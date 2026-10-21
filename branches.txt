@@ -1,0 +1,70 @@
+Branches with Zupona AI code (newest first)
+2026-10-21  origin/task-11-12-ui-release-audit-20261021  —  Add orchestration CI evidence and clarify workflow duplication
+2026-10-21  origin/task-06-durable-project-storage-20261021  —  Fix storage documentation formatting
+2026-10-21  origin/task-02-audit-ci-rebased-20261021  —  docs(ai): record specialist-agent origin guard follow-up
+2026-10-21  origin/task-01-security-review-clean-20261021  —  docs: record latest failed dependency audit rerun
+2026-10-21  origin/task-01-security-isolation-review-20261021  —  docs: record TASK 01 AI isolation and dependency review
+2026-10-21  origin/security/dependency-remediation-20261021  —  fix(security): update vulnerable dependencies
+2026-10-21  origin/security/bounded-ai-request-bodies-v6-20261020  —  test(ai): reject non-canonical origin values
+2026-10-21  origin/integrate/ai-staging-isolation-20261021  —  docs: define AI staging isolation contract and release gates
+2026-10-21  origin/fix/task04-transcription-contract-20261021  —  Test overlapping transcription timestamps as review warnings
+2026-10-21  origin/fix/documentary-media-search-normalization-20261021  —  ci(ai): avoid duplicate FFmpeg installation
+2026-10-21  origin/fix/documentary-coverage-reliability-current-base  —  test(documentary): follow memoized selected renderer assets
+2026-10-21  origin/fix/documentary-agent-verdict-safety  —  Clarify batch completion versus effective verdicts
+2026-10-21  origin/fix/documentary-agent-role-scope-tests  —  Document source-context requirements for verdict parser
+2026-10-21  origin/fix/documentary-agent-role-scope-only  —  Align visual accessibility test with evidence-based mission
+2026-10-21  origin/fix/documentary-agent-partial-failure-ui-v2  —  Add focused CI for partial specialist failure UI
+2026-10-21  origin/fix/documentary-agent-partial-failure-ui  —  Add regression for preserving partial reviewer failure details
+2026-10-21  origin/fix/ai-worker-isolation-staging  —  Run AI Worker isolation guard in CI
+2026-10-21  origin/fix/ai-staging-route-allowlist  —  fix: allow and assert disabled staging preview URLs
+2026-10-21  origin/feat/task03-video-composer-e2e-v3-20261021  —  Add explicit stable scene mapping to latest renderer utility
+2026-10-21  origin/feat/task03-video-composer-e2e-v2-20261021  —  Cover unsupported AVI footage rejection
+2026-10-21  origin/feat/task03-video-composer-e2e-20261021  —  Enable CI for stacked renderer integration PR
+2026-10-21  origin/feat/staging-qa-release-gate-task10  —  ci(ai): remove duplicate ffmpeg installation step
+2026-10-21  origin/feat/specialist-agent-orchestration-task09  —  security(ai): align shared origin helper for integration
+2026-10-21  origin/feat/reliability-tasks-04-08-20261021  —  Narrow legacy backup version IDs before creating R2 metadata
+2026-10-21  origin/feat/documentary-tool-registry-20261021  —  Remove duplicate evidence contract CI path filters
+2026-10-21  origin/feat/documentary-renderer-1080p-output-20261021  —  ci(documentary): install FFmpeg only once in renderer checks
+2026-10-21  origin/feat/documentary-media-connection-status-20261021  —  Lint media provider status helper in CI
+2026-10-21  origin/audit/task05-media-rights-evidence-pr43-20261021  —  docs: document fail-closed attribution evidence
+2026-10-20  origin/test/documentary-dynamic-chain-invariants-20261020b  —  docs(documentary): record dependency and squad invariants
+2026-10-20  origin/test/documentary-chain-regression-guards-final-20261020  —  docs(documentary): record QA squad and dependency invariants
+2026-10-20  origin/test/documentary-chain-regression-guards-20261020  —  docs(documentary): record QA squad and dependency invariants
+2026-10-20  origin/test/documentary-chain-invariants-after-type-fix-20261020  —  docs(documentary): format chain invariants cleanly
+2026-10-20  origin/test/documentary-chain-guards-on-type-fix-v4-20261020  —  ci(documentary): skip renderer test until harness files exist
+2026-10-20  origin/test/documentary-chain-guardrails-followup-20261020  —  Preserve latest base workflow and run dynamic-chain CI
+2026-10-20  origin/task-02-codebase-audit-ci  —  fix: escape apostrophe in image auto-fit setting
+2026-10-20  origin/security/bounded-ai-request-bodies-v5-20261020  —  ci(ai): run bounded request-body security tests
+2026-10-20  origin/security/bounded-ai-request-bodies-v4-20261020  —  ci(ai): run bounded request-body security tests
+2026-10-20  origin/security/bounded-ai-request-bodies-v3-20261020  —  ci(ai): run bounded request-body security tests
+2026-10-20  origin/security/bounded-ai-request-bodies-v2-20261020  —  ci(ai): run bounded body tests through npm script
+2026-10-20  origin/security/bounded-ai-request-bodies-20261020  —  test(ai): guard Claude Sonnet 5 sampling compatibility
+2026-10-20  origin/fix/renderer-utils-js-syntax-20261020  —  fix: use valid JavaScript syntax in MP4 verifier
+2026-10-20  origin/fix/planned-role-squad-id-type-v6-20261020  —  ci(documentary): report missing renderer harness without aborting planner checks
+2026-10-20  origin/fix/planned-role-squad-id-type-v4-20261020  —  ci(documentary): enable checks for isolated feature PRs
+2026-10-20  origin/fix/planned-role-squad-id-type-v3-20261020  —  ci(documentary): enable checks for feature branch PRs
+2026-10-20  origin/fix/planned-role-squad-id-type-v2-20261020  —  ci(documentary): run workspace checks on feature branch pull requests
+2026-10-20  origin/fix/planned-role-squad-id-type-20261020  —  Test that skipped prerequisites do not pass dependency gates
+2026-10-20  origin/fix/dynamic-chain-quality-squad-ids-v5-20261020  —  ci(documentary): run QA ID regression checks on feature PRs
+2026-10-20  origin/fix/dynamic-chain-quality-squad-ids-v4-20261020  —  test(documentary): provide squad IDs in dependency-wave fixtures
+2026-10-20  origin/fix/dynamic-chain-quality-squad-ids-v3-20261020  —  fix(documentary): correct quality squad comparison
+2026-10-20  origin/fix/dynamic-chain-quality-squad-ids-v2-20261020  —  ci(documentary): enable checks for dynamic-chain feature PRs
+2026-10-20  origin/fix/dynamic-chain-quality-squad-ids-20261020  —  ci(documentary): run dynamic-chain checks on isolated feature PRs
+2026-10-20  origin/fix/documentary-scene-coverage-20261020  —  Keep coverage preflight consistent for mixed filenames
+2026-10-20  origin/fix/documentary-planned-role-squad-type-20261020  —  Keep long-form trigger tests separate from prerequisite gates
+2026-10-20  origin/fix/documentary-dynamic-chain-quality-squad-20261020  —  test(documentary): assert canonical quality release gate
+2026-10-20  origin/fix/documentary-dynamic-chain-quality-id-followup-20261020  —  docs(documentary): record dependency and squad invariants
+2026-10-20  origin/fix/documentary-dynamic-chain-quality-id-final-20261020  —  docs(documentary): record dependency and squad invariants
+2026-10-20  origin/fix/documentary-dynamic-chain-quality-id-20261020  —  docs(documentary): explain dependency wave safety
+2026-10-20  origin/fix/documentary-dynamic-chain-final-validation-20261020  —  ci(documentary): enable checks on feature follow-up
+2026-10-20  origin/fix/documentary-chain-type-deps-ci-20261020  —  ci(documentary): run validation on follow-up branch pushes
+2026-10-20  origin/fix/documentary-chain-role-type-and-guards-20261020  —  docs(documentary): define dependency-wave type contract
+2026-10-20  origin/fix/documentary-agent-verdicts-20261020  —  Summarize review and unknown verdicts in full agent batch
+2026-10-20  origin/fix/deep-research-expired-poll-state-v2-20261020  —  test(ai): cover Deep Research polling failure statuses
+2026-10-20  origin/fix/deep-research-expired-poll-state-20261020  —  ci(ai): lint Deep Research polling helper
+2026-10-20  origin/feature/ai-studio-private-v1  —  Return 401 for unauthorized AI API requests
+2026-10-20  origin/feat/documentary-dynamic-chain-20261020  —  Assert the actual video-only and audio MP4 fixture byte fields
+2026-10-20  origin/audit/task05-media-rights-evidence-20261021  —  fix: clean up AAC MP4 browser test fixture setup
+2026-10-20  origin/audit/registry-roster-header-20261020  —  docs(ai): correct specialist registry header count
+2026-10-20  origin/audit/agent-roster-doc-sync-20261020  —  ci(ai): run workspace checks for AI branch pull requests
+2026-10-20  origin/ai-platform-foundation  —  fix: clean up AAC MP4 browser test fixture setup
