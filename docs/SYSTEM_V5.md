@@ -62,7 +62,7 @@ Automatic checks (`GATES`):
 | Music policy | Nothing under Quran recitation or quotations; no instruments where the policy says so |
 | Visual adab | No depiction of prophets, Companions, angels or Allah; in recitation videos also no people, AI-made people or animals, or Paradise and Hell imagery |
 | Version purity | Each version's narration, captions and titles in its own language and script only |
-| Fiction label | An invented story carries the label from 0:00, in the description and in every Short |
+| Fiction label | An invented story is never called true or tied to a real person; a one-line dramatization note goes in the description only, nothing on screen |
 | AI disclosure | Every photoreal AI scene is listed for YouTube's disclosure |
 | Voice preservation | The owner's voice is never pitch-shifted, sped up, re-synthesised or echoed; the original is kept |
 | Loudness | Master at −14 LUFS (±1), true peak at or below −1 dBTP |
@@ -224,7 +224,7 @@ A study of more than 50,000 AI stories found that the bigger giveaways are expla
 - **Inauthentic content.** In July 2025 YouTube renamed "repetitious content" to "inauthentic content". It names channels that upload narrative stories with only superficial differences between them. Every story must therefore differ in premise, structure, characters and visuals.
 - **Disclosure.** Realistic synthetic scenes must be disclosed, and since May 2026 YouTube also labels photoreal AI automatically.
 - **Enforcement.** A channel that told AI-invented crimes as fact was removed. Fake-trailer channels were terminated once they dropped their "fan-made" labels.
-- **The fiction label.** Hence the fiction label (`FICTION_LABELS`, written natively in all three languages), shown from 0:00, in the description and in every Short.
+- **No label on screen (owner's decision, 30 Oct 2026).** Nothing is written on the video, because on-screen labels drive viewers away and no YouTube rule requires one. What keeps the channel safe instead: an invented story is never called true or tied to a real person, its description ends with a one-line dramatization note (`FICTION_LABELS`, written natively in all three languages), and photoreal AI scenes are disclosed in YouTube Studio. When the owner wants a real person's story, documentary mode tells it from sources.
 
 **Fantasy (a dragon).**
 

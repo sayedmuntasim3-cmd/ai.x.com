@@ -24,7 +24,7 @@ export const GATES = Object.freeze({
   "music-policy": "Nothing under Quran recitation or quotations; no instruments where the policy is no-instruments; licensed tracks only.",
   "visual-adab": "No depiction of prophets, Companions, angels or Allah; in recitation videos also no people, AI-generated people or animals, or Paradise and Hell imagery.",
   "version-purity": "Each version's narration, captions and titles are in its own language and script only.",
-  "fiction-label": "An invented story carries the fiction label from 0:00, in the description and in every Short, and is never called true.",
+  "fiction-label": "An invented story is never called true or based on a real person; its description carries a one-line dramatization note. Nothing is written on screen.",
   "ai-disclosure": "Every photoreal AI scene is listed for YouTube's altered or synthetic content disclosure.",
   "voice-preservation": "The owner's voice is never pitch-shifted, sped up, re-synthesised or given echoes; the original is kept.",
   loudness: "The master measures -14 LUFS (within 1 LU) with true peak at or below -1 dBTP.",

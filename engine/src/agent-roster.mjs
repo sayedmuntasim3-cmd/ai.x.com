@@ -253,7 +253,7 @@ export const SQUADS = Object.freeze([
       ["narration-writer", "Narration Writer", "Write spoken, human narration in each version's language.", "Narration per version."],
       ["realism-auditor", "Realism & Anti-Robotic Auditor", "Catch stock phrases, uniform sentences, \"and then\" chains and stated morals, and rewrite them.", "A lint report and rewrites."],
       ["ai-scene-director", "AI Scene Director", "Generate only the shots stock footage cannot supply (a dragon, a lost city) from one character bible and the same reference images, through whichever video model is available, and mark every one for disclosure.", "Generated shots with their prompts, references and disclosure flags."],
-      ["fiction-label-guard", "Fiction Label & Ethics Guard", "Keep the fiction label on screen from 0:00, in the description and in Shorts; never \"true story\"; disclose photoreal AI scenes.", "A label checklist."],
+      ["fiction-label-guard", "Fiction Label & Ethics Guard", "Keep the film free of on-screen labels while never calling an invented story true: a one-line note in the description, real-person stories told from sources, photoreal AI scenes disclosed in YouTube Studio.", "A label checklist."],
     ],
   },
   {

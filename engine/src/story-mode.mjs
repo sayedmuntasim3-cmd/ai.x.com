@@ -2,23 +2,27 @@
  * Idea mode: a one-line premise ("started with $50 and bought a Rolls-Royce")
  * becomes an original, movie-like story. This module holds the parts that
  * must be the same every time: the beat plan with its hooks and twists, the
- * fiction label, the realism rules and the checks that catch robotic
+ * description note, the realism rules and the checks that catch robotic
  * writing and money that does not add up. The writing itself is done by the
  * screenplay agents, inside these rules.
  */
 import { planRetention } from "./documentary-engine-core.mjs";
 import { checkVersionPurity, getVersion } from "./versions.mjs";
 
-/** Shown on screen from 0:00, first line of the description and every Short. */
+/**
+ * One line for the end of the video description (never on screen), so an
+ * invented story is not passed off as true. Stories of real people are not
+ * labelled; they are told from sources (documentary mode).
+ */
 export const FICTION_LABELS = Object.freeze({
-  "en-US": "A fictional story. Any resemblance to real people is coincidental.",
-  "bn-BD": "এটি একটি কাল্পনিক গল্প। বাস্তবের কোনো মানুষের সঙ্গে মিল থাকলে তা কাকতালীয়।",
-  ar: "قصة خيالية، وأي تشابه مع أشخاص حقيقيين محض مصادفة.",
+  "en-US": "Dramatized story. Characters and events are created for this film.",
+  "bn-BD": "নাটকীয় রূপে বলা গল্প। চরিত্র ও ঘটনা এই ভিডিওর জন্য তৈরি।",
+  ar: "قصة مروية بأسلوب درامي، شخصياتها وأحداثها من صنع هذا الفيلم.",
 });
 
 /** Rules every story follows; the realism auditor and the label guard check them. */
 export const STORY_RULES = Object.freeze([
-  "Never call an invented story true, and keep the fiction label from 0:00, in the description and in every Short.",
+  "Never call an invented story true or attach it to a real person; no label on screen, a one-line dramatization note in the description. To tell a real person's story, use documentary mode and its sources.",
   "No real private people, no real town as a crime scene, no real company as a villain, no cloned voice of a real person.",
   "Beats connect with \"but\" or \"therefore\", never \"and then\".",
   "The hero fails at least once through his own fault, and the win costs him something.",
@@ -81,12 +85,13 @@ export function planStory({ durationSeconds, versionId }) {
   const d = Math.round(durationSeconds);
   /** @param {number} share */
   const at = (share) => Math.round(d * share);
-  const label = FICTION_LABELS[version.id];
+  const descriptionNote = FICTION_LABELS[version.id];
 
   if (d <= 180) {
     return {
       format: "short",
-      label,
+      descriptionNote,
+      onScreenLabel: false,
       beats: [
         { id: "hook", atSeconds: 0, purpose: "The impossible image and one spoken question, inside 3 seconds; no intro." },
         { id: "want-and-wound", atSeconds: 3, purpose: "What he lacks and what he wants, one line each." },
@@ -118,7 +123,7 @@ export function planStory({ durationSeconds, versionId }) {
   ];
   beats.sort((a, b) => a.atSeconds - b.atSeconds);
   const reHooks = retention.beats.filter((b) => b.kind === "segment-reset").map((b) => b.atSeconds);
-  return { format: "long", label, beats, reHooks, rules: STORY_RULES };
+  return { format: "long", descriptionNote, onScreenLabel: false, beats, reHooks, rules: STORY_RULES };
 }
 
 const ROBOTIC_PHRASES = Object.freeze([

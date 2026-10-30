@@ -5,8 +5,13 @@ import { AGENTS, SQUADS, getAgent } from "../src/agent-roster.mjs";
 import { GATES, planRun } from "../src/pipeline.mjs";
 import { checkVersionPurity, VERSION_IDS } from "../src/versions.mjs";
 
-test("every version has a fiction label written in its own language", () => {
+test("stories carry no on-screen label, only a description note in each language", () => {
   for (const id of VERSION_IDS) assert.equal(checkVersionPurity(FICTION_LABELS[id], id).ok, true, id);
+  for (const d of [45, 2700]) {
+    const plan = planStory({ durationSeconds: d, versionId: "bn-BD" });
+    assert.equal(plan.onScreenLabel, false);
+    assert.equal(plan.descriptionNote, FICTION_LABELS["bn-BD"]);
+  }
 });
 
 test("a Short hooks inside 3 seconds and ends on a line that loops back", () => {
