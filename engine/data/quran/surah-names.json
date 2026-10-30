@@ -1,0 +1,914 @@
+[
+ {
+  "number": 1,
+  "arabic": "الفاتحة",
+  "arabicVocalized": "الفَاتِحة",
+  "transliteration": "Al-Faatiha",
+  "englishMeaning": "The Opening",
+  "banglaMeaning": "সূচনা"
+ },
+ {
+  "number": 2,
+  "arabic": "البقرة",
+  "arabicVocalized": "البَقَرَة",
+  "transliteration": "Al-Baqara",
+  "englishMeaning": "The Cow",
+  "banglaMeaning": "বকনা-বাছুর"
+ },
+ {
+  "number": 3,
+  "arabic": "آل عمران",
+  "arabicVocalized": "آل عِمران",
+  "transliteration": "Aal-i-Imraan",
+  "englishMeaning": "The Family of Imraan",
+  "banglaMeaning": "ইমরানের পরিবার"
+ },
+ {
+  "number": 4,
+  "arabic": "النساء",
+  "arabicVocalized": "النِّسَاء",
+  "transliteration": "An-Nisaa",
+  "englishMeaning": "The Women",
+  "banglaMeaning": "নারী"
+ },
+ {
+  "number": 5,
+  "arabic": "المائدة",
+  "arabicVocalized": "المَائدة",
+  "transliteration": "Al-Maaida",
+  "englishMeaning": "The Table",
+  "banglaMeaning": "খাদ্য পরিবেশিত টেবিল"
+ },
+ {
+  "number": 6,
+  "arabic": "الأنعام",
+  "arabicVocalized": "الأنعَام",
+  "transliteration": "Al-An'aam",
+  "englishMeaning": "The Cattle",
+  "banglaMeaning": "গৃহপালিত পশু"
+ },
+ {
+  "number": 7,
+  "arabic": "الأعراف",
+  "arabicVocalized": "الأعرَاف",
+  "transliteration": "Al-A'raaf",
+  "englishMeaning": "The Heights",
+  "banglaMeaning": "উচু স্থান"
+ },
+ {
+  "number": 8,
+  "arabic": "الأنفال",
+  "arabicVocalized": "الأنفَال",
+  "transliteration": "Al-Anfaal",
+  "englishMeaning": "The Spoils of War",
+  "banglaMeaning": "যুদ্ধ-লব্ধ ধনসম্পদ"
+ },
+ {
+  "number": 9,
+  "arabic": "التوبة",
+  "arabicVocalized": "التوبَة",
+  "transliteration": "At-Tawba",
+  "englishMeaning": "The Repentance",
+  "banglaMeaning": "অনুশোচনা"
+ },
+ {
+  "number": 10,
+  "arabic": "يونس",
+  "arabicVocalized": "يُونس",
+  "transliteration": "Yunus",
+  "englishMeaning": "Jonas",
+  "banglaMeaning": "নবী ইউনুস"
+ },
+ {
+  "number": 11,
+  "arabic": "هود",
+  "arabicVocalized": "هُود",
+  "transliteration": "Hud",
+  "englishMeaning": "Hud",
+  "banglaMeaning": "নবী হুদ"
+ },
+ {
+  "number": 12,
+  "arabic": "يوسف",
+  "arabicVocalized": "يُوسُف",
+  "transliteration": "Yusuf",
+  "englishMeaning": "Joseph",
+  "banglaMeaning": "নবী ইউসুফ"
+ },
+ {
+  "number": 13,
+  "arabic": "الرعد",
+  "arabicVocalized": "الرَّعد",
+  "transliteration": "Ar-Ra'd",
+  "englishMeaning": "The Thunder",
+  "banglaMeaning": "বজ্রপাত"
+ },
+ {
+  "number": 14,
+  "arabic": "إبراهيم",
+  "arabicVocalized": "إبراهِيم",
+  "transliteration": "Ibrahim",
+  "englishMeaning": "Abraham",
+  "banglaMeaning": "নবী ইবরাহীম"
+ },
+ {
+  "number": 15,
+  "arabic": "الحجر",
+  "arabicVocalized": "الحِجر",
+  "transliteration": "Al-Hijr",
+  "englishMeaning": "The Rock",
+  "banglaMeaning": "পাথুরে পাহাড়"
+ },
+ {
+  "number": 16,
+  "arabic": "النحل",
+  "arabicVocalized": "النَّحل",
+  "transliteration": "An-Nahl",
+  "englishMeaning": "The Bee",
+  "banglaMeaning": "মৌমাছি"
+ },
+ {
+  "number": 17,
+  "arabic": "الإسراء",
+  "arabicVocalized": "الإسرَاء",
+  "transliteration": "Al-Israa",
+  "englishMeaning": "The Night Journey",
+  "banglaMeaning": "ইহুদি জাতি"
+ },
+ {
+  "number": 18,
+  "arabic": "الكهف",
+  "arabicVocalized": "الكَهف",
+  "transliteration": "Al-Kahf",
+  "englishMeaning": "The Cave",
+  "banglaMeaning": "গুহা"
+ },
+ {
+  "number": 19,
+  "arabic": "مريم",
+  "arabicVocalized": "مَريَم",
+  "transliteration": "Maryam",
+  "englishMeaning": "Mary",
+  "banglaMeaning": "মারইয়াম (ঈসা নবীর মা)"
+ },
+ {
+  "number": 20,
+  "arabic": "طه",
+  "arabicVocalized": "طه",
+  "transliteration": "Taa-Haa",
+  "englishMeaning": "Taa-Haa",
+  "banglaMeaning": "ত়া হা"
+ },
+ {
+  "number": 21,
+  "arabic": "الأنبياء",
+  "arabicVocalized": "الأنبيَاء",
+  "transliteration": "Al-Anbiyaa",
+  "englishMeaning": "The Prophets",
+  "banglaMeaning": "নবীগণ"
+ },
+ {
+  "number": 22,
+  "arabic": "الحج",
+  "arabicVocalized": "الحج",
+  "transliteration": "Al-Hajj",
+  "englishMeaning": "The Pilgrimage",
+  "banglaMeaning": "হ়াজ্জ"
+ },
+ {
+  "number": 23,
+  "arabic": "المؤمنون",
+  "arabicVocalized": "المؤمنُون",
+  "transliteration": "Al-Muminoon",
+  "englishMeaning": "The Believers",
+  "banglaMeaning": "বিশ্বাসী"
+ },
+ {
+  "number": 24,
+  "arabic": "النور",
+  "arabicVocalized": "النور",
+  "transliteration": "An-Noor",
+  "englishMeaning": "The Light",
+  "banglaMeaning": "আলো"
+ },
+ {
+  "number": 25,
+  "arabic": "الفرقان",
+  "arabicVocalized": "الفُرقَان",
+  "transliteration": "Al-Furqaan",
+  "englishMeaning": "The Criterion",
+  "banglaMeaning": "মানদণ্ড"
+ },
+ {
+  "number": 26,
+  "arabic": "الشعراء",
+  "arabicVocalized": "الشعراء",
+  "transliteration": "Ash-Shu'araa",
+  "englishMeaning": "The Poets",
+  "banglaMeaning": "কবি"
+ },
+ {
+  "number": 27,
+  "arabic": "النمل",
+  "arabicVocalized": "النَّمل",
+  "transliteration": "An-Naml",
+  "englishMeaning": "The Ant",
+  "banglaMeaning": "পিঁপড়া"
+ },
+ {
+  "number": 28,
+  "arabic": "القصص",
+  "arabicVocalized": "القَصَص",
+  "transliteration": "Al-Qasas",
+  "englishMeaning": "The Stories",
+  "banglaMeaning": "কাহিনি"
+ },
+ {
+  "number": 29,
+  "arabic": "العنكبوت",
+  "arabicVocalized": "العَنكبُوت",
+  "transliteration": "Al-Ankaboot",
+  "englishMeaning": "The Spider",
+  "banglaMeaning": "মাকড়শা"
+ },
+ {
+  "number": 30,
+  "arabic": "الروم",
+  "arabicVocalized": "الرُّوم",
+  "transliteration": "Ar-Room",
+  "englishMeaning": "The Romans",
+  "banglaMeaning": "রোমান জাতি"
+ },
+ {
+  "number": 31,
+  "arabic": "لقمان",
+  "arabicVocalized": "لُقمَان",
+  "transliteration": "Luqman",
+  "englishMeaning": "Luqman",
+  "banglaMeaning": "এক জ্ঞানী ব্যাক্তি"
+ },
+ {
+  "number": 32,
+  "arabic": "السجدة",
+  "arabicVocalized": "السَّجدة",
+  "transliteration": "As-Sajda",
+  "englishMeaning": "The Prostration",
+  "banglaMeaning": "সিজদা"
+ },
+ {
+  "number": 33,
+  "arabic": "الأحزاب",
+  "arabicVocalized": "الأحزَاب",
+  "transliteration": "Al-Ahzaab",
+  "englishMeaning": "The Clans",
+  "banglaMeaning": "জোট"
+ },
+ {
+  "number": 34,
+  "arabic": "سبإ",
+  "arabicVocalized": "سَبإ",
+  "transliteration": "Saba",
+  "englishMeaning": "Sheba",
+  "banglaMeaning": "রানী সাবা/শেবা"
+ },
+ {
+  "number": 35,
+  "arabic": "فاطر",
+  "arabicVocalized": "فَاطِر",
+  "transliteration": "Faatir",
+  "englishMeaning": "The Originator",
+  "banglaMeaning": "আদি স্রষ্টা"
+ },
+ {
+  "number": 36,
+  "arabic": "يس",
+  "arabicVocalized": "يسٓ",
+  "transliteration": "Yaseen",
+  "englishMeaning": "Yaseen",
+  "banglaMeaning": "ইয়াসীন"
+ },
+ {
+  "number": 37,
+  "arabic": "الصافات",
+  "arabicVocalized": "الصَّافَات",
+  "transliteration": "As-Saaffaat",
+  "englishMeaning": "Those drawn up in Ranks",
+  "banglaMeaning": "সারিবদ্ধভাবে দাঁড়ানো"
+ },
+ {
+  "number": 38,
+  "arabic": "ص",
+  "arabicVocalized": "صٓ",
+  "transliteration": "Saad",
+  "englishMeaning": "The letter Saad",
+  "banglaMeaning": "আরবি বর্ণ সাদ"
+ },
+ {
+  "number": 39,
+  "arabic": "الزمر",
+  "arabicVocalized": "الزُّمَر",
+  "transliteration": "Az-Zumar",
+  "englishMeaning": "The Groups",
+  "banglaMeaning": "দলবদ্ধ জনতা"
+ },
+ {
+  "number": 40,
+  "arabic": "غافر",
+  "arabicVocalized": "غَافِر",
+  "transliteration": "Al-Ghaafir",
+  "englishMeaning": "The Forgiver",
+  "banglaMeaning": "ক্ষমাকারী"
+ },
+ {
+  "number": 41,
+  "arabic": "فصلت",
+  "arabicVocalized": "فُصِّلَت",
+  "transliteration": "Fussilat",
+  "englishMeaning": "Explained in detail",
+  "banglaMeaning": "সুস্পষ্ট বিবরণ"
+ },
+ {
+  "number": 42,
+  "arabic": "الشورى",
+  "arabicVocalized": "الشُّورى",
+  "transliteration": "Ash-Shura",
+  "englishMeaning": "Consultation",
+  "banglaMeaning": "পরামর্শ"
+ },
+ {
+  "number": 43,
+  "arabic": "الزخرف",
+  "arabicVocalized": "الزُّخرُف",
+  "transliteration": "Az-Zukhruf",
+  "englishMeaning": "Ornaments of gold",
+  "banglaMeaning": "সোনাদানা"
+ },
+ {
+  "number": 44,
+  "arabic": "الدخان",
+  "arabicVocalized": "الدُّخان",
+  "transliteration": "Ad-Dukhaan",
+  "englishMeaning": "The Smoke",
+  "banglaMeaning": "ধোঁয়া"
+ },
+ {
+  "number": 45,
+  "arabic": "الجاثية",
+  "arabicVocalized": "الجاثِية",
+  "transliteration": "Al-Jaathiya",
+  "englishMeaning": "Crouching",
+  "banglaMeaning": "নতজানু"
+ },
+ {
+  "number": 46,
+  "arabic": "الأحقاف",
+  "arabicVocalized": "الأحقَاف",
+  "transliteration": "Al-Ahqaf",
+  "englishMeaning": "The Dunes",
+  "banglaMeaning": "বালুর পাহাড়"
+ },
+ {
+  "number": 47,
+  "arabic": "محمد",
+  "arabicVocalized": "مُحمد",
+  "transliteration": "Muhammad",
+  "englishMeaning": "Muhammad",
+  "banglaMeaning": "নবী মুহাম্মদ"
+ },
+ {
+  "number": 48,
+  "arabic": "الفتح",
+  "arabicVocalized": "الفَتح",
+  "transliteration": "Al-Fath",
+  "englishMeaning": "The Victory",
+  "banglaMeaning": "বিজয়"
+ },
+ {
+  "number": 49,
+  "arabic": "الحجرات",
+  "arabicVocalized": "الحُجُرَات",
+  "transliteration": "Al-Hujuraat",
+  "englishMeaning": "The Inner Apartments",
+  "banglaMeaning": "আবাস"
+ },
+ {
+  "number": 50,
+  "arabic": "ق",
+  "arabicVocalized": "قٓ",
+  "transliteration": "Qaaf",
+  "englishMeaning": "The letter Qaaf",
+  "banglaMeaning": "কাফ"
+ },
+ {
+  "number": 51,
+  "arabic": "الذاريات",
+  "arabicVocalized": "الذَّاريَات",
+  "transliteration": "Adh-Dhaariyat",
+  "englishMeaning": "The Winnowing Winds",
+  "banglaMeaning": "বিক্ষেপকারী বাতাস"
+ },
+ {
+  "number": 52,
+  "arabic": "الطور",
+  "arabicVocalized": "الطُّور",
+  "transliteration": "At-Tur",
+  "englishMeaning": "The Mount",
+  "banglaMeaning": "পাহাড়"
+ },
+ {
+  "number": 53,
+  "arabic": "النجم",
+  "arabicVocalized": "النَّجم",
+  "transliteration": "An-Najm",
+  "englishMeaning": "The Star",
+  "banglaMeaning": "তারা"
+ },
+ {
+  "number": 54,
+  "arabic": "القمر",
+  "arabicVocalized": "القَمَر",
+  "transliteration": "Al-Qamar",
+  "englishMeaning": "The Moon",
+  "banglaMeaning": "চাঁদ"
+ },
+ {
+  "number": 55,
+  "arabic": "الرحمن",
+  "arabicVocalized": "الرَّحمٰن",
+  "transliteration": "Ar-Rahmaan",
+  "englishMeaning": "The Beneficent",
+  "banglaMeaning": "পরম করুণাময়"
+ },
+ {
+  "number": 56,
+  "arabic": "الواقعة",
+  "arabicVocalized": "الوَاقِعة",
+  "transliteration": "Al-Waaqia",
+  "englishMeaning": "The Inevitable",
+  "banglaMeaning": "নিশ্চিত ঘটনা"
+ },
+ {
+  "number": 57,
+  "arabic": "الحديد",
+  "arabicVocalized": "الحدِيد",
+  "transliteration": "Al-Hadid",
+  "englishMeaning": "The Iron",
+  "banglaMeaning": "লোহা"
+ },
+ {
+  "number": 58,
+  "arabic": "المجادلة",
+  "arabicVocalized": "المُجَادلة",
+  "transliteration": "Al-Mujaadila",
+  "englishMeaning": "The Pleading Woman",
+  "banglaMeaning": "অনুযোগকারিণী"
+ },
+ {
+  "number": 59,
+  "arabic": "الحشر",
+  "arabicVocalized": "الحَشر",
+  "transliteration": "Al-Hashr",
+  "englishMeaning": "The Exile",
+  "banglaMeaning": "সমাবেশ"
+ },
+ {
+  "number": 60,
+  "arabic": "الممتحنة",
+  "arabicVocalized": "المُمتَحنَة",
+  "transliteration": "Al-Mumtahana",
+  "englishMeaning": "She that is to be examined",
+  "banglaMeaning": "নারী, যাকে পরীক্ষা করা হবে"
+ },
+ {
+  "number": 61,
+  "arabic": "الصف",
+  "arabicVocalized": "الصَّف",
+  "transliteration": "As-Saff",
+  "englishMeaning": "The Ranks",
+  "banglaMeaning": "সারিবদ্ধ সৈন্যদল"
+ },
+ {
+  "number": 62,
+  "arabic": "الجمعة",
+  "arabicVocalized": "الجُمعَة",
+  "transliteration": "Al-Jumu'a",
+  "englishMeaning": "Friday",
+  "banglaMeaning": "সম্মেলন/শুক্রবার"
+ },
+ {
+  "number": 63,
+  "arabic": "المنافقون",
+  "arabicVocalized": "المُنَافِقُونَ",
+  "transliteration": "Al-Munaafiqoon",
+  "englishMeaning": "The Hypocrites",
+  "banglaMeaning": "ভণ্ড বিশ্বাসী"
+ },
+ {
+  "number": 64,
+  "arabic": "التغابن",
+  "arabicVocalized": "التغَابُن",
+  "transliteration": "At-Taghaabun",
+  "englishMeaning": "Mutual Disillusion",
+  "banglaMeaning": "মোহ অপসারণ"
+ },
+ {
+  "number": 65,
+  "arabic": "الطلاق",
+  "arabicVocalized": "الطَّلَاق",
+  "transliteration": "At-Talaaq",
+  "englishMeaning": "Divorce",
+  "banglaMeaning": "তালাক"
+ },
+ {
+  "number": 66,
+  "arabic": "التحريم",
+  "arabicVocalized": "التَّحرِيم",
+  "transliteration": "At-Tahrim",
+  "englishMeaning": "The Prohibition",
+  "banglaMeaning": "নিষিদ্ধকরণ"
+ },
+ {
+  "number": 67,
+  "arabic": "الملك",
+  "arabicVocalized": "المُلك",
+  "transliteration": "Al-Mulk",
+  "englishMeaning": "The Sovereignty",
+  "banglaMeaning": "সার্বভৌম কর্তৃত্ব"
+ },
+ {
+  "number": 68,
+  "arabic": "القلم",
+  "arabicVocalized": "القَلَم",
+  "transliteration": "Al-Qalam",
+  "englishMeaning": "The Pen",
+  "banglaMeaning": "কলম"
+ },
+ {
+  "number": 69,
+  "arabic": "الحاقة",
+  "arabicVocalized": "الحَاقة",
+  "transliteration": "Al-Haaqqa",
+  "englishMeaning": "The Reality",
+  "banglaMeaning": "নিশ্চিত সত্য"
+ },
+ {
+  "number": 70,
+  "arabic": "المعارج",
+  "arabicVocalized": "المَعَارج",
+  "transliteration": "Al-Ma'aarij",
+  "englishMeaning": "The Ascending Stairways",
+  "banglaMeaning": "উন্নয়নের সোপান"
+ },
+ {
+  "number": 71,
+  "arabic": "نوح",
+  "arabicVocalized": "نُوح",
+  "transliteration": "Nooh",
+  "englishMeaning": "Noah",
+  "banglaMeaning": "নবী নূহ"
+ },
+ {
+  "number": 72,
+  "arabic": "الجن",
+  "arabicVocalized": "الجِن",
+  "transliteration": "Al-Jinn",
+  "englishMeaning": "The Jinn",
+  "banglaMeaning": "জিন সম্প্রদায়"
+ },
+ {
+  "number": 73,
+  "arabic": "المزمل",
+  "arabicVocalized": "المُزمل",
+  "transliteration": "Al-Muzzammil",
+  "englishMeaning": "The Enshrouded One",
+  "banglaMeaning": "বস্ত্রাচ্ছাদনকারী"
+ },
+ {
+  "number": 74,
+  "arabic": "المدثر",
+  "arabicVocalized": "المُدثر",
+  "transliteration": "Al-Muddaththir",
+  "englishMeaning": "The Cloaked One",
+  "banglaMeaning": "পোশাক পরিহিত"
+ },
+ {
+  "number": 75,
+  "arabic": "القيامة",
+  "arabicVocalized": "القِيَامة",
+  "transliteration": "Al-Qiyaama",
+  "englishMeaning": "The Resurrection",
+  "banglaMeaning": "পুনরুত্থান"
+ },
+ {
+  "number": 76,
+  "arabic": "الإنسان",
+  "arabicVocalized": "الإنسَان",
+  "transliteration": "Al-Insaan",
+  "englishMeaning": "Man",
+  "banglaMeaning": "মানবজাতি"
+ },
+ {
+  "number": 77,
+  "arabic": "المرسلات",
+  "arabicVocalized": "المُرسَلات",
+  "transliteration": "Al-Mursalaat",
+  "englishMeaning": "The Emissaries",
+  "banglaMeaning": "প্রেরিত পুরুষ"
+ },
+ {
+  "number": 78,
+  "arabic": "النبإ",
+  "arabicVocalized": "النَّبَإ",
+  "transliteration": "An-Naba",
+  "englishMeaning": "The Announcement",
+  "banglaMeaning": "মহাসংবাদ"
+ },
+ {
+  "number": 79,
+  "arabic": "النازعات",
+  "arabicVocalized": "النَّازعَات",
+  "transliteration": "An-Naazi'aat",
+  "englishMeaning": "Those who drag forth",
+  "banglaMeaning": "প্রচেষ্টাকারী"
+ },
+ {
+  "number": 80,
+  "arabic": "عبس",
+  "arabicVocalized": "عَبَسَ",
+  "transliteration": "Abasa",
+  "englishMeaning": "He frowned",
+  "banglaMeaning": "সে ভ্রু কুঁচকালো"
+ },
+ {
+  "number": 81,
+  "arabic": "التكوير",
+  "arabicVocalized": "التَّكوير",
+  "transliteration": "At-Takwir",
+  "englishMeaning": "The Overthrowing",
+  "banglaMeaning": "অন্ধকারাচ্ছন্ন"
+ },
+ {
+  "number": 82,
+  "arabic": "الانفطار",
+  "arabicVocalized": "الانفِطَار",
+  "transliteration": "Al-Infitaar",
+  "englishMeaning": "The Cleaving",
+  "banglaMeaning": "বিদীর্ণ করা"
+ },
+ {
+  "number": 83,
+  "arabic": "المطففين",
+  "arabicVocalized": "المُطَففين",
+  "transliteration": "Al-Mutaffifin",
+  "englishMeaning": "Defrauding",
+  "banglaMeaning": "প্রতারণা করা"
+ },
+ {
+  "number": 84,
+  "arabic": "الانشقاق",
+  "arabicVocalized": "الانشِقَاق",
+  "transliteration": "Al-Inshiqaaq",
+  "englishMeaning": "The Splitting Open",
+  "banglaMeaning": "খণ্ড-বিখণ্ডকরণ"
+ },
+ {
+  "number": 85,
+  "arabic": "البروج",
+  "arabicVocalized": "البُرُوج",
+  "transliteration": "Al-Burooj",
+  "englishMeaning": "The Constellations",
+  "banglaMeaning": "নক্ষত্রপুঞ্জ"
+ },
+ {
+  "number": 86,
+  "arabic": "الطارق",
+  "arabicVocalized": "الطَّارق",
+  "transliteration": "At-Taariq",
+  "englishMeaning": "The Morning Star",
+  "banglaMeaning": "রাতের আগন্তুক"
+ },
+ {
+  "number": 87,
+  "arabic": "الأعلى",
+  "arabicVocalized": "الأعلى",
+  "transliteration": "Al-A'laa",
+  "englishMeaning": "The Most High",
+  "banglaMeaning": "সর্বোন্নত"
+ },
+ {
+  "number": 88,
+  "arabic": "الغاشية",
+  "arabicVocalized": "الغَاشِية",
+  "transliteration": "Al-Ghaashiya",
+  "englishMeaning": "The Overwhelming",
+  "banglaMeaning": "বিহ্বলকর ঘটনা"
+ },
+ {
+  "number": 89,
+  "arabic": "الفجر",
+  "arabicVocalized": "الفَجر",
+  "transliteration": "Al-Fajr",
+  "englishMeaning": "The Dawn",
+  "banglaMeaning": "ভোরবেলা"
+ },
+ {
+  "number": 90,
+  "arabic": "البلد",
+  "arabicVocalized": "البَلَد",
+  "transliteration": "Al-Balad",
+  "englishMeaning": "The City",
+  "banglaMeaning": "নগর"
+ },
+ {
+  "number": 91,
+  "arabic": "الشمس",
+  "arabicVocalized": "الشَّمس",
+  "transliteration": "Ash-Shams",
+  "englishMeaning": "The Sun",
+  "banglaMeaning": "সূর্য"
+ },
+ {
+  "number": 92,
+  "arabic": "الليل",
+  "arabicVocalized": "اللَّيل",
+  "transliteration": "Al-Lail",
+  "englishMeaning": "The Night",
+  "banglaMeaning": "রাত"
+ },
+ {
+  "number": 93,
+  "arabic": "الضحى",
+  "arabicVocalized": "الضُّحى",
+  "transliteration": "Ad-Dhuhaa",
+  "englishMeaning": "The Morning Hours",
+  "banglaMeaning": "পূর্বাহ্নের সুর্যকিরণ"
+ },
+ {
+  "number": 94,
+  "arabic": "الشرح",
+  "arabicVocalized": "الشَّرح",
+  "transliteration": "Ash-Sharh",
+  "englishMeaning": "The Consolation",
+  "banglaMeaning": "বক্ষ প্রশস্তকরণ"
+ },
+ {
+  "number": 95,
+  "arabic": "التين",
+  "arabicVocalized": "التِّين",
+  "transliteration": "At-Tin",
+  "englishMeaning": "The Fig",
+  "banglaMeaning": "ডুমুর"
+ },
+ {
+  "number": 96,
+  "arabic": "العلق",
+  "arabicVocalized": "العَلَق",
+  "transliteration": "Al-Alaq",
+  "englishMeaning": "The Clot",
+  "banglaMeaning": "রক্তপিণ্ড"
+ },
+ {
+  "number": 97,
+  "arabic": "القدر",
+  "arabicVocalized": "القَدر",
+  "transliteration": "Al-Qadr",
+  "englishMeaning": "The Power, Fate",
+  "banglaMeaning": "মহিমান্বিত"
+ },
+ {
+  "number": 98,
+  "arabic": "البينة",
+  "arabicVocalized": "البَينَة",
+  "transliteration": "Al-Bayyina",
+  "englishMeaning": "The Evidence",
+  "banglaMeaning": "প্রমাণ"
+ },
+ {
+  "number": 99,
+  "arabic": "الزلزلة",
+  "arabicVocalized": "الزَّلزَلة",
+  "transliteration": "Az-Zalzala",
+  "englishMeaning": "The Earthquake",
+  "banglaMeaning": "ভূমিকম্প"
+ },
+ {
+  "number": 100,
+  "arabic": "العاديات",
+  "arabicVocalized": "العَاديَات",
+  "transliteration": "Al-Aadiyaat",
+  "englishMeaning": "The Chargers",
+  "banglaMeaning": "অভিযানকারী"
+ },
+ {
+  "number": 101,
+  "arabic": "القارعة",
+  "arabicVocalized": "القَارعَة",
+  "transliteration": "Al-Qaari'a",
+  "englishMeaning": "The Calamity",
+  "banglaMeaning": "মহাসংকট"
+ },
+ {
+  "number": 102,
+  "arabic": "التكاثر",
+  "arabicVocalized": "التَّكاثُر",
+  "transliteration": "At-Takaathur",
+  "englishMeaning": "Competition",
+  "banglaMeaning": "প্রাচুর্যের প্রতিযোগিতা"
+ },
+ {
+  "number": 103,
+  "arabic": "العصر",
+  "arabicVocalized": "العَصر",
+  "transliteration": "Al-Asr",
+  "englishMeaning": "The Declining Day, Epoch",
+  "banglaMeaning": "সময়"
+ },
+ {
+  "number": 104,
+  "arabic": "الهمزة",
+  "arabicVocalized": "الهُمَزة",
+  "transliteration": "Al-Humaza",
+  "englishMeaning": "The Traducer",
+  "banglaMeaning": "পরনিন্দাকারী"
+ },
+ {
+  "number": 105,
+  "arabic": "الفيل",
+  "arabicVocalized": "الفِيل",
+  "transliteration": "Al-Fil",
+  "englishMeaning": "The Elephant",
+  "banglaMeaning": "হাতি"
+ },
+ {
+  "number": 106,
+  "arabic": "قريش",
+  "arabicVocalized": "قُرَيش",
+  "transliteration": "Quraish",
+  "englishMeaning": "Quraysh",
+  "banglaMeaning": "কুরাইশ গোত্র"
+ },
+ {
+  "number": 107,
+  "arabic": "الماعون",
+  "arabicVocalized": "المَاعُون",
+  "transliteration": "Al-Maa'un",
+  "englishMeaning": "Almsgiving",
+  "banglaMeaning": "সাহায্য সহায়তা"
+ },
+ {
+  "number": 108,
+  "arabic": "الكوثر",
+  "arabicVocalized": "الكَوثر",
+  "transliteration": "Al-Kawthar",
+  "englishMeaning": "Abundance",
+  "banglaMeaning": "কাউসার/প্রাচুর্য"
+ },
+ {
+  "number": 109,
+  "arabic": "الكافرون",
+  "arabicVocalized": "الكافِرون",
+  "transliteration": "Al-Kaafiroon",
+  "englishMeaning": "The Disbelievers",
+  "banglaMeaning": "অবিশ্বাসী"
+ },
+ {
+  "number": 110,
+  "arabic": "النصر",
+  "arabicVocalized": "النَّصر",
+  "transliteration": "An-Nasr",
+  "englishMeaning": "Divine Support",
+  "banglaMeaning": "সাহায্য"
+ },
+ {
+  "number": 111,
+  "arabic": "المسد",
+  "arabicVocalized": "المَسَد",
+  "transliteration": "Al-Masad",
+  "englishMeaning": "The Palm Fibre",
+  "banglaMeaning": "খেজুরের পাকানো (রশি)"
+ },
+ {
+  "number": 112,
+  "arabic": "الإخلاص",
+  "arabicVocalized": "الإخلَاص",
+  "transliteration": "Al-Ikhlaas",
+  "englishMeaning": "Sincerity",
+  "banglaMeaning": "আন্তরিকতা"
+ },
+ {
+  "number": 113,
+  "arabic": "الفلق",
+  "arabicVocalized": "الفَلَق",
+  "transliteration": "Al-Falaq",
+  "englishMeaning": "The Dawn",
+  "banglaMeaning": "নিশিভোর"
+ },
+ {
+  "number": 114,
+  "arabic": "الناس",
+  "arabicVocalized": "النَّاس",
+  "transliteration": "An-Naas",
+  "englishMeaning": "Mankind",
+  "banglaMeaning": "মানুষ জাতি"
+ }
+]

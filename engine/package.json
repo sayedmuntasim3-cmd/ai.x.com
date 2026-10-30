@@ -1,0 +1,13 @@
+{
+  "name": "zupona-ai-engine",
+  "private": true,
+  "description": "Pure planning and media modules for the Zupona AI documentary studio: versions, voice, Quran recognition, story mode, agent roster and run plans.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "npx --yes -p typescript@5.9.3 tsc -p jsconfig.json"
+  }
+}
