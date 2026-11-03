@@ -234,6 +234,37 @@ A study of more than 50,000 AI stories found that the bigger giveaways are expla
 - Every generated shot is disclosed.
 - At about four takes per usable shot, a finished minute of dragon footage was estimated at about $29 on Veo 3.1 Fast and $96 on Standard (research arithmetic, September 2026 prices).
 
+## 9a. Formats
+
+`formats.mjs` offers fifteen formats as presets, drawn from the owner's 39 example videos and research into what each kind of video does. Each preset sets a length range, the hook, the beats, the visuals and the music:
+
+- re-enacted true story, the Yarnhub pattern: one named person, an exact date, cinematic re-enactment with one consistent cast. Twelve of the owner's nineteen newest examples are Yarnhub films.
+- rags to riches or riches to ruin;
+- motivational real-life story;
+- place nobody can visit;
+- deadliest journey;
+- history epic (archive, colourised);
+- whole history in N minutes;
+- the other side of a famous event;
+- rise, betrayal and fall of an inner circle;
+- dark business exposé;
+- money explainer;
+- big question / deep-time science;
+- mystery investigation;
+- numbered compilation;
+- original dramatized story (idea mode).
+
+A preset guides the agents; it never fills a template. Every film is written new, because YouTube's "inauthentic content" rule demonetises channels whose videos differ only on the surface.
+
+**Why creators would choose Zupona** (research into complaints about InVideo, Pictory, Revid and similar tools, October 2026):
+
+- a price shown before rendering, and cheap re-renders of one scene;
+- real visuals matched to each scene instead of stock slideshows;
+- coherent long films of 20 to 90 minutes with consistent characters;
+- output that stays monetisable: original scripts, sources, disclosure handled;
+- natural narration in three languages, including the owner's own voice;
+- scene-level editing.
+
 ## 10. Footage: legal sources only
 
 **The answer to "can we cut a few images or clips from Facebook, X, YouTube or TikTok" is no, at any number.**
@@ -298,12 +329,13 @@ Adding roles without distinct checks would add cost, not quality. That is why th
 
 ## 12a. What runs today
 
-`cd engine && npm test` runs 49 tests:
+`cd engine && npm test` runs 51 tests:
 
 - Quran recognition (16);
 - loudness (8);
 - versions, voice and intake (13);
 - story, roster and run plans (10);
+- formats (2);
 - the ported engine core and media fetching (2 files with 24 and 18 cases).
 
 The strict JSDoc type check passes on all 12 source files.
