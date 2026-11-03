@@ -87,7 +87,8 @@ function findCues(text, cues) {
  * Decide what kind of film the input asks for. A recitation is recognised
  * from the Quran match; otherwise true-story cues mean a researched
  * documentary, a long text is kept as the owner's own script, and a short
- * idea becomes an original story (labelled as fiction). Islamic content and
+ * idea becomes an original story (a dramatization note in the description,
+ * never a label on screen). Islamic content and
  * fantasy imagery are flagged separately because they change the rules.
  * @param {{ text?: string, recitation?: RecitationMatch | null }} input
  */
@@ -109,7 +110,10 @@ export function classifyInput({ text = "", recitation = null }) {
     ...ISLAMIC_TERMS.bengali.filter((t) => clean.includes(t)),
     ...ISLAMIC_TERMS.arabic.filter((t) => (" " + normalizeArabic(clean) + " ").includes(" " + t + " ")),
   ])];
-  const islamic = islamicTerms.length >= 2 || quoted.length > 0;
+  // A prophet or a Companion named even once makes the input Islamic, so their
+  // story can never fall through to fiction ("قصة النبي يوسف", "নবীর গল্প").
+  const prophetic = findCues(clean, PROPHETIC_CUES);
+  const islamic = islamicTerms.length >= 2 || quoted.length > 0 || (prophetic.length > 0 && islamicTerms.length >= 1);
   if (islamicTerms.length >= 2) reasons.push("Islamic terms: " + islamicTerms.slice(0, 5).join(", ") + ".");
   if (quoted.length) reasons.push(`It quotes ${quoted.length} Quran passage${quoted.length === 1 ? "" : "s"}, which are shown verbatim and never put under music.`);
 
@@ -117,7 +121,6 @@ export function classifyInput({ text = "", recitation = null }) {
   if (fantasy.length) reasons.push("Imagery stock footage cannot show (" + fantasy.slice(0, 3).join(", ") + "): labelled AI visuals are needed.");
   const fact = findCues(clean, FACT_CUES);
   const story = findCues(clean, STORY_CUES);
-  const prophetic = findCues(clean, PROPHETIC_CUES);
 
   if (islamic && prophetic.length) {
     reasons.push("It is about a prophet or a Companion, so it is told from the Quran, hadith and sira with sources, never as fiction, and no one is depicted.");
@@ -131,8 +134,8 @@ export function classifyInput({ text = "", recitation = null }) {
     reasons.push(`It is a ${words}-word text, so it is treated as the owner's own script: the words are kept and their claims are checked.`);
     return result("own-script", islamic ? "islamic" : "documentary", islamic, fantasy.length > 0, "medium");
   }
-  if (story.length || fantasy.length) reasons.push("It asks for a story, so an original story is written and labelled as fiction.");
-  else reasons.push("It is a short idea with no sign of being a true story, so it becomes an original story labelled as fiction.");
+  if (story.length || fantasy.length) reasons.push("It asks for a story, so an original story is written, with a one-line dramatization note in the description and no label on screen.");
+  else reasons.push("It is a short idea with no sign of being a true story, so it becomes an original story, with a one-line dramatization note in the description and no label on screen.");
   return result("story", islamic ? "islamic" : "story", islamic, fantasy.length > 0, story.length || fantasy.length ? "high" : "low");
 
   /**
