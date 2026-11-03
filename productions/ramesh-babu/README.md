@@ -9,10 +9,10 @@ Two separate films: `USA/` (American English, dollars) and `Bangladesh/` (Bangla
 | S2 claim ledger (`s2.md`) | done | done |
 | S3 structure, 6 chapters (`s3.md`, `s3-chapters.json`) | done | done |
 | S4 production bibles (`s4.md`) | done | done |
-| S5 script, chapter by chapter (`s5-C1.md` ... `s5-C6.md`) | C3, C4, C6 done; C1 and C2 partly written (end with `<!-- CONTINUE -->`); C5 not started | not started |
+| S5 script, chapter by chapter (`s5-C1.md` ... `s5-C6.md`) | C2, C3, C4, C6 done; C1 partly written (ends with `<!-- CONTINUE -->`); C5 not started | not started |
 | QA, fixes, S6 report, S7 publishing pack | not started | not started |
 
-How to continue (each step is one agent; the exact instructions are in `prompts/`):
+How to continue (each step is one agent, run from the repository root; the exact instructions are in `prompts/`; see also `docs/NEXT_SESSION.md`):
 
 1. Finish the missing S5 chapters with `prompts/s5-<version>-<chapter>.txt`. A partly written chapter is finished in place and its marker removed.
 2. Run `prompts/qa-<version>.txt` (writes `qa.json`), then `prompts/fix-<version>.txt` (edits the chapters in place, keeps `.draft.md` copies).
