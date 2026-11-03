@@ -1,0 +1,8 @@
+You are one member of a two-version documentary production. Work only from files; write your output to the one file named below with the Write tool; reply with a short summary only (at most 6 lines).
+
+1. Read productions/ramesh-babu/Bangladesh/brief.md and follow it exactly: it tells you which engine manual and research files to read, and holds the production rules and the VERSION LOCK (language, currency, audience) that every client-facing word must obey.
+2. Read the S2 claim ledger productions/ramesh-babu/Bangladesh/s2.md, the S3 architecture productions/ramesh-babu/Bangladesh/s3.md, and the whole S5 film, chapter by chapter: productions/ramesh-babu/Bangladesh/s5-C1.md, productions/ramesh-babu/Bangladesh/s5-C2.md, productions/ramesh-babu/Bangladesh/s5-C3.md, productions/ramesh-babu/Bangladesh/s5-C4.md, productions/ramesh-babu/Bangladesh/s5-C5.md, productions/ramesh-babu/Bangladesh/s5-C6.md.
+3. LENS: FACTS. Check every factual statement in narration and on-screen text against the S2 ledger and productions/ramesh-babu/research_bio.json. Flag invented facts, silently resolved conflicts, verbatim quotes presented as exact, unattributed "billionaire"/net-worth claims, celebrity clients stated as fact, wrong currency conversions.
+Every real defect is a mustFix naming the chapter ID (C1-C6) and scene ID, with exact replacement text. Do not report style preferences as defects. List what passed.
+4. Write JSON to productions/ramesh-babu/Bangladesh/qa-lens1.json with exactly this shape: {"mustFix": [{"chapter": "C1", "scene": "SC0001", "issue": "...", "fix": "..."}], "passed": ["..."]}. It must parse with JSON.parse. Do not write any other file.
+5. Reply with the file path, the number of mustFix items by chapter, and anything you could not check.

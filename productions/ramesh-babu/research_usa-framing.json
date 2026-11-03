@@ -1,0 +1,87 @@
+{
+ "topic": "Research for the US version (American English, 45 minutes) of the Ramesh Babu documentary: exchange rates, US prices and pay, US market comparisons, cultural framing and US publishing rules. RESEARCH BLOCKED: no web source could be reached in this run, so every requested number is \"unknown\". Nothing below is sourced. It is method guidance and general knowledge to check before scripting.",
+ "keyFindings": [
+  {
+   "finding": "No web research was possible in this run, so every number and URL the brief asked for (exchange rates, Rolls-Royce MSRP, barber pay, haircut prices, US market sizes) is UNKNOWN. Do not put any of them in the script until a later run with working web access pulls them from the sources named below.",
+   "evidence": "WebSearch returned 'this turn's web search budget is used up (limit: 200 WebSearch calls per turn, shared by every agent in it)' on the first query. WebFetch then failed on fred.stlouisfed.org, bls.gov, en.wikipedia.org, x-rates.com, ftc.gov and rolls-roycemotorcars.com (getaddrinfo ENOTFOUND) and on caranddriver.com ('unable to fetch'). A direct curl to FRED was refused by the egress proxy (403). Per the search-limit notice, I did not try to get around it with other readers, proxies or search engines.",
+   "sourceUrls": [],
+   "confidence": "confirmed"
+  },
+  {
+   "finding": "Current INR-to-USD rate (October 2026): UNKNOWN. Historical yearly rates for 1979, 1989 to 1994, 2004, 2011, 2015 and the 2020s: UNKNOWN. Pull them next run from the St. Louis Fed's FRED series AEXINUS (yearly average, rupees per US dollar) and DEXINUS (daily). Use the RBI reference rate as a cross-check for the current figure. Write the date and source on screen next to any rate shown.",
+   "evidence": "Nothing was fetched. These series IDs come from general knowledge and must be checked when the pages load. For an Indian source, check that RBI's reference-rate page loads; no RBI URL is given here because none could be checked.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Method for honest dollar conversion: (1) Convert each rupee amount at the average rate for the year it was spent, giving 'then-dollars'. (2) Bring that figure up to today's dollars with the US CPI-U, for example with the BLS CPI Inflation Calculator. (3) Disclose the method once on screen. Do not use today's rate on a 1990s rupee amount, because that badly understates what the money was worth then. Note that 'adjust by Indian inflation, then convert' and 'convert, then adjust by US inflation' give different answers. Pick one method, use it throughout, and say which one it is.",
+   "evidence": "Method guidance from general knowledge; no data source was fetched to illustrate it with numbers.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Do not use one 'early-1990s' exchange rate for 1989 to 1994. India devalued the rupee in July 1991 and moved to a market-set rate in 1992-93, so the rupee-to-dollar rate shifted a lot within that window. Any conversion for those years needs the exact year, ideally the month.",
+   "evidence": "General knowledge of India's 1991 balance-of-payments crisis and the reforms that followed. Not checked against a source in this run. Check it against FRED AEXINUS once it is reachable.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Current US MSRP of the Rolls-Royce Ghost and Phantom: UNKNOWN. Rolls-Royce's own site may not list US prices. Next run, use Car and Driver, Edmunds or Kelley Blue Book model pages, and record the model year, the 'starting at' figure and the date it was checked. Also UNKNOWN: which model and year Ramesh Babu owns, and what he paid in rupees. Verify both from primary interviews or news reports before comparing.",
+   "evidence": "Fetching rolls-roycemotorcars.com and caranddriver.com both failed.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Average US barber pay and typical US haircut price: UNKNOWN. Pull pay from the BLS Occupational Outlook Handbook page 'Barbers, Hairstylists, and Cosmetologists' and from the BLS occupational wage data (OEWS) for barbers alone, code 39-5011, rather than the combined group. A haircut price needs a named survey or industry source with a date. If none can be found, describe the price without a number.",
+   "evidence": "bls.gov was unreachable (ENOTFOUND). The occupation code 39-5011 comes from general knowledge and needs checking.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "US comparisons to make the size of his business intuitive: no figures were gathered (UNKNOWN). Possible sources for next run: US Census County Business Patterns or Economic Census by industry code (NAICS 485320 Limousine Service, 532111 Passenger Car Rental, 812111 Barber Shops) for establishment counts and typical firm size. For scale, compare his fleet size to a typical US limo or exotic-car-rental operator, not to Hertz or Uber; the gap with those makes a comparison meaningless. His fleet size is itself UNKNOWN here and is reported differently by different outlets, so verify it first.",
+   "evidence": "Industry codes are from general knowledge; the Census site was not reached.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Framing for US viewers (editorial guidance): present the story as a small-business, self-made story that Americans already know (a family shop that outgrew itself, a first van bought on borrowed money, still doing his original trade). Do not frame it as an immigrant story; he built the business in Bengaluru. Use Bengaluru's role as India's tech hub to explain why corporate clients needed cars, without turning the city into backdrop scenery. Avoid: making India look exotic (snake-charmer or slum stock shots, sitar clichés), poverty porn (lingering on hardship for shock), accent or name jokes, 'even an Indian barber...' condescension, and presenting him as a curiosity rather than a businessman. Give his own words through subtitles or a respectful voiceover, never a put-on accent.",
+   "evidence": "Editorial recommendation based on general knowledge, not on a cited audience study. No source was fetched.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Footage-search risk: 'Ramesh Babu' is a common name. Another well-known person with that name is the Telugu film actor and producer (brother of actor Mahesh Babu), reported to have died in January 2022. When licensing clips from Newsflare, ViralHog, Storyful or stock libraries, confirm every clip shows the Bengaluru barber and entrepreneur, and keep each clip's license (territory: worldwide or US, plus YouTube or online-video rights).",
+   "evidence": "General knowledge; not checked in this run. Nothing was confirmed about any agency's catalog.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "US defamation basics for profiling a living, semi-public person (not legal advice; have a lawyer review). Truth is a defense, and opinion clearly presented as opinion is generally protected. Public officials and public figures must prove 'actual malice' (New York Times v. Sullivan, 1964). For private figures, states may set a lower standard such as negligence (Gertz v. Robert Welch, 1974). A businessman who has given many media interviews about his rise may count as a 'limited-purpose public figure' for that story; that is a legal judgment call. Also watch for: false light (true footage edited to imply something false), and using his likeness in thumbnails or ads in a way that implies he endorses the channel. Never state numbers such as net worth or fleet value as fact unless they are sourced. Attribute them ('he told [outlet] in [year]...'). He lives in India, so Indian defamation law may also apply. That is outside this US brief.",
+   "evidence": "General legal knowledge; case names and years are from memory and were not checked against a source in this run.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "FTC and YouTube disclosure: these apply only if the video has sponsorship, affiliate links or free products. If so, the FTC Endorsement Guides require a clear disclosure in the video itself, and YouTube requires ticking its 'paid promotion' setting. If AI-generated or realistic synthetic re-enactments or voices are used, YouTube's altered or synthetic content disclosure setting applies. Licensed real footage needs no FTC disclosure, but keep license records in case of Content ID disputes.",
+   "evidence": "General knowledge of FTC and YouTube policies; ftc.gov was unreachable (ENOTFOUND) and no YouTube help page was fetched.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "US YouTube norms for a 45-minute documentary (no audience data gathered). General practice: add chapters (timestamps), a strong first-minute hook that previews the Rolls-Royce payoff, mid-roll ad breaks placed at natural act breaks (long videos are eligible for mid-rolls), and on-screen captions for money figures in USD, with the rupee figure shown smaller.",
+   "evidence": "General knowledge; no YouTube or creator-industry source was fetched. Retention or length benchmarks for US audiences are UNKNOWN.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  }
+ ],
+ "gapsOrUnknowns": [
+  "Every number the brief asked for is unknown: the current INR/USD rate and its date; yearly INR/USD averages for 1979, 1989, 1990, 1991, 1992, 1993, 1994, 2004, 2011, 2015 and 2020 onward; US CPI factors for converting to today's dollars; Rolls-Royce Ghost and Phantom US MSRPs and model years; BLS median pay for barbers; typical US haircut price; US limo and car-rental market sizes and typical fleet sizes.",
+  "None of Ramesh Babu's biography could be checked: birth year, year his father died, the barbershop's history, year and price of his first vehicle, start of the luxury-rental business, Rolls-Royce model, purchase year and price, current fleet size, and what he charges for a haircut today. Different outlets report different fleet sizes and prices; check them against named interviews and dated articles.",
+  "No source URLs could be fetched or checked in this run, so sourceUrls is empty throughout and no URL is cited, to avoid citing ones that do not exist. FRED (AEXINUS, DEXINUS, CPIAUCSL), BLS (OOH, OEWS 39-5011, CPI Inflation Calculator), RBI reference rates, Car and Driver, Edmunds, KBB, the US Census CBP/Economic Census, FTC Endorsement Guides and YouTube Help pages must be fetched in a follow-up run.",
+  "Why it was blocked: the web-search budget shared by the workflow was already used up (200 searches per turn), WebFetch failed on DNS lookups or was refused on every domain tried, and direct curl was refused by the egress proxy (403). To continue, the user can send a follow-up message after this run or raise CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION; the fetch failures may also need network settings changed.",
+  "Not checked: which clips Newsflare, ViralHog and Storyful hold of the right Ramesh Babu, and their license terms.",
+  "No sourced US audience-retention benchmarks for 45-minute documentaries.",
+  "Indian defamation exposure (he lives in India) was not covered, since this brief is US-only.",
+  "No work was done on the Bangladesh/Bangla version (outside this step), and none of this US-version material should be reused there."
+ ]
+}
