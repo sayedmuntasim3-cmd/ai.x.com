@@ -47,11 +47,11 @@ The topic is "Ramesh Babu: From Barber to Rolls-Royce", 45:00. Each version has 
 
 | Ch | Title | Time | Scenes | Status |
 |---|---|---|---|---|
-| C1 | The Shop | 0:00-8:30 | SC0001-SC0054 | **partly written** (ends with `<!-- CONTINUE -->`): finish it |
+| C1 | The Shop | 0:00-8:30 | SC0001-SC0054 | done |
 | C2 | The Chair | 8:30-15:30 | SC0055-SC0095 | done |
 | C3 | One Used Van | 15:30-22:30 | SC0096-SC0136 | done (use as the format example) |
 | C4 | The Luxury Bet | 22:30-30:00 | SC0137-SC0181 | done |
-| C5 | The Ghost and the Bill | 30:00-38:00 | SC0182-SC0228 | **not started** |
+| C5 | The Ghost and the Bill | 30:00-38:00 | SC0182-SC0228 | done |
 | C6 | Still at the Chair | 38:00-45:00 | SC0229-SC0270 | done |
 
 **Bangladesh** (Bangla, Taka). S0 to S4 are done; every chapter is still to write:
@@ -64,6 +64,8 @@ The topic is "Ramesh Babu: From Barber to Rolls-Royce", 45:00. Each version has 
 | C4 | ঘোস্ট | 22:30-30:00 | SC0139-SC0183 |
 | C5 | কর | 30:00-36:00 | SC0184-SC0219 |
 | C6 | আয়না | 36:00-45:00 | SC0220-SC0270 |
+
+**USA status (3 Nov 2026): finished.** C1–C6, `USA/qa.json` (14 fixes, all applied, `fix-log.json`), `USA/s6.md` (0 FAIL, 8 GAPs), `USA/s7.md`, and the page `ramesh-babu-usa.html` are on branch `ccr-cb190ece-ukm6vg`. Before render: fill the 24 `$[C##]` dollar placeholders (FRED AEXINUS + BLS CPI-U) and close the other S6 GAPs.
 
 **Order of work.** One agent at a time; each step writes to files.
 
@@ -91,7 +93,7 @@ It does not read the whole engine manual. When the prompt names the manual, only
 
 ## 4. Benchmarks
 
-The owner sent 39 example videos. All 39 links, with what each one is and what to learn from it, are in `docs/YOUTUBE_BENCHMARKS.md`; use that file instead of searching again. The main lessons are already built into `engine/src/formats.mjs` (15 formats) and `docs/SYSTEM_V5.md`:
+The owner sent 39 example videos. `docs/YOUTUBE_BENCHMARKS.md` is meant to hold all the links with what to learn from each one. **It is not in the repository yet** (not on `main`, this branch or the studio branch); only the 7 links sent on 3 Nov are saved there so far. The main lessons are already built into `engine/src/formats.mjs` (15 formats) and `docs/SYSTEM_V5.md`:
 
 - a superlative or impossible title with a concrete noun;
 - the hook stated within 30 seconds;
