@@ -30,7 +30,12 @@ Every film must feel human-made and Hollywood or Bollywood level. Films can be a
 | A. The platform | The website and engine clients will use | `engine/` (formats, versions, voice, Quran, story mode, 151-role roster, run plans; tests); the first screen at `/studio/` on branch `claude/studio-first-screen-y4tp15` |
 | B. The Ramesh Babu film | A sample 45-minute documentary script made with the engine prompts, in two fully separate versions. It shows the quality the platform must reach | `productions/ramesh-babu/` |
 
-The owner's current priority is **Track B: finish the chapters.**
+The owner's current priority (3 Nov 2026):
+
+1. Finish the **USA version** of the Ramesh Babu film.
+2. Then put the effort into the platform for the **US market** (English first).
+
+**The Bangladesh version of the film is postponed to save credits; do not start it.** Arabic and Bangla stay in the platform's design, but they are built after the English path works end to end.
 
 A link from the landing page (the site's home page, `public/index.html`) to `/studio/` is a small Track A task for later.
 
@@ -65,7 +70,7 @@ The topic is "Ramesh Babu: From Barber to Rolls-Royce", 45:00. Each version has 
 1. USA: finish C1, then write C5 (`productions/ramesh-babu/prompts/s5-USA-C1.txt`, `s5-USA-C5.txt`).
 2. USA: QA (`qa-USA.txt` → `USA/qa.json`), then fixes (`fix-USA.txt`, which edits in place and keeps `.draft.md` copies), then the S6 report (`s6-USA.txt`) and the S7 publishing pack (`s7-USA.txt`).
 3. Build the USA page: `cd productions/ramesh-babu && python3 assemble.py && npm install marked && node build.mjs result.json`.
-4. Bangladesh: C1 to C6, then QA, fixes, S6, S7 and the page, in the same way.
+4. Bangladesh: **postponed by the owner.** When it is resumed: C1 to C6, then QA, fixes, S6, S7 and the page, in the same way.
 
 **Saving credits on the chapter agents.** Each agent reads:
 
