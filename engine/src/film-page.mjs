@@ -428,7 +428,7 @@ export function renderFilmPage(d) {
   <p class="eyebrow">Zupona AI Studio · Film run · ${esc(film.versionId ?? "")}${runtime ? ` · ${esc(runtime)}` : ""}</p>
   <h1>${esc(film.topic ?? "Untitled film")}</h1>
   <p class="lede">${esc([runtime && `Runtime ${runtime}`, d.chapters.length && `${d.chapters.length} chapters`, scenes && `${scenes} scenes`].filter(Boolean).join(" · ") || "The run has not written a chapter yet.")}. Every fact links to its sources, every stock shot to its clip and licence, and every cent spent is counted.</p>
-  <nav class="toc">${nav.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join("")}</nav>
+  <nav class="toc">${nav.map(([id, label]) => `<a href="#${id}">${esc(label)}</a>`).join("")}<a href="script">Narration script (record it yourself)</a></nav>
   <div class="tiles">${tiles}</div>
   ${stageChips(d)}
   ${gaps.length ? `<details class="block"><summary>Open items (${gaps.length})</summary><div class="md"><ul class="gaps">${gaps.slice(0, 200).map((/** @type {unknown} */ g) => `<li>${inline(g)}</li>`).join("")}</ul></div></details>` : ""}
@@ -442,6 +442,51 @@ ${creditsHtml(d)}
 <section id="publish"><div class="section-head"><h2>Publishing pack</h2></div>${doc("s7", "S7 titles, description, chapters, Shorts", true) || `<p class="small">Not written yet.</p>`}</section>
 <section id="plan"><div class="section-head"><h2>Plan and bibles</h2></div>${[doc("s01", "S0–S1 intake, angle and titles"), doc("s2", "S2 claim ledger"), doc("s3", "S3 story architecture"), doc("s4", "S4 production bibles")].join("") || `<p class="small">Not written yet.</p>`}</section>
 <p class="small">Rebuilt from the run's files each time this page opens.</p>
+</div>
+</body>
+</html>`;
+}
+
+/**
+ * The narration script for recording it yourself: one block per narrated
+ * scene with the file name to save it under (SC0001.wav), its time slot and
+ * the words it should take at the version's pace. Large type, readable on a
+ * phone held as a prompter. Scenes that still hold an unresolved number are
+ * marked, so they are not recorded yet.
+ * @param {PageData} d
+ */
+export function renderScriptPage(d) {
+  const film = d.run.film ?? {};
+  const scenes = d.chapters.flatMap((c) => (d.s5[c.id] !== undefined ? parseSceneLines(d.s5[c.id]).map((s) => ({ ...s, chapter: c.id })) : []));
+  const narrated = scenes.filter((s) => !s.wordless);
+  const minutes = narrated.reduce((n, s) => n + s.seconds, 0) / 60;
+  const blocks = narrated.map((s) => {
+    const pending = /\$?\[C\d{2,3}[^\]]*\]/.test(s.narration);
+    return `<article class="line${pending ? " pending" : ""}" id="${esc(s.sc)}"><p class="meta"><b>${esc(s.sc)}</b> · ${esc(s.chapter)} · ${esc(toClock(s.start))}–${esc(toClock(s.end))} · ${Math.round(s.seconds * 10) / 10} s · ${s.words} words${pending ? ` · ${chip("warn", "number not resolved yet: do not record")}` : ""}</p><p class="say">${esc(s.narration)}</p></article>`;
+  }).join("\n");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>${esc(film.topic ? `${film.topic} · Narration script` : "Narration script")}</title>
+<style>${CSS}
+.line { border-top: 1px solid var(--line); padding: 18px 0; display: grid; gap: 8px; }
+.line.pending .say { color: var(--muted); }
+.meta { font: 500 0.82rem/1.4 var(--font-mono); color: var(--muted); }
+.say { font: 500 clamp(1.25rem, 4.6vw, 1.7rem)/1.5 var(--font-body); max-width: 40ch; }
+</style>
+</head>
+<body>
+<div class="wrap" style="gap: 24px">
+<header class="head">
+  <p class="eyebrow">Zupona AI Studio · Narration script · ${esc(film.versionId ?? "")}</p>
+  <h1>${esc(film.topic ?? "Untitled film")}</h1>
+  <p class="lede">${narrated.length} lines, about ${Math.round(minutes)} minutes of speech. Record each line as its own file named after its scene (<code>SC0001.wav</code>, <code>SC0001.m4a</code> …), in a quiet room, at the pace the words-per-line allow. Your recordings are used exactly as recorded; scenes you leave out can be voiced by ElevenLabs.</p>
+</header>
+${blocks || `<p class="small">No chapter written yet.</p>`}
 </div>
 </body>
 </html>`;

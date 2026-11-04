@@ -11,6 +11,7 @@ name: Render a film
 # Optional repository secrets (Settings > Secrets and variables > Actions):
 #   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
 #   FREESOUND_API_KEY                        sound effects fetched automatically (CC0 only)
+# Optional own voice: commit your recordings as voice/<film id>/SC0001.wav ... (script: /api/films/<id>/script)
 # Optional music: commit one track per cue as music/<film id>/M01.mp3 ...
 # Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
 
@@ -64,16 +65,17 @@ jobs:
             render-${{ inputs.film_id }}-${{ inputs.resolution }}-
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null && ffmpeg -version | head -1
-      - name: Record the narration (ElevenLabs)
+      - name: Narration (your own recordings first, ElevenLabs for the rest)
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
         run: |
-          mkdir -p voice
+          mkdir -p narration
+          if [ -d "voice/$FILM_ID" ]; then cp "voice/$FILM_ID"/SC* narration/ 2>/dev/null || true; echo "Own recordings: $(ls narration | wc -l)"; fi
           if [ -n "$ELEVENLABS_API_KEY" ] && [ -n "$ELEVENLABS_VOICE_ID" ]; then
-            node render/voice.mjs --api "$SITE" --id "$FILM_ID" --voice-id "$ELEVENLABS_VOICE_ID" --out voice/
+            node render/voice.mjs --api "$SITE" --id "$FILM_ID" --voice-id "$ELEVENLABS_VOICE_ID" --out narration/
           else
-            echo "::warning::No ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID secrets: the film renders without narration."
+            echo "::warning::No ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID secrets: only your own recordings are used."
           fi
       - name: Fetch the sound effects (Freesound, CC0 only)
         env:
@@ -87,7 +89,7 @@ jobs:
           fi
       - name: Render
         run: |
-          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice voice/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" \
+          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" \
             --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out "out/$FILM_ID.mp4"
       - name: Summary
         if: always()

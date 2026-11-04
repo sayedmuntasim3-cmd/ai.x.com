@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
-import { inline, loadFilmPage, markdown, PAGE_CSP, renderFilmPage } from "../src/film-page.mjs";
+import { inline, loadFilmPage, markdown, PAGE_CSP, renderFilmPage, renderScriptPage } from "../src/film-page.mjs";
 
 const USA = new URL("../../productions/ramesh-babu/USA/", import.meta.url);
 /** The finished USA film as a run's store, plus a run.json. */
@@ -58,4 +58,16 @@ test("a run that has only started still gets a page; an unknown run gets none", 
   assert.ok(queued);
   const html = renderFilmPage(queued);
   assert.ok(html.includes("The Suez Canal") && html.includes("No chapter written yet.") && html.includes("Queued"));
+});
+
+test("the narration script lists every narrated scene with its file name, slot and word count", async () => {
+  const store = usaStore();
+  const s5 = String(store.m.get("s5-C1.md")).replace(/(\*\*SC0002\*\*[^\n]*?NARR: )/, "$1<b>It cost [C12 low] dollars.</b> ");
+  store.m.set("s5-C1.md", s5);
+  const html = renderScriptPage(/** @type {any} */ (await loadFilmPage(store)));
+  assert.equal((html.match(/<article class="line/g) ?? []).length, 248, "every narrated scene, no wordless one");
+  assert.ok(html.includes('<article class="line" id="SC0001"><p class="meta"><b>SC0001</b> · C1 · 0:00:00–0:00:08 · 8 s · 18 words</p>'));
+  assert.ok(html.includes('<article class="line pending" id="SC0002">') && html.includes("do not record"), "a scene with an unresolved number is marked");
+  assert.ok(html.includes("&lt;b&gt;It cost") && !html.includes("<b>It cost"), "narration is escaped");
+  assert.ok(renderFilmPage(/** @type {any} */ (await loadFilmPage(store))).includes('<a href="script">'), "the film page links to it");
 });

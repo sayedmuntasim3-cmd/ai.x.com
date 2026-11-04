@@ -11,6 +11,7 @@
  *   GET  /api/films/:id              run state: stages, usage, cost, gaps
  *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
  *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
+ *   GET  /api/films/:id/script       the narration script for recording it yourself (one line per scene file)
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/render       start the GitHub render (MP4, Shorts, thumbnails)   (Bearer STUDIO_TOKEN)
  *
@@ -25,7 +26,7 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
-import { loadFilmPage, PAGE_CSP, renderFilmPage } from "../engine/src/film-page.mjs";
+import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../engine/src/film-page.mjs";
 import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
@@ -156,12 +157,12 @@ export default {
         if (env.FILMS && result.ok) await r2Store(env.FILMS, render[1]).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
         return json(result, result.ok ? 202 : 502);
       }
-      const page = /^\/api\/films\/([0-9a-f-]{36})\/page$/.exec(url.pathname);
+      const page = /^\/api\/films\/([0-9a-f-]{36})\/(page|script)$/.exec(url.pathname);
       if (page && request.method === "GET") {
         if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
         const data = await loadFilmPage(r2Store(env.FILMS, page[1]));
         if (!data) return json({ error: "Not found." }, 404);
-        return new Response(renderFilmPage(data), {
+        return new Response(page[2] === "script" ? renderScriptPage(data) : renderFilmPage(data), {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": PAGE_CSP, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" },
         });
       }

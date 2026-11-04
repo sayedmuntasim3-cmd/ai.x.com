@@ -60,7 +60,7 @@ export async function recordVoice(o) {
       const line = o.lines[next];
       next += 1;
       const file = join(o.outDir, `${line.scene}.mp3`);
-      if (["mp3", "wav", "m4a", "flac"].some((ext) => existsSync(join(o.outDir, `${line.scene}.${ext}`)))) { result.kept += 1; continue; }
+      if (["mp3", "wav", "m4a", "aac", "ogg", "flac"].some((ext) => existsSync(join(o.outDir, `${line.scene}.${ext}`)))) { result.kept += 1; continue; }
       try {
         const data = await speak(line);
         writeFileSync(file + ".part", Buffer.from(data.audio_base64, "base64"));
