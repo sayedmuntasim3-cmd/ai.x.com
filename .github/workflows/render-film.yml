@@ -55,6 +55,13 @@ jobs:
           [[ "$FILM_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::The film ID must be the 36-character ID from the studio."; exit 1; }
           [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::The site must look like https://ai.zupona.com"; exit 1; }
           [[ "$RESOLUTION" =~ ^[0-9]{3,4}x[0-9]{3,4}$ ]] || { echo "::error::Bad resolution."; exit 1; }
+      - name: Reuse the previous render of this film (only changed scenes are redone)
+        uses: actions/cache@v4
+        with:
+          path: .render
+          key: render-${{ inputs.film_id }}-${{ inputs.resolution }}-${{ github.run_id }}
+          restore-keys: |
+            render-${{ inputs.film_id }}-${{ inputs.resolution }}-
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null && ffmpeg -version | head -1
       - name: Record the narration (ElevenLabs)
