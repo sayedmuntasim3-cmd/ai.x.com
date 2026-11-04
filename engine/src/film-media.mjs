@@ -41,6 +41,15 @@ function wordSet(text) {
 const clock = (t) => toSeconds(t);
 
 /**
+ * The shots of one SHOTS field, "(1) ...; (2) ...", in order. Shot numbers in
+ * media-C1.json are positions in this list, starting at 1.
+ * @param {string} field
+ */
+export function shotParts(field) {
+  return field.split(/\(\d+\)\s*/).map((p) => p.trim().replace(/;$/, "").trim()).filter(Boolean);
+}
+
+/**
  * The stock shots of a chapter, with their film times and search queries.
  * Graphics shots (rung R1) need no footage and are left out. Queries come
  * from the SRC field (Q1 "...", Q2 "..."), which holds one group per subject
@@ -55,7 +64,7 @@ export function stockShots(markdown) {
   /** @type {StockShot[]} */
   const out = [];
   for (const s of parseSceneLines(markdown)) {
-    const shots = (s.fields.SHOTS ?? "").split(/\(\d+\)\s*/).map((p) => p.trim().replace(/;$/, "").trim()).filter(Boolean);
+    const shots = shotParts(s.fields.SHOTS ?? "");
     /** @type {{ start: number, end: number, rung: string | null, description: string, index: number }[]} */
     const stock = [];
     shots.forEach((text, i) => {

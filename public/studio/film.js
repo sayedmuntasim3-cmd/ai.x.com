@@ -18,6 +18,8 @@ const T = {
     status: "অবস্থা",
     spent: "এখন পর্যন্ত খরচ",
     files: "ফাইল",
+    page: "পুরো ফিল্মের পেজ খোলো (স্ক্রিপ্ট, শট, ক্লিপ, সোর্স, খরচ)",
+    footage: "ফুটেজ",
     gaps: "বাকি কাজ (GAP)",
     stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
   },
@@ -35,6 +37,8 @@ const T = {
     status: "Status",
     spent: "Spent so far",
     files: "Files",
+    page: "Open the film page (script, shots, clips, sources, cost)",
+    footage: "Footage",
     gaps: "Open items (GAPs)",
     stages: { s01: "S0–S1 titles and plan", research: "Web research", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
   },
@@ -115,8 +119,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   out.append(h("p", `${l.spent}: $${run.costUsd ?? 0}`));
   const list = document.createElement("ul");
   for (const [stage, info] of Object.entries(run.stages ?? {})) {
-    const key = stage.startsWith("s5:") ? null : stage;
-    const label = key ? l.stages[key] ?? stage : `S5 ${stage.slice(3)}`;
+    const label = stage.startsWith("s5:") ? `S5 ${stage.slice(3)}` : stage.startsWith("media:") ? `${l.footage} ${stage.slice(6)}` : l.stages[stage] ?? stage;
     list.append(h("li", `✓ ${label}${info.result && info.result.ok === false ? " (GAP)" : ""}`));
   }
   out.append(list);
@@ -126,7 +129,15 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
     for (const x of run.gaps.slice(0, 20)) g.append(h("li", x));
     out.append(g);
   }
-  const files = ["s01.md", "research.json", "s2.md", "s3.md", "s4.md", ...Object.keys(run.stages ?? {}).filter((s) => s.startsWith("s5:")).map((s) => `s5-${s.slice(3)}.md`), "qa.json", "s6.md", "s7.md"];
+  const stages = Object.keys(run.stages ?? {});
+  const files = ["s01.md", "research.json", "s2.md", "s3.md", "s4.md", ...stages.filter((s) => s.startsWith("s5:")).map((s) => `s5-${s.slice(3)}.md`), "qa.json", ...stages.filter((s) => s.startsWith("media:")).map((s) => `media-${s.slice(6)}.json`), "s6.md", "s7.md"];
+  const page = document.createElement("a");
+  page.href = `/api/films/${id}/page`;
+  page.textContent = l.page;
+  page.target = "_blank";
+  page.rel = "noopener";
+  page.className = "go";
+  out.append(page);
   out.append(h("h4", l.files));
   const p = document.createElement("p");
   for (const f of files) {

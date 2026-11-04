@@ -9,6 +9,7 @@
  *   POST /api/films                  { topic, minutes, versionId?, notes? } -> { id }   (Bearer STUDIO_TOKEN)
  *   GET  /api/films/:id              run state: stages, usage, cost, gaps
  *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
+ *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
  *
  * Needs (set by the owner when Cloudflare is connected):
  *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
@@ -19,6 +20,7 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
+import { loadFilmPage, PAGE_CSP, renderFilmPage } from "../engine/src/film-page.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
 
@@ -104,6 +106,15 @@ export default {
         await store.put("film.json", JSON.stringify(made.film, null, 1));
         await env.FILM_RUN.create({ id, params: { film: made.film } });
         return json({ id, film: made.film, estimate: estimateRun(made.film.durationSeconds, env.MODEL || "claude-opus-5-5") }, 202);
+      }
+      const page = /^\/api\/films\/([0-9a-f-]{36})\/page$/.exec(url.pathname);
+      if (page && request.method === "GET") {
+        if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
+        const data = await loadFilmPage(r2Store(env.FILMS, page[1]));
+        if (!data) return json({ error: "Not found." }, 404);
+        return new Response(renderFilmPage(data), {
+          headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": PAGE_CSP, "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" },
+        });
       }
       const m = /^\/api\/films\/([0-9a-f-]{36})(?:\/files\/([^/]+))?$/.exec(url.pathname);
       if (m && request.method === "GET") {
