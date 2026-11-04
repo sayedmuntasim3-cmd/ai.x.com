@@ -114,3 +114,10 @@ test("captions land on the voice's own word timings, sped up exactly as the rend
   const estimated = buildTimeline({ chapters: [{ id: "C1", markdown: md }] });
   assert.ok(estimated.captions.every((c) => c.words && c.words.length > 0), "without timings, every word still gets an estimated time");
 });
+
+test("v3 delivery tags in a take's timings never become caption words", async () => {
+  const { wordsFromAlignment } = await import("../src/timeline.mjs");
+  const chars = [..."[softly] He kept it."];
+  const words = wordsFromAlignment({ characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.05), character_end_times_seconds: chars.map((_, i) => i * 0.05 + 0.05) });
+  assert.deepEqual(words.map((w) => w.text), ["He", "kept", "it."]);
+});

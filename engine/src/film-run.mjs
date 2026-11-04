@@ -15,7 +15,7 @@
  * so a run survives restarts: a finished stage is never paid for twice.
  */
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
-import { getFormat, suggestFormat } from "./formats.mjs";
+import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
 import { applyFixes, checkChapter, checkFilm, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
@@ -101,6 +101,7 @@ export function filmBrief(film) {
     "5. Cinema finish: one master grade, speed ramps, push-ins, match cuts, layered sound, deliberate silence; less-downloaded clips; no clip repeated within 10 minutes; at most 3 variants per clip. Nothing is written on the video to mark it as fiction, AI or illustration.",
     "6. Retention: a 30-second hook (four beats, fast cuts), a reset about every 3 minutes, a pattern interrupt about every 25 seconds, a midpoint turn, an 80% cliffhanger, every open loop paid.",
     "7. Written to be felt, not only understood: every chapter has one scene built to move the viewer (a loss, a sacrifice, a choice, a reunion or a reveal). Before it the music drops or goes silent and the narration slows into short sentences; the picture holds; the music swells after. Specific sensory detail beats adjectives. People want something concrete, fear something specific and pay a price for what they get. The lesson lands through what happens and is never stated. End on an image and one line the viewer repeats.",
+    ...(lookFor(film.formatId) === "cinematic" ? ["8. Performance: every scene line adds DELIVERY: one to three ElevenLabs v3 tags in square brackets for the narrator, matching the scene's emotion ([softly], [serious], [warm], [whispers], [sighs], [hopeful], [excited], [pause]). They direct the voice and are never read aloud; they never count toward W."] : []),
     ...(story ? ["", "STORY RULES:", ...STORY_RULES.map((r, i) => `S${i + 1}. ${r}`)] : []),
     "",
     `VERSION LOCK: audience ${v.audience}; language ${v.register}; currency ${v.currency} (an amount that began in another currency is shown in dollars first, with the original small beneath and the conversion basis in the ledger). Narration pace ${v.narrationWpm.target} words per minute. Codes, IDs, search queries and file or grade terms stay in English. Never mention any other version.`,

@@ -45,3 +45,42 @@ test("narrated scenes are recorded with their neighbours as context; placeholder
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("stories read with ElevenLabs v3: each scene's DELIVERY tags lead the line, never read by v2; a model without timings still records", async () => {
+  const { deliveryTags, V3 } = await import("./voice.mjs");
+  assert.equal(deliveryTags("[softly] [serious]"), "[softly] [serious]");
+  assert.equal(deliveryTags("quiet, slow"), "[quiet] [slow]");
+  assert.equal(deliveryTags("[a] [b] [c] [d]"), "", "too short to be a direction");
+  assert.equal(deliveryTags("[warm] [hopeful] [pause] [sighs]"), "[warm] [hopeful] [pause]", "at most three");
+  assert.equal(deliveryTags(undefined), "");
+
+  const md = `**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: He kept the razor. | W 4/4 | ANCHOR: x | SHOTS: (1) R3 razor | DELIVERY: [softly] [serious] | LOOK: L`;
+  const { lines } = voiceLines([{ markdown: md }]);
+  assert.equal(lines[0].delivery, "[softly] [serious]");
+  const dir = mkdtempSync(join(tmpdir(), "zupona-v3-"));
+  try {
+    /** @type {any[]} */
+    const calls = [];
+    const fake = /** @type {typeof fetch} */ (async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      if (String(url).includes("/with-timestamps")) return new Response("timestamps not supported for this model", { status: 422 });
+      return new Response("ID3 v3 audio");
+    });
+    const r = await recordVoice({ apiKey: "K", voiceId: "v", modelId: V3, outDir: dir, lines, fetch: fake, sleep: async () => {} });
+    assert.deepEqual([r.recorded, r.failed.length], [1, 0]);
+    assert.equal(calls[0].body.model_id, "eleven_v3");
+    assert.equal(calls[0].body.text, "[softly] [serious] He kept the razor.");
+    assert.equal(calls[0].body.previous_text, undefined, "v3 has no request stitching");
+    assert.ok(!calls[1].url.includes("with-timestamps"), "falls back to the plain endpoint");
+    assert.equal(readFileSync(join(dir, "SC0001.mp3"), "utf8"), "ID3 v3 audio");
+    assert.ok(!existsSync(join(dir, "SC0001.alignment.json")), "no timings: captions are estimated");
+
+    const v2calls = /** @type {any[]} */ ([]);
+    const dir2 = mkdtempSync(join(tmpdir(), "zupona-v2-"));
+    await recordVoice({ apiKey: "K", voiceId: "v", outDir: dir2, lines, fetch: /** @type {typeof fetch} */ (async (_u, init) => { v2calls.push(JSON.parse(String(init?.body))); return Response.json({ audio_base64: "", alignment: null }); }), sleep: async () => {} });
+    assert.equal(v2calls[0].text, "He kept the razor.", "v2 never sees the tags");
+    rmSync(dir2, { recursive: true, force: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

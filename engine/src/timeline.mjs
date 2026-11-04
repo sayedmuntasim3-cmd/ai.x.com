@@ -96,7 +96,11 @@ export function wordsFromAlignment(alignment, offset = 0, tempo = 1) {
   const words = [];
   /** @type {TimedWord | null} */
   let word = null;
+  let inTag = false;
   for (let i = 0; i < chars.length; i += 1) {
+    // ElevenLabs v3 delivery tags ("[softly]") are performance, not words: they never reach the captions.
+    if (chars[i] === "[") { inTag = true; if (word) words.push(word); word = null; continue; }
+    if (inTag) { if (chars[i] === "]") inTag = false; continue; }
     if (/\s/.test(chars[i])) { if (word) words.push(word); word = null; continue; }
     if (!word) word = { text: "", start: Number(starts[i]), end: Number(ends[i]) };
     word.text += chars[i];
