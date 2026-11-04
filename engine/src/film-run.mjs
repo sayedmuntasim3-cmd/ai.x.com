@@ -14,6 +14,7 @@
  * - step(name, fn)                                       (Cloudflare Workflows step.do, or fn() in tests)
  * so a run survives restarts: a finished stage is never paid for twice.
  */
+import { chapterMedia, createUseHistory } from "./film-media.mjs";
 import { applyFixes, checkChapter, checkFilm, toClock, toSeconds } from "./scene-lines.mjs";
 import { getVersion } from "./versions.mjs";
 
@@ -174,7 +175,10 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * Run (or resume) a film. Returns the final run state.
  * budgetUsd stops the run before any stage that starts once the money spent
  * has reached it, so a small budget is never overrun by more than one stage.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number }} o
+ * media (optional) adds the media step after QA: free stock footage for
+ * every S5 shot, one media-C1.json ... per chapter. Without providers (no
+ * PEXELS_API_KEY or PIXABAY_API_KEY) the step is left for a later resume.
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, media?: { providers: import("./film-media.mjs").MediaProvider[], maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -383,6 +387,26 @@ export async function runFilm(o) {
       await store.put("fix-log.json", JSON.stringify(fixLog, null, 1));
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };
     });
+
+    // Media: free stock footage for every shot, in film order, so no clip
+    // repeats within 10 minutes across chapters (earlier picks are reloaded).
+    if (o.media?.providers.length) {
+      const providers = o.media.providers;
+      const history = createUseHistory();
+      for (const c of plan.chapters) {
+        const key = `media-${c.id}.json`;
+        await stage(`media:${c.id}`, async () => {
+          const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep });
+          await store.put(key, JSON.stringify(media, null, 1));
+          if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no free clip yet (see ${key}).`);
+          return media.stats;
+        });
+        const saved = await store.get(key);
+        if (saved) history.load(JSON.parse(saved));
+      }
+    } else if (o.media) {
+      state.media = "skipped: no PEXELS_API_KEY or PIXABAY_API_KEY";
+    }
 
     await stage("s6", async () => {
       const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId) })));

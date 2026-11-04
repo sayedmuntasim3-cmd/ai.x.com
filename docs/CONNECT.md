@@ -26,8 +26,17 @@ The studio shows an estimate before you start (Claude Opus 5.5): about **$4–8 
 
 Optional: change `MODEL` or `BUDGET_USD` in `wrangler.jsonc` (`vars`). `GET /api/health` shows what is connected, without showing any secret.
 
+## Media step (optional, free)
+
+After QA the run searches free stock footage for every S5 stock shot, with the scene's own queries, and writes `media-C1.json` ... per chapter: one pick per shot with its licence record (licence, source page, creator), up to three alternates, and the search trace. Only Pexels License and Pixabay Content License items are kept, and no clip is used twice within 10 minutes of film time. Shots with no free clip are listed as GAPs.
+
+1. Pexels: create a free key at https://www.pexels.com/api/ and run `npx wrangler secret put PEXELS_API_KEY` (limit 200 searches per hour).
+2. Pixabay: log in, copy your key from https://pixabay.com/api/docs/ and run `npx wrangler secret put PIXABAY_API_KEY` (limit 100 searches per minute).
+
+One key is enough; both give more choice. Without either the step is skipped (`run.json` says so) and runs when the film is resumed with a key. `GET /api/health` shows `pexels` and `pixabay` as true once set.
+
 ## Not built yet (next steps)
 
-- Turning the blueprint into video: stock search and download through the Pexels and Pixabay APIs (`engine/src/documentary-media-fetch.mjs` is ready), voice, edit and render.
+- Turning the blueprint into video: downloading the picked clips, voice, edit and render (the stock search is built: the media step above).
 - Arabic and Bangla runs (English first, by the owner's decision).
 - A login system for clients (today one studio token protects the paid API).

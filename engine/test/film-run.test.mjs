@@ -157,3 +157,37 @@ test("a run stops at its budget and resumes where it stopped", async () => {
   assert.equal(done.status, "done");
   assert.equal(model.calls.length, 12, "nothing already paid for is asked again");
 });
+
+test("the media step writes media-C1.json per chapter, never repeats a clip, and resumes without searching again", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f3");
+  assert.ok(made.ok);
+  let searches = 0;
+  let clip = 0;
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const pexels = { id: "pexels", layer: 2, kinds: ["video"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search() {
+    searches += 1;
+    // Ten distinct free clips in total: the twelve shots of a two-minute film cannot all get one.
+    return Array.from({ length: 3 }, () => { const id = (clip++ % 10) + 1; return { id: `pexels:video:${id}`, source: "pexels", mediaType: "video", title: "mill", previewUrl: null, mediaUrl: `https://videos.pexels.com/${id}.mp4`, sourcePageUrl: `https://www.pexels.com/video/${id}/`, creator: "Ana", license: "Pexels License", licenseUrl: "https://www.pexels.com/license/", durationSeconds: 10, width: 1920, height: 1080, attributionRequired: false }; });
+  } };
+  const model = scriptedModel();
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "M", model, store, media: { providers: [pexels] } });
+  const c1 = JSON.parse(store.m.get("media-C1.json"));
+  const c2 = JSON.parse(store.m.get("media-C2.json"));
+  assert.equal(c1.stats.shots + c2.stats.shots, 12);
+  const ids = [...c1.shots, ...c2.shots].filter((/** @type {any} */ s) => s.pick).map((/** @type {any} */ s) => s.pick.id);
+  assert.equal(new Set(ids).size, ids.length, "no clip twice within 10 minutes, across chapters too");
+  assert.equal(c1.shots[0].pick.licence.licenseId, "PEXELS");
+  assert.equal(c1.shots[0].query, "old mill");
+  assert.equal(state.status, c1.stats.missing + c2.stats.missing ? "done-with-gaps" : "done");
+  assert.ok(state.stages["media:C2"].status === "done");
+  const before = searches;
+  await runFilm({ film: made.film, manual: "M", model, store, media: { providers: [pexels] } });
+  assert.equal(searches, before, "a finished media step is not searched again");
+
+  const noKeys = memoryStore();
+  const plain = await runFilm({ film: made.film, manual: "M", model: scriptedModel(), store: noKeys, media: { providers: [] } });
+  assert.equal(plain.status, "done");
+  assert.match(plain.media, /no PEXELS_API_KEY/);
+  assert.ok(!noKeys.m.has("media-C1.json"));
+});

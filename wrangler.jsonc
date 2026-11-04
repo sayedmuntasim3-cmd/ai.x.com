@@ -18,4 +18,5 @@
   "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60" },
   "observability": { "enabled": true }
   // Secrets (npx wrangler secret put NAME): ANTHROPIC_API_KEY, STUDIO_TOKEN
+  // Optional secrets for the media step: PEXELS_API_KEY, PIXABAY_API_KEY
 }

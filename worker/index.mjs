@@ -13,8 +13,11 @@
  * Needs (set by the owner when Cloudflare is connected):
  *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
  *   Optional vars: MODEL (default claude-opus-5-5), BUDGET_USD (default 60).
+ *   Optional secrets PEXELS_API_KEY, PIXABAY_API_KEY: the media step (free
+ *   stock footage per shot, media-C1.json ...). Without them it is skipped.
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
+import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
@@ -66,6 +69,7 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       model,
       store: r2Store(env.FILMS, film.id),
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
+      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY }) },
       log: (line) => console.log(`[${film.id}] ${line}`),
       step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "30 minutes" }, fn),
     });
@@ -79,7 +83,7 @@ export default {
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
       if (url.pathname === "/api/health") {
-        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), model: env.MODEL || "claude-opus-5-5" });
+        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), model: env.MODEL || "claude-opus-5-5" });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
