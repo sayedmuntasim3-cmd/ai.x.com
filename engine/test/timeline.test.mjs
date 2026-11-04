@@ -30,6 +30,7 @@ test("untimed shots share the scene, picked clips are used, and voice length set
   const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, media: /** @type {any} */ (media) }], voice: { SC0001: { durationSeconds: 6 } } });
   assert.deepEqual(t.video.map((v) => [v.type, v.start, v.end]), [["clip", 0, 3], ["card", 3, 6], ["card", 6, 9]]);
   assert.equal(t.video[0].motion, "push");
+  assert.equal(t.video[0].sourceIn, 1, "a 5 s clip for a 3 s shot starts 1 s in, in its steady middle");
   assert.equal(t.video[2].text, "THE MILL");
   assert.ok(t.notes.some((n) => n.startsWith("SC0001-2: no clip")));
   assert.equal(t.captions[t.captions.length - 1].end, 6, "captions end when the voice ends, not the scene");

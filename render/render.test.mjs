@@ -131,3 +131,22 @@ test("the S7 Shorts and Facebook cut are read and cut vertical with hook and cap
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("counter cards run up to quantities, never to years, ranges or decimals", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const { counterParts } = await import("./render-film.mjs");
+  assert.deepEqual(counterParts("$20,000 a year"), { before: "$", value: 20000, after: " a year" });
+  assert.deepEqual(counterParts("400 cars"), { before: "", value: 400, after: " cars" });
+  for (const t of ["Year 2011", "500–750 haircuts", "1.5 million", "no number", "50% off"].slice(0, 4)) assert.equal(counterParts(t), null, t);
+  assert.deepEqual(counterParts("50% more"), { before: "", value: 50, after: "%% more" }, "a literal % is escaped for drawtext");
+  const md = `**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card | FX: FX-COUNTER | OST: "$20,000 a year" | LOOK: L`;
+  const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+  assert.equal(timeline.video[0].counter, true);
+  const dir = mkdtempSync(join(tmpdir(), "zupona-counter-"));
+  try {
+    const out = join(dir, "c.mp4");
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    assert.ok(Math.abs((await mediaDuration(out)) - 3) < 0.15);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

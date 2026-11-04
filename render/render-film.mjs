@@ -55,6 +55,20 @@ export async function mediaDuration(file, ffprobe = "ffprobe") {
   return Number(out.trim());
 }
 
+/**
+ * The number a counter card runs up to, with the words around it; null when
+ * there is no whole number to count (decimals and ranges stay static).
+ * @param {string} text
+ */
+export function counterParts(text) {
+  const m = /^([^\d]*?)(\d{1,3}(?:,\d{3})+|\d+)(?![\d.]\d)(.*)$/s.exec(text);
+  if (!m || /^\s*[–-]\s*\d/.test(m[3])) return null;
+  const value = Number(m[2].replace(/,/g, ""));
+  if (!Number.isSafeInteger(value) || value < 2) return null;
+  if (!m[2].includes(",") && value >= 1500 && value <= 2100) return null; // a year, not a quantity
+  return { before: m[1].replace(/%/g, "%%"), value, after: m[3].split("\n")[0].replace(/%/g, "%%").slice(0, 40) };
+}
+
 /** @param {unknown} v */
 const hash = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex").slice(0, 16);
 
@@ -150,7 +164,7 @@ export async function renderFilm(o) {
   /** @type {string[]} */
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
-    const key = hash({ v: 2, type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 2, in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -161,7 +175,7 @@ export async function renderFilm(o) {
     let type = v.type;
     if (type === "clip" && v.url) {
       try {
-        input = ["-stream_loop", "-1", "-i", await fetchClip(v.url)];
+        input = [...(v.sourceIn ? ["-ss", String(v.sourceIn)] : []), "-stream_loop", "-1", "-i", await fetchClip(v.url)];
         chain.push(frame);
         if (v.motion === "push") chain.push(`zoompan=z='1+0.06*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}`);
         chain.push(LOOK);
@@ -176,7 +190,14 @@ export async function renderFilm(o) {
       input = color(type === "black" ? "black" : "0x0b110e");
       if (type === "card") {
         chain.push(CARD_BG(v.frames));
-        if (v.text && font) chain.push(text(wrap(v.text, 26), "card", `fontfile='${escPath(font)}':fontcolor=0xe4ede7:fontsize=${Math.round(H * 0.065)}:line_spacing=${Math.round(H * 0.02)}:x=(w-text_w)/2:y=(h-text_h)/2`));
+        const cardStyle = `fontfile='${escPath(font ?? "")}':fontcolor=0xe4ede7:fontsize=${Math.round(H * 0.065)}:line_spacing=${Math.round(H * 0.02)}:x=(w-text_w)/2:y=(h-text_h)/2`;
+        const count = v.counter ? counterParts(v.text) : null;
+        if (v.text && font && count) {
+          // The number runs up for the first part of the shot, then the text settles exactly as written.
+          const runFor = Math.min(1.2, (v.frames / t.fps) * 0.6).toFixed(2);
+          chain.push(text(`${count.before}%{eif:min(${count.value},${count.value}*t/${runFor}):d}${count.after}`, "count", `${cardStyle}:expansion=normal:enable='lt(t,${runFor})'`));
+          chain.push(text(wrap(v.text, 26), "card", `${cardStyle}:enable='gte(t,${runFor})'`));
+        } else if (v.text && font) chain.push(text(wrap(v.text, 26), "card", cardStyle));
       }
     }
     // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.

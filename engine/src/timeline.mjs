@@ -12,8 +12,10 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string }} VideoSegment
- *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean }} VideoSegment
+ *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
+ *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
+ *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
@@ -155,9 +157,13 @@ export function buildTimeline(o) {
         first = false;
         if (rung === "R1") {
           const black = /\bcut to black\b|\bblack (frame|card|hold)\b|^R1\s+[\d.]+\s*s\s+black/i.test(shot.text);
-          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: black ? "" : cardText(shot.text, ost) });
+          const words = black ? "" : cardText(shot.text, ost);
+          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: /COUNTER/i.test(s.fields.FX ?? "") && /\d/.test(words) });
         } else if (row?.pick?.mediaUrl) {
-          video.push({ ...base, type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
+          const clipSeconds = Number(row.pick.durationSeconds) || 0;
+          const shotSeconds = frames / fps;
+          const sourceIn = clipSeconds > shotSeconds ? Math.round(Math.min(3, (clipSeconds - shotSeconds) / 2) * 100) / 100 : 0;
+          video.push({ ...base, sourceIn, type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
           video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: cardText(shot.text, ost) });
