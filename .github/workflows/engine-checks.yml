@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "engine/**"
+      - "public/studio/**"
       - ".github/workflows/engine-checks.yml"
   pull_request:
     paths:
       - "engine/**"
+      - "public/studio/**"
       - ".github/workflows/engine-checks.yml"
 
 permissions:

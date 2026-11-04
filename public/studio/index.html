@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zupona AI Studio</title>
+<meta name="description" content="Plan a documentary from one idea, in Arabic, English and Bangla, and check your voice recording. Runs in your browser.">
+<meta name="theme-color" content="#080b0a">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&family=Noto+Naskh+Arabic:wght@400;600&display=swap">
+<link rel="stylesheet" href="./studio.css">
+<script type="module" src="./app.js"></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/" aria-label="Zupona AI">
+    <span class="logo" aria-hidden="true">Z</span>
+    <span><strong>Zupona AI</strong> <span class="muted" data-t="studio">Studio</span></span>
+  </a>
+  <div class="lang" role="group" aria-label="Language">
+    <button type="button" data-lang="bn" aria-pressed="true">বাংলা</button>
+    <button type="button" data-lang="en" aria-pressed="false">English</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="lead" data-t="lead"></p>
+  <div class="grid">
+    <section class="col" aria-labelledby="idea-h">
+      <form class="card" id="idea-form" novalidate>
+        <h2 id="idea-h"><span class="step">1</span> <span data-t="ideaTitle"></span></h2>
+        <label class="sr" for="idea" data-t="ideaTitle"></label>
+        <textarea id="idea" rows="4" dir="auto" data-ph="ideaPlaceholder" required></textarea>
+        <div class="examples" aria-label="Examples">
+          <span class="muted small" data-t="tryExample"></span>
+          <button type="button" class="chip" data-example="a poor boy starts with $50 and buys a Rolls-Royce, a stroy">$50 → Rolls-Royce</button>
+          <button type="button" class="chip" data-example="ইতিহাশের সবচেয়ে বড় রহস্য">ইতিহাসের রহস্য</button>
+          <button type="button" class="chip" lang="ar" dir="rtl" data-example="قصة النبي يوسف">قصة النبي يوسف</button>
+          <button type="button" class="chip" data-example="what is realy under antartica">Under Antarctica</button>
+        </div>
+        <fieldset class="seg">
+          <legend data-t="modeLabel"></legend>
+          <label><input type="radio" name="mode" value="auto" checked><span data-t="modeAuto"></span></label>
+          <label><input type="radio" name="mode" value="documentary"><span data-t="modeReal"></span></label>
+          <label><input type="radio" name="mode" value="story"><span data-t="modeStory"></span></label>
+        </fieldset>
+        <div class="row">
+          <label for="minutes" data-t="lengthLabel"></label>
+          <select id="minutes">
+            <option value="" data-t="lengthAuto"></option>
+            <option value="1" data-t="lengthShort"></option>
+            <option value="5">5 min</option>
+            <option value="10">10 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+          </select>
+        </div>
+        <button class="go" type="submit" data-t="planButton"></button>
+        <p class="error" id="idea-error" role="alert" hidden></p>
+      </form>
+      <div id="idea-out" class="out" aria-live="polite"></div>
+    </section>
+
+    <section class="col" aria-labelledby="voice-h">
+      <form class="card" id="voice-form" novalidate>
+        <h2 id="voice-h"><span class="step">2</span> <span data-t="voiceTitle"></span></h2>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.opus,.flac,.webm">
+          <span class="drop-main" data-t="dropMain"></span>
+          <span class="muted small" data-t="dropHint"></span>
+          <span class="file-name" id="file-name"></span>
+        </label>
+        <fieldset class="seg">
+          <legend data-t="voiceLang"></legend>
+          <label><input type="radio" name="vlang" value="bn-BD" checked><span>বাংলা</span></label>
+          <label><input type="radio" name="vlang" value="en-US"><span>English</span></label>
+          <label><input type="radio" name="vlang" value="ar"><span lang="ar">العربية</span></label>
+        </fieldset>
+        <div class="row">
+          <label for="ctype" data-t="contentLabel"></label>
+          <select id="ctype">
+            <option value="documentary" data-t="ctDoc"></option>
+            <option value="story" data-t="ctStory"></option>
+            <option value="islamic" data-t="ctIslamic"></option>
+            <option value="quran_recitation" data-t="ctQuran"></option>
+          </select>
+        </div>
+        <p class="status" id="voice-status" role="status"></p>
+        <audio id="player" controls hidden></audio>
+        <p class="error" id="voice-error" role="alert" hidden></p>
+      </form>
+      <div id="voice-out" class="out" aria-live="polite"></div>
+    </section>
+  </div>
+  <footer class="foot muted small" data-t="footer"></footer>
+</main>
+</body>
+</html>

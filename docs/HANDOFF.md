@@ -34,6 +34,13 @@ Read this file instead of re-analysing everything. It is the short state of the 
 8. Footage comes from legal sources only (stock sites, Commons, NASA and others) or with written permission from the creator. **No cutting or downloading from Facebook, X, YouTube or TikTok.** The owner's own master prompt said the same.
 9. Honesty: no fake functionality, no guaranteed view counts. Test everything.
 
+## Studio first screen (done, 3 Nov 2026)
+
+`public/studio/` is served at `/studio/` by the same Worker (static files, no server, no keys). Two inputs:
+idea → `planIdea` (spelling fixes, film kind, format, beats, three versions, run plan, rules);
+recording → `analyzeRecording` in a Web Worker → `planRecording` (report and voice plan).
+Bangla and English interface. `public/studio/engine/` is a copy of `engine/src/`: run `cd engine && npm run sync` after any engine change (a test fails otherwise).
+
 ## Next steps, in order
 
 1. **Studio app.** Move it from the zupona AI branches into ai.x.com as its own Worker and wire the engine modules in. When Cloudflare is connected it will need:
