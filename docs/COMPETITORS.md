@@ -15,10 +15,12 @@ This scan was quick (five web searches). It updates the October list in `docs/SY
 ## Our position, honestly
 
 - **Ahead:** the price is shown before a run. A finished stage is never paid for twice (resumable runs). There is a budget stop. Every chapter is checked in code. Every fact has a source. Every stock shot gets a free-licence clip that is not repeated within 10 minutes. The run's page shows all of this in one place.
-- **Behind:** we do not render a video yet. InVideo delivers a finished video file, and we deliver a production blueprint plus a footage list. This is the largest gap.
+- **Behind (closing):** InVideo delivers a finished video file. We now render an MP4 with narration, captions and a licence report (`render/`), but our graphics shots are plain text cards and there is no music bed yet.
 - **Unproven:** nothing has run against the real Claude, Pexels or Pixabay APIs yet.
 
 ## What to build, in order of value
+
+Status, 4 Nov 2026: items 1–4 are built and tested with fakes (render runs on any machine with ffmpeg; a hosted render machine is still the owner's choice). Item 5 needs client billing, which does not exist yet.
 
 1. **Render (closes the largest gap):** download the picked clips, record the voice (ElevenLabs), build a timeline from the scene lines, then render with ffmpeg. A Cloudflare Worker cannot run ffmpeg, so this needs a render machine: Cloudflare Containers, or a small VM. The owner chooses, because it has a running cost.
 2. **Footage relevance check:** show Claude the top three thumbnails per shot and keep the one that really matches the shot. This answers "wrong footage", the second-largest complaint.

@@ -11,14 +11,20 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
   - Media step (task 2 below, done 4 Nov 2026): `engine/src/film-media.mjs` + stage `media:C1` ... in `film-run.mjs` after QA; Pexels/Pixabay keys via `PEXELS_API_KEY`, `PIXABAY_API_KEY` (`docs/CONNECT.md`). Tested with fakes only; never run against the real APIs.
   - Film page (task 3, done 4 Nov 2026): `engine/src/film-page.mjs`, served at `/api/films/:id/page` with a no-script CSP; checked in the local Workers runtime (`wrangler dev --local`). The studio links to it. Landing page links to `/studio/` (task 4, done).
   - Competitor scan, 4 Nov 2026: `docs/COMPETITORS.md` (what to build next and why).
-  - Checks: `npm test` (74 engine + 1 worker), `npm run check` (wrangler dry-run) and `cd engine && npm run typecheck` pass.
+  - Built the same day from that scan (all tested with fakes; nothing has called a real API yet):
+    - render: `engine/src/timeline.mjs` (frame-exact edit list and captions) and `render/render-film.mjs` (ffmpeg MP4, SRT and a licence report; resumable; runs on any machine with ffmpeg). The full 45-minute USA film rendered in 81 s at 320×180.
+    - voice: `render/voice.mjs` (ElevenLabs per scene; placeholders are never read; the owner's own takes are kept).
+    - footage desk: Claude judges 320 px thumbnails, six shots per call (`createFootageJudge` in `film-run.mjs`); it is included in the estimate.
+    - re-make one scene: `engine/src/scene-remake.mjs`, `POST /api/films/:id/scenes/:sc`, and a form in the studio.
+    - channel originality guard: `engine/src/originality.mjs`, the `originality` stage, fingerprints in R2 `channel/fingerprints.json`.
+  - Checks: `npm test` (87 engine + 4 worker/render), `npm run check` (wrangler dry-run) and `cd engine && npm run typecheck` pass.
 - **Not done:** the film API has never run against the real Claude API. It needs the owner's Cloudflare connection and API key (`docs/CONNECT.md`).
 - **Next, in order:**
   1. If the owner says Cloudflare is connected: run one 2–10 minute English test film from `/studio/`, read `run.json` and the files, fix what breaks (prompts, timeouts, parsing), and report the real cost.
   2. ~~Media step~~ (done) (buildable without keys, fakes in tests): for each S5 shot, search Pexels and Pixabay with its queries through `engine/src/documentary-media-fetch.mjs`, keep only free-licence items with their licence record, never repeat a clip within 10 minutes, and write `media-C1.json` ... per chapter.
   3. ~~A readable page per run~~ (done) (like `productions/ramesh-babu/build.mjs`), served from `/api/films/:id/page`.
   4. ~~Link from the landing page~~ (done) (`public/index.html`) to `/studio/`.
-  5. Then, from `docs/COMPETITORS.md`: render (the owner chooses Cloudflare Containers or a VM), the footage relevance check with Claude vision, re-making one scene only, and the channel originality guard.
+  5. ~~Render, footage desk, scene re-make, originality guard~~ (built, see above). Next: the music bed with ducking under the voice, designed cards for graphics shots (kinetic text, lower thirds, source chips), and then a hosted render (the owner chooses Cloudflare Containers or a VM; until then `render/` runs on the owner's computer).
 - **Save credits:** no extra agents, no web research, long outputs written to files in parts, commit and push after every step, replies of 2–3 lines in Bangla.
 
 ## 1. The owner's mission and standard
