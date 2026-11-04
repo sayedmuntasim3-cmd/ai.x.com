@@ -12,7 +12,7 @@ Every file appears under the run in the studio as it is written (`s5-C1.md`, `qa
 
 ## Cost
 
-The studio shows an estimate before you start (Claude Opus 5.5): about **$4–8 for a 10-minute film** and **$6–13 for 45 minutes**. The real spend is counted from every API call and shown live. `BUDGET_USD` (default **60**) stops a run before the next stage once it is reached.
+The studio shows an estimate before you start (Claude Opus 5.5): about **$4–9 for a 10-minute film** and **$7–15 for 45 minutes** (including the footage desk that checks clips by eye). The real spend is counted from every API call and shown live. `BUDGET_USD` (default **60**) stops a run before the next stage once it is reached.
 
 ## Steps (one time, on your computer, in this repository)
 

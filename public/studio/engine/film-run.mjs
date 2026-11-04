@@ -154,8 +154,11 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
   const cachedIn = 30000 * (chapters + 8); // manual + brief + ledger + bibles, read from cache
   const searches = 30; // research stage: web_search max_uses
   const freshIn = Math.round(chapters * 12000 + 8 * 15000 + minutes * 3000 + searches * 10000); // stage inputs, QA reads the film, search results
-  const usd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6 + searches * 0.01;
-  return { model, chapters, outputTokens, inputTokens: cachedIn + freshIn, usdLow: round2(usd * 0.7), usdHigh: round2(usd * 1.5) };
+  // Footage desk: about 6.3 stock shots a minute, judged six at a time from 320 px thumbnails.
+  const judgeCalls = Math.ceil((minutes * 6.3) / 6);
+  const judgeUsd = (judgeCalls * (30000 * price.cacheRead + 3500 * price.input + 400 * price.output)) / 1e6;
+  const usd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6 + searches * 0.01 + judgeUsd;
+  return { model, chapters, outputTokens, inputTokens: cachedIn + freshIn, judgeCalls, usdLow: round2(usd * 0.7), usdHigh: round2(usd * 1.5) };
 }
 
 /**
