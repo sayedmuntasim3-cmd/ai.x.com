@@ -60,3 +60,30 @@ test("a film renders to MP4 with picture, voice in its slots, captions and a rep
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("run files are read from the film API the same way as from a folder", async () => {
+  const { createServer } = await import("node:http");
+  const { loadRunFiles } = await import("./render-film.mjs");
+  const usa = new URL("../productions/ramesh-babu/USA/", import.meta.url);
+  const id = "11111111-2222-3333-4444-555555555555";
+  /** @type {string[]} */
+  const asked = [];
+  const server = createServer((req, res) => {
+    asked.push(String(req.url));
+    const m = new RegExp(`^/api/films/${id}/files/([a-z0-9.-]+)$`, "i").exec(String(req.url));
+    const file = m ? new URL(m[1], usa) : null;
+    if (!file || !existsSync(file)) { res.writeHead(404).end("{}"); return; }
+    res.writeHead(200).end(readFileSync(file));
+  });
+  await new Promise((ok) => server.listen(0, "127.0.0.1", () => ok(null)));
+  try {
+    const port = /** @type {import("node:net").AddressInfo} */ (server.address()).port;
+    const fromApi = await loadRunFiles({ api: `http://127.0.0.1:${port}`, id });
+    const fromDir = await loadRunFiles({ dir: new URL(".", usa).pathname });
+    assert.equal(fromApi.length, 6);
+    assert.deepEqual(fromApi, fromDir);
+    assert.ok(asked.includes(`/api/films/${id}/files/media-C1.json`), "footage picks are asked for too");
+  } finally {
+    server.close();
+  }
+});

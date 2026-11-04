@@ -35,8 +35,20 @@ After QA the run searches free stock footage for every S5 stock shot, with the s
 
 One key is enough; both give more choice. Without either the step is skipped (`run.json` says so) and runs when the film is resumed with a key. `GET /api/health` shows `pexels` and `pixabay` as true once set.
 
+## Render the video (from the phone, free)
+
+When a film run is done, GitHub renders the MP4 on its own machines. The free plan includes 2,000 minutes a month for a private repository, and a 45-minute film takes roughly 30–90 minutes.
+
+1. One time only: in GitHub, open Settings > Secrets and variables > Actions and add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` (the voice to narrate with). Without them, the film renders without narration.
+2. Optional music: commit one track per cue as `music/<film id>/M01.mp3` ... (free tracks from Pixabay Music or Mixkit, chosen from the S4 music plan).
+3. Open the GitHub app or website and go to Actions > **Render a film** > Run workflow. Enter the film ID (the long ID in the film page's address), the site address and the picture size.
+4. When it finishes, download the artifact `film-<id>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload) and `<id>.report.json` (every clip with its licence page, and every warning).
+
+The same render also runs on any computer with Node 22 and ffmpeg: see `render/README.md`.
+
 ## Not built yet (next steps)
 
-- Turning the blueprint into video: downloading the picked clips, voice, edit and render (the stock search is built: the media step above).
+- Designed motion graphics (maps, counters, timelines). Graphics shots are text cards today.
+- A render started automatically when a run finishes (today it is one tap in GitHub Actions).
 - Arabic and Bangla runs (English first, by the owner's decision).
 - A login system for clients (today one studio token protects the paid API).
