@@ -12,10 +12,11 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[] }} VideoSegment
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
  *   style: "paper" for FX-PAPER cards (document look); kinetic: text moves in (FX-KINETIC);
+ *   split: the panels of an FX-SPLIT card ("A / B"), shown side by side, often two versions sources disagree on;
  *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
@@ -36,6 +37,31 @@ const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/g;
 export function cardText(shotText, ost) {
   const quoted = (/** @type {string} */ s) => /["“]([^"”]{2,80})["”]/.exec(s)?.[1]?.trim() ?? "";
   return quoted(ost) || quoted(shotText);
+}
+
+/**
+ * The panels of a split card, from the shot's own description: "a / b" in one
+ * quote, "a" / "b" as quotes, or two columns (options, cards) "a" and "b".
+ * Source notes in brackets are dropped. Two or three panels, else null.
+ * @param {string} text
+ * @returns {string[] | null}
+ */
+export function splitPanels(text) {
+  const clean = (/** @type {string} */ p) => p.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+  const Q = `["“]([^"”]{2,80})["”]`;
+  const slashed = new RegExp(`${Q}\\s*\\/\\s*${Q}(?:\\s*\\/\\s*${Q})?`).exec(text);
+  if (slashed) return slashed.slice(1).filter(Boolean).map(clean);
+  const named = new RegExp(`\\btwo (?:\\w+ )?(?:columns|options|panels|cards)\\b[^"“]*${Q}\\s*(?:and|,|\\/)\\s*${Q}`, "i").exec(text);
+  if (named) return [named[1], named[2]].map(clean);
+  const one = quotes(text).find((q) => / \/ /.test(q));
+  if (!one) return null;
+  const parts = one.split(/\s+\/\s+/).map(clean).filter(Boolean);
+  return parts.length >= 2 && parts.length <= 3 ? parts : null;
+}
+
+/** Quoted texts with at least one letter or digit, in order. @param {string} text */
+function quotes(text) {
+  return [...text.matchAll(/["“]([^"”]{1,160})["”]/g)].map((m) => m[1].trim()).filter((q) => /[\p{L}\p{N}]/u.test(q));
 }
 
 /**
@@ -194,8 +220,14 @@ export function buildTimeline(o) {
         first = false;
         if (rung === "R1") {
           const black = /\bcut to black\b|\bblack (frame|card|hold)\b|^R1\s+[\d.]+\s*s\s+black/i.test(shot.text);
-          const words = black ? "" : cardText(shot.text, ost);
-          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: /COUNTER/i.test(s.fields.FX ?? "") && /\d/.test(words) });
+          const panels = !black && /FX-SPLIT|split card|two columns/i.test(`${fx} ${shot.text}`) ? splitPanels(shot.text) : null;
+          let words = black ? "" : cardText(shot.text, ost);
+          if (panels) {
+            // The heading is the quote marked header, question or title, else the first quote that is not a panel.
+            const marked = /\b(?:header|question|title|heading)\s*["“]([^"”]{2,80})["”]/i.exec(shot.text)?.[1];
+            words = marked ?? quotes(shot.text).find((q) => !q.includes(" / ") && !panels.some((p) => q.includes(p) || p.includes(q))) ?? "";
+          }
+          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: !panels && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
           const shotSeconds = frames / fps;

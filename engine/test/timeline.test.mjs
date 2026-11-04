@@ -62,3 +62,20 @@ test("sound effects land on their cut or word; ambience lies under the scene", a
   assert.deepEqual(events.map((e) => [e.token, e.kind, e.start]), [["SND-AMB-03", "bed", 22], ["SND-FX-05", "hit", 25], ["SND-FX-06", "hit", 22 + (8 * 6) / 11]].map(([t, k, s]) => [t, k, Math.round(Number(s) * 1000) / 1000]));
   assert.deepEqual(sceneSounds("", scene, []), []);
 });
+
+test("split cards show both versions side by side, from the shot's own description", async () => {
+  const { splitPanels } = await import("../src/timeline.mjs");
+  assert.deepEqual(splitPanels('R1 split card "a relative ran it / it was leased out" in GRAY'), ["a relative ran it", "it was leased out"]);
+  assert.deepEqual(splitPanels('two GRAY options in a FX-SPLIT: "a relative ran it (YourStory)" / "his mother leased it (India TV)"; no names'), ["a relative ran it", "his mother leased it"]);
+  assert.deepEqual(splitPanels('header "STAFF, AS REPORTED", kinetic "ABOUT 120–300", then two columns, "about 120" and "about 300", each with its chip'), ["about 120", "about 300"]);
+  assert.equal(splitPanels('R1 card "one thing"'), null);
+  const t = buildTimeline({ chapters });
+  const split = t.video.filter((v) => v.split);
+  assert.deepEqual(split.map((v) => [v.id, v.text, v.split]), [
+    ["SC0019-2", "", ["a relative ran it", "it was leased out"]],
+    ["SC0027-1", "Who ran the shop?", ["a relative ran it", "his mother leased it"]],
+    ["SC0144-2", "WHICH CAME FIRST?", ["COMPANY · April 12, 2004", "LUXURY CAR · 2004"]],
+    ["SC0168-2", "STAFF, AS REPORTED", ["about 120", "about 300"]],
+    ["SC0173-2", "HUNDREDS APART", ["INDIA TV · about 2017", "RUSHLANE · 2017"]],
+  ], "every split in the USA film, with a real heading (never a stray quote such as \"; \")");
+});

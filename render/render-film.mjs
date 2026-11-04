@@ -178,7 +178,8 @@ export async function renderFilm(o) {
   /** @type {string[]} */
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
-    const key = hash({ v: 4, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
+    const key = hash({ v: 5, split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -207,7 +208,19 @@ export async function renderFilm(o) {
         chain.push(CARD_BG(v.frames));
         const cardStyle = `fontfile='${escPath((paper ? serif : font) ?? "")}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${Math.round(H * 0.065)}:line_spacing=${Math.round(H * 0.02)}:x=(w-text_w)/2:${rise(v.kinetic, "(h-text_h)/2")}`;
         const count = v.counter ? counterParts(v.text) : null;
-        if (v.text && font && count) {
+        if (v.split?.length && font) {
+          // Side by side, neither emphasised: a heading on top, the panels in columns with thin dividers.
+          const n = v.split.length;
+          const ink = paper ? "0x1d1a16" : "0xe4ede7";
+          const muted = paper ? "0x4a443c" : "0xb8c2bb";
+          const face = escPath((paper ? serif : font) ?? "");
+          if (v.text) chain.push(text(wrap(v.text, 30), "heading", `fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.06)}:x=(w-text_w)/2:${rise(v.kinetic, "h*0.16")}`));
+          for (let k = 1; k < n; k += 1) chain.push(`drawbox=x=iw*${(k / n).toFixed(4)}-1:y=ih*0.36:w=2:h=ih*0.46:color=${muted}@0.6:t=fill`);
+          v.split.forEach((panel, k) => {
+            const col = `w*${(k / n).toFixed(4)}+(w/${n}-text_w)/2`;
+            chain.push(text(wrap(panel, n === 2 ? 18 : 12), `panel${k}`, `fontfile='${face}':text_align=C:fontcolor=${muted}:fontsize=${Math.round(H * (n === 2 ? 0.055 : 0.045))}:line_spacing=${Math.round(H * 0.015)}:x=${col}:${rise(v.kinetic, "h*0.59-text_h/2")}`));
+          });
+        } else if (v.text && font && count) {
           // The number runs up for the first part of the shot, then the text settles exactly as written.
           const runFor = Math.min(1.2, (v.frames / t.fps) * 0.6).toFixed(2);
           chain.push(text(`${count.before}%{eif:min(${count.value},${count.value}*t/${runFor}):d}${count.after}`, "count", `${cardStyle}:expansion=normal:enable='lt(t,${runFor})'`));
@@ -218,7 +231,10 @@ export async function renderFilm(o) {
     // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.
     if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:${rise(v.kinetic, "h*0.72")}`));
     if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.026))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
-    await run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", chain.length ? chain.join(",") : "null", "-threads", "2", ...enc, file + ".part.mp4"]);
+    const vf = chain.length ? chain.join(",") : "null";
+    const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
+    // Centred lines (text_align) need ffmpeg 6.1+; older builds centre the block instead.
+    try { await encode(vf); } catch (error) { if (!vf.includes("text_align")) throw error; await encode(vf.replaceAll(":text_align=C", "")); }
     renameSync(file + ".part.mp4", file);
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
