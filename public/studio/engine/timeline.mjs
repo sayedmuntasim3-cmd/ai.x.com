@@ -12,7 +12,8 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, brief: string }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string }} VideoSegment
+ *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
@@ -30,6 +31,14 @@ const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/g;
 export function cardText(shotText, ost) {
   const quoted = (/** @type {string} */ s) => /["“]([^"”]{2,80})["”]/.exec(s)?.[1]?.trim() ?? "";
   return quoted(ost) || quoted(shotText);
+}
+
+/**
+ * The source chip of a scene's on-screen text: chip "C03 · cartoq.com 2025".
+ * @param {string} ost
+ */
+export function sourceChip(ost) {
+  return /\bchips?\s+["“]([^"”]{2,80})["”]/i.exec(ost)?.[1]?.trim() ?? "";
 }
 
 /**
@@ -132,6 +141,8 @@ export function buildTimeline(o) {
 
       const ost = s.fields.OST ?? "";
       const push = /push|zoom in|push-in/i.test(s.fields.MOTION ?? "");
+      const chip = sourceChip(ost);
+      let first = true;
       for (const shot of shots) {
         const start = shot.start ?? s.start;
         const end = shot.end ?? s.end;
@@ -139,12 +150,14 @@ export function buildTimeline(o) {
         if (frames <= 0) continue;
         const rung = /^(R\d)\b/.exec(shot.text)?.[1] ?? null;
         const row = picks.get(`${s.sc}#${shot.index}`);
-        const base = { id: `${s.sc}-${shot.index}`, scene: s.sc, shot: shot.index, start: frameAt(start) / fps, end: frameAt(end) / fps, frames, brief: shot.text.slice(0, 240) };
+        const base = { id: `${s.sc}-${shot.index}`, scene: s.sc, shot: shot.index, start: frameAt(start) / fps, end: frameAt(end) / fps, frames, brief: shot.text.slice(0, 240), title: "", chip: first ? chip : "" };
+        const lead = first;
+        first = false;
         if (rung === "R1") {
           const black = /\bcut to black\b|\bblack (frame|card|hold)\b|^R1\s+[\d.]+\s*s\s+black/i.test(shot.text);
           video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: black ? "" : cardText(shot.text, ost) });
         } else if (row?.pick?.mediaUrl) {
-          video.push({ ...base, type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push ? "push" : "none", text: "" });
+          video.push({ ...base, type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
           video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: cardText(shot.text, ost) });

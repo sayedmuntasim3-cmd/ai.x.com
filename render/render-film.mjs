@@ -129,39 +129,58 @@ export async function renderFilm(o) {
   const frame = `scale=${t.width}:${t.height}:force_original_aspect_ratio=increase,crop=${t.width}:${t.height},fps=${t.fps},setsar=1`;
   const color = (/** @type {string} */ c) => ["-f", "lavfi", "-i", `color=c=${c}:s=${t.width}x${t.height}:r=${t.fps}`];
 
+  // The house look: one gentle grade and light grain on every picture, so clips from many sources read as one film.
+  const LOOK = "eq=contrast=1.06:saturation=0.92:gamma=0.98,noise=alls=5:allf=t";
+  const CARD_BG = (/** @type {number} */ frames) => `vignette=PI/4,noise=alls=7:allf=t,fade=t=in:st=0:d=${Math.min(0.25, frames / t.fps / 4).toFixed(3)}`;
+  const mono = FONT_CANDIDATES.map((f) => f.replace("DejaVuSans-Bold", "DejaVuSansMono")).find((f) => existsSync(f) && /Mono/.test(f)) ?? font;
+  const escPath = (/** @type {string} */ p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+  /**
+   * A drawtext filter reading its words from a file (no escaping of the text itself), fading in.
+   * @param {string} words @param {string} key @param {string} style
+   */
+  const text = (words, key, style) => {
+    const file = join(dirs.cards, `${hash({ words, key })}.txt`);
+    writeFileSync(file, words);
+    return `drawtext=textfile='${escPath(file)}':${style}:alpha='min(1,t/0.35)'`;
+  };
+
   // 1. Picture: one cached segment per shot, rendered in parallel.
   /** @type {string[]} */
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
-    const key = hash({ type: v.type, url: v.url, text: v.text, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 2, type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
     /** @type {string[]} */
-    let input;
-    let filter;
+    let input = [];
+    /** @type {string[]} */
+    const chain = [];
     let type = v.type;
     if (type === "clip" && v.url) {
       try {
         input = ["-stream_loop", "-1", "-i", await fetchClip(v.url)];
-        filter = v.motion === "push" ? `${frame},zoompan=z='1+0.06*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}` : frame;
+        chain.push(frame);
+        if (v.motion === "push") chain.push(`zoompan=z='1+0.06*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}`);
+        chain.push(LOOK);
       } catch (error) {
         stats.clipsFailed += 1;
         warnings.push(`${v.id}: clip could not be downloaded (${error instanceof Error ? error.message : error}); a text card stands in.`);
         type = "card";
       }
     }
-    if (type !== "clip" || !input) {
+    const H = t.height;
+    if (type !== "clip" || !input.length) {
       input = color(type === "black" ? "black" : "0x0b110e");
-      filter = "null";
-      if (type === "card" && v.text && font) {
-        const textFile = join(dirs.cards, `${key}.txt`);
-        writeFileSync(textFile, wrap(v.text, 26));
-        const esc = (/** @type {string} */ p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
-        filter = `drawtext=fontfile='${esc(font)}':textfile='${esc(textFile)}':fontcolor=0xe4ede7:fontsize=${Math.round(t.height * 0.065)}:line_spacing=${Math.round(t.height * 0.02)}:x=(w-text_w)/2:y=(h-text_h)/2`;
+      if (type === "card") {
+        chain.push(CARD_BG(v.frames));
+        if (v.text && font) chain.push(text(wrap(v.text, 26), "card", `fontfile='${escPath(font)}':fontcolor=0xe4ede7:fontsize=${Math.round(H * 0.065)}:line_spacing=${Math.round(H * 0.02)}:x=(w-text_w)/2:y=(h-text_h)/2`));
       }
     }
-    await run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", /** @type {string} */ (filter), "-threads", "2", ...enc, file + ".part.mp4"]);
+    // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.
+    if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:y=h*0.72`));
+    if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.026))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
+    await run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", chain.length ? chain.join(",") : "null", "-threads", "2", ...enc, file + ".part.mp4"]);
     renameSync(file + ".part.mp4", file);
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
