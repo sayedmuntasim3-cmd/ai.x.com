@@ -12,9 +12,10 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean }} VideoSegment
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
+ *   style: "paper" for FX-PAPER cards (document look); kinetic: text moves in (FX-KINETIC);
  *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
@@ -178,6 +179,8 @@ export function buildTimeline(o) {
       const ost = s.fields.OST ?? "";
       const push = /push|zoom in|push-in/i.test(s.fields.MOTION ?? "");
       const chip = sourceChip(ost);
+      const fx = s.fields.FX ?? "";
+      const look = { style: /** @type {"plain" | "paper"} */ (/FX-PAPER/i.test(fx) ? "paper" : "plain"), kinetic: /FX-KINETIC/i.test(fx) };
       let first = true;
       for (const shot of shots) {
         const start = shot.start ?? s.start;
@@ -186,7 +189,7 @@ export function buildTimeline(o) {
         if (frames <= 0) continue;
         const rung = /^(R\d)\b/.exec(shot.text)?.[1] ?? null;
         const row = picks.get(`${s.sc}#${shot.index}`);
-        const base = { id: `${s.sc}-${shot.index}`, scene: s.sc, shot: shot.index, start: frameAt(start) / fps, end: frameAt(end) / fps, frames, brief: shot.text.slice(0, 240), title: "", chip: first ? chip : "" };
+        const base = { ...look, id: `${s.sc}-${shot.index}`, scene: s.sc, shot: shot.index, start: frameAt(start) / fps, end: frameAt(end) / fps, frames, brief: shot.text.slice(0, 240), title: "", chip: first ? chip : "" };
         const lead = first;
         first = false;
         if (rung === "R1") {

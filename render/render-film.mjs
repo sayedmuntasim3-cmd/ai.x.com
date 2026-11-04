@@ -25,6 +25,12 @@ import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
 const SAMPLE_RATE = 48000;
 const MAX_TEMPO = 1.15;
+const SERIF_CANDIDATES = [
+  "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+  "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+  "/System/Library/Fonts/Supplemental/Georgia Bold.ttf",
+  "C:\\Windows\\Fonts\\georgiab.ttf",
+];
 const FONT_CANDIDATES = [
   "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
   "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -164,12 +170,15 @@ export async function renderFilm(o) {
     writeFileSync(file, words);
     return `drawtext=textfile='${escPath(file)}':${style}:alpha='min(1,t/0.35)'`;
   };
+  const serif = SERIF_CANDIDATES.find((f) => existsSync(f)) ?? font;
+  // Kinetic type rises 4% of the frame while it fades in (FX-KINETIC); otherwise it stays put.
+  const rise = (/** @type {boolean | undefined} */ kinetic, /** @type {string} */ y) => (kinetic ? `y='${y}+h*0.04*(1-min(1,t/0.45))'` : `y=${y}`);
 
   // 1. Picture: one cached segment per shot, rendered in parallel.
   /** @type {string[]} */
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
-    const key = hash({ v: 3, in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 4, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -192,10 +201,11 @@ export async function renderFilm(o) {
     }
     const H = t.height;
     if (type !== "clip" || !input.length) {
-      input = color(type === "black" ? "black" : "0x0b110e");
+      const paper = type === "card" && v.style === "paper";
+      input = color(type === "black" ? "black" : paper ? "0xefe6d2" : "0x0b110e");
       if (type === "card") {
         chain.push(CARD_BG(v.frames));
-        const cardStyle = `fontfile='${escPath(font ?? "")}':fontcolor=0xe4ede7:fontsize=${Math.round(H * 0.065)}:line_spacing=${Math.round(H * 0.02)}:x=(w-text_w)/2:y=(h-text_h)/2`;
+        const cardStyle = `fontfile='${escPath((paper ? serif : font) ?? "")}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${Math.round(H * 0.065)}:line_spacing=${Math.round(H * 0.02)}:x=(w-text_w)/2:${rise(v.kinetic, "(h-text_h)/2")}`;
         const count = v.counter ? counterParts(v.text) : null;
         if (v.text && font && count) {
           // The number runs up for the first part of the shot, then the text settles exactly as written.
@@ -206,7 +216,7 @@ export async function renderFilm(o) {
       }
     }
     // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.
-    if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:y=h*0.72`));
+    if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:${rise(v.kinetic, "h*0.72")}`));
     if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.026))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
     await run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", chain.length ? chain.join(",") : "null", "-threads", "2", ...enc, file + ".part.mp4"]);
     renameSync(file + ".part.mp4", file);
