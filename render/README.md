@@ -1,4 +1,17 @@
-# Render a film to MP4
+# Record the voice and render a film to MP4
+
+## 1. Voice (ElevenLabs)
+
+```sh
+ELEVENLABS_API_KEY=... node render/voice.mjs --run productions/ramesh-babu/USA --voice-id <voice id> --out voice/
+```
+
+- It writes one file per narrated scene (`SC0001.mp3`, plus `SC0001.alignment.json` with character timings), using Multilingual v2 for English.
+- The neighbouring scenes' text is sent as context, so the read flows across cuts.
+- A scene that still holds an unresolved number such as `[C12 low]` is skipped and listed, so the voice never reads a placeholder.
+- Files that already exist are kept. A stopped recording resumes, and the owner's own takes, saved by hand under the same names (`SC0004.wav`), are never overwritten. The owner's voice is never processed.
+
+## 2. Render
 
 `render-film.mjs` turns a film run into a video file with ffmpeg. It runs anywhere ffmpeg 6 or newer and Node 22 are installed: the owner's own computer (free), a small VM, or a container. It cannot run inside the Cloudflare Worker.
 

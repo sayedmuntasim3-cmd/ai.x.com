@@ -266,7 +266,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
   const chapters = await loadRunFiles(args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id });
   const voice = voiceFolder(args.voice);
-  const timeline = buildTimeline({ chapters, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
+  // Captions follow the recorded voice, not the scene slot.
+  /** @type {Record<string, { durationSeconds: number }>} */
+  const spoken = {};
+  for (const [scene, file] of Object.entries(voice)) spoken[scene] = { durationSeconds: await mediaDuration(file) };
+  const timeline = buildTimeline({ chapters, voice: spoken, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
   const report = await renderFilm({ timeline, voice, workDir: args.work ?? ".render", outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
   console.log(JSON.stringify({ ...report, licences: report.licences.length, warnings: report.warnings.length }, null, 1));
 }
