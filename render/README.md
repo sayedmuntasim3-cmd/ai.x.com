@@ -25,6 +25,8 @@ S4's sound bible names every sound with a token and search phrases: `SND-AMB-01`
 - An effect lands on the cut it names ("on cut 2") or the word it names ("on \"put up\"", estimated from the narration), and otherwise at the scene's start.
 - Tokens with no file are listed in the report.
 
+To fetch them automatically, run `FREESOUND_API_KEY=... node render/sound-kit.mjs --run <folder> --out sfx/` (the free key is at freesound.org/apiv2/apply). It searches Freesound with each token's own S4 phrases and takes **CC0 sounds only**: the licence is filtered in the search and checked again on every result. Ambience must last 8 s or more; effects 8 s or less. Each pick is recorded in `sfx/sound-kit.json` (sound page, creator, licence). Files already in the folder are kept, so your own choices win.
+
 ## 4. Render
 
 `render-film.mjs` turns a film run into a video file with ffmpeg. It runs anywhere ffmpeg 6 or newer and Node 22 are installed: the owner's own computer (free), a small VM, or a container. It cannot run inside the Cloudflare Worker.

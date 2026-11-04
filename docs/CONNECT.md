@@ -39,7 +39,7 @@ One key is enough; both give more choice. Without either the step is skipped (`r
 
 When a film run is done, GitHub renders the MP4 on its own machines. The free plan includes 2,000 minutes a month for a private repository, and a 45-minute film takes roughly 30–90 minutes.
 
-1. One time only: in GitHub, open Settings > Secrets and variables > Actions and add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` (the voice to narrate with). Without them, the film renders without narration.
+1. One time only: in GitHub, open Settings > Secrets and variables > Actions and add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` (the voice to narrate with). Without them, the film renders without narration. Optionally add `FREESOUND_API_KEY` (free at freesound.org/apiv2/apply): the sound effects are then fetched automatically, CC0 only, with a licence record.
 2. Optional music: commit one track per cue as `music/<film id>/M01.mp3` ... (free tracks from Pixabay Music or Mixkit, chosen from the S4 music plan).
 3. GitHub shows the **Run workflow** button only for workflows on the default branch. So the work on `ccr-cb190ece-ukm6vg` has to be merged into `main` once, by you (a pull request you open and merge).
 4. Open the GitHub app or website and go to Actions > **Render a film** > Run workflow. Enter the film ID (the long ID in the film page's address), the site address and the picture size.

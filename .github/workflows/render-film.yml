@@ -10,6 +10,7 @@ name: Render a film
 #
 # Optional repository secrets (Settings > Secrets and variables > Actions):
 #   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
+#   FREESOUND_API_KEY                        sound effects fetched automatically (CC0 only)
 # Optional music: commit one track per cue as music/<film id>/M01.mp3 ...
 # Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
 
@@ -67,6 +68,16 @@ jobs:
           else
             echo "::warning::No ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID secrets: the film renders without narration."
           fi
+      - name: Fetch the sound effects (Freesound, CC0 only)
+        env:
+          FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+        run: |
+          mkdir -p "sfx/$FILM_ID"
+          if [ -n "$FREESOUND_API_KEY" ]; then
+            node render/sound-kit.mjs --api "$SITE" --id "$FILM_ID" --out "sfx/$FILM_ID/" || echo "::warning::Sound effects could not be fetched; the film renders without the missing ones."
+          else
+            echo "No FREESOUND_API_KEY secret: only sound effects committed under sfx/$FILM_ID/ are used."
+          fi
       - name: Render
         run: |
           node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice voice/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" \
@@ -83,6 +94,7 @@ jobs:
         run: |
           shopt -s nullglob
           files=()
+          [ -f "sfx/$FILM_ID/sound-kit.json" ] && cp "sfx/$FILM_ID/sound-kit.json" "out/$FILM_ID.sound-kit.json"
           for f in out/*.mp4 out/*.jpg out/*.srt out/*.json; do
             if [ "$(stat -c %s "$f")" -ge 2147000000 ]; then echo "::warning::$f is over 2 GB and was not published; render at 1280x720."; else files+=("$f"); fi
           done
