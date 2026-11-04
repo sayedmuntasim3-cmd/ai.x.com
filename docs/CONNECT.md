@@ -41,8 +41,9 @@ When a film run is done, GitHub renders the MP4 on its own machines. The free pl
 
 1. One time only: in GitHub, open Settings > Secrets and variables > Actions and add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` (the voice to narrate with). Without them, the film renders without narration.
 2. Optional music: commit one track per cue as `music/<film id>/M01.mp3` ... (free tracks from Pixabay Music or Mixkit, chosen from the S4 music plan).
-3. Open the GitHub app or website and go to Actions > **Render a film** > Run workflow. Enter the film ID (the long ID in the film page's address), the site address and the picture size.
-4. When it finishes, download the artifact `film-<id>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload) and `<id>.report.json` (every clip with its licence page, and every warning).
+3. GitHub shows the **Run workflow** button only for workflows on the default branch. So the work on `ccr-cb190ece-ukm6vg` has to be merged into `main` once, by you (a pull request you open and merge).
+4. Open the GitHub app or website and go to Actions > **Render a film** > Run workflow. Enter the film ID (the long ID in the film page's address), the site address and the picture size.
+5. When it finishes, download the artifact `film-<id>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload), `<id>.TH-A.jpg` / `TH-B` / `TH-C` (three thumbnails for YouTube's Test & Compare) and `<id>.report.json` (every clip with its licence page, and every warning).
 
 The same render also runs on any computer with Node 22 and ffmpeg: see `render/README.md`.
 

@@ -87,3 +87,27 @@ test("run files are read from the film API the same way as from a folder", async
     server.close();
   }
 });
+
+test("the three S7 thumbnail briefs become 1280×720 JPEGs from the named scene's clip", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const { renderThumbnails, thumbnailBriefs } = await import("./thumbnails.mjs");
+  const briefs = thumbnailBriefs(readFileSync(new URL("../productions/ramesh-babu/USA/s7.md", import.meta.url), "utf8"));
+  assert.deepEqual(briefs.map((b) => [b.id, b.words, b.scenes]), [["TH-A", "HE KEPT THIS", ["SC0227"]], ["TH-B", "PLUS TAX", ["SC0204"]], ["TH-C", "1 DAY =", ["SC0221", "SC0225"]]]);
+  const dir = mkdtempSync(join(tmpdir(), "zupona-thumb-"));
+  try {
+    const clip = join(dir, "clip.mp4");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "testsrc2=s=1920x1080:r=25:d=3", "-pix_fmt", "yuv420p", clip]);
+    const seg = (/** @type {string} */ scene, /** @type {string} */ url) => ({ id: scene + "-1", scene, shot: 1, start: 0, end: 4, frames: 120, type: "clip", url, sourcePageUrl: null, licence: null, motion: "none", text: "", title: "", chip: "", brief: "" });
+    const timeline = /** @type {any} */ ({ video: [seg("SC0001", "https://v/1"), seg("SC0227", "https://v/227"), seg("SC0300", "https://v/300")] });
+    /** @type {string[]} */
+    const fetched = [];
+    const thumbs = await renderThumbnails({ briefs, timeline, fetchClip: async (url) => { fetched.push(url); return clip; }, outBase: join(dir, "film"), font: ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"].find((f) => existsSync(f)) });
+    assert.equal(thumbs[0].frameFrom, "SC0227", "TH-A uses the scene it names");
+    assert.equal(new Set(thumbs.map((t) => t.frameFrom)).size, 3, "each thumbnail uses a different clip");
+    for (const t of thumbs) {
+      assert.ok(t.bytes > 10000 && t.bytes < 2 * 1024 * 1024, `${t.id} is under YouTube's 2 MB limit`);
+      assert.equal((await run("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", t.file])).trim(), "1280,720");
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

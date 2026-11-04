@@ -20,6 +20,7 @@ import { cpus } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildTimeline, toSrt } from "../engine/src/timeline.mjs";
+import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
 const SAMPLE_RATE = 48000;
 const MAX_TEMPO = 1.15;
@@ -311,6 +312,16 @@ export async function loadRunFiles(from) {
   }));
 }
 
+/**
+ * One text file of a run (s7.md ...), from a folder or the film API; null when missing.
+ * @param {{ dir?: string, api?: string, id?: string }} from @param {string} name
+ */
+export async function loadRunText(from, name) {
+  if (from.dir) { const f = join(from.dir, name); return existsSync(f) ? readFileSync(f, "utf8") : null; }
+  const res = await fetch(`${from.api}/api/films/${from.id}/files/${name}`);
+  return res.ok ? res.text() : null;
+}
+
 /** Music files named after their cue (M01.mp3 ...) in a folder. @param {string | undefined} dir */
 export function musicFolder(dir) {
   /** @type {Record<string, string>} */
@@ -336,13 +347,25 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
-  const chapters = await loadRunFiles(args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id });
+  const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
+  const chapters = await loadRunFiles(from);
   const voice = voiceFolder(args.voice);
   // Captions follow the recorded voice, not the scene slot.
   /** @type {Record<string, { durationSeconds: number }>} */
   const spoken = {};
   for (const [scene, file] of Object.entries(voice)) spoken[scene] = { durationSeconds: await mediaDuration(file) };
   const timeline = buildTimeline({ chapters, voice: spoken, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
-  const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), workDir: args.work ?? ".render", outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
+  const workDir = args.work ?? ".render";
+  const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
+  // The three A/B thumbnails from the S7 briefs, next to the film.
+  const s7 = await loadRunText(from, "s7.md");
+  if (s7) {
+    const clipsDir = join(workDir, "clips");
+    mkdirSync(clipsDir, { recursive: true });
+    const thumbs = await renderThumbnails({ briefs: thumbnailBriefs(s7), timeline, fetchClip: (url) => downloadClip(url, clipsDir), outBase: args.out.replace(/\.mp4$/i, ""), font: args.font ?? FONT_CANDIDATES.find((f) => existsSync(f)) });
+    const base = args.out.replace(/\.mp4$/i, "");
+    writeFileSync(base + ".report.json", JSON.stringify({ ...report, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })) }, null, 1));
+    console.log(`thumbnails: ${thumbs.map((t) => t.id).join(", ")}`);
+  }
   console.log(JSON.stringify({ ...report, licences: report.licences.length, warnings: report.warnings.length }, null, 1));
 }
