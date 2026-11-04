@@ -9,13 +9,16 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
   - USA Ramesh Babu film: C1–C6, QA (14 fixes), S6, S7 and the page `productions/ramesh-babu/ramesh-babu-usa.html`.
   - Platform, English (USA) path in code: `engine/src/film-run.mjs` (S0–S7 from one topic, resumable, budget stop), `engine/src/scene-lines.mjs` (every S5 chapter checked in code), `worker/` (Cloudflare Worker + Workflow + Claude API, token-protected) and section 3 of `/studio/` (cost estimate, start, progress, files).
   - Media step (task 2 below, done 4 Nov 2026): `engine/src/film-media.mjs` + stage `media:C1` ... in `film-run.mjs` after QA; Pexels/Pixabay keys via `PEXELS_API_KEY`, `PIXABAY_API_KEY` (`docs/CONNECT.md`). Tested with fakes only; never run against the real APIs.
-  - Checks: `npm test` (71 engine + 1 worker) and `npm run check` (wrangler dry-run) pass.
+  - Film page (task 3, done 4 Nov 2026): `engine/src/film-page.mjs`, served at `/api/films/:id/page` with a no-script CSP; checked in the local Workers runtime (`wrangler dev --local`). The studio links to it. Landing page links to `/studio/` (task 4, done).
+  - Competitor scan, 4 Nov 2026: `docs/COMPETITORS.md` (what to build next and why).
+  - Checks: `npm test` (74 engine + 1 worker), `npm run check` (wrangler dry-run) and `cd engine && npm run typecheck` pass.
 - **Not done:** the film API has never run against the real Claude API. It needs the owner's Cloudflare connection and API key (`docs/CONNECT.md`).
 - **Next, in order:**
   1. If the owner says Cloudflare is connected: run one 2–10 minute English test film from `/studio/`, read `run.json` and the files, fix what breaks (prompts, timeouts, parsing), and report the real cost.
   2. ~~Media step~~ (done) (buildable without keys, fakes in tests): for each S5 shot, search Pexels and Pixabay with its queries through `engine/src/documentary-media-fetch.mjs`, keep only free-licence items with their licence record, never repeat a clip within 10 minutes, and write `media-C1.json` ... per chapter.
-  3. A readable page per run (like `productions/ramesh-babu/build.mjs`), served from `/api/films/:id/page`.
-  4. Link from the landing page (`public/index.html`) to `/studio/`.
+  3. ~~A readable page per run~~ (done) (like `productions/ramesh-babu/build.mjs`), served from `/api/films/:id/page`.
+  4. ~~Link from the landing page~~ (done) (`public/index.html`) to `/studio/`.
+  5. Then, from `docs/COMPETITORS.md`: render (the owner chooses Cloudflare Containers or a VM), the footage relevance check with Claude vision, re-making one scene only, and the channel originality guard.
 - **Save credits:** no extra agents, no web research, long outputs written to files in parts, commit and push after every step, replies of 2–3 lines in Bangla.
 
 ## 1. The owner's mission and standard
