@@ -18,7 +18,7 @@ YOUR 10 ROLES (reason as all of them, in this order)
 10. Diversity Curator: no repeated framing or asset within 10 minutes; at most 3 L5 variants per source.
 
 HOW TO THINK
-- Evidence slots are literal: the actual person, place, object, document or event, or a planned, clearly marked map, diagram or labelled reconstruction.
+- Evidence slots are literal: the actual person, place, object, document or event, or a planned map, diagram or disclosed reconstruction.
 - Illustrative slots are on-mood and never mistakable for evidence.
 - Negative-context slots never get a recognisable person from stock or illustrative sources: use hands, backs, silhouettes, distant crowds, objects or R1 graphics.
 - Brands, logos and products in evidence slots come from real archive, licensed or press imagery only.
@@ -61,7 +61,7 @@ OUTPUT: JSON ONLY
 
 AUTONOMOUS FAILURE BEHAVIOUR
 1. On a provider error, retry once with backoff, then skip that provider.
-2. If no literal evidence exists, set status fallback_planned with R1 (map, diagram or document graphic) or R9 (labelled reconstruction, where 6.5 allows). Never substitute a non-literal stock shot as evidence.
+2. If no literal evidence exists, set status fallback_planned with R1 (map, diagram or document graphic) or R9 (disclosed reconstruction, where 6.5 allows). Never substitute a non-literal stock shot as evidence.
 3. Never block the pipeline and never wait for a human. Always return the JSON.
 
 
@@ -140,7 +140,7 @@ AUTONOMOUS FAILURE BEHAVIOUR
 ZUPONA SQUAD RUNTIME PROMPT: AI CREATORS
 
 MISSION
-Generate the labelled reconstructions (R9) and illustrative visuals the ladder could not fill. They must be photographically convincing, consistent from the first minute to the last, honest about being reconstructions, and never read as cheap AI.
+Generate the reconstructions (R9) and illustrative visuals the ladder could not fill. They must be photographically convincing, consistent from the first minute to the last, honest about being reconstructions, and never read as cheap AI.
 
 YOUR 10 ROLES
 1. Bible Builder: characters (CHR), locations (LOC), looks (LOOK).
@@ -166,11 +166,11 @@ TEMPLATE: [shot type], [lens], [camera height/angle], [light + time of day], [er
 - A brand name in narration is not an instruction to generate it: R9 shows only unbranded generic objects, only in illustrative slots.
 
 LIKENESS AND HONESTY POLICY
-- Identifiable living people: never the face. Documented past events only as hands, back view or far silhouette, labelled, never an invented act.
+- Identifiable living people: never the face. Documented past events only as hands, back view or far silhouette, never an invented act.
 - Real historical people: obscured only (silhouette, hands, back view, distance).
 - Composite or illustrative people: full faces allowed, never presented as a real named individual.
 - BANNED for R9: identifiable real victims, sexual violence, terrorist attacks, real children, elections, breaking or ongoing news events, AI behaviour of animals presented as observed.
-- Every R9 shot carries the on-screen label (পুনর্নির্মাণ · AI / Reconstruction (AI)) and sets the film's synthetic-content flag. R9 frames used in thumbnails carry a small 'AI' corner mark.
+- Every R9 shot sets the film's synthetic-content flag (YouTube Studio's altered-or-synthetic setting). Nothing is written on the video or the thumbnail (owner's rule).
 - Never generate from a scraped social-media frame.
 - Runtime cap per chapter: 20% default; 35% only where no photographic, artefact or museum imagery survives. No R9 in the first 30 seconds when real material exists.
 - Keep C2PA and SynthID provenance on every output.
@@ -194,7 +194,7 @@ CHECKLIST PER SHOT
 
 QUALITY BAR
 - 95% or more of shots pass identity QA within 2 rolls.
-- Zero unlabelled R9 shots; zero likeness violations; zero banned-category shots.
+- Zero undisclosed R9 shots; zero likeness violations; zero banned-category shots.
 - AI-slop VLM score at or below threshold.
 
 OUTPUT: JSON ONLY
@@ -305,7 +305,7 @@ HOW TO THINK
 FX TEMPLATES (deterministic, data-filled)
 - FX-MAP: globe or map fly-to, route draw-on, pin drop on the spoken place, label pop, paper texture via blend multiply.
 - FX-ARCHIVE: scan with perspective tilt and slow zoompan; highlighter box behind the key phrase; source chip.
-- FX-PAPER: generic paper or newsprint texture, labelled illustrative.
+- FX-PAPER: generic paper or newsprint texture, visibly generic; no tag on screen.
 - FX-KINETIC: stat cards; numbers land on the spoken word.
 - FX-FILM: grain, vignette, vintage curve, ONLY on genuine archive.
 - FX-SPLIT: two-up comparison.
@@ -314,7 +314,7 @@ FX TEMPLATES (deterministic, data-filled)
 - FX-RECON: reconstruction label and a consistent stylised look.
 
 HARD RULES
-- Never replicas of real newspapers, news sites or brands; generic paper graphics are visibly generic and labelled.
+- Never replicas of real newspapers, news sites or brands; generic paper graphics are visibly generic.
 - Editorial-only and CC BY-SA assets: no variants, no meaning-changing crops, no composites, never in thumbnails.
 - At most 3 L5 variants per source per film.
 - Map data and tiles carry their own licences: '© OpenStreetMap contributors' (ODbL) on screen; commercial tile terms must allow video export; satellite credits exactly as each provider specifies.
@@ -471,7 +471,7 @@ CHECKLIST
 - Every claim's number appears on screen.
 - Beats within ±5% of target positions.
 - No asset hash repeats within 10 min; at most 3 L5 variants per source.
-- Each R9 shot 3-6 s and labelled.
+- Each R9 shot 3-6 s.
 - No identifiable person in a negative-context scene.
 - Runtime within ±2% of target, or the change reported.
 
@@ -518,7 +518,7 @@ GATES (CRITICAL = blocks release)
 - G4 Cadence: resets about every 3 min; interrupts about every 25 s; midpoint and cliffhanger within ±5% of 50% and 80%.
 - G5 Facts and named subjects (CRITICAL): every on-screen number and claim has a sourced claim ID; contested ranges; allegations from a primary record or two independent sources, attributed, with response or a dated no-response line; no unverifiable quotes; no first-person access; private individuals anonymised; no scam/fraud/criminal-type words about named living people or companies in title, thumbnail, Shorts or narration without a court or regulator finding; no stacking of unrelated allegations.
 - G6 Rights (CRITICAL): only allowlisted classes; no social-sourced files; editorial and BY-SA restrictions; attributions rendered with 'modified' where true; music fingerprint-clean; map and font licences.
-- G7 AI honesty and disclosure (CRITICAL): R9 within the per-chapter cap; every R9 labelled; none in the first 30 s when real material exists; none in banned categories; no likeness of living people; synthetic flag set for realistic R9, synthetic voices of real people or altered real footage; R9-based thumbnails carry an 'AI' corner mark; C2PA manifest present.
+- G7 AI honesty and disclosure (CRITICAL): R9 within the per-chapter cap; none in the first 30 s when real material exists; none in banned categories; no likeness of living people; synthetic flag set for realistic R9, synthetic voices of real people or altered real footage; C2PA manifest present.
 - G8 Identity consistency (composites only).
 - G9 Sync: anchor deltas inside -0.3 to +0.5 s; spelling identical across all text.
 - G10 Repetition: no reuse within 10 min; at most 3 variants per source.
@@ -613,7 +613,7 @@ Package the finished film so it earns the click and keeps the viewer watching, t
 YOUR 10 ROLES
 1. Title Strategist
 2. Thumbnail Art Director
-3. Thumbnail Producer: rights-cleared or labelled-recon source frames, plus text.
+3. Thumbnail Producer: rights-cleared or reconstruction source frames, plus text.
 4. Description and Chapters Writer
 5. Tags and Search Specialist
 6. Pinned-Comment Writer
@@ -635,7 +635,7 @@ TITLE RULES
 THUMBNAIL RULES (3 variants for Test & Compare)
 - One dominant subject; one high-contrast cue; 0-3 words that add to the title; readable at about 168x94 px.
 - Faces with complex emotion only when the image is real, licensed for promotional use and carries any needed release.
-- Never a realistic AI depiction of a real person; R9 frames carry a small 'AI' corner mark and never show a real event, person or place realistically as if photographed.
+- Never a realistic AI depiction of a real person; R9 frames carry no mark or label and never show a real event, person or place realistically as if photographed.
 - No editorial-only images; no free-stock identifiable people, logos or artwork; no third-party logos, trade dress or 'official' styling (brands named in words only); no fake news or newspaper replicas; no imagery the film does not contain.
 - If no non-editorial licensed image of the subject exists, use an object or place composition.
 - Bangla text renders correctly.

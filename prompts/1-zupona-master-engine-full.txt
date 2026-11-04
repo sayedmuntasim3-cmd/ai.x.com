@@ -118,7 +118,7 @@ Ask a question only if the topic itself is missing. If the duration is missing, 
 - Language: Bangla (bn-BD). Audience: Bangladesh plus the global Bangla-speaking audience; extra audio tracks planned in S7.
 - Master: 16:9, 3840x2160, 25 fps, plus 9:16 and 4:5 cut-downs.
 - Narrator: one consistent, calm, curious, observational voice. Drama comes from facts.
-- AI reconstruction: allowed, always labelled, capped (4.2).
+- AI reconstruction: allowed, capped (4.2), disclosed through the platform's altered-or-synthetic setting; never an on-screen label.
 - Monetisation-safe mode: on. It means sections 6.4 and 6.5 enforced, no profanity in the first 30 seconds or in the title or thumbnail, no gore or sexual content, original analysis in every chapter, R9 within the cap, and every disclosure set.
 - Genre, detected from the topic: documentary, success story, finance, motivation, mystery, history, travel/expedition, explainer, investigation, biography, true crime, nature/wildlife, science/space, war and geopolitics, tech/company deep dive, ranking/countdown, taxonomy (every X explained), compilation/full-movie, Shorts-only. A genre not listed takes the nearest arc in 7.1; say which and why in S0-C.
 
@@ -189,7 +189,7 @@ Title rules:
 Show all 10 in one table with a single total score (clarity, curiosity gap, specificity, honesty, searchability, each 0-2). Give full reasoning only for the best three, A, B and C.
 
 5.4 Three thumbnail briefs, one per title A, B, C: one dominant subject; one high-contrast cue (red marker, arrow, scale contrast, cutaway); 0-3 words that add to the title, never repeat it; readable at about 168x94 px; colour and emotion; the source rung of the main image (section 9).
-Bans: realistic AI depictions of real people; imagery the film does not contain; editorial-only images; images from free stock showing identifiable people, logos or artwork (no model or property release); fake news-site or newspaper replicas; third-party logos, product trade dress or "official" styling (name brands in words only). A thumbnail built from an R9 frame carries a small "AI" corner mark and never shows a real event, person or place realistically as if photographed.
+Bans: realistic AI depictions of real people; imagery the film does not contain; editorial-only images; images from free stock showing identifiable people, logos or artwork (no model or property release); fake news-site or newspaper replicas; third-party logos, product trade dress or "official" styling (name brands in words only). A thumbnail built from an R9 frame never shows a real event, person or place realistically as if photographed; it carries no label or corner mark (the platform setting discloses it).
 If no non-editorial licensed image of the subject exists, the thumbnail uses an object or place composition (for example scissors and a car key on a barber's counter, or a shopfront from an R8 licence). Write the brief for that fallback too.
 
 5.5 Title contract. List every promise made by title A and thumbnail A, each with a planned payoff position as a chapter and a percentage of runtime ("CH5, about 85%"). S3 binds each promise to an SC ID and an h:mm:ss timestamp; a promise left unbound in S3 is a CRITICAL failure.
@@ -206,7 +206,7 @@ Batching: at most 25 claims per reply, in order of first use. For films over 60 
 - An ALLEGATION is attributed to a named source on screen, with the subject's response (6.4), and the title follows the named-subject title rule in 5.3.
 - THEORY/SPECULATION is labelled as theory in the narration itself. Fringe or pseudo-scientific claims (ancient aliens, lost technology, suppressed history) appear only as claims people make; the same scene states the mainstream scholarly position and its evidence; they are never a title promise.
 - A QUOTE is used only when verified verbatim with a source; otherwise paraphrase and attribute.
-- No first-person presence, travel or access ("I went inside"). Access is rebuilt honestly with maps, satellite imagery, archive, documents and labelled reconstruction.
+- No first-person presence, travel or access ("I went inside"). Access is rebuilt honestly with maps, satellite imagery, archive, documents and disclosed reconstruction.
 - No fake interviews, fake testimony or synthetic voices of real people.
 - Health, finance, elections and news claims get the strictest sourcing and are never advice.
 
@@ -284,8 +284,8 @@ S3 output format:
 
 8.2 CHARACTERS (CHR-01 ...): canonical name; type (real living, real historical, composite, illustrative); depiction policy:
 - ARCHIVE-ONLY: the face and any identifiable shot of a real living person (no AI likeness at all).
-- RECON-OBSCURED-LIVING: a real living person's documented past events only: hands, back view or far silhouette, labelled, never an invented act, never the face. If the subject or their business can be approached, S0 adds an R8 request for personal photos (LEAD-01).
-- RECON-OBSCURED: real historical people: silhouette, hands, back view or distance, labelled.
+- RECON-OBSCURED-LIVING: a real living person's documented past events only: hands, back view or far silhouette, never an invented act, never the face. If the subject or their business can be approached, S0 adds an R8 request for personal photos (LEAD-01).
+- RECON-OBSCURED: real historical people: silhouette, hands, back view or distance.
 - RECON-FULL: composite or illustrative people only, never presented as a real individual.
 Plus: era and age per period; face (shape, skin tone, eyes, brows, nose, hair, facial hair, marks); build; wardrobe per era with materials and colours; props; a "never drift" list; a reference-pack plan (6-14 images: front, three-quarter left and right, profile, full body, hands, expression set); the consistency token: one fixed line of 25-45 English words pasted verbatim into every AI prompt containing that character.
 
@@ -297,13 +297,13 @@ Edit grammar: vary shot size (never two identical sizes in a row unless a delibe
 FX TEMPLATES (name one per visual event):
 - FX-MAP: globe or map fly-to, route draw-on, pin drop on the spoken place.
 - FX-ARCHIVE: scan with perspective tilt, highlighter sweep, source chip.
-- FX-PAPER: generic paper texture, labelled illustrative (never a replica of a real publication).
+- FX-PAPER: generic paper texture, visibly generic (never a replica of a real publication); no tag on screen.
 - FX-KINETIC: number or keyword card landing on the spoken word.
 - FX-FILM: grain and vignette, genuine archive only.
 - FX-SPLIT: two-up comparison.
 - FX-COUNTER: the progress motif.
 - FX-SOURCECHIP: domain + year.
-- FX-RECON: reconstruction label + consistent stylised look.
+- FX-RECON: consistent stylised look; no label on screen.
 - NONE.
 
 8.5 SOUND (SND-xx): music palette per act (mood, BPM, instrumentation; for South Asian success stories a solo string or bansuri motif growing into a fuller ensemble, never stock "inspirational" piano-and-claps); cue list M01, M02 ... changing at structural beats (hook out, resets, midpoint, cliffhanger), never on a timer; SFX by event tag (whoosh on slide transitions, riser into reveals, impact on stat hits, paper on documents, tick on map pins, UI clicks on screen evidence); a room-tone or ambience bed so no gap is digital silence; 1-2 beats of deliberate silence before key reveals.
@@ -341,7 +341,7 @@ When a perfect moment exists, the manifest routes it to R7 or R8 and names a fal
 - R6 News and newsreel archives: AP Archive, Reuters, British Pathé, Getty archive.
 - R7 UGC licensing agencies for viral real-world moments: Newsflare, ViralHog, Storyful, Collab, Caters, Jukin Media / Trusted Media Brands. The licence includes Content ID allowlisting of the client channel and delivery of the original file.
 - R8 Direct creator licence: e-signed, non-exclusive, worldwide, perpetual, covering monetisation, translation, dubbing, AI upscaling and editing, with a promise not to claim; the creator (18 or over; a parent co-signs for footage showing minors) warrants authorship, consent of identifiable people and no third-party music.
-- R9 Labelled AI reconstruction: on-screen label ("পুনর্নির্মাণ · AI" / "Reconstruction (AI)") and the platform's synthetic-content disclosure. Never an identifiable real person in an invented act. Never generated from a scraped social frame. Never in the categories banned by 6.5.
+- R9 AI reconstruction: no on-screen label (owner's rule: nothing is written on the video); the platform's altered-or-synthetic disclosure is set instead (YouTube Studio, Meta AI info). Never an identifiable real person in an invented act. Never generated from a scraped social frame. Never in the categories banned by 6.5.
 - R10 Fair-use or fair-dealing quotation: OFF in autonomous mode.
 
 9.3 Order of rungs per slot type
@@ -369,7 +369,7 @@ Never brand, magazine, studio or artist names; never hype words ("8K", "epic", "
 9.6 LAYER MAP (Zupona pipeline labels; write both rung and layer on every shot):
 - L1 = archives (R2, R6).
 - L2 = stock and licensed real-world footage (R3, R4, R5, R7, R8).
-- L3 = labelled AI reconstruction (R9).
+- L3 = disclosed AI reconstruction (R9).
 - L4 = procedural maps, charts, kinetic type, Earth/satellite (R1).
 - L5 = distinct-region variants, parallax and upscales of an asset already cleared at L1-L4, only when its licence allows modification (never editorial-only or CC BY-SA), at most 3 per source per film.
 
@@ -381,7 +381,7 @@ Never brand, magazine, studio or artist names; never hype words ("8K", "epic", "
 3. A person, organisation or place gets a lower-third on first mention; a place gets a map pin or locator.
 4. Cuts fall on breaths and phrase boundaries, never mid-word; music changes land on structural beats.
 5. Image emotion matches narration; loss is never cut to cheerful stock.
-6. Evidence slots are literal; illustrative slots are visibly stylised or labelled.
+6. Evidence slots are literal; illustrative slots are visibly stylised (graded, abstracted or typographic), never stamped with a label.
 7. Nothing is shown before it is named unless marked TEASE.
 8. Subtitles match narration word for word: at most 2 lines, title-safe, correct Bangla conjunct shaping.
 9. No synthetic talking heads of real people, no lip-synced fabrications; on-camera speech only from licensed archive with original audio.
@@ -409,7 +409,7 @@ RUNG / LAYER: primary (variant n/3 of ASSET-ID if L5) -> fallback
 FX: template per visual event with its data (place name; number + unit + claim ID; highlighted phrase)
 QUERIES: the first two applicable rungs in 9.3 order plus the fallback rung, one exact query per provider named
 SOCIAL LEAD: what to look for and which licence route (R7 or R8), or n/a
-AI PROMPT (R9 only): full prompt + tokens + negative prompt + label + duration 3-6 s
+AI PROMPT (R9 only): full prompt + tokens + negative prompt + duration 3-6 s
 MOTION: camera or Ken Burns direction, speed, parallax depth
 TRANSITION: in and out (cut, match cut, dip, whoosh-slide; light leak only on archive)
 ON-SCREEN TEXT: client language, at most 6 words, position and timing
@@ -471,7 +471,7 @@ S5, each batch:
 - Evidence slots literal (CRITICAL).
 - No identifiable stock face over negative narration (CRITICAL).
 - Every shot has rung, layer, fallback, FX and queries.
-- Every R9 prompt has tokens, negative prompt and label, and respects 6.5 (CRITICAL).
+- Every R9 prompt has tokens and a negative prompt, and respects 6.5 (CRITICAL).
 - No source repeats within 10 minutes; at most 3 L5 variants per source.
 - Interrupt count matches batch seconds / 25 (±1).
 - Banned-list clean.
@@ -494,7 +494,7 @@ G3 Loops: all closed; at least one open until the final payoff.
 G4 Cadence: resets about every 3 minutes, interrupts about every 25 s, midpoint at 50%, cliffhanger at 80%.
 G5 Facts: every claim ledgered; contested ranges; allegations attributed with responses; no invented quotes; named-subject rules (6.4) met.
 G6 Rights: every shot has a rung; no social file sources; editorial restrictions; attributions generated; music fingerprint-clean.
-G7 AI share: within the per-chapter cap; none in the first 30 s where real material exists; every R9 shot labelled; none in 6.5-banned categories.
+G7 AI share: within the per-chapter cap; none in the first 30 s where real material exists; every R9 shot disclosed through the platform setting (never an on-screen label); none in 6.5-banned categories.
 G8 Consistency: tokens on every R9 prompt; continuity log clean.
 G9 Sync: anchors on every scene; numbers on screen; IDs on first mention; spelling identical everywhere.
 G10 Repetition: no asset or region reused within 10 minutes; at most 3 L5 variants per source.
@@ -519,7 +519,7 @@ G17 Beat-the-best: each S1 commitment shown delivered, with scene IDs. (The pipe
 8. Upload, claims and disclosure:
    - Upload private first; wait for YouTube's copyright and ad-suitability checks; publish only when no claim is open.
    - On a Content ID claim: (a) if the claimant is the licensor or its agency, request allowlisting or a release under the stored licence; (b) dispute only when a stored record proves the segment is public domain, Zupona-generated or licensed for this channel, citing that record; (c) if the claimant reinstates the claim, never appeal automatically (a rejected appeal lets the claimant issue a takedown and a strike): swap the segment from the next rung, re-render and replace the upload, or trim with YouTube's editor; (d) never dispute in bulk.
-   - DISCLOSURE (CRITICAL): set YouTube's altered or synthetic setting whenever the film contains a realistic R9 shot, a synthetic or cloned voice of a real person, or altered real footage; keep the on-screen label on every R9 shot; mark R9-based thumbnails with a small "AI" corner; keep C2PA/SynthID provenance and sign the master with a C2PA manifest declaring AI use; note EU AI Act Art. 50 duties (check the current application date) and India's labelling rules for synthetic content (check scope); use Meta's AI label for photorealistic AI video and realistic AI audio.
+   - DISCLOSURE (CRITICAL): set YouTube's altered or synthetic setting whenever the film contains a realistic R9 shot, a synthetic or cloned voice of a real person, or altered real footage; write nothing on the video or thumbnail to mark fiction, AI, reconstruction or illustration (owner's rule: on-screen labels drive viewers away and no platform requires them); keep C2PA/SynthID provenance and sign the master with a C2PA manifest declaring AI use; note EU AI Act Art. 50 duties (check the current application date) and India's labelling rules for synthetic content (check scope); use Meta's AI label for photorealistic AI video and realistic AI audio.
 9. Measurement plan (YouTube Studio at 48 hours and 7 days): intro retention at 0:30 (Key moments); retention against the channel's typical retention for that length; impressions CTR read together with average view duration; average view duration and percentage; the Test & Compare result; the dips to fix next time.
 10. Facebook pack:
    (a) a native cut for feed and Reels: 9:16 or 4:5, 60-180 s, built from the hook and the strongest reveal, paying off its own promise;
@@ -527,7 +527,7 @@ G17 Beat-the-best: each S1 commitment shown delivered, with scene IDs. (The pipe
    (c) full-length burned-in captions in the client's language;
    (d) a caption of 1-2 short relevant lines, at most 3 hashtags (Meta reduces reach for long or unrelated captions);
    (e) one original upload per Page, no cross-posted duplicates, no re-uploads of others' clips (Meta's July 2025 unoriginal-content rules cut reach and monetisation);
-   (f) the AI label on photorealistic AI;
+   (f) Meta's AI info setting on for photorealistic AI (a platform setting; nothing written on the video);
    (g) the link to the full YouTube film in the first comment, not the caption;
    (h) Facebook monetisation eligibility in Bangladesh is unknown: never promise revenue.
 
