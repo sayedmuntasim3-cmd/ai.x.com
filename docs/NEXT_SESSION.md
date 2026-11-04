@@ -91,6 +91,10 @@ It does not read the whole engine manual. When the prompt names the manual, only
 - Never a stock face presented as Ramesh Babu or his family.
 - The USA version is English only; the Bangladesh version is Bangla only. Never mix them.
 
+## 3b. Platform status (4 Nov 2026)
+
+The English (USA) path now runs end to end in code: `engine/src/film-run.mjs` (S0–S7, resumable, budget-capped), `engine/src/scene-lines.mjs` (every S5 chapter checked in code: clock, IDs, words, fields, banned phrases, language, sources, loops), `worker/` (Cloudflare Worker + Workflow + Claude API) and section 3 of `/studio/`. Tests: `npm test` (66 + 1). `npm run check` (wrangler dry-run) passes. It needs the owner's Cloudflare and API key: `docs/CONNECT.md`. Next: first real test run (2–10 min), then stock download, voice and render.
+
 ## 4. Benchmarks
 
 The owner sent 39 example videos. `docs/YOUTUBE_BENCHMARKS.md` is meant to hold all the links with what to learn from each one. **It is not in the repository yet** (not on `main`, this branch or the studio branch); only the 7 links sent on 3 Nov are saved there so far. The main lessons are already built into `engine/src/formats.mjs` (15 formats) and `docs/SYSTEM_V5.md`:

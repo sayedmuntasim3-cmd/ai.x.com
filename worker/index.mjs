@@ -1,0 +1,128 @@
+/**
+ * Zupona AI Studio on Cloudflare: the static site (public/) plus the film
+ * API. A film is a durable Workflow, so a 45-minute run of many long model
+ * calls survives restarts and never pays twice for a finished stage.
+ *
+ * Routes
+ *   GET  /api/health                 what is connected (no secrets shown)
+ *   GET  /api/estimate?minutes=45    cost estimate before a run
+ *   POST /api/films                  { topic, minutes, versionId?, notes? } -> { id }   (Bearer STUDIO_TOKEN)
+ *   GET  /api/films/:id              run state: stages, usage, cost, gaps
+ *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
+ *
+ * Needs (set by the owner when Cloudflare is connected):
+ *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
+ *   Optional vars: MODEL (default claude-opus-5-5), BUDGET_USD (default 60).
+ */
+import { WorkflowEntrypoint } from "cloudflare:workers";
+import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
+import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
+import { anthropicModel } from "./anthropic.mjs";
+
+const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
+const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
+
+/**
+ * @param {any} bucket R2 bucket
+ * @param {string} id
+ */
+function r2Store(bucket, id) {
+  return {
+    /** @param {string} key */
+    async get(key) {
+      const obj = await bucket.get(`films/${id}/${key}`);
+      return obj ? obj.text() : null;
+    },
+    /** @param {string} key @param {string} text */
+    async put(key, text) {
+      await bucket.put(`films/${id}/${key}`, text);
+    },
+  };
+}
+
+/** @param {unknown} body @param {number} [status] */
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": TYPES.json, "cache-control": "no-store" } });
+}
+
+/** Constant-time comparison for the studio token. @param {string} a @param {string} b */
+function sameToken(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export class FilmRunWorkflow extends WorkflowEntrypoint {
+  /** @param {any} event @param {any} step */
+  async run(event, step) {
+    const /** @type {any} */ env = this.env;
+    const film = event.payload.film;
+    const model = anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5" });
+    const budget = Number(env.BUDGET_USD);
+    await runFilm({
+      film,
+      manual: MANUAL,
+      model,
+      store: r2Store(env.FILMS, film.id),
+      budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
+      log: (line) => console.log(`[${film.id}] ${line}`),
+      step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "30 minutes" }, fn),
+    });
+  }
+}
+
+export default {
+  /** @param {Request} request @param {any} env */
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+    try {
+      if (url.pathname === "/api/health") {
+        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), model: env.MODEL || "claude-opus-5-5" });
+      }
+      if (url.pathname === "/api/estimate" && request.method === "GET") {
+        const minutes = Number(url.searchParams.get("minutes") ?? "45");
+        if (!(minutes >= 1 && minutes <= 300)) return json({ error: "Length must be 1 to 300 minutes." }, 400);
+        return json(estimateRun(Math.round(minutes * 60), env.MODEL || "claude-opus-5-5"));
+      }
+      if (url.pathname === "/api/films" && request.method === "POST") {
+        if (!env.ANTHROPIC_API_KEY || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your credits." }, 503);
+        const auth = request.headers.get("authorization") ?? "";
+        if (!sameToken(auth.replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const body = await request.json().catch(() => null);
+        if (!body || typeof body !== "object") return json({ error: "Send JSON: { topic, minutes }." }, 400);
+        const id = crypto.randomUUID();
+        const made = newFilm(/** @type {any} */ (body), id);
+        if (!made.ok) return json({ error: made.error }, 400);
+        const store = r2Store(env.FILMS, id);
+        await store.put("film.json", JSON.stringify(made.film, null, 1));
+        await env.FILM_RUN.create({ id, params: { film: made.film } });
+        return json({ id, film: made.film, estimate: estimateRun(made.film.durationSeconds, env.MODEL || "claude-opus-5-5") }, 202);
+      }
+      const m = /^\/api\/films\/([0-9a-f-]{36})(?:\/files\/([^/]+))?$/.exec(url.pathname);
+      if (m && request.method === "GET") {
+        if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
+        const store = r2Store(env.FILMS, m[1]);
+        if (m[2]) {
+          if (!FILE_NAME.test(m[2])) return json({ error: "Bad file name." }, 400);
+          const text = await store.get(m[2]);
+          if (text === null) return json({ error: "Not found." }, 404);
+          const ext = /** @type {keyof typeof TYPES} */ (m[2].split(".").pop());
+          return new Response(text, { headers: { "content-type": TYPES[ext] ?? "text/plain; charset=utf-8", "cache-control": "no-store" } });
+        }
+        const run = (await store.get("run.json")) ?? (await store.get("film.json"));
+        if (run === null) return json({ error: "Not found." }, 404);
+        /** @type {unknown} */
+        let workflow = null;
+        try { workflow = await (await env.FILM_RUN.get(m[1])).status(); } catch { workflow = null; }
+        return json({ run: JSON.parse(run), workflow });
+      }
+      return json({ error: "Not found." }, 404);
+    } catch (error) {
+      console.error(error);
+      return json({ error: "Something went wrong on the server." }, 500);
+    }
+  },
+};

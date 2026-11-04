@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { estimateRun, newFilm, runFilm, validateChapterPlan } from "../src/film-run.mjs";
+import { BudgetReached, estimateRun, newFilm, runFilm, validateChapterPlan } from "../src/film-run.mjs";
 import { applyFixes, checkChapter, checkFilm, countWords, toSeconds } from "../src/scene-lines.mjs";
 
 const USA = new URL("../../productions/ramesh-babu/USA/", import.meta.url);
@@ -141,4 +141,19 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   const again = await runFilm({ film: made.film, manual: "MANUAL", model, store });
   assert.equal(again.status, "done");
   assert.equal(model.calls.length, 12, "a finished run makes no new model calls");
+});
+
+test("a run stops at its budget and resumes where it stopped", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f2");
+  assert.ok(made.ok);
+  const model = scriptedModel();
+  const store = memoryStore();
+  await assert.rejects(runFilm({ film: made.film, manual: "M", model, store, budgetUsd: 0.02 }), BudgetReached);
+  const stopped = JSON.parse(store.m.get("run.json"));
+  assert.equal(stopped.status, "stopped-budget");
+  const spent = model.calls.length;
+  assert.ok(spent >= 1 && spent < 12);
+  const done = await runFilm({ film: made.film, manual: "M", model, store });
+  assert.equal(done.status, "done");
+  assert.equal(model.calls.length, 12, "nothing already paid for is asked again");
 });

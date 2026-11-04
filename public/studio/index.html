@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&family=Noto+Naskh+Arabic:wght@400;600&display=swap">
 <link rel="stylesheet" href="./studio.css">
 <script type="module" src="./app.js"></script>
+<script type="module" src="./film.js"></script>
 </head>
 <body>
 <header class="top">
@@ -96,6 +97,23 @@
       <div id="voice-out" class="out" aria-live="polite"></div>
     </section>
   </div>
+  <section class="film" aria-labelledby="film-h">
+    <form class="card" id="film-form" novalidate>
+      <h2 id="film-h"><span class="step">3</span> <span data-f="title"></span></h2>
+      <p class="muted small" data-f="lead"></p>
+      <label><span data-f="topic"></span>
+        <input id="film-topic" type="text" maxlength="500" required dir="auto" placeholder="Ramesh Babu: From Barber to Rolls-Royce"></label>
+      <label><span data-f="minutes"></span>
+        <input id="film-minutes" type="number" min="1" max="300" value="45" inputmode="numeric"></label>
+      <label><span data-f="token"></span>
+        <input id="film-token" type="password" autocomplete="off"></label>
+      <p class="muted small" data-f="tokenHint"></p>
+      <p class="small" id="film-estimate" aria-live="polite"></p>
+      <button class="go" type="submit" id="film-start" data-f="start"></button>
+      <p class="error" id="film-error" role="alert" hidden></p>
+    </form>
+    <div id="film-out" class="out" aria-live="polite"></div>
+  </section>
   <footer class="foot muted small" data-t="footer"></footer>
 </main>
 </body>

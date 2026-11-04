@@ -1,0 +1,149 @@
+// Zupona AI Studio: make the full film (English, USA) through the film API.
+// The price is shown before anything starts; the run is protected by the
+// owner's studio token, which stays in this browser only.
+import { estimateRun } from "./engine/film-run.mjs";
+
+const T = {
+  bn: {
+    title: "পুরো ফিল্ম বানাও (English, USA)",
+    lead: "বিষয় দিলে ইঞ্জিন নিজে রিসার্চ, তথ্য যাচাই, স্ক্রিপ্ট, শট লিস্ট, QA আর পাবলিশিং প্যাক বানাবে। প্রতিটি চ্যাপ্টার কোড দিয়ে যাচাই হয়।",
+    topic: "বিষয় (ইংরেজিতে বা বাংলায়)",
+    minutes: "দৈর্ঘ্য (মিনিট)",
+    token: "স্টুডিও টোকেন",
+    tokenHint: "Cloudflare-এ যে STUDIO_TOKEN দিয়েছেন। শুধু এই ব্রাউজারে থাকে।",
+    estimate: "আনুমানিক খরচ",
+    start: "ফিল্ম শুরু করো",
+    starting: "শুরু হচ্ছে…",
+    notConnected: "সার্ভার এখনও কানেক্ট হয়নি। Cloudflare আর Claude API key কানেক্ট হলে এখান থেকে ফিল্ম চলবে।",
+    status: "অবস্থা",
+    spent: "এখন পর্যন্ত খরচ",
+    files: "ফাইল",
+    gaps: "বাকি কাজ (GAP)",
+    stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
+  },
+  en: {
+    title: "Make the full film (English, USA)",
+    lead: "Give a topic and the engine researches, fact-checks and writes the script, shot list, QA and publishing pack. Every chapter is checked in code.",
+    topic: "Topic",
+    minutes: "Length (minutes)",
+    token: "Studio token",
+    tokenHint: "The STUDIO_TOKEN you set in Cloudflare. It stays in this browser only.",
+    estimate: "Estimated cost",
+    start: "Start the film",
+    starting: "Starting…",
+    notConnected: "The server is not connected yet. Once Cloudflare and the Claude API key are connected, films run from here.",
+    status: "Status",
+    spent: "Spent so far",
+    files: "Files",
+    gaps: "Open items (GAPs)",
+    stages: { s01: "S0–S1 titles and plan", research: "Web research", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
+  },
+};
+
+const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
+const lang = () => (document.documentElement.lang === "en" ? "en" : "bn");
+const L = () => T[lang()];
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
+
+function render() {
+  const l = L();
+  for (const el of document.querySelectorAll("[data-f]")) el.textContent = l[/** @type {HTMLElement} */ (el).dataset.f];
+  showEstimate();
+  const id = store.get("studio-film-id");
+  if (id) poll(id);
+}
+
+function showEstimate() {
+  const minutes = Number(/** @type {HTMLInputElement} */ ($("film-minutes")).value);
+  if (!(minutes >= 1 && minutes <= 300)) { $("film-estimate").textContent = ""; return; }
+  const e = estimateRun(Math.round(minutes * 60));
+  $("film-estimate").textContent = `${L().estimate}: $${e.usdLow}–$${e.usdHigh} (${e.chapters} ch, ${e.model})`;
+}
+
+/** @param {string} msg */
+function error(msg) {
+  const el = $("film-error");
+  el.textContent = msg;
+  el.hidden = !msg;
+}
+
+async function start(/** @type {SubmitEvent} */ ev) {
+  ev.preventDefault();
+  error("");
+  const topic = /** @type {HTMLInputElement} */ ($("film-topic")).value.trim();
+  const minutes = Number(/** @type {HTMLInputElement} */ ($("film-minutes")).value);
+  const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+  if (token) store.set("studio-token", token);
+  const button = /** @type {HTMLButtonElement} */ ($("film-start"));
+  button.disabled = true;
+  button.textContent = L().starting;
+  try {
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US" }) });
+    const body = await res.json().catch(() => ({}));
+    const isApi = (res.headers.get("content-type") ?? "").includes("json");
+    if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }
+    if (!res.ok) { error(body.error ?? L().notConnected); return; }
+    store.set("studio-film-id", body.id);
+    poll(body.id);
+  } catch {
+    error(L().notConnected);
+  } finally {
+    button.disabled = false;
+    button.textContent = L().start;
+  }
+}
+
+/** @type {number | undefined} */
+let timer;
+async function poll(/** @type {string} */ id) {
+  clearTimeout(timer);
+  try {
+    const res = await fetch(`/api/films/${id}`);
+    if (!res.ok) return;
+    const { run } = await res.json();
+    showRun(id, run);
+    if (run.status === "running" || !run.status) timer = window.setTimeout(() => poll(id), 15000);
+  } catch { /* offline: try again on the next visit */ }
+}
+
+function showRun(/** @type {string} */ id, /** @type {any} */ run) {
+  const l = L();
+  const out = $("film-out");
+  out.replaceChildren();
+  const h = (/** @type {string} */ tag, /** @type {string} */ text) => { const e = document.createElement(tag); e.textContent = text; return e; };
+  out.append(h("h3", `${run.film?.topic ?? ""} · ${l.status}: ${run.status ?? "queued"}`));
+  out.append(h("p", `${l.spent}: $${run.costUsd ?? 0}`));
+  const list = document.createElement("ul");
+  for (const [stage, info] of Object.entries(run.stages ?? {})) {
+    const key = stage.startsWith("s5:") ? null : stage;
+    const label = key ? l.stages[key] ?? stage : `S5 ${stage.slice(3)}`;
+    list.append(h("li", `✓ ${label}${info.result && info.result.ok === false ? " (GAP)" : ""}`));
+  }
+  out.append(list);
+  if (run.gaps?.length) {
+    out.append(h("h4", l.gaps));
+    const g = document.createElement("ul");
+    for (const x of run.gaps.slice(0, 20)) g.append(h("li", x));
+    out.append(g);
+  }
+  const files = ["s01.md", "research.json", "s2.md", "s3.md", "s4.md", ...Object.keys(run.stages ?? {}).filter((s) => s.startsWith("s5:")).map((s) => `s5-${s.slice(3)}.md`), "qa.json", "s6.md", "s7.md"];
+  out.append(h("h4", l.files));
+  const p = document.createElement("p");
+  for (const f of files) {
+    const a = document.createElement("a");
+    a.href = `/api/films/${id}/files/${f}`;
+    a.textContent = f;
+    a.target = "_blank";
+    a.rel = "noopener";
+    p.append(a, " ");
+  }
+  out.append(p);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  /** @type {HTMLInputElement} */ ($("film-token")).value = store.get("studio-token") ?? "";
+  $("film-form").addEventListener("submit", start);
+  $("film-minutes").addEventListener("input", showEstimate);
+  for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setTimeout(render, 0));
+  render();
+});

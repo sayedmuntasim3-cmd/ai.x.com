@@ -1,0 +1,17 @@
+{
+  "name": "ai-x-com",
+  "private": true,
+  "type": "module",
+  "description": "Zupona AI Studio: the Cloudflare Worker (site + film API) and its engine.",
+  "scripts": {
+    "test": "cd engine && npm test && cd .. && node --test worker/anthropic.test.mjs",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.157.0"
+  }
+}

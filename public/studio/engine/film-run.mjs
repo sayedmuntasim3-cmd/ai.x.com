@@ -151,8 +151,9 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
   const fixedOut = 6 * 12000 * 1.5; // S0-S4, QA, S6, S7
   const outputTokens = Math.round(chapters * outPerChapter * 1.2 + fixedOut); // 1.2: repairs
   const cachedIn = 30000 * (chapters + 8); // manual + brief + ledger + bibles, read from cache
-  const freshIn = Math.round(chapters * 12000 + 8 * 15000 + minutes * 3000); // stage inputs, QA reads the film
-  const usd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6;
+  const searches = 30; // research stage: web_search max_uses
+  const freshIn = Math.round(chapters * 12000 + 8 * 15000 + minutes * 3000 + searches * 10000); // stage inputs, QA reads the film, search results
+  const usd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6 + searches * 0.01;
   return { model, chapters, outputTokens, inputTokens: cachedIn + freshIn, usdLow: round2(usd * 0.7), usdHigh: round2(usd * 1.5) };
 }
 
@@ -171,7 +172,9 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
 
 /**
  * Run (or resume) a film. Returns the final run state.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number }} o
+ * budgetUsd stops the run before any stage that starts once the money spent
+ * has reached it, so a small budget is never overrun by more than one stage.
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -224,6 +227,10 @@ export async function runFilm(o) {
    */
   async function stage(id, fn) {
     if (state.stages[id]?.status === "done") return state.stages[id].result;
+    if (o.budgetUsd !== undefined && state.costUsd >= o.budgetUsd) {
+      state.status = "stopped-budget";
+      throw new BudgetReached(`Budget of $${o.budgetUsd} reached ($${state.costUsd} spent) before ${id}.`);
+    }
     log(`${id}: start`);
     const result = await step(id, async () => {
       const r = await fn();
@@ -401,7 +408,7 @@ export async function runFilm(o) {
 
     state.status = state.gaps.length ? "done-with-gaps" : "done";
   } catch (error) {
-    state.status = "failed";
+    if (!(error instanceof BudgetReached)) state.status = "failed";
     state.error = error instanceof Error ? error.message : String(error);
     await save();
     throw error;
@@ -409,6 +416,9 @@ export async function runFilm(o) {
   await save();
   return state;
 }
+
+/** Thrown when a run stops at its budget; the run can be resumed with a higher one. */
+export class BudgetReached extends Error {}
 
 /** @param {string} text */
 function safeJson(text) {
