@@ -19,6 +19,9 @@ const T = {
     spent: "এখন পর্যন্ত খরচ",
     files: "ফাইল",
     page: "পুরো ফিল্মের পেজ খোলো (স্ক্রিপ্ট, শট, ক্লিপ, সোর্স, খরচ)",
+    myFilms: "আমার ফিল্মগুলো",
+    noFilms: "এখনও কোনো ফিল্ম নেই।",
+    open: "খোলো",
     render: "ভিডিও রেন্ডার করো (MP4, Shorts, থাম্বনেইল)",
     renderStarted: "রেন্ডার শুরু হয়েছে। GitHub-এ দেখুন:",
     remake: "একটা দৃশ্য আবার বানাও",
@@ -47,6 +50,9 @@ const T = {
     spent: "Spent so far",
     files: "Files",
     page: "Open the film page (script, shots, clips, sources, cost)",
+    myFilms: "My films",
+    noFilms: "No films yet.",
+    open: "Open",
     render: "Render the video (MP4, Shorts, thumbnails)",
     renderStarted: "Render started. Follow it on GitHub:",
     remake: "Re-make one scene",
@@ -170,6 +176,34 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   out.append(p);
 }
 
+/** The owner's films, newest first; choosing one shows it below. */
+async function showFilms() {
+  const l = L();
+  const list = $("film-list");
+  const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+  list.replaceChildren();
+  const say = (/** @type {string} */ text) => { const li = document.createElement("li"); li.textContent = text; list.append(li); };
+  if (!token) { say(`${l.remakeFailed} ${l.token}`); return; }
+  try {
+    const res = await fetch("/api/films", { headers: { authorization: `Bearer ${token}` } });
+    const r = await res.json().catch(() => ({ error: l.notConnected }));
+    if (!res.ok) { say(`${l.remakeFailed} ${r.error ?? res.status}`); return; }
+    if (!r.films.length) { say(l.noFilms); return; }
+    for (const f of r.films) {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = l.open;
+      b.addEventListener("click", () => { store.set("studio-film-id", f.id); poll(f.id); $("film-out").scrollIntoView({ behavior: "smooth" }); });
+      li.append(b, ` ${f.topic} · ${f.minutes ?? "?"} min · ${f.status} · $${f.costUsd}${f.createdAt ? ` · ${String(f.createdAt).slice(0, 10)}` : ""}`);
+      list.append(li);
+    }
+  } catch (error) {
+    say(`${l.remakeFailed} ${error instanceof Error ? error.message : error}`);
+  }
+}
+
 /** Start the GitHub render of a finished film. @param {string} id */
 function renderButton(id) {
   const l = L();
@@ -187,7 +221,7 @@ function renderButton(id) {
     result.textContent = " …";
     try {
       const res = await fetch(`/api/films/${id}/render`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
-      const r = await res.json();
+      const r = await res.json().catch(() => ({ error: l.notConnected }));
       result.replaceChildren();
       if (r.ok) {
         const a = document.createElement("a");
@@ -246,7 +280,7 @@ function remakeForm(id) {
     result.textContent = "…";
     try {
       const res = await fetch(`/api/films/${id}/scenes/${scene.value.trim().toUpperCase()}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ instruction: what.value.trim() }) });
-      const r = await res.json();
+      const r = await res.json().catch(() => ({ error: l.notConnected }));
       result.textContent = r.ok ? `${l.remakeDone} $${r.costUsd}. ${r.after}` : `${l.remakeFailed} ${r.error ?? res.status}`;
     } catch (error) {
       result.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
@@ -261,6 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /** @type {HTMLInputElement} */ ($("film-token")).value = store.get("studio-token") ?? "";
   $("film-form").addEventListener("submit", start);
   $("film-minutes").addEventListener("input", showEstimate);
+  $("film-list-btn").addEventListener("click", showFilms);
   for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setTimeout(render, 0));
   render();
 });

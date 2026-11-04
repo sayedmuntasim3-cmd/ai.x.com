@@ -7,6 +7,7 @@
  *   GET  /api/health                 what is connected (no secrets shown)
  *   GET  /api/estimate?minutes=45    cost estimate before a run
  *   POST /api/films                  { topic, minutes, versionId?, notes? } -> { id }   (Bearer STUDIO_TOKEN)
+ *   GET  /api/films                  my films, newest first   (Bearer STUDIO_TOKEN)
  *   GET  /api/films/:id              run state: stages, usage, cost, gaps
  *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
  *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
@@ -29,6 +30,7 @@ import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
 import { dispatchRender } from "./github.mjs";
+import { listFilms } from "./films.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
@@ -108,6 +110,11 @@ export default {
         if (!(minutes >= 1 && minutes <= 300)) return json({ error: "Length must be 1 to 300 minutes." }, 400);
         return json(estimateRun(Math.round(minutes * 60), env.MODEL || "claude-opus-5-5"));
       }
+      if (url.pathname === "/api/films" && request.method === "GET") {
+        if (!env.FILMS || !env.STUDIO_TOKEN) return json({ error: "The studio is not connected yet." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        return json({ films: await listFilms(env.FILMS) });
+      }
       if (url.pathname === "/api/films" && request.method === "POST") {
         if (!env.ANTHROPIC_API_KEY || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your credits." }, 503);
@@ -119,7 +126,7 @@ export default {
         const made = newFilm(/** @type {any} */ (body), id);
         if (!made.ok) return json({ error: made.error }, 400);
         const store = r2Store(env.FILMS, id);
-        await store.put("film.json", JSON.stringify(made.film, null, 1));
+        await store.put("film.json", JSON.stringify({ ...made.film, createdAt: new Date().toISOString() }, null, 1));
         await env.FILM_RUN.create({ id, params: { film: made.film } });
         return json({ id, film: made.film, estimate: estimateRun(made.film.durationSeconds, env.MODEL || "claude-opus-5-5") }, 202);
       }
