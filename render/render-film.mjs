@@ -20,6 +20,7 @@ import { cpus } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildTimeline, toSrt } from "../engine/src/timeline.mjs";
+import { cutBriefs, renderCuts } from "./cuts.mjs";
 import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
 const SAMPLE_RATE = 48000;
@@ -362,10 +363,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (s7) {
     const clipsDir = join(workDir, "clips");
     mkdirSync(clipsDir, { recursive: true });
-    const thumbs = await renderThumbnails({ briefs: thumbnailBriefs(s7), timeline, fetchClip: (url) => downloadClip(url, clipsDir), outBase: args.out.replace(/\.mp4$/i, ""), font: args.font ?? FONT_CANDIDATES.find((f) => existsSync(f)) });
+    const font = args.font ?? FONT_CANDIDATES.find((f) => existsSync(f));
     const base = args.out.replace(/\.mp4$/i, "");
-    writeFileSync(base + ".report.json", JSON.stringify({ ...report, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })) }, null, 1));
+    const thumbs = await renderThumbnails({ briefs: thumbnailBriefs(s7), timeline, fetchClip: (url) => downloadClip(url, clipsDir), outBase: base, font });
     console.log(`thumbnails: ${thumbs.map((t) => t.id).join(", ")}`);
+    // The Shorts and the Facebook cut, vertical, with their hooks and burned-in captions.
+    const cuts = await renderCuts({ film: args.out, briefs: cutBriefs(s7).filter((b) => b.end <= timeline.durationSeconds), captions: timeline.captions, outBase: base, font });
+    console.log(`cuts: ${cuts.map((c) => c.id).join(", ")}`);
+    writeFileSync(base + ".report.json", JSON.stringify({ ...report, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })), cuts: cuts.map((c) => ({ id: c.id, file: basename(c.file), seconds: c.seconds, size: `${c.width}x${c.height}` })) }, null, 1));
   }
   console.log(JSON.stringify({ ...report, licences: report.licences.length, warnings: report.warnings.length }, null, 1));
 }

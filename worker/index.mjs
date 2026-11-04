@@ -11,12 +11,15 @@
  *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
  *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
+ *   POST /api/films/:id/render       start the GitHub render (MP4, Shorts, thumbnails)   (Bearer STUDIO_TOKEN)
  *
  * Needs (set by the owner when Cloudflare is connected):
  *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
  *   Optional vars: MODEL (default claude-opus-5-5), BUDGET_USD (default 60).
  *   Optional secrets PEXELS_API_KEY, PIXABAY_API_KEY: the media step (free
  *   stock footage per shot, media-C1.json ...). Without them it is skipped.
+ *   Optional GITHUB_TOKEN secret + GITHUB_REPO and SITE_URL vars: a finished
+ *   film starts the "Render a film" GitHub workflow by itself (render.json).
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { mediaProviders } from "../engine/src/film-media.mjs";
@@ -25,6 +28,7 @@ import { loadFilmPage, PAGE_CSP, renderFilmPage } from "../engine/src/film-page.
 import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
+import { dispatchRender } from "./github.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
@@ -82,6 +86,11 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       log: (line) => console.log(`[${film.id}] ${line}`),
       step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "30 minutes" }, fn),
     });
+    // The finished film goes straight to the renderer when GitHub is connected.
+    if (env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL) {
+      const result = await step.do("render", async () => dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: film.id, site: String(env.SITE_URL).replace(/\/$/, "") }));
+      await r2Store(env.FILMS, film.id).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
+    }
   }
 }
 
@@ -92,7 +101,7 @@ export default {
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
       if (url.pathname === "/api/health") {
-        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), model: env.MODEL || "claude-opus-5-5" });
+        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), model: env.MODEL || "claude-opus-5-5" });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
@@ -129,6 +138,15 @@ export default {
           providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY }),
         });
         return json(result, result.ok ? 200 : 422);
+      }
+      const render = /^\/api\/films\/([0-9a-f-]{36})\/render$/.exec(url.pathname);
+      if (render && request.method === "POST") {
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return json({ error: "Connect GitHub first: the GITHUB_TOKEN secret and the GITHUB_REPO var (docs/CONNECT.md)." }, 503);
+        const result = await dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: render[1], site: url.origin });
+        if (env.FILMS && result.ok) await r2Store(env.FILMS, render[1]).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
+        return json(result, result.ok ? 202 : 502);
       }
       const page = /^\/api\/films\/([0-9a-f-]{36})\/page$/.exec(url.pathname);
       if (page && request.method === "GET") {

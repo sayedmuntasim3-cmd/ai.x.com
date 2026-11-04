@@ -38,6 +38,7 @@ What it makes:
   - Loudness is -14 LUFS.
 - `film.srt`: captions for the YouTube upload.
 - `film.report.json`: counts, every clip with its licence page, and every warning (missing clips, voice too long, unresolved numbers).
+- `film.SH-01.mp4` … and `film.FB-01.mp4`: the Shorts (9:16) and the Facebook cut (4:5) from S7, cut at their exact source times. Each has the full frame centred over a blurred fill, its own hook on screen for the first 3.5 s, and the film's captions burned in large, so it works with the sound off. Each also gets its own `.srt`.
 - `film.TH-A.jpg`, `film.TH-B.jpg`, `film.TH-C.jpg`: the three S7 thumbnail briefs, for YouTube's Test & Compare. Each is 1280×720 and under 2 MB. The frame comes from the film's own footage (the scene the brief names, otherwise a different clip for each), graded, with the brief's words in large type.
 
 Every shot and audio piece is cached in `--work` (default `.render/`) under a hash of what makes it, so a stopped render resumes and a changed scene re-renders only its own shots. `npm test` renders a 10-second film to check the whole path, and skips that check when ffmpeg is missing.

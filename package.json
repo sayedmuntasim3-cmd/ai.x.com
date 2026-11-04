@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Zupona AI Studio: the Cloudflare Worker (site + film API) and its engine.",
   "scripts": {
-    "test": "cd engine && npm test && cd .. && node --test worker/anthropic.test.mjs render/render.test.mjs render/voice.test.mjs",
+    "test": "cd engine && npm test && cd .. && node --test worker/anthropic.test.mjs worker/github.test.mjs render/render.test.mjs render/voice.test.mjs",
     "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
     "deploy": "wrangler deploy",
     "render": "node render/render-film.mjs"

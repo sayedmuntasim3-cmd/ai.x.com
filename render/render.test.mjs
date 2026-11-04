@@ -111,3 +111,23 @@ test("the three S7 thumbnail briefs become 1280×720 JPEGs from the named scene'
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the S7 Shorts and Facebook cut are read and cut vertical with hook and captions", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const { cutBriefs, captionsFor, renderCuts } = await import("./cuts.mjs");
+  const briefs = cutBriefs(readFileSync(new URL("../productions/ramesh-babu/USA/s7.md", import.meta.url), "utf8"));
+  assert.deepEqual(briefs.map((b) => [b.id, b.start, b.end, `${b.width}x${b.height}`]), [["SH-01", 0, 58, "1080x1920"], ["SH-02", 2230, 2270, "1080x1920"], ["SH-03", 225, 275, "1080x1920"], ["FB-01", 2150, 2240, "1080x1350"]]);
+  assert.equal(briefs[0].hook, "He bought a Rolls-Royce. He still cuts hair.");
+  assert.deepEqual(captionsFor([{ start: 0, end: 2, text: "a" }, { start: 2, end: 5, text: "b" }, { start: 9, end: 10, text: "c" }], 3, 8), [{ start: 0, end: 2, text: "b" }]);
+  const dir = mkdtempSync(join(tmpdir(), "zupona-cuts-"));
+  try {
+    const film = join(dir, "film.mp4");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30:d=6", "-f", "lavfi", "-i", "sine=d=6", "-shortest", "-pix_fmt", "yuv420p", "-c:a", "aac", film]);
+    const cuts = await renderCuts({ film, briefs: [{ ...briefs[0], start: 1, end: 4 }, { ...briefs[3], start: 2, end: 5 }], captions: [{ start: 0, end: 6, text: "Its buyer cuts hair." }], outBase: join(dir, "film"), font: ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"].find((f) => existsSync(f)) });
+    for (const [c, size] of [[cuts[0], "1080,1920"], [cuts[1], "1080,1350"]]) {
+      assert.equal((await run("ffprobe", ["-v", "error", "-select_streams", "v", "-show_entries", "stream=width,height", "-of", "csv=p=0", c.file])).trim(), size);
+      assert.ok(Math.abs((await mediaDuration(c.file)) - 3) < 0.15, `${c.id} is the brief's length`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

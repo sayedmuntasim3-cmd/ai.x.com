@@ -43,13 +43,20 @@ When a film run is done, GitHub renders the MP4 on its own machines. The free pl
 2. Optional music: commit one track per cue as `music/<film id>/M01.mp3` ... (free tracks from Pixabay Music or Mixkit, chosen from the S4 music plan).
 3. GitHub shows the **Run workflow** button only for workflows on the default branch. So the work on `ccr-cb190ece-ukm6vg` has to be merged into `main` once, by you (a pull request you open and merge).
 4. Open the GitHub app or website and go to Actions > **Render a film** > Run workflow. Enter the film ID (the long ID in the film page's address), the site address and the picture size.
-5. When it finishes, download the artifact `film-<id>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload), `<id>.TH-A.jpg` / `TH-B` / `TH-C` (three thumbnails for YouTube's Test & Compare) and `<id>.report.json` (every clip with its licence page, and every warning).
+5. When it finishes, download the artifact `film-<id>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload), `<id>.TH-A.jpg` / `TH-B` / `TH-C` (three thumbnails for YouTube's Test & Compare), `<id>.SH-01.mp4` … (vertical Shorts with hook and burned-in captions), `<id>.FB-01.mp4` (the Facebook cut) and `<id>.report.json` (every clip with its licence page, and every warning).
+
+**Automatic render (optional):** to have every finished film start this render by itself, and to enable the studio's "Render the video" button:
+
+1. In GitHub, create a fine-grained token (Settings > Developer settings > Fine-grained tokens) for this repository only, with **Actions: Read and write**.
+2. `npx wrangler secret put GITHUB_TOKEN` (paste the token).
+3. In `wrangler.jsonc` under `vars`, add `"GITHUB_REPO": "sayedmuntasim3-cmd/ai.x.com"` and `"SITE_URL": "https://<your site>"`, then deploy.
+
+`/api/health` then shows `github: true`. Each film's `render.json` records whether its render started.
 
 The same render also runs on any computer with Node 22 and ffmpeg: see `render/README.md`.
 
 ## Not built yet (next steps)
 
 - Designed motion graphics (maps, counters, timelines). Graphics shots are text cards today.
-- A render started automatically when a run finishes (today it is one tap in GitHub Actions).
 - Arabic and Bangla runs (English first, by the owner's decision).
 - A login system for clients (today one studio token protects the paid API).

@@ -19,4 +19,5 @@
   "observability": { "enabled": true }
   // Secrets (npx wrangler secret put NAME): ANTHROPIC_API_KEY, STUDIO_TOKEN
   // Optional secrets for the media step: PEXELS_API_KEY, PIXABAY_API_KEY
+  // Optional auto-render: secret GITHUB_TOKEN; vars GITHUB_REPO ("owner/name") and SITE_URL ("https://...")
 }

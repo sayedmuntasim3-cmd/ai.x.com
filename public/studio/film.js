@@ -19,6 +19,8 @@ const T = {
     spent: "এখন পর্যন্ত খরচ",
     files: "ফাইল",
     page: "পুরো ফিল্মের পেজ খোলো (স্ক্রিপ্ট, শট, ক্লিপ, সোর্স, খরচ)",
+    render: "ভিডিও রেন্ডার করো (MP4, Shorts, থাম্বনেইল)",
+    renderStarted: "রেন্ডার শুরু হয়েছে। GitHub-এ দেখুন:",
     remake: "একটা দৃশ্য আবার বানাও",
     remakeHint: "শুধু ওই দৃশ্যটা নতুন করে লেখা হবে, কোডে যাচাই হবে, নতুন ফুটেজ পাবে। বাকি ফিল্ম যেমন আছে তেমন থাকবে।",
     remakeScene: "দৃশ্যের ID (যেমন SC0012)",
@@ -45,6 +47,8 @@ const T = {
     spent: "Spent so far",
     files: "Files",
     page: "Open the film page (script, shots, clips, sources, cost)",
+    render: "Render the video (MP4, Shorts, thumbnails)",
+    renderStarted: "Render started. Follow it on GitHub:",
     remake: "Re-make one scene",
     remakeHint: "Only that scene is rewritten, checked in code and given fresh footage. The rest of the film stays as it is.",
     remakeScene: "Scene ID (e.g. SC0012)",
@@ -152,7 +156,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   page.rel = "noopener";
   page.className = "go";
   out.append(page);
-  if (run.status === "done" || run.status === "done-with-gaps") out.append(remakeForm(id));
+  if (run.status === "done" || run.status === "done-with-gaps") out.append(renderButton(id), remakeForm(id));
   out.append(h("h4", l.files));
   const p = document.createElement("p");
   for (const f of files) {
@@ -164,6 +168,45 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
     p.append(a, " ");
   }
   out.append(p);
+}
+
+/** Start the GitHub render of a finished film. @param {string} id */
+function renderButton(id) {
+  const l = L();
+  const wrap = document.createElement("p");
+  const go = document.createElement("button");
+  go.type = "button";
+  go.className = "go";
+  go.textContent = l.render;
+  const result = document.createElement("span");
+  result.setAttribute("aria-live", "polite");
+  go.addEventListener("click", async () => {
+    const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+    if (!token) { result.textContent = ` ${l.remakeFailed} ${l.token}`; return; }
+    go.disabled = true;
+    result.textContent = " …";
+    try {
+      const res = await fetch(`/api/films/${id}/render`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+      const r = await res.json();
+      result.replaceChildren();
+      if (r.ok) {
+        const a = document.createElement("a");
+        a.href = r.actionsUrl;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = r.actionsUrl;
+        result.append(` ${l.renderStarted} `, a);
+      } else {
+        result.textContent = ` ${l.remakeFailed} ${r.error ?? res.status}`;
+      }
+    } catch (error) {
+      result.textContent = ` ${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
+    } finally {
+      go.disabled = false;
+    }
+  });
+  wrap.append(go, result);
+  return wrap;
 }
 
 /** The owner's re-make of one scene, through the token-protected API. @param {string} id */
