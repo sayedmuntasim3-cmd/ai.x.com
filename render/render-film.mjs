@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFile
 import { cpus } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { lookFor } from "../engine/src/formats.mjs";
 import { buildTimeline, toSrt } from "../engine/src/timeline.mjs";
 import { cutBriefs, renderCuts } from "./cuts.mjs";
 import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
@@ -157,7 +158,17 @@ export async function renderFilm(o) {
   // The house look: one gentle grade on every picture, so clips from many sources read as one film.
   // No synthetic grain: random grain on every frame cannot be compressed (a 45-minute film grew past
   // 1.5 GB at 360p) and YouTube's own encoder smears it away anyway.
-  const LOOK = "eq=contrast=1.06:saturation=0.92:gamma=0.98";
+  // Per format: documentary (gentle), cinematic (teal shadows, warm highlights; 2.39:1 bars), archive (faded and warm).
+  const LOOKS = {
+    documentary: "eq=contrast=1.06:saturation=0.92:gamma=0.98",
+    cinematic: "eq=contrast=1.12:saturation=1.06:gamma=0.97,colorbalance=rs=-0.05:gs=-0.01:bs=0.06:rh=0.07:gh=0.02:bh=-0.06,vignette=PI/5",
+    archive: "eq=contrast=1.08:saturation=0.7:gamma=0.97,colorbalance=rh=0.06:gh=0.03:bh=-0.05,vignette=PI/4.5",
+  };
+  const filmLook = t.look ?? "documentary";
+  const LOOK = LOOKS[filmLook] ?? LOOKS.documentary;
+  // Cinematic films are framed 2.39:1 with black bars, on every shot, so the frame never jumps.
+  const bar = filmLook === "cinematic" ? Math.max(0, Math.round((t.height - t.width / 2.39) / 2)) : 0;
+  const BARS = bar ? `drawbox=x=0:y=0:w=iw:h=${bar}:color=black:t=fill,drawbox=x=0:y=ih-${bar}:w=iw:h=${bar}:color=black:t=fill` : "";
   const CARD_BG = (/** @type {number} */ frames) => `vignette=PI/4,fade=t=in:st=0:d=${Math.min(0.25, frames / t.fps / 4).toFixed(3)}`;
   const mono = FONT_CANDIDATES.map((f) => f.replace("DejaVuSans-Bold", "DejaVuSansMono")).find((f) => existsSync(f) && /Mono/.test(f)) ?? font;
   const escPath = (/** @type {string} */ p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
@@ -165,11 +176,12 @@ export async function renderFilm(o) {
    * A drawtext filter reading its words from a file (no escaping of the text itself), fading in.
    * @param {string} words @param {string} key @param {string} style
    */
-  const text = (words, key, style) => {
+  const writeText = (/** @type {string} */ words, /** @type {string} */ key) => {
     const file = join(dirs.cards, `${hash({ words, key })}.txt`);
     writeFileSync(file, words);
-    return `drawtext=textfile='${escPath(file)}':${style}:alpha='min(1,t/0.35)'`;
+    return file;
   };
+  const text = (words, key, style) => `drawtext=textfile='${escPath(writeText(words, key))}':${style}:alpha='min(1,t/0.35)'`;
   const serif = SERIF_CANDIDATES.find((f) => existsSync(f)) ?? font;
   // Kinetic type rises 4% of the frame while it fades in (FX-KINETIC); otherwise it stays put.
   const rise = (/** @type {boolean | undefined} */ kinetic, /** @type {string} */ y) => (kinetic ? `y='${y}+h*0.04*(1-min(1,t/0.45))'` : `y=${y}`);
@@ -179,7 +191,7 @@ export async function renderFilm(o) {
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
-    const key = hash({ v: 5, split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 6, look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -191,6 +203,8 @@ export async function renderFilm(o) {
     if (type === "clip" && v.url) {
       try {
         input = [...(v.sourceIn ? ["-ss", String(v.sourceIn)] : []), "-stream_loop", "-1", "-i", await fetchClip(v.url)];
+        // Slow motion written in the script stretches the clip before it is framed.
+        if (v.speed && v.speed < 1) chain.push(`setpts=PTS/${v.speed}`);
         chain.push(frame);
         if (v.motion === "push") chain.push(`zoompan=z='1+0.06*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}`);
         chain.push(LOOK);
@@ -230,7 +244,21 @@ export async function renderFilm(o) {
     }
     // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.
     if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:${rise(v.kinetic, "h*0.72")}`));
+    if (BARS) chain.push(BARS);
     if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.026))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
+    // A chapter opens with its number and title, top left, for about three seconds.
+    if (v.chapterTitle && font && mono && type !== "black") {
+      const show = Math.min(3.2, (v.frames / t.fps) * 0.8);
+      const fadeAlpha = `alpha='min(1,max(0,(t-0.3)/0.4))*min(1,max(0,(${show.toFixed(2)}-t)/0.5))'`;
+      const [label, ...rest] = v.chapterTitle.split(" · ");
+      const top = Math.max(bar, 0) + Math.round(H * 0.07);
+      chain.push(`drawtext=textfile='${escPath(writeText(label.toUpperCase(), "chapter-label"))}':fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.024))}:x=w*0.06:y=${top}:${fadeAlpha}`);
+      chain.push(`drawtext=textfile='${escPath(writeText(wrap(rest.join(" · "), 30), "chapter-title"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.05)}:x=w*0.06:y=${top + Math.round(H * 0.04)}:shadowcolor=black@0.6:shadowx=2:shadowy=2:${fadeAlpha}`);
+    }
+    // Dips through black at chapter breaks and written dissolves: the shot fades out, the next fades in.
+    const seconds = v.frames / t.fps;
+    if (v.fadeIn) chain.push(`fade=t=in:st=0:d=${v.fadeIn.toFixed(3)}`);
+    if (v.fadeOut) chain.push(`fade=t=out:st=${Math.max(0, seconds - v.fadeOut).toFixed(3)}:d=${v.fadeOut.toFixed(3)}`);
     const vf = chain.length ? chain.join(",") : "null";
     const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
     // Centred lines (text_align) need ffmpeg 6.1+; older builds centre the block instead.
@@ -408,7 +436,18 @@ export async function renderFilm(o) {
   const mix = extra.length
     ? [...extra.flatMap((f) => ["-i", /** @type {string} */ (f)]), "-filter_complex", parts.join(";"), "-map", "0:v", "-map", "[a]"]
     : ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"];
-  await run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, ...mix, "-c:v", "copy", "-ar", String(SAMPLE_RATE), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
+  const mux = (/** @type {string[]} */ m) => run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, ...m, "-c:v", "copy", "-ar", String(SAMPLE_RATE), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
+  // Loudness normalisation needs sound and at least 3 s; on pure digital silence it yields NaN and the encoder stops.
+  const anySound = pieces.some((p) => p.file) || extra.length > 0;
+  const plain = ["-map", "0:v", "-map", "1:a"];
+  if (!anySound || t.durationSeconds < 3) await mux(plain);
+  else {
+    try { await mux(mix); } catch (error) {
+      if (!/NaN|Inf/.test(String(error))) throw error;
+      warnings.push("Loudness normalisation failed on this soundtrack (near-silent); the mix was written without it.");
+      await mux(extra.length ? [...extra.flatMap((f) => ["-i", /** @type {string} */ (f)]), "-filter_complex", parts.join(";").replace(",loudnorm=I=-14:TP=-1.5:LRA=11", ""), "-map", "0:v", "-map", "[a]"] : plain);
+    }
+  }
   renameSync(o.outFile + ".part.mp4", o.outFile);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
@@ -433,7 +472,7 @@ export async function loadRunFiles(from) {
   const plan = JSON.parse((await get("s3-chapters.json")) ?? "[]");
   return Promise.all(plan.map(async (/** @type {any} */ c) => {
     const media = await get(`media-${c.id}.json`);
-    return { id: c.id, markdown: (await get(`s5-${c.id}.md`)) ?? "", media: media ? JSON.parse(media) : null };
+    return { id: c.id, title: typeof c.title === "string" ? c.title : "", markdown: (await get(`s5-${c.id}.md`)) ?? "", media: media ? JSON.parse(media) : null };
   }));
 }
 
@@ -478,7 +517,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -488,7 +527,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   /** @type {Record<string, { durationSeconds: number }>} */
   const spoken = {};
   for (const [scene, file] of Object.entries(voice)) spoken[scene] = { durationSeconds: await mediaDuration(file) };
-  const timeline = buildTimeline({ chapters, voice: spoken, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
+  // The film's format decides its look (cinematic for stories and motivation, archive for history); --look overrides.
+  const filmInfo = JSON.parse((await loadRunText(from, "film.json")) ?? (await loadRunText(from, "run.json")) ?? "{}");
+  const look = /** @type {"documentary" | "cinematic" | "archive"} */ (["documentary", "cinematic", "archive"].includes(args.look) ? args.look : lookFor(filmInfo.formatId ?? filmInfo.film?.formatId));
+  const timeline = buildTimeline({ chapters, voice: spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
+  console.log(`look: ${look}`);
   const workDir = args.work ?? ".render";
   const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
   // The three A/B thumbnails from the S7 briefs, next to the film.

@@ -2,6 +2,26 @@
 // The price is shown before anything starts; the run is protected by the
 // owner's studio token, which stays in this browser only.
 import { estimateRun } from "./engine/film-run.mjs";
+import { FORMATS } from "./engine/formats.mjs";
+
+/** Format names in Bangla (the English names come from formats.mjs). */
+const FORMAT_BN = {
+  "true-story-reenactment": "সত্য ঘটনার পুনর্নির্মাণ",
+  "rags-to-riches": "শূন্য থেকে শীর্ষে, শীর্ষ থেকে পতন",
+  "motivational-life-story": "অনুপ্রেরণার সত্যিকারের জীবনকাহিনি",
+  "place-nobody-can-visit": "যেখানে কেউ যেতে পারে না",
+  "deadliest-journey": "সবচেয়ে বিপজ্জনক যাত্রা",
+  "history-epic": "ইতিহাসের মহাকাব্য",
+  "history-in-minutes": "কয়েক মিনিটে পুরো ইতিহাস",
+  "other-side": "বিখ্যাত ঘটনার অন্য দিক",
+  "inner-circle": "ভেতরের মানুষদের উত্থান, বিশ্বাসঘাতকতা ও পতন",
+  "dark-business-expose": "ব্যবসার অন্ধকার দিক",
+  "money-explainer": "টাকা আসলে কীভাবে কাজ করে",
+  "big-question-science": "বিজ্ঞানের বড় প্রশ্ন",
+  "mystery-investigation": "রহস্যের অনুসন্ধান",
+  "numbered-compilation": "নম্বর দেওয়া সংকলন",
+  "dramatized-story": "আইডিয়া থেকে নিজস্ব গল্প",
+};
 
 const T = {
   bn: {
@@ -9,6 +29,9 @@ const T = {
     lead: "বিষয় দিলে ইঞ্জিন নিজে রিসার্চ, তথ্য যাচাই, স্ক্রিপ্ট, শট লিস্ট, QA আর পাবলিশিং প্যাক বানাবে। প্রতিটি চ্যাপ্টার কোড দিয়ে যাচাই হয়।",
     topic: "বিষয় (ইংরেজিতে বা বাংলায়)",
     minutes: "দৈর্ঘ্য (মিনিট)",
+    format: "ভিডিওর ধরন",
+    formatAuto: "বিষয় দেখে নিজে বেছে নাও",
+    formatPlain: "সাধারণ ডকুমেন্টারি",
     token: "স্টুডিও টোকেন",
     tokenHint: "Cloudflare-এ যে STUDIO_TOKEN দিয়েছেন। শুধু এই ব্রাউজারে থাকে।",
     estimate: "আনুমানিক খরচ",
@@ -40,6 +63,9 @@ const T = {
     lead: "Give a topic and the engine researches, fact-checks and writes the script, shot list, QA and publishing pack. Every chapter is checked in code.",
     topic: "Topic",
     minutes: "Length (minutes)",
+    format: "Kind of film",
+    formatAuto: "Choose from the topic",
+    formatPlain: "General documentary",
     token: "Studio token",
     tokenHint: "The STUDIO_TOKEN you set in Cloudflare. It stays in this browser only.",
     estimate: "Estimated cost",
@@ -73,9 +99,20 @@ const lang = () => (document.documentElement.lang === "en" ? "en" : "bn");
 const L = () => T[lang()];
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
 
+/** Fill the format choice in the page's language, keeping the current pick. */
+function formatOptions() {
+  const l = L();
+  const select = /** @type {HTMLSelectElement} */ ($("film-format"));
+  const keep = select.value || "auto";
+  const option = (/** @type {string} */ value, /** @type {string} */ label) => { const o = document.createElement("option"); o.value = value; o.textContent = label; return o; };
+  select.replaceChildren(option("auto", l.formatAuto), option("", l.formatPlain), ...FORMATS.map((f) => option(f.id, lang() === "bn" ? FORMAT_BN[/** @type {keyof typeof FORMAT_BN} */ (f.id)] ?? f.name : f.name)));
+  select.value = keep;
+}
+
 function render() {
   const l = L();
   for (const el of document.querySelectorAll("[data-f]")) el.textContent = l[/** @type {HTMLElement} */ (el).dataset.f];
+  formatOptions();
   showEstimate();
   const id = store.get("studio-film-id");
   if (id) poll(id);
@@ -106,7 +143,8 @@ async function start(/** @type {SubmitEvent} */ ev) {
   button.disabled = true;
   button.textContent = L().starting;
   try {
-    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US" }) });
+    const formatId = /** @type {HTMLSelectElement} */ ($("film-format")).value;
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId }) });
     const body = await res.json().catch(() => ({}));
     const isApi = (res.headers.get("content-type") ?? "").includes("json");
     if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }

@@ -79,6 +79,19 @@ export const FORMATS = Object.freeze([
     visuals: "stock, graphics and disclosed AI scenes only where stock cannot", music: "per version policy", examples: ["owner's ideas: $50 to a Rolls-Royce, the baby dragon"] },
 ]);
 
+/**
+ * The picture look a format is rendered in: invented stories and human
+ * stories get the cinematic look (teal-and-warm grade, 2.39:1 bars), history
+ * the faded archive look, everything else the documentary look.
+ * @param {string | null | undefined} id
+ * @returns {"documentary" | "cinematic" | "archive"}
+ */
+export function lookFor(id) {
+  if (["dramatized-story", "motivational-life-story", "true-story-reenactment", "other-side", "rags-to-riches", "deadliest-journey"].includes(String(id))) return "cinematic";
+  if (["history-epic", "inner-circle", "history-in-minutes"].includes(String(id))) return "archive";
+  return "documentary";
+}
+
 /** @param {string} id */
 export function getFormat(id) {
   return FORMATS.find((format) => format.id === id) ?? null;

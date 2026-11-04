@@ -239,3 +239,50 @@ test("the finished film is compared with the channel's earlier films and added t
   assert.ok(second.gaps.some((/** @type {string} */ g) => g.startsWith("originality (fail)")));
   assert.equal(saved.length, 2);
 });
+
+test("formats: a film can be a motivational life story, an invented story or chosen by its topic", async () => {
+  const { filmBrief, isStoryFilm } = await import("../src/film-run.mjs");
+  const story = newFilm({ topic: "A barber's son and a borrowed suit", minutes: 12, formatId: "dramatized-story" }, "s1");
+  assert.ok(story.ok && story.film.formatId === "dramatized-story" && isStoryFilm(story.film));
+  const auto = newFilm({ topic: "He never gave up after losing everything", minutes: 12, formatId: "auto" }, "s2");
+  assert.ok(auto.ok && auto.film.formatId === "motivational-life-story" && !isStoryFilm(auto.film));
+  assert.deepEqual(newFilm({ topic: "Anything at all", minutes: 12, formatId: "cat-videos" }, "s3"), { ok: false, error: 'Unknown format "cat-videos".' });
+  const plain = newFilm({ topic: "The Suez Canal", minutes: 12 }, "s4");
+  assert.ok(plain.ok && plain.film.formatId === null);
+
+  const sb = filmBrief(story.film);
+  assert.match(sb, /FORMAT: Original dramatized story/);
+  assert.match(sb, /1\. STORY MODE: the story is invented/);
+  assert.match(sb, /Dramatized story\. Characters and events are created for this film\./);
+  assert.match(sb, /STORY RULES:\nS1\. Never call an invented story true/);
+  assert.match(sb, /Nothing is written on the video/);
+  const db = filmBrief(plain.film);
+  assert.doesNotMatch(db, /STORY MODE|STORY RULES|FORMAT:/);
+  assert.match(db, /1\. Facts only from the research file/);
+  assert.match(filmBrief(auto.film), /FORMAT: Motivational real-life story \(a true story told from sources\)/);
+});
+
+test("an invented story gets its description note in code, and a title that claims truth is flagged", async () => {
+  const made = newFilm({ topic: "The old mill's last apprentice", minutes: 2, formatId: "dramatized-story" }, "f7");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  /** @type {string[]} */
+  const asked = [];
+  const model = { ...base, async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
+    if (r.stage === "research" || r.stage === "s2") asked.push(r.messages[0].content.map((b) => b.text).join(" "));
+    if (r.stage === "s7") {
+      asked.push(r.messages[0].content.map((b) => b.text).join(" "));
+      return { text: "**Final title (A): The True Story of the Old Mill**\n## S7", stopReason: "end_turn", usage: { input_tokens: 10, output_tokens: 10 } };
+    }
+    return base.call(r);
+  } };
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "M", model, store });
+  assert.match(asked[0], /This film is an invented story\. Research on the web the real-world details/);
+  assert.match(asked[1], /Write S2 for an invented story: \(a\) the realism ledger/);
+  assert.match(asked[2], /never say true, real or "based on a true story"/);
+  const s7 = store.m.get("s7.md");
+  assert.ok(s7.trimEnd().endsWith("Dramatized story. Characters and events are created for this film."), "the note is added when the model forgot it");
+  assert.ok(state.gaps.some((/** @type {string} */ g) => g.startsWith('S7: the title "The True Story of the Old Mill" claims')));
+  assert.ok(state.gaps.some((/** @type {string} */ g) => / writing \(/.test(g)), "machine-sounding or flat writing is flagged in story mode");
+});

@@ -15,8 +15,10 @@
  * so a run survives restarts: a finished stage is never paid for twice.
  */
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
+import { getFormat, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
-import { applyFixes, checkChapter, checkFilm, toClock, toSeconds } from "./scene-lines.mjs";
+import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
+import { applyFixes, checkChapter, checkFilm, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
 import { getVersion } from "./versions.mjs";
 
 /** Versions the run can produce today. Arabic and Bangla follow once English works end to end. */
@@ -29,7 +31,7 @@ export const PRICES = Object.freeze({
 });
 
 /**
- * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string }} Film
+ * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string, formatId?: string | null }} Film
  * @typedef {{ text: string, cache?: boolean, image?: string }} Block  image: an https image URL; text is ignored then
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number }} Usage
@@ -41,8 +43,10 @@ export const PRICES = Object.freeze({
  */
 
 /**
- * Validate a new film request.
- * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown }} input
+ * Validate a new film request. formatId picks one of the format presets
+ * (formats.mjs: motivational life story, dramatized story, history epic ...);
+ * "auto" lets the topic choose; none keeps the general documentary.
+ * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown }} input
  * @param {string} id
  * @returns {{ ok: true, film: Film } | { ok: false, error: string }}
  */
@@ -54,7 +58,19 @@ export function newFilm(input, id) {
   if (!Number.isFinite(minutes) || minutes < 1 || minutes > 300) return { ok: false, error: "Length must be 1 to 300 minutes." };
   if (!RUN_VERSIONS.includes(versionId)) return { ok: false, error: `Only ${RUN_VERSIONS.join(", ")} can be made right now.` };
   const notes = typeof input.notes === "string" ? input.notes.trim().slice(0, 2000) : "";
-  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi: input.allowAi === true, notes } };
+  const asked = typeof input.formatId === "string" ? input.formatId.trim() : "";
+  const format = asked === "auto" ? suggestFormat(topic) : asked ? getFormat(asked) : null;
+  if (asked && !format) return { ok: false, error: `Unknown format "${asked}".` };
+  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi: input.allowAi === true, notes, formatId: format?.id ?? null } };
+}
+
+/**
+ * True when the film is an invented story (format mode "story"): no research
+ * claims to prove, but realism facts, story rules and the description note.
+ * @param {Film} film
+ */
+export function isStoryFilm(film) {
+  return Boolean(film.formatId && getFormat(film.formatId)?.mode === "story");
 }
 
 /**
@@ -64,20 +80,28 @@ export function newFilm(input, id) {
 export function filmBrief(film) {
   const v = getVersion(film.versionId);
   if (!v) throw new Error(`Unknown version "${film.versionId}".`);
+  const format = film.formatId ? getFormat(film.formatId) : null;
+  const story = format?.mode === "story";
+  const note = FICTION_LABELS[/** @type {keyof typeof FICTION_LABELS} */ (film.versionId)] ?? FICTION_LABELS["en-US"];
   return [
     `FILM: "${film.topic}". Runtime exactly ${toClock(film.durationSeconds)}. Version ${v.name}.`,
+    format ? `FORMAT: ${format.name} (${story ? "an invented story" : "a true story told from sources"}). Hook: ${format.hook} Beats: ${format.beats.join("; ")}. Visuals: ${format.visuals}. Music: ${format.music}. The genre examples (${format.examples.join(", ")}) only show the kind of film: never copy a channel's structure, wording or look; every film is written new (YouTube's inauthentic-content rule).` : "",
     film.notes ? `CLIENT NOTES: ${film.notes}` : "",
     "",
     "PIPELINE MODE (overrides the chat protocol in section 2): there are no chat turns. Write the complete stage you are asked for in one reply. Ignore the reply budget, batch sizes and the STATE block. Output only the stage itself, in markdown, with no preamble and no closing remarks.",
     "Every S5 chapter uses COMPACT scene lines (11.2) whatever the film length, because code parses and checks every line.",
     "",
     "PRODUCTION RULES (override the engine where they differ):",
-    "1. Facts only from the research file and the S2 ledger. Where sources conflict, never pick silently: say \"reports differ\" or use wording every source supports. Quotes are paraphrased with attribution (\"he told X in 2014 that ...\"), never presented as verbatim. Unknown means unknown.",
+    story
+      ? `1. STORY MODE: the story is invented. Never name, depict or imply a real private person, and never attach an invented act to any real person, company or town; invented characters get names no famous real person has. Real-world details (prices, wages, laws, distances, jobs, era) come from the research file and the S2 realism ledger and must be exact. Never call the story true, real or "based on a true story" in narration, title, thumbnail or description. Nothing is written on the video to say it is invented; S7 ends the description with this exact line: "${note}"`
+      : "1. Facts only from the research file and the S2 ledger. Where sources conflict, never pick silently: say \"reports differ\" or use wording every source supports. Quotes are paraphrased with attribution (\"he told X in 2014 that ...\"), never presented as verbatim. Unknown means unknown.",
     "2. Footage only from free stock: Pexels, Pixabay, Videvo (free licence, commercial use, never Editorial Use Only or Premium), Coverr (downloaded by hand) and Mixkit (Free Licence), plus graphics the editor builds (R1: OpenStreetMap maps credited \"© OpenStreetMap contributors\", kinetic type, counters, timelines, document-style cards rebuilt from public facts). Music and SFX only from Pixabay and Mixkit. Never social media, agency, archive or screenshot material.",
-    film.allowAi ? "3. AI imagery only where the engine allows it, labelled, never a real person's likeness." : "3. No AI imagery or AI audio (AI cap = 0 s).",
+    film.allowAi ? "3. AI imagery only where the engine allows it, never a real person's likeness, disclosed in YouTube Studio's altered-or-synthetic setting; nothing written on the video." : "3. No AI imagery or AI audio (AI cap = 0 s).",
     "4. Never present a stock person's face as a real person in the story or their family; never imply it in narration. Use hands, backs, silhouettes, objects, places and typography. Minors are never named or shown.",
-    "5. Hollywood finish: one master grade, film grain, speed ramps, push-ins, match cuts, layered sound, deliberate silence; less-downloaded clips; no clip repeated within 10 minutes; at most 3 variants per clip.",
+    "5. Cinema finish: one master grade, speed ramps, push-ins, match cuts, layered sound, deliberate silence; less-downloaded clips; no clip repeated within 10 minutes; at most 3 variants per clip. Nothing is written on the video to mark it as fiction, AI or illustration.",
     "6. Retention: a 30-second hook (four beats, fast cuts), a reset about every 3 minutes, a pattern interrupt about every 25 seconds, a midpoint turn, an 80% cliffhanger, every open loop paid.",
+    "7. Written to be felt, not only understood: every chapter has one scene built to move the viewer (a loss, a sacrifice, a choice, a reunion or a reveal). Before it the music drops or goes silent and the narration slows into short sentences; the picture holds; the music swells after. Specific sensory detail beats adjectives. People want something concrete, fear something specific and pay a price for what they get. The lesson lands through what happens and is never stated. End on an image and one line the viewer repeats.",
+    ...(story ? ["", "STORY RULES:", ...STORY_RULES.map((r, i) => `S${i + 1}. ${r}`)] : []),
     "",
     `VERSION LOCK: audience ${v.audience}; language ${v.register}; currency ${v.currency} (an amount that began in another currency is shown in dollars first, with the original small beneath and the conversion basis in the ledger). Narration pace ${v.narrationWpm.target} words per minute. Codes, IDs, search queries and file or grade terms stay in English. Never mention any other version.`,
   ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n");
@@ -270,12 +294,15 @@ export async function runFilm(o) {
       const s01 = await read("s01.md");
       const text = await ask("research", [
         { text: ctx("S0_S1", s01) },
-        { text: "Research this film's subject on the web. Find primary and reliable secondary sources; record conflicts between sources instead of resolving them; note people or things that could be confused with the subject. Then output ONE fenced ```json block, and nothing after it, shaped as: {\"subject\": string, \"facts\": [{\"id\": \"F01\", \"claim\": string, \"value\": string, \"sources\": [url, ...], \"confidence\": \"high\"|\"medium\"|\"low\", \"conflict\": string|null}], \"unknowns\": [string], \"doNotConfuse\": [string]}. Every fact needs at least one source URL you actually opened or found in search results. Never invent a URL." },
+        { text: (isStoryFilm(film)
+          ? "This film is an invented story. Research on the web the real-world details it needs to feel exact: prices, wages and costs of the time and place, laws and procedures, jobs and how they are done, places, distances, customs and era details. Record conflicts between sources instead of resolving them; list famous real people the invented characters must not be confused with."
+          : "Research this film's subject on the web. Find primary and reliable secondary sources; record conflicts between sources instead of resolving them; note people or things that could be confused with the subject.") + " Then output ONE fenced ```json block, and nothing after it, shaped as: {\"subject\": string, \"facts\": [{\"id\": \"F01\", \"claim\": string, \"value\": string, \"sources\": [url, ...], \"confidence\": \"high\"|\"medium\"|\"low\", \"conflict\": string|null}], \"unknowns\": [string], \"doNotConfuse\": [string]}. Every fact needs at least one source URL you actually opened or found in search results. Never invent a URL." },
       ], 32000, { webSearch: { maxUses: 30 } });
       const data = extractJson(text);
       const facts = Array.isArray(data?.facts) ? data.facts : [];
       const sourced = facts.filter((/** @type {any} */ f) => Array.isArray(f.sources) && f.sources.some((/** @type {unknown} */ u) => typeof u === "string" && /^https?:\/\//.test(u)));
-      if (sourced.length < 8) throw new Error(`Research found only ${sourced.length} sourced facts (at least 8 needed).`);
+      const needed = isStoryFilm(film) ? 5 : 8;
+      if (sourced.length < needed) throw new Error(`Research found only ${sourced.length} sourced facts (at least ${needed} needed).`);
       if (sourced.length < facts.length) state.gaps.push(`research: ${facts.length - sourced.length} facts without a source URL were dropped.`);
       data.facts = sourced;
       await store.put("research.json", JSON.stringify(data, null, 1));
@@ -285,7 +312,9 @@ export async function runFilm(o) {
     await stage("s2", async () => {
       const text = await ask("s2", [
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("RESEARCH", await read("research.json")) },
-        { text: "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources, confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." },
+        { text: isStoryFilm(film)
+          ? "Write S2 for an invented story: (a) the realism ledger, one row per real-world detail the story uses, with ID (C01...), detail, exact value, sources and chapter use, from the research file only; (b) the story bible: each invented character's name (no famous real person's name), age, want, wound, fear and the price they pay; (c) if money is involved, the money path: every jump in wealth with its cause and the exact figures, adding up."
+          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources, confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." },
       ], 32000);
       await store.put("s2.md", text);
       return { claims: (text.match(/\bC\d{2,3}\b/g) ?? []).length };
@@ -343,6 +372,12 @@ export async function runFilm(o) {
           check = checkChapter(text, spec);
         }
         if (!check.ok) state.gaps.push(...check.errors.map((e) => `${ch.id} ${e.scene ?? ""} ${e.code}: ${e.detail}`.replace(/\s+/g, " ")));
+        if (isStoryFilm(film) || film.formatId === "motivational-life-story") {
+          // Writing that sounds machine-made or preaches loses the viewer; flag it for the QA desk and the owner.
+          const narration = parseSceneLines(text).filter((s) => !s.wordless).map((s) => s.narration).join(" ");
+          const lint = lintNarration(narration, film.versionId);
+          state.gaps.push(...lint.problems.filter((p) => p.rule !== "version-purity").map((p) => `${ch.id} writing (${p.rule}): ${p.detail}`));
+        }
         await store.put(key, text);
         return { ok: check.ok, ...check.stats };
       });
@@ -433,10 +468,16 @@ export async function runFilm(o) {
 
     await stage("s7", async () => {
       const chapterTimes = plan.chapters.map((c) => `${c.start} ${c.title}`).join("\n");
-      const text = await ask("s7", [
+      let text = await ask("s7", [
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) },
-        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (no synthetic content, not made for kids, category, language) and a posting plan for this audience." },
+        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (no synthetic content, not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") },
       ], 16000);
+      if (isStoryFilm(film)) {
+        const note = storyNote(film);
+        if (!text.includes(note)) text += `\n\n### Description note (required for an invented story)\n\n${note}\n`;
+        const title = /\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(text)?.[1] ?? "";
+        if (/\b(true|real)[- ]life\b|\btrue story\b|\breal story\b|\bbased on (a )?true\b|\breally happened\b/i.test(title)) state.gaps.push(`S7: the title "${title.trim()}" claims the invented story is true; change it before upload.`);
+      }
       await store.put("s7.md", text);
       return { chars: text.length };
     });
@@ -486,6 +527,11 @@ export function createFootageJudge(ask) {
     if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("The footage verdict was not a JSON object.");
     return verdict;
   };
+}
+
+/** The one-line description note of an invented story, in the film's language. @param {Film} film */
+export function storyNote(film) {
+  return FICTION_LABELS[/** @type {keyof typeof FICTION_LABELS} */ (film.versionId)] ?? FICTION_LABELS["en-US"];
 }
 
 /** Thrown when a run stops at its budget; the run can be resumed with a higher one. */

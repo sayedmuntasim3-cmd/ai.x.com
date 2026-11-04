@@ -79,3 +79,18 @@ test("split cards show both versions side by side, from the shot's own descripti
     ["SC0173-2", "HUNDREDS APART", ["INDIA TV · about 2017", "RUSHLANE · 2017"]],
   ], "every split in the USA film, with a real heading (never a stray quote such as \"; \")");
 });
+
+test("chapter breaks and written dissolves dip through black; slow motion and chapter titles come from the script", async () => {
+  const { slowMotion } = await import("../src/timeline.mjs");
+  const { lookFor } = await import("../src/formats.mjs");
+  assert.deepEqual(["0.5x slow", "slow motion pour", "half speed", "1.08x push", "speed ramp", ""].map(slowMotion), [0.5, 0.6, 0.5, 1, 1, 1]);
+  assert.deepEqual(["dramatized-story", "motivational-life-story", "history-epic", "money-explainer", null].map(lookFor), ["cinematic", "cinematic", "archive", "documentary", "documentary"]);
+  const t = buildTimeline({ chapters: chapters.map((c, i) => ({ ...c, title: ["The Shop", "The Chair", "One Used Van", "The Luxury Bet", "The Ghost and the Bill", "Still at the Chair"][i] })), look: "cinematic" });
+  assert.equal(t.frames, 81000, "dips and titles never change the length");
+  assert.equal(t.look, "cinematic");
+  assert.deepEqual(t.video.filter((v) => v.chapterTitle).map((v) => v.chapterTitle), ["Chapter 2 · The Chair", "Chapter 3 · One Used Van", "Chapter 4 · The Luxury Bet", "Chapter 5 · The Ghost and the Bill", "Chapter 6 · Still at the Chair"]);
+  const c2 = t.video.findIndex((v) => v.chapterTitle === "Chapter 2 · The Chair");
+  assert.ok(t.video[c2].fadeIn && t.video[c2 - 1].fadeOut, "a chapter break fades out and back in");
+  assert.ok(t.video.filter((v) => v.fadeIn).length > 5, "written dissolves dip too");
+  assert.ok(t.video.every((v) => !v.fadeIn || v.fadeIn <= v.frames / 30 / 3 + 1e-9), "a dip never takes more than a third of a shot");
+});

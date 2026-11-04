@@ -12,18 +12,22 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[] }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string }} VideoSegment
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
  *   style: "paper" for FX-PAPER cards (document look); kinetic: text moves in (FX-KINETIC);
  *   split: the panels of an FX-SPLIT card ("A / B"), shown side by side, often two versions sources disagree on;
+ *   fadeIn / fadeOut: seconds of dip through black at a chapter break or a written dissolve or fade;
+ *   speed: below 1 for slow motion written in MOTION; chapterTitle: shown on a chapter's first shot;
  *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
+ * @typedef {"documentary" | "cinematic" | "archive"} FilmLook
+ *   documentary: a gentle grade; cinematic: a teal-and-warm grade and 2.39:1 bars (stories, motivation); archive: a faded warm grade (history)
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
  * @typedef {{ token: string, kind: "bed" | "hit", scene: string, start: number, end: number }} SoundEvent
  *   bed: ambience under the whole scene; hit: a one-shot from start (end is the scene's end)
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
  */
 
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
@@ -144,8 +148,29 @@ export function sceneSounds(field, scene, shotStarts) {
   return out;
 }
 
+/** Seconds of the dip through black at a chapter break, and at a written dissolve or fade. */
+export const CHAPTER_DIP = 0.4;
+export const SCENE_DIP = 0.25;
+
 /**
- * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number }> }} o
+ * Slow motion written in a scene's MOTION field ("slow motion", "0.5x",
+ * "half speed"); 1 when there is none. Speed ramps and push-ins are not
+ * slow motion.
+ * @param {string} motion
+ */
+export function slowMotion(motion) {
+  const factor = /\b(0?\.\d+)\s*[x×]\s*(?:speed|slow)?|\b(\d{2})\s*%\s*speed\b/i.exec(motion);
+  if (factor) {
+    const v = factor[1] ? Number(factor[1]) : Number(factor[2]) / 100;
+    if (v >= 0.25 && v < 1) return v;
+  }
+  if (/\bhalf[- ]speed\b/i.test(motion)) return 0.5;
+  if (/\bslow[- ]?(motion|mo)\b/i.test(motion)) return 0.6;
+  return 1;
+}
+
+/**
+ * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number }>, look?: FilmLook }} o
  * @returns {Timeline}
  */
 export function buildTimeline(o) {
@@ -168,8 +193,9 @@ export function buildTimeline(o) {
   let scenes = 0;
   let filmEnd = 0;
 
-  for (const chapter of o.chapters) {
+  for (const [chapterIndex, chapter] of o.chapters.entries()) {
     const picks = new Map((chapter.media?.shots ?? []).map((s) => [`${s.scene}#${s.shot}`, s]));
+    let chapterStart = chapterIndex > 0;
     for (const s of parseSceneLines(chapter.markdown)) {
       scenes += 1;
       if (!(s.end > s.start)) { notes.push(`${s.sc}: no duration, skipped.`); continue; }
@@ -207,6 +233,9 @@ export function buildTimeline(o) {
       const chip = sourceChip(ost);
       const fx = s.fields.FX ?? "";
       const look = { style: /** @type {"plain" | "paper"} */ (/FX-PAPER/i.test(fx) ? "paper" : "plain"), kinetic: /FX-KINETIC/i.test(fx) };
+      const speed = slowMotion(s.fields.MOTION ?? "");
+      // A chapter break dips through black; so does a dissolve or fade the script writes into this scene.
+      const dip = chapterStart ? CHAPTER_DIP : /\b(cross[- ]?)?dissolve\b|\bdip\b|\bfade (to|from|in|out)\b/i.test(s.fields.TRANS ?? "") ? SCENE_DIP : 0;
       let first = true;
       for (const shot of shots) {
         const start = shot.start ?? s.start;
@@ -215,9 +244,17 @@ export function buildTimeline(o) {
         if (frames <= 0) continue;
         const rung = /^(R\d)\b/.exec(shot.text)?.[1] ?? null;
         const row = picks.get(`${s.sc}#${shot.index}`);
+        /** @type {Omit<VideoSegment, "type" | "url" | "sourcePageUrl" | "licence" | "motion" | "text"> & Partial<VideoSegment>} */
         const base = { ...look, id: `${s.sc}-${shot.index}`, scene: s.sc, shot: shot.index, start: frameAt(start) / fps, end: frameAt(end) / fps, frames, brief: shot.text.slice(0, 240), title: "", chip: first ? chip : "" };
         const lead = first;
         first = false;
+        if (lead && dip) {
+          const previous = video[video.length - 1];
+          if (previous && previous.type !== "black") previous.fadeOut = Math.min(dip, previous.frames / fps / 3);
+          base.fadeIn = Math.min(dip, frames / fps / 3);
+        }
+        if (lead && chapterStart && chapter.title) base.chapterTitle = `${chapter.id.replace(/^C/, "Chapter ")} · ${chapter.title}`;
+        if (lead) chapterStart = false;
         if (rung === "R1") {
           const black = /\bcut to black\b|\bblack (frame|card|hold)\b|^R1\s+[\d.]+\s*s\s+black/i.test(shot.text);
           const panels = !black && /FX-SPLIT|split card|two columns/i.test(`${fx} ${shot.text}`) ? splitPanels(shot.text) : null;
@@ -232,7 +269,7 @@ export function buildTimeline(o) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
           const shotSeconds = frames / fps;
           const sourceIn = clipSeconds > shotSeconds ? Math.round(Math.min(3, (clipSeconds - shotSeconds) / 2) * 100) / 100 : 0;
-          video.push({ ...base, sourceIn, type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
+          video.push({ ...base, sourceIn, ...(speed < 1 ? { speed } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
           video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: cardText(shot.text, ost) });
@@ -261,7 +298,7 @@ export function buildTimeline(o) {
   }
   const frames = video.reduce((n, v) => n + v.frames, 0);
   return {
-    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, notes,
+    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, look: o.look ?? "documentary", notes,
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },
   };
 }

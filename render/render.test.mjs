@@ -157,3 +157,27 @@ test("counter cards run up to quantities, never to years, ranges or decimals", {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the cinematic look frames every shot 2.39:1 with black bars; the documentary look has none", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-look-"));
+  try {
+    const clip = join(dir, "clip.mp4");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=white:s=640x360:r=10:d=3", "-pix_fmt", "yuv420p", clip]);
+    const md = `**SC0001** | 0:00:00-0:00:02 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 street | LOOK: L`;
+    const media = { shots: [{ scene: "SC0001", shot: 1, status: "found", pick: { mediaUrl: "https://v/1", sourcePageUrl: "p", durationSeconds: 3, licence: { name: "Pexels License" } } }] };
+    /** @param {string} look */
+    const topBand = async (look) => {
+      const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md, media: /** @type {any} */ (media) }], width: 320, height: 180, fps: 10, look: /** @type {any} */ (look) });
+      const out = join(dir, `${look}.mp4`);
+      await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, fetchClip: async () => clip });
+      const p = spawnSync("ffmpeg", ["-v", "info", "-ss", "1", "-i", out, "-frames:v", "1", "-vf", "crop=iw:8:0:0,signalstats,metadata=print:key=lavfi.signalstats.YAVG", "-f", "null", "-"], { encoding: "utf8" });
+      return Number(/YAVG=([\d.]+)/.exec(p.stderr)?.[1] ?? -1);
+    };
+    const cinematic = await topBand("cinematic");
+    const documentary = await topBand("documentary");
+    assert.ok(cinematic >= 0 && cinematic < 25, `the top band is black in the cinematic look (${cinematic})`);
+    assert.ok(documentary > 150, `the picture reaches the top in the documentary look (${documentary})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
