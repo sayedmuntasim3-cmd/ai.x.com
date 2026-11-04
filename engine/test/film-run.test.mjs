@@ -249,6 +249,10 @@ test("formats: a film can be a motivational life story, an invented story or cho
   assert.deepEqual(newFilm({ topic: "Anything at all", minutes: 12, formatId: "cat-videos" }, "s3"), { ok: false, error: 'Unknown format "cat-videos".' });
   const plain = newFilm({ topic: "The Suez Canal", minutes: 12 }, "s4");
   assert.ok(plain.ok && plain.film.formatId === null);
+  assert.equal(story.film.allowAi, true, "invented stories use AI scenes with one cast by default");
+  assert.equal(plain.film.allowAi, false);
+  const noAi = newFilm({ topic: "A barber's son and a borrowed suit", minutes: 12, formatId: "dramatized-story", allowAi: false }, "s5");
+  assert.ok(noAi.ok && noAi.film.allowAi === false, "the owner can turn them off");
 
   const sb = filmBrief(story.film);
   assert.match(sb, /FORMAT: Original dramatized story/);
@@ -256,6 +260,8 @@ test("formats: a film can be a motivational life story, an invented story or cho
   assert.match(sb, /Dramatized story\. Characters and events are created for this film\./);
   assert.match(sb, /STORY RULES:\nS1\. Never call an invented story true/);
   assert.match(sb, /Nothing is written on the video/);
+  assert.match(sb, /3\. AI SCENES \(R9\) carry the story's people: one consistent cast/);
+  assert.match(sb, /8\. Performance: every scene line adds DELIVERY:/);
   const db = filmBrief(plain.film);
   assert.doesNotMatch(db, /STORY MODE|STORY RULES|FORMAT:/);
   assert.match(db, /1\. Facts only from the research file/);
@@ -269,7 +275,7 @@ test("an invented story gets its description note in code, and a title that clai
   /** @type {string[]} */
   const asked = [];
   const model = { ...base, async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
-    if (r.stage === "research" || r.stage === "s2") asked.push(r.messages[0].content.map((b) => b.text).join(" "));
+    if (r.stage === "research" || r.stage === "s2" || r.stage === "s4") asked.push(r.messages[0].content.map((b) => b.text).join(" "));
     if (r.stage === "s7") {
       asked.push(r.messages[0].content.map((b) => b.text).join(" "));
       return { text: "**Final title (A): The True Story of the Old Mill**\n## S7", stopReason: "end_turn", usage: { input_tokens: 10, output_tokens: 10 } };
@@ -280,7 +286,11 @@ test("an invented story gets its description note in code, and a title that clai
   const state = await runFilm({ film: made.film, manual: "M", model, store });
   assert.match(asked[0], /This film is an invented story\. Research on the web the real-world details/);
   assert.match(asked[1], /Write S2 for an invented story: \(a\) the realism ledger/);
-  assert.match(asked[2], /never say true, real or "based on a true story"/);
+  const s4Prompt = asked.find((a) => /Write S4, the production bibles/.test(a)) ?? "";
+  const s7Prompt = asked.find((a) => /Write S7, the publishing pack/.test(a)) ?? "";
+  assert.match(s4Prompt, /CHR-01 LOOK: <age, build, skin tone, face, hair, clothes, era and place>/, "S4 writes one look line per invented character");
+  assert.match(s7Prompt, /never say true, real or "based on a true story"/);
+  assert.match(s7Prompt, /altered or synthetic content: Yes when the film has realistic AI scenes/);
   const s7 = store.m.get("s7.md");
   assert.ok(s7.trimEnd().endsWith("Dramatized story. Characters and events are created for this film."), "the note is added when the model forgot it");
   assert.ok(state.gaps.some((/** @type {string} */ g) => g.startsWith('S7: the title "The True Story of the Old Mill" claims')));

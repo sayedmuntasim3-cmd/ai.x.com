@@ -61,7 +61,9 @@ export function newFilm(input, id) {
   const asked = typeof input.formatId === "string" ? input.formatId.trim() : "";
   const format = asked === "auto" ? suggestFormat(topic) : asked ? getFormat(asked) : null;
   if (asked && !format) return { ok: false, error: `Unknown format "${asked}".` };
-  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi: input.allowAi === true, notes, formatId: format?.id ?? null } };
+  // Invented stories use AI scenes with one cast unless the owner turns them off (owner's decision, 4 Nov 2026).
+  const allowAi = typeof input.allowAi === "boolean" ? input.allowAi : format?.mode === "story";
+  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null } };
 }
 
 /**
@@ -96,7 +98,9 @@ export function filmBrief(film) {
       ? `1. STORY MODE: the story is invented. Never name, depict or imply a real private person, and never attach an invented act to any real person, company or town; invented characters get names no famous real person has. Real-world details (prices, wages, laws, distances, jobs, era) come from the research file and the S2 realism ledger and must be exact. Never call the story true, real or "based on a true story" in narration, title, thumbnail or description. Nothing is written on the video to say it is invented; S7 ends the description with this exact line: "${note}"`
       : "1. Facts only from the research file and the S2 ledger. Where sources conflict, never pick silently: say \"reports differ\" or use wording every source supports. Quotes are paraphrased with attribution (\"he told X in 2014 that ...\"), never presented as verbatim. Unknown means unknown.",
     "2. Footage only from free stock: Pexels, Pixabay, Videvo (free licence, commercial use, never Editorial Use Only or Premium), Coverr (downloaded by hand) and Mixkit (Free Licence), plus graphics the editor builds (R1: OpenStreetMap maps credited \"© OpenStreetMap contributors\", kinetic type, counters, timelines, document-style cards rebuilt from public facts). Music and SFX only from Pixabay and Mixkit. Never social media, agency, archive or screenshot material.",
-    film.allowAi ? "3. AI imagery only where the engine allows it, never a real person's likeness, disclosed in YouTube Studio's altered-or-synthetic setting; nothing written on the video." : "3. No AI imagery or AI audio (AI cap = 0 s).",
+    film.allowAi && story
+      ? "3. AI SCENES (R9) carry the story's people: one consistent cast from the S4 bible. Every shot of a character is an R9 shot that names its token (CHR-01) and describes, in one concrete sentence, the action, the place, the light and the camera. Places and objects may still come from stock (R3). Never a real person's likeness, a child as the focus, a real brand, gore or nudity. The film is disclosed in YouTube Studio's altered-or-synthetic setting; nothing is written on the video."
+      : film.allowAi ? "3. AI imagery only where the engine allows it, never a real person's likeness, disclosed in YouTube Studio's altered-or-synthetic setting; nothing written on the video." : "3. No AI imagery or AI audio (AI cap = 0 s).",
     "4. Never present a stock person's face as a real person in the story or their family; never imply it in narration. Use hands, backs, silhouettes, objects, places and typography. Minors are never named or shown.",
     "5. Cinema finish: one master grade, speed ramps, push-ins, match cuts, layered sound, deliberate silence; less-downloaded clips; no clip repeated within 10 minutes; at most 3 variants per clip. Nothing is written on the video to mark it as fiction, AI or illustration.",
     "6. Retention: a 30-second hook (four beats, fast cuts), a reset about every 3 minutes, a pattern interrupt about every 25 seconds, a midpoint turn, an 80% cliffhanger, every open loop paid.",
@@ -344,7 +348,7 @@ export async function runFilm(o) {
     await stage("s4", async () => {
       const text = await ask("s4", [
         { text: ctx("S2", await read("s2.md")) + "\n" + ctx("S3", await read("s3.md")) },
-        { text: "Write S4, the production bibles (section 8): narrator, characters and depiction policy, locations, objects, the master look and chapter trims, motion-graphics style, sound bible with tokens and search phrases, music plan per cue, pronunciation lexicon, continuity rules, and the bible summary block (8.8)." },
+        { text: "Write S4, the production bibles (section 8): narrator, characters and depiction policy, locations, objects, the master look and chapter trims, motion-graphics style, sound bible with tokens and search phrases, music plan per cue, pronunciation lexicon, continuity rules, and the bible summary block (8.8)." + (film.allowAi && isStoryFilm(film) ? " For every invented character add one line, on its own: `CHR-01 LOOK: <age, build, skin tone, face, hair, clothes, era and place>`. Every AI prompt repeats it word for word, so the character looks the same in every scene; mark each invented character's type as Invented." : "") },
       ], 32000);
       await store.put("s4.md", text);
       return { chars: text.length };
@@ -471,7 +475,7 @@ export async function runFilm(o) {
       const chapterTimes = plan.chapters.map((c) => `${c.start} ${c.title}`).join("\n");
       let text = await ask("s7", [
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) },
-        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (no synthetic content, not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") },
+        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") },
       ], 16000);
       if (isStoryFilm(film)) {
         const note = storyNote(film);

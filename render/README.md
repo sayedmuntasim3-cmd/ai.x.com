@@ -32,13 +32,22 @@ S4's sound bible names every sound with a token and search phrases: `SND-AMB-01`
 
 To fetch them automatically, run `FREESOUND_API_KEY=... node render/sound-kit.mjs --run <folder> --out sfx/` (the free key is at freesound.org/apiv2/apply). It searches Freesound with each token's own S4 phrases and takes **CC0 sounds only**: the licence is filtered in the search and checked again on every result. Ambience must last 8 s or more; effects 8 s or less. Each pick is recorded in `sfx/sound-kit.json` (sound page, creator, licence). Files already in the folder are kept, so your own choices win.
 
-## 4. Render
+## 4. AI scenes for invented stories (optional)
+
+`FAL_KEY=... node render/ai-scenes.mjs --run <folder> --out ai/ [--budget 15]` makes the shots that need the story's people. It covers every R9 shot, plus stock shots that found no clip:
+- one reference portrait per invented character, from S4's `CHR-01 LOOK:` line;
+- a keyframe per shot made from that reference, so the same face, hair and clothes appear in every scene;
+- a short clip animated from the keyframe.
+
+It runs only when the film allows AI (`allowAi`, on by default for invented stories). A character whose type is a real person, company or brand is never generated. Prompts forbid text, logos, real likenesses and children as the focus. A budget cap stops generation, and the shots left keep their cards. Made shots are cached in `ai/ai-scenes.json`, so they are never paid for twice. Pass `--ai ai/` to the renderer, and set "Altered or synthetic content" to Yes in YouTube Studio when uploading.
+
+## 5. Render
 
 `render-film.mjs` turns a film run into a video file with ffmpeg. It runs anywhere ffmpeg 6 or newer and Node 22 are installed: the owner's own computer (free), a small VM, or a container. It cannot run inside the Cloudflare Worker.
 
 ```sh
 # From the run's files on the deployed site:
-node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --sfx sfx/ --out film.mp4
+node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --sfx sfx/ --ai ai/ --out film.mp4
 # From a folder of run files (s3-chapters.json, s5-C1.md ..., media-C1.json ...):
 node render/render-film.mjs --run productions/ramesh-babu/USA --out usa.mp4 --width 1280 --height 720
 ```

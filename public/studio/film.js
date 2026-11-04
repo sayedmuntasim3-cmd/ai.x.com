@@ -32,6 +32,7 @@ const T = {
     format: "ভিডিওর ধরন",
     formatAuto: "বিষয় দেখে নিজে বেছে নাও",
     formatPlain: "সাধারণ ডকুমেন্টারি",
+    ai: "গল্পের চরিত্র AI দৃশ্যে দেখাও (একই চেহারা সব দৃশ্যে; আসল কোনো মানুষ নয়; YouTube Studio-তে ঘোষণা, স্ক্রিনে কিছু লেখা নয়)",
     token: "স্টুডিও টোকেন",
     tokenHint: "Cloudflare-এ যে STUDIO_TOKEN দিয়েছেন। শুধু এই ব্রাউজারে থাকে।",
     estimate: "আনুমানিক খরচ",
@@ -66,6 +67,7 @@ const T = {
     format: "Kind of film",
     formatAuto: "Choose from the topic",
     formatPlain: "General documentary",
+    ai: "Show the story's characters in AI scenes (the same look in every scene; never a real person; disclosed in YouTube Studio, nothing on screen)",
     token: "Studio token",
     tokenHint: "The STUDIO_TOKEN you set in Cloudflare. It stays in this browser only.",
     estimate: "Estimated cost",
@@ -144,7 +146,8 @@ async function start(/** @type {SubmitEvent} */ ev) {
   button.textContent = L().starting;
   try {
     const formatId = /** @type {HTMLSelectElement} */ ($("film-format")).value;
-    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId }) });
+    const allowAi = /** @type {HTMLInputElement} */ ($("film-ai")).checked;
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi }) });
     const body = await res.json().catch(() => ({}));
     const isApi = (res.headers.get("content-type") ?? "").includes("json");
     if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }
@@ -334,6 +337,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $("film-form").addEventListener("submit", start);
   $("film-minutes").addEventListener("input", showEstimate);
   $("film-list-btn").addEventListener("click", showFilms);
+  // AI scenes are on by default for invented stories only; the owner can change it for any film.
+  const syncAi = () => { /** @type {HTMLInputElement} */ ($("film-ai")).checked = /** @type {HTMLSelectElement} */ ($("film-format")).value === "dramatized-story"; };
+  $("film-format").addEventListener("change", syncAi);
+  syncAi();
   for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setTimeout(render, 0));
   render();
 });

@@ -136,3 +136,6 @@ details summary { cursor: pointer; color: var(--muted); }
 .film label { display: grid; gap: .3rem; margin: .6rem 0; }
 .film input { font: inherit; padding: .6rem .7rem; border-radius: .6rem; border: 1px solid var(--line, #2a3330); background: transparent; color: inherit; max-width: 100%; }
 .film #film-out a { margin-right: .6rem; }
+
+label.tick { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; }
+label.tick input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--accent); }

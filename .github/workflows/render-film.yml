@@ -11,6 +11,7 @@ name: Render a film
 # Optional repository secrets (Settings > Secrets and variables > Actions):
 #   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
 #   FREESOUND_API_KEY                        sound effects fetched automatically (CC0 only)
+#   FAL_KEY                                  AI scenes for invented stories (one consistent cast); variable AI_BUDGET_USD caps the spend (default 15)
 # Optional own voice: commit your recordings as voice/<film id>/SC0001.wav ... (script: /api/films/<id>/script)
 # Music: composed per cue with ElevenLabs Music when ELEVENLABS_API_KEY is set (repository variable MUSIC_AUTO=off
 #   turns it off); tracks committed as music/<film id>/M01.mp3 ... always win.
@@ -60,7 +61,9 @@ jobs:
       - name: Reuse the previous render of this film (only changed scenes are redone)
         uses: actions/cache@v4
         with:
-          path: .render
+          path: |
+            .render
+            ai
           key: render-${{ inputs.film_id }}-${{ inputs.resolution }}-${{ github.run_id }}
           restore-keys: |
             render-${{ inputs.film_id }}-${{ inputs.resolution }}-
@@ -99,9 +102,23 @@ jobs:
           else
             echo "Music: only tracks committed under music/$FILM_ID/ are used."
           fi
+      - name: AI scenes for invented stories (fal.ai, one consistent cast)
+        env:
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          AI_BUDGET_USD: ${{ vars.AI_BUDGET_USD }}
+          AI_IMAGE_MODEL: ${{ vars.AI_IMAGE_MODEL }}
+          AI_EDIT_MODEL: ${{ vars.AI_EDIT_MODEL }}
+          AI_VIDEO_MODEL: ${{ vars.AI_VIDEO_MODEL }}
+        run: |
+          mkdir -p "ai/$FILM_ID"
+          if [ -n "$FAL_KEY" ]; then
+            node render/ai-scenes.mjs --api "$SITE" --id "$FILM_ID" --out "ai/$FILM_ID/" || echo "::warning::Some AI scenes could not be made; those shots keep their cards."
+          else
+            echo "No FAL_KEY secret: no AI scenes (stories show stock and cards)."
+          fi
       - name: Render
         run: |
-          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" \
+          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" --ai "ai/$FILM_ID" \
             --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out "out/$FILM_ID.mp4"
       - name: Summary
         if: always()
@@ -117,12 +134,16 @@ jobs:
           files=()
           [ -f "sfx/$FILM_ID/sound-kit.json" ] && cp "sfx/$FILM_ID/sound-kit.json" "out/$FILM_ID.sound-kit.json"
           [ -f "music/$FILM_ID/music-kit.json" ] && cp "music/$FILM_ID/music-kit.json" "out/$FILM_ID.music-kit.json"
+          [ -f "ai/$FILM_ID/ai-scenes.json" ] && cp "ai/$FILM_ID/ai-scenes.json" "out/$FILM_ID.ai-scenes.json"
           for f in out/*.mp4 out/*.jpg out/*.srt out/*.json; do
             if [ "$(stat -c %s "$f")" -ge 2147000000 ]; then echo "::warning::$f is over 2 GB and was not published; render at 1280x720."; else files+=("$f"); fi
           done
           [ ${#files[@]} -gt 0 ] || { echo "::error::Nothing was rendered."; exit 1; }
           tag="film-${FILM_ID:0:8}-${GITHUB_RUN_NUMBER}"
           printf 'Film %s, rendered from %s.\n\nThe .mp4 is the film; SH-* are the Shorts (9:16), FB-* the Facebook cut (4:5), TH-* the thumbnails for YouTube Test & Compare, and the .report.json lists every clip with its licence page.\n' "$FILM_ID" "$SITE" > notes.md
+          if [ -f "ai/$FILM_ID/ai-scenes.json" ] && node -e 'process.exit(Object.keys(require(process.argv[1]).shots||{}).length?0:1)' "$PWD/ai/$FILM_ID/ai-scenes.json"; then
+            printf '\n**This film contains realistic AI scenes.** When uploading, set "Altered or synthetic content" to Yes in YouTube Studio. Nothing is written on the video.\n' >> notes.md
+          fi
           gh release create "$tag" "${files[@]}" --prerelease --title "Film $FILM_ID" --notes-file notes.md --target "$GITHUB_SHA"
           echo "Release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4

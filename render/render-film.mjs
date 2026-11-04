@@ -108,6 +108,12 @@ async function pool(items, limit, fn) {
  * @param {string} url @param {string} dir
  */
 async function downloadClip(url, dir) {
+  // AI scenes and other local clips are used where they are.
+  if (!/^https?:\/\//i.test(url)) {
+    const local = url.startsWith("file://") ? fileURLToPath(url) : url;
+    if (existsSync(local)) return local;
+    throw new Error(`Local clip not found: ${local}`);
+  }
   const file = join(dir, hash(url) + ".mp4");
   if (existsSync(file)) return file;
   let lastError;
@@ -517,7 +523,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--ai <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -536,6 +542,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const look = /** @type {"documentary" | "cinematic" | "archive"} */ (["documentary", "cinematic", "archive"].includes(args.look) ? args.look : lookFor(filmInfo.formatId ?? filmInfo.film?.formatId));
   const timeline = buildTimeline({ chapters, voice: spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
   console.log(`look: ${look}`);
+  // AI scenes made by ai-scenes.mjs replace their cards (stories with one cast).
+  let aiShots = 0;
+  if (args.ai) {
+    const { applyAiScenes } = await import("./ai-scenes.mjs");
+    aiShots = applyAiScenes(timeline, args.ai);
+    if (aiShots) console.log(`AI scenes: ${aiShots}`);
+  }
   const workDir = args.work ?? ".render";
   const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
   // The three A/B thumbnails from the S7 briefs, next to the film.
@@ -550,7 +563,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     // The Shorts and the Facebook cut, vertical, with their hooks and burned-in captions.
     const cuts = await renderCuts({ film: args.out, briefs: cutBriefs(s7).filter((b) => b.end <= timeline.durationSeconds), captions: timeline.captions, outBase: base, workDir, font });
     console.log(`cuts: ${cuts.map((c) => c.id).join(", ")}`);
-    writeFileSync(base + ".report.json", JSON.stringify({ ...report, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })), cuts: cuts.map((c) => ({ id: c.id, file: basename(c.file), seconds: c.seconds, size: `${c.width}x${c.height}` })) }, null, 1));
+    if (aiShots) report.warnings.unshift(`This film has ${aiShots} realistic AI scenes: when uploading, set "Altered or synthetic content" to Yes in YouTube Studio (nothing is written on the video).`);
+    writeFileSync(base + ".report.json", JSON.stringify({ ...report, aiShots, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })), cuts: cuts.map((c) => ({ id: c.id, file: basename(c.file), seconds: c.seconds, size: `${c.width}x${c.height}` })) }, null, 1));
   }
   console.log(JSON.stringify({ ...report, licences: report.licences.length, warnings: report.warnings.length }, null, 1));
 }
