@@ -191,3 +191,31 @@ test("the media step writes media-C1.json per chapter, never repeats a clip, and
   assert.match(plain.media, /no PEXELS_API_KEY/);
   assert.ok(!noKeys.m.has("media-C1.json"));
 });
+
+test("the footage desk sees the thumbnails, its verdict picks the clip, and its cost is counted", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f4");
+  assert.ok(made.ok);
+  let n = 0;
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const pexels = { id: "pexels", layer: 2, kinds: ["video"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search() {
+    return [0, 1].map(() => { n += 1; return { id: `pexels:video:${n}`, source: "pexels", mediaType: "video", title: "mill", previewUrl: `https://images.pexels.com/${n}.jpg?w=320`, mediaUrl: `https://v/${n}.mp4`, sourcePageUrl: `https://www.pexels.com/video/${n}/`, creator: null, license: "Pexels License", licenseUrl: null, durationSeconds: 10, width: 1920, height: 1080, attributionRequired: false }; });
+  } };
+  const base = scriptedModel();
+  /** @type {any[]} */
+  const judged = [];
+  const model = { ...base, async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
+    if (!r.stage.startsWith("media-judge:")) return base.call(r);
+    judged.push(r);
+    const keys = r.messages[0].content.map((b) => /^SHOT (\S+):/.exec(b.text)?.[1]).filter(Boolean);
+    return { text: "```json\n" + JSON.stringify(Object.fromEntries(keys.map((k) => [k, [1]]))) + "\n```", stopReason: "end_turn", usage: { input_tokens: 2000, output_tokens: 50 } };
+  } };
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "M", model, store, media: { providers: [pexels] } });
+  assert.equal(judged.length, 2, "one batched request per chapter of six shots");
+  assert.ok(judged[0].messages[0].content.some((/** @type {any} */ b) => b.image === "https://images.pexels.com/2.jpg?w=320"));
+  assert.equal(judged[0].effort, "low");
+  const c1 = JSON.parse(store.m.get("media-C1.json"));
+  assert.deepEqual(c1.shots.map((/** @type {any} */ s) => [s.pick.id, s.review]).slice(0, 2), [["pexels:video:2", "fit"], ["pexels:video:4", "fit"]], "the second candidate, as the desk said");
+  assert.equal(state.usage["media-judge:C1"].calls, 1);
+  assert.equal(state.status, "done");
+});

@@ -285,11 +285,14 @@ function shotHtml(text, row, searched) {
     media = [
       img && page ? link(page, img) : img,
       chip("ok", p.licence.name || p.licence.licenseId),
+      row.review === "fit" ? chip("ok", "checked by eye") : row.review === "unreviewed" ? chip("warn", "not checked by eye") : "",
       p.creator ? `<span>by ${esc(p.creator)}</span>` : "",
       page ? link(page, `on ${esc(host(page))}`) : "",
       row.query ? `<span class="small">query “${esc(row.query)}”</span>` : "",
       row.alternates.length ? chip("", `${row.alternates.length} alternate${row.alternates.length > 1 ? "s" : ""}`) : "",
     ].filter(Boolean).join(" ");
+  } else if (row?.status === "missing" && row.review === "none-fit") {
+    media = `${chip("warn", "no candidate fit the shot")} <span class="small">checked by eye after searching ${row.queries.map((q) => `“${esc(q)}”`).join(", ")}</span>`;
   } else if (row?.status === "missing") {
     media = `${chip("warn", "no free clip yet")} <span class="small">searched ${row.queries.map((q) => `“${esc(q)}”`).join(", ")}</span>`;
   } else if (row?.status === "no-query") {

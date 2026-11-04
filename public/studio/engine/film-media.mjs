@@ -25,7 +25,7 @@ export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0"]);
  * @typedef {{ scene: string, shot: number, start: number, end: number, rung: string | null, description: string, queries: string[] }} StockShot
  * @typedef {{ licenseId: string, name: string, licenseUrl: string | null, attributionRequired: boolean, creator: string | null, sourcePageUrl: string }} LicenceRecord
  * @typedef {{ id: string, source: string, mediaUrl: string | null, previewUrl: string | null, sourcePageUrl: string, creator: string | null, durationSeconds: number | null, width: number | null, height: number | null, licence: LicenceRecord }} MediaPick
- * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[] }} ShotMedia
+ * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], review?: "fit" | "none-fit" | "unreviewed", trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[] }} ShotMedia
  * @typedef {{ chapter: string, providers: string[], repeatWindowSeconds: number, shots: ShotMedia[], stats: { shots: number, found: number, missing: number, noQuery: number } }} ChapterMedia
  * @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike
  */
@@ -114,8 +114,33 @@ export function createUseHistory(windowSeconds = REPEAT_WINDOW_SECONDS) {
 }
 
 /**
- * Find footage for every stock shot of one chapter.
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> }} o
+ * Shots shown to the judge in one request, and candidates per shot.
+ */
+export const JUDGE_BATCH = 6;
+export const JUDGE_POOL = 4;
+
+/**
+ * @typedef {{ key: string, description: string, query: string, candidates: { index: number, previewUrl: string, title: string }[] }} JudgeShot
+ * @typedef {(chapter: string, shots: JudgeShot[]) => Promise<Record<string, number[]>>} MediaJudge
+ *   returns, per shot key, the candidate indices that fit the shot, best first ([] = none fits)
+ */
+
+/** @param {import("./documentary-media-fetch.mjs").MediaCandidate} c @returns {MediaPick} */
+function toPick(c) {
+  return {
+    id: c.id, source: c.source, mediaUrl: c.mediaUrl, previewUrl: c.previewUrl, sourcePageUrl: c.sourcePageUrl,
+    creator: c.creator, durationSeconds: c.durationSeconds, width: c.width, height: c.height,
+    licence: { licenseId: c.rights.licenseId, name: c.rights.reason, licenseUrl: c.licenseUrl, attributionRequired: c.attributionRequired, creator: c.creator, sourcePageUrl: c.sourcePageUrl },
+  };
+}
+
+/**
+ * Find footage for every stock shot of one chapter. With a judge, the top
+ * candidates of each shot are shown to it (as small thumbnails, in batches)
+ * and only a clip it says fits is used; a shot where nothing fits gets no
+ * clip rather than the wrong one. If the judge fails, the first free clip is
+ * used and the shot is marked unreviewed, so the run never stops here.
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -124,6 +149,8 @@ export async function chapterMedia(o) {
   const kind = o.kind ?? "video";
   /** @type {ShotMedia[]} */
   const shots = [];
+  /** @type {Map<ShotMedia, import("./documentary-media-fetch.mjs").MediaCandidate[]>} */
+  const pools = new Map();
   for (const shot of stockShots(o.markdown)) {
     /** @type {ShotMedia} */
     const row = { ...shot, status: shot.queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
@@ -135,19 +162,47 @@ export async function chapterMedia(o) {
       row.trace.push(...found.trace.map((t) => ({ query, ...t })));
       const free = found.candidates.filter((c) => c.rights.allowed && !c.rights.needsPageCheck && FREE_LICENCES.includes(c.rights.licenseId));
       if (!free.length) continue;
+      row.query = query;
+      if (o.judge) { pools.set(row, free); break; }
       const [best, ...rest] = free;
       row.status = "found";
-      row.query = query;
-      row.pick = {
-        id: best.id, source: best.source, mediaUrl: best.mediaUrl, previewUrl: best.previewUrl, sourcePageUrl: best.sourcePageUrl,
-        creator: best.creator, durationSeconds: best.durationSeconds, width: best.width, height: best.height,
-        licence: { licenseId: best.rights.licenseId, name: best.rights.reason, licenseUrl: best.licenseUrl, attributionRequired: best.attributionRequired, creator: best.creator, sourcePageUrl: best.sourcePageUrl },
-      };
+      row.pick = toPick(best);
       row.alternates = rest.slice(0, 3).map((c) => c.id);
       history.add(best.id, shot.start);
       break;
     }
     shots.push(row);
+  }
+
+  if (o.judge && pools.size) {
+    // Ask the judge, batch by batch; a failed batch falls back to search order.
+    const rows = [...pools.keys()];
+    /** @type {Map<ShotMedia, number[] | null>} */
+    const verdicts = new Map();
+    for (let i = 0; i < rows.length; i += JUDGE_BATCH) {
+      const batch = rows.slice(i, i + JUDGE_BATCH);
+      const asked = batch.map((row) => ({ row, shot: { key: `${row.scene}-${row.shot}`, description: row.description, query: row.query ?? "", candidates: (pools.get(row) ?? []).slice(0, JUDGE_POOL).map((c, index) => ({ index, previewUrl: c.previewUrl ?? "", title: c.title })).filter((c) => c.previewUrl) } })).filter((x) => x.shot.candidates.length);
+      /** @type {Record<string, number[]> | null} */
+      let answer = null;
+      try { answer = asked.length ? await o.judge(o.chapter, asked.map((x) => x.shot)) : null; } catch { answer = null; }
+      for (const { row, shot } of asked) {
+        const order = answer?.[shot.key];
+        verdicts.set(row, Array.isArray(order) ? order.filter((n) => Number.isInteger(n) && n >= 0 && n < shot.candidates.length) : null);
+      }
+    }
+    // Commit picks in film order, so the 10-minute rule holds within the chapter too.
+    for (const row of rows) {
+      const pool = pools.get(row) ?? [];
+      const verdict = verdicts.get(row) ?? null;
+      const order = verdict === null ? pool.map((_, n) => n) : verdict;
+      const chosen = order.map((n) => pool[n]).find((c) => c && !history.blocked(c.id, row.start));
+      row.review = verdict === null ? "unreviewed" : chosen ? "fit" : "none-fit";
+      if (!chosen) continue;
+      row.status = "found";
+      row.pick = toPick(chosen);
+      row.alternates = order.map((n) => pool[n]).filter((c) => c && c.id !== chosen.id).slice(0, 3).map((c) => c.id);
+      history.add(chosen.id, row.start);
+    }
   }
   return {
     chapter: o.chapter,
@@ -177,6 +232,22 @@ function httpError(res) {
 }
 
 /**
+ * A 320 px wide Pexels preview: enough for the judge to see the shot, at a
+ * small fraction of the image tokens of the full-size one.
+ * @param {unknown} url
+ */
+function smallPexels(url) {
+  if (typeof url !== "string" || !url) return null;
+  try {
+    const u = new URL(url);
+    if (u.hostname === "images.pexels.com") { u.searchParams.set("auto", "compress"); u.searchParams.set("cs", "tinysrgb"); u.searchParams.set("w", "320"); u.searchParams.delete("h"); u.searchParams.delete("fit"); }
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Pexels search (videos and photos). Pexels License: free, no attribution
  * required. Limit: 200 requests per hour by default.
  * @param {{ apiKey: string, fetch?: FetchLike, perPage?: number }} o
@@ -197,7 +268,7 @@ export function pexelsProvider(o) {
         return (data.videos ?? []).map((/** @type {any} */ v) => {
           const files = (v.video_files ?? []).filter((/** @type {any} */ f) => f.link && (f.file_type ?? "video/mp4") === "video/mp4");
           const file = files.filter((/** @type {any} */ f) => (f.width ?? 0) <= 1920).sort((/** @type {any} */ a, /** @type {any} */ b) => (b.width ?? 0) - (a.width ?? 0))[0] ?? files[0];
-          return { ...common, id: `pexels:video:${v.id}`, mediaType: "video", title: query, previewUrl: v.image ?? null, mediaUrl: file?.link ?? null, sourcePageUrl: v.url ?? `https://www.pexels.com/video/${v.id}/`, creator: v.user?.name ?? null, durationSeconds: v.duration ?? null, width: file?.width ?? v.width ?? null, height: file?.height ?? v.height ?? null };
+          return { ...common, id: `pexels:video:${v.id}`, mediaType: "video", title: query, previewUrl: smallPexels(v.image), mediaUrl: file?.link ?? null, sourcePageUrl: v.url ?? `https://www.pexels.com/video/${v.id}/`, creator: v.user?.name ?? null, durationSeconds: v.duration ?? null, width: file?.width ?? v.width ?? null, height: file?.height ?? v.height ?? null };
         });
       }
       return (data.photos ?? []).map((/** @type {any} */ p) => ({ ...common, id: `pexels:photo:${p.id}`, mediaType: "image", title: p.alt || query, previewUrl: p.src?.medium ?? null, mediaUrl: p.src?.original ?? null, sourcePageUrl: p.url ?? `https://www.pexels.com/photo/${p.id}/`, creator: p.photographer ?? null, durationSeconds: null, width: p.width ?? null, height: p.height ?? null }));
@@ -225,8 +296,9 @@ export function pixabayProvider(o) {
       const common = { source: "pixabay", license: "Pixabay Content License", licenseUrl: "https://pixabay.com/service/license-summary/", attributionRequired: false };
       if (kind === "video") {
         return (data.hits ?? []).map((/** @type {any} */ h) => {
+          const thumb = h.videos?.tiny?.thumbnail || h.videos?.small?.thumbnail || null;
           const file = h.videos?.large?.url ? h.videos.large : h.videos?.medium?.url ? h.videos.medium : h.videos?.small ?? null;
-          return { ...common, id: `pixabay:video:${h.id}`, mediaType: "video", title: h.tags || query, previewUrl: file?.thumbnail ?? null, mediaUrl: file?.url || null, sourcePageUrl: h.pageURL ?? `https://pixabay.com/videos/id-${h.id}/`, creator: h.user ?? null, durationSeconds: h.duration ?? null, width: file?.width || null, height: file?.height || null };
+          return { ...common, id: `pixabay:video:${h.id}`, mediaType: "video", title: h.tags || query, previewUrl: thumb ?? file?.thumbnail ?? null, mediaUrl: file?.url || null, sourcePageUrl: h.pageURL ?? `https://pixabay.com/videos/id-${h.id}/`, creator: h.user ?? null, durationSeconds: h.duration ?? null, width: file?.width || null, height: file?.height || null };
         });
       }
       return (data.hits ?? []).map((/** @type {any} */ h) => ({ ...common, id: `pixabay:photo:${h.id}`, mediaType: "image", title: h.tags || query, previewUrl: h.previewURL ?? null, mediaUrl: h.largeImageURL ?? null, sourcePageUrl: h.pageURL ?? `https://pixabay.com/photos/id-${h.id}/`, creator: h.user ?? null, durationSeconds: null, width: h.imageWidth ?? null, height: h.imageHeight ?? null }));

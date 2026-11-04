@@ -57,3 +57,12 @@ test("requests stream with caching, effort, web search and fallbacks; a paused s
   assert.equal(bodies[1].messages.length, 2);
   assert.equal(bodies[1].messages[1].role, "assistant");
 });
+
+test("an image block goes to the API as a URL image source", async () => {
+  /** @type {any[]} */
+  const bodies = [];
+  const fakeFetch = /** @type {typeof fetch} */ (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return sse("{}", "end_turn"); });
+  const model = anthropicModel({ apiKey: "test", fetch: fakeFetch, maxRetries: 0 });
+  await model.call({ stage: "media-judge:C1", system: [{ text: "M", cache: true }], messages: [{ role: "user", content: [{ text: "SHOT SC0001-1: mill" }, { text: "", image: "https://images.pexels.com/1.jpg?w=320" }] }], maxTokens: 2000, effort: "low" });
+  assert.deepEqual(bodies[0].messages[0].content[1], { type: "image", source: { type: "url", url: "https://images.pexels.com/1.jpg?w=320" } });
+});

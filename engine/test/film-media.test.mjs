@@ -85,3 +85,32 @@ test("a clip may come back after 10 minutes; non-free and rate-limited results a
   assert.equal(none.shots[0].trace[0].outcome, "rate_limited");
   assert.equal(limited.calls.length, 1, "after a 429 the provider is closed instead of hammered");
 });
+
+test("with a judge, only a clip it says fits is used; nothing fitting means no clip, and a failed judge falls back", async () => {
+  const md = [0, 20, 40].map((t, i) => `**SC000${i + 1}** | 0:00:${String(t).padStart(2, "0")}-0:00:${String(t + 10).padStart(2, "0")} | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 old mill wheel turning | SRC: Pexels · Q1 "old mill" | LOOK: L`).join("\n");
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const stock = { id: "pexels", layer: 2, kinds: ["video"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search() {
+    return [1, 2, 3].map((n) => ({ id: `pexels:video:${n}`, source: "pexels", mediaType: "video", title: `clip ${n}`, previewUrl: `https://images.pexels.com/${n}.jpg?w=320`, mediaUrl: `https://v/${n}.mp4`, sourcePageUrl: `https://www.pexels.com/video/${n}/`, creator: null, license: "Pexels License", licenseUrl: null, durationSeconds: 8, width: 1920, height: 1080, attributionRequired: false }));
+  } };
+  /** @type {any[]} */
+  const asked = [];
+  const media = await chapterMedia({ chapter: "C1", markdown: md, providers: [stock], judge: async (chapter, shots) => {
+    asked.push({ chapter, keys: shots.map((s) => s.key), n: shots[0].candidates.length, desc: shots[0].description });
+    // Shot 1 and 2 both like clip 2 best; shot 3 sees nothing that fits.
+    return { "SC0001-1": [1, 0], "SC0002-1": [1, 2], "SC0003-1": [] };
+  } });
+  assert.deepEqual(asked, [{ chapter: "C1", keys: ["SC0001-1", "SC0002-1", "SC0003-1"], n: 3, desc: "R3 old mill wheel turning" }], "one batched request");
+  assert.deepEqual(media.shots.map((s) => [s.pick?.id ?? null, s.review]), [["pexels:video:2", "fit"], ["pexels:video:3", "fit"], [null, "none-fit"]], "the judge's order is kept, the 10-minute rule still applies, and a misfit is never used");
+  assert.equal(media.stats.missing, 1);
+
+  const fallback = await chapterMedia({ chapter: "C1", markdown: md, providers: [stock], judge: async () => { throw new Error("image fetch failed"); } });
+  assert.deepEqual(fallback.shots.map((s) => [s.pick?.id, s.review]), [["pexels:video:1", "unreviewed"], ["pexels:video:2", "unreviewed"], ["pexels:video:3", "unreviewed"]]);
+});
+
+test("Pexels previews are asked for at 320 px, so the judge's images stay cheap", async () => {
+  const f = /** @type {any} */ (async () => Response.json({ videos: [{ id: 5, url: "https://www.pexels.com/video/5/", image: "https://images.pexels.com/videos/5/pictures/preview-0.jpg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200", video_files: [{ link: "https://v/5.mp4", file_type: "video/mp4", width: 1920, height: 1080 }] }] }));
+  const [r] = await pexelsProvider({ apiKey: "k", fetch: f }).search("x", "video", AbortSignal.timeout(1000));
+  const u = new URL(String(r.previewUrl));
+  assert.equal(u.searchParams.get("w"), "320");
+  assert.equal(u.searchParams.get("h"), null);
+});

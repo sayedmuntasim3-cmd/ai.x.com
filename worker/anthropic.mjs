@@ -9,8 +9,9 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
-/** @param {{ text: string, cache?: boolean }} b */
+/** @param {{ text: string, cache?: boolean, image?: string }} b */
 function block(b) {
+  if (b.image) return { type: "image", source: { type: "url", url: b.image } };
   return b.cache ? { type: "text", text: b.text, cache_control: { type: "ephemeral", ttl: "1h" } } : { type: "text", text: b.text };
 }
 

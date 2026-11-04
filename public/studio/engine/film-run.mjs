@@ -29,7 +29,7 @@ export const PRICES = Object.freeze({
 
 /**
  * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string }} Film
- * @typedef {{ text: string, cache?: boolean }} Block
+ * @typedef {{ text: string, cache?: boolean, image?: string }} Block  image: an https image URL; text is ignored then
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number }} Usage
  * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string }} ModelReply
@@ -178,7 +178,9 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * media (optional) adds the media step after QA: free stock footage for
  * every S5 shot, one media-C1.json ... per chapter. Without providers (no
  * PEXELS_API_KEY or PIXABAY_API_KEY) the step is left for a later resume.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, media?: { providers: import("./film-media.mjs").MediaProvider[], maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * media.review (default true) shows the model small thumbnails of each
+ * shot's top candidates and keeps only a clip it says fits.
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -388,6 +390,23 @@ export async function runFilm(o) {
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };
     });
 
+    /**
+     * The footage desk: which candidates fit each shot, judged from thumbnails.
+     * @type {import("./film-media.mjs").MediaJudge}
+     */
+    async function judgeFootage(chapterId, shots) {
+      /** @type {Block[]} */
+      const content = [{ text: "You are the footage desk. For each shot below, look at its candidate thumbnails and list the ones that work as documentary B-roll for exactly that shot: the right subject and setting, plausible for the place and period described. Reject a candidate that shows an identifiable face when the shot says no face, a readable brand, logo or licence plate where the shot avoids them, a watermark or burned-in text, an obviously staged stock-model look, or a clearly different country or period. Order the fitting candidates best first." }];
+      for (const s of shots) {
+        content.push({ text: `SHOT ${s.key}: ${s.description} (searched "${s.query}")` });
+        for (const cand of s.candidates) { content.push({ text: `${s.key} candidate ${cand.index}:` }); content.push({ text: "", image: cand.previewUrl }); }
+      }
+      content.push({ text: "Output ONE fenced ```json object and nothing else, mapping every shot key to the candidate numbers that fit, best first, or [] when none fits. Example: {\"SC0001-1\": [2, 0], \"SC0001-2\": []}" });
+      const verdict = safeJson(await ask(`media-judge:${chapterId}`, content, 2000, { effort: "low" }));
+      if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("The footage verdict was not a JSON object.");
+      return verdict;
+    }
+
     // Media: free stock footage for every shot, in film order, so no clip
     // repeats within 10 minutes across chapters (earlier picks are reloaded).
     if (o.media?.providers.length) {
@@ -396,9 +415,12 @@ export async function runFilm(o) {
       for (const c of plan.chapters) {
         const key = `media-${c.id}.json`;
         await stage(`media:${c.id}`, async () => {
-          const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep });
+          const judge = o.media?.review === false ? undefined : judgeFootage;
+          const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, judge, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep });
           await store.put(key, JSON.stringify(media, null, 1));
-          if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no free clip yet (see ${key}).`);
+          if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no fitting free clip yet (see ${key}).`);
+          const unreviewed = media.shots.filter((s) => s.review === "unreviewed").length;
+          if (unreviewed) state.gaps.push(`${c.id} media: ${unreviewed} picks could not be checked by eye and use the first search result.`);
           return media.stats;
         });
         const saved = await store.get(key);
