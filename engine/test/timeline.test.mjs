@@ -94,3 +94,23 @@ test("chapter breaks and written dissolves dip through black; slow motion and ch
   assert.ok(t.video.filter((v) => v.fadeIn).length > 5, "written dissolves dip too");
   assert.ok(t.video.every((v) => !v.fadeIn || v.fadeIn <= v.frames / 30 / 3 + 1e-9), "a dip never takes more than a third of a shot");
 });
+
+test("captions land on the voice's own word timings, sped up exactly as the renderer speeds the voice", async () => {
+  const { wordsFromAlignment, captionsFromWords } = await import("../src/timeline.mjs");
+  const text = "The mill opens. It never stops.";
+  const chars = [...text];
+  const alignment = { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.1), character_end_times_seconds: chars.map((_, i) => i * 0.1 + 0.1) };
+  const words = wordsFromAlignment(alignment, 10, 1);
+  assert.deepEqual(words.slice(0, 2), [{ text: "The", start: 10, end: 10.3 }, { text: "mill", start: 10.4, end: 10.8 }]);
+  assert.equal(words.length, 6);
+  assert.deepEqual(captionsFromWords(words, 16).map((c) => c.text), ["The mill opens.", "It never stops."]);
+
+  const md = `**SC0001** | 0:00:00-0:00:02 | C1 | b | E | C01 | NARR: ${text} | W 6/5 | ANCHOR: x | SHOTS: (1) R1 card | LOOK: L`;
+  // A 3.1 s take for a 2 s scene is sped up 15% (the cap); the rest is cut, and so are its captions.
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md }], voice: { SC0001: { durationSeconds: 3.1, alignment } } });
+  const all = t.captions.flatMap((c) => c.words ?? []);
+  assert.equal(all[1].start, Math.round((0.4 / 1.15) * 1000) / 1000);
+  assert.ok(all.every((w) => w.end <= 2), "no caption runs past its scene");
+  const estimated = buildTimeline({ chapters: [{ id: "C1", markdown: md }] });
+  assert.ok(estimated.captions.every((c) => c.words && c.words.length > 0), "without timings, every word still gets an estimated time");
+});

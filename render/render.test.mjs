@@ -181,3 +181,16 @@ test("the cinematic look frames every shot 2.39:1 with black bars; the documenta
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("Shorts captions light up the word being spoken (ASS), shifted to the cut's own clock", async () => {
+  const { captionsFor, toAss } = await import("./cuts.mjs");
+  const captions = [{ start: 9, end: 12, text: "He still cuts hair.", words: [{ text: "He", start: 9, end: 9.3 }, { text: "still", start: 9.4, end: 9.9 }, { text: "cuts", start: 10, end: 10.5 }, { text: "hair.", start: 10.6, end: 11.2 }] }];
+  const own = captionsFor(captions, 8, 11);
+  assert.deepEqual(own[0].words?.map((w) => [w.text, w.start]), [["He", 1], ["still", 1.4], ["cuts", 2], ["hair.", 2.6]]);
+  assert.equal(own[0].end, 3, "the line is cut at the end of the Short");
+  const ass = toAss(own, { width: 1080, height: 1920 });
+  assert.match(ass, /PlayResX: 1080\nPlayResY: 1920/);
+  assert.match(ass, /Dialogue: 0,0:00:01\.40,0:00:02\.00,Cap,,0,0,0,,He \{\\c&H0000D7FF&\}still\{\\c&H00FFFFFF&\} cuts hair\./);
+  assert.equal((ass.match(/^Dialogue:/gm) ?? []).length, 4, "one event per word");
+  assert.doesNotMatch(toAss([{ start: 0, end: 1, text: "a {\\b1}b" }], { width: 1080, height: 1920 }), /\{\\b1\}/, "override codes in the text are neutralised");
+});

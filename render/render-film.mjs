@@ -20,12 +20,12 @@ import { cpus } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lookFor } from "../engine/src/formats.mjs";
-import { buildTimeline, toSrt } from "../engine/src/timeline.mjs";
+import { buildTimeline, MAX_VOICE_TEMPO, toSrt } from "../engine/src/timeline.mjs";
 import { cutBriefs, renderCuts } from "./cuts.mjs";
 import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
 const SAMPLE_RATE = 48000;
-const MAX_TEMPO = 1.15;
+const MAX_TEMPO = MAX_VOICE_TEMPO;
 const SERIF_CANDIDATES = [
   "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
   "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
@@ -524,9 +524,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const chapters = await loadRunFiles(from);
   const voice = voiceFolder(args.voice);
   // Captions follow the recorded voice, not the scene slot.
-  /** @type {Record<string, { durationSeconds: number }>} */
+  /** @type {Record<string, { durationSeconds: number, alignment?: any }>} */
   const spoken = {};
-  for (const [scene, file] of Object.entries(voice)) spoken[scene] = { durationSeconds: await mediaDuration(file) };
+  for (const [scene, file] of Object.entries(voice)) {
+    // ElevenLabs takes come with their character timings (SC0001.alignment.json), so captions land on the word.
+    const timings = file.replace(/\.[a-z0-9]+$/i, ".alignment.json");
+    spoken[scene] = { durationSeconds: await mediaDuration(file), ...(existsSync(timings) ? { alignment: JSON.parse(readFileSync(timings, "utf8")) } : {}) };
+  }
   // The film's format decides its look (cinematic for stories and motivation, archive for history); --look overrides.
   const filmInfo = JSON.parse((await loadRunText(from, "film.json")) ?? (await loadRunText(from, "run.json")) ?? "{}");
   const look = /** @type {"documentary" | "cinematic" | "archive"} */ (["documentary", "cinematic", "archive"].includes(args.look) ? args.look : lookFor(filmInfo.formatId ?? filmInfo.film?.formatId));

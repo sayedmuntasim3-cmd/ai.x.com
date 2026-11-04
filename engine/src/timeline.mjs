@@ -21,7 +21,9 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
  *   speed: below 1 for slow motion written in MOTION; chapterTitle: shown on a chapter's first shot;
  *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
- * @typedef {{ start: number, end: number, text: string }} Caption
+ * @typedef {{ text: string, start: number, end: number }} TimedWord
+ * @typedef {{ start: number, end: number, text: string, words?: TimedWord[] }} Caption
+ *   words: when each word is spoken (from the voice's own timings, or estimated), for word-by-word captions
  * @typedef {"documentary" | "cinematic" | "archive"} FilmLook
  *   documentary: a gentle grade; cinematic: a teal-and-warm grade and 2.39:1 bars (stories, motivation); archive: a faded warm grade (history)
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
@@ -76,8 +78,60 @@ export function sourceChip(ost) {
   return /\bchips?\s+["“]([^"”]{2,80})["”]/i.exec(ost)?.[1]?.trim() ?? "";
 }
 
+/** The most a voice is sped up to fit its scene (the renderer and the captions use the same rule). */
+export const MAX_VOICE_TEMPO = 1.15;
+
 /**
- * Split narration into caption lines of at most maxChars, timed by length.
+ * Words with their times from an ElevenLabs alignment (one time per
+ * character), shifted to the scene's start and scaled by the speed-up.
+ * @param {{ characters?: string[], character_start_times_seconds?: number[], character_end_times_seconds?: number[] } | null | undefined} alignment
+ * @param {number} [offset] @param {number} [tempo]
+ * @returns {TimedWord[]}
+ */
+export function wordsFromAlignment(alignment, offset = 0, tempo = 1) {
+  const chars = alignment?.characters ?? [];
+  const starts = alignment?.character_start_times_seconds ?? [];
+  const ends = alignment?.character_end_times_seconds ?? [];
+  /** @type {TimedWord[]} */
+  const words = [];
+  /** @type {TimedWord | null} */
+  let word = null;
+  for (let i = 0; i < chars.length; i += 1) {
+    if (/\s/.test(chars[i])) { if (word) words.push(word); word = null; continue; }
+    if (!word) word = { text: "", start: Number(starts[i]), end: Number(ends[i]) };
+    word.text += chars[i];
+    word.end = Number(ends[i]);
+  }
+  if (word) words.push(word);
+  return words.filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end)).map((w) => ({ text: w.text, start: round3(offset + w.start / tempo), end: round3(offset + w.end / tempo) }));
+}
+
+/**
+ * Caption lines from timed words: at most maxChars, broken at sentence ends
+ * once half full, each line ending where the next begins when the gap is short.
+ * @param {TimedWord[]} words @param {number} [maxChars]
+ * @returns {Caption[]}
+ */
+export function captionsFromWords(words, maxChars = 42) {
+  /** @type {Caption[]} */
+  const out = [];
+  /** @type {TimedWord[]} */
+  let line = [];
+  const joined = () => line.map((w) => w.text).join(" ");
+  const flush = () => { if (line.length) out.push({ start: line[0].start, end: line[line.length - 1].end, text: joined(), words: line }); line = []; };
+  for (const w of words) {
+    if (line.length && (joined() + " " + w.text).length > maxChars) flush();
+    line.push(w);
+    if (/[.!?]["”']?$/.test(w.text) && joined().length >= maxChars / 2) flush();
+  }
+  flush();
+  for (let i = 0; i < out.length - 1; i += 1) if (out[i + 1].start - out[i].end < 0.3) out[i].end = out[i + 1].start;
+  return out;
+}
+
+/**
+ * Split narration into caption lines of at most maxChars, timed by length
+ * (each word gets a share of its line by its length).
  * @param {string} text @param {number} start @param {number} end @param {number} [maxChars]
  * @returns {Caption[]}
  */
@@ -98,7 +152,12 @@ export function captionLines(text, start, end, maxChars = 42) {
   return lines.map((l, i) => {
     const s = t;
     t = i === lines.length - 1 ? end : t + ((end - start) * l.length) / total;
-    return { start: round3(s), end: round3(t), text: l.replace(/ /g, " ") };
+    const text = l.replace(/\u00a0/g, " ");
+    const parts = text.split(" ");
+    const letters = parts.reduce((n, w) => n + w.length + 1, 0);
+    let at = s;
+    const words = parts.map((w) => { const from = at; at += ((t - s) * (w.length + 1)) / letters; return { text: w, start: round3(from), end: round3(at) }; });
+    return { start: round3(s), end: round3(t), text, words };
   });
 }
 
@@ -170,7 +229,7 @@ export function slowMotion(motion) {
 }
 
 /**
- * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number }>, look?: FilmLook }} o
+ * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook }} o
  * @returns {Timeline}
  */
 export function buildTimeline(o) {
@@ -288,11 +347,17 @@ export function buildTimeline(o) {
 
       if (!s.wordless) {
         const spoken = o.voice?.[s.sc]?.durationSeconds;
+        const alignment = o.voice?.[s.sc]?.alignment;
         const end = spoken ? Math.min(s.end, s.start + spoken) : s.end;
         const placeholders = s.narration.match(PLACEHOLDER) ?? [];
         if (placeholders.length) notes.push(`${s.sc}: narration still has ${placeholders.join(", ")}; resolve the number before recording.`);
         narration.push({ scene: s.sc, start: s.start, end: s.end, text: s.narration, placeholders });
-        captions.push(...captionLines(s.narration, s.start, end));
+        if (alignment) {
+          // The voice's own timings: captions land on the word, sped up exactly as the renderer speeds the voice.
+          const tempo = spoken && spoken > s.seconds ? Math.min(MAX_VOICE_TEMPO, spoken / s.seconds) : 1;
+          const words = wordsFromAlignment(alignment, s.start, tempo).filter((w) => w.start < s.end).map((w) => ({ ...w, end: Math.min(w.end, s.end) }));
+          captions.push(...(words.length ? captionsFromWords(words) : captionLines(s.narration, s.start, end)));
+        } else captions.push(...captionLines(s.narration, s.start, end));
       }
     }
   }
