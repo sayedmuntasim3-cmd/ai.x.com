@@ -42,7 +42,7 @@ What it makes:
 
 - `film.mp4`: picture from the timeline (`engine/src/timeline.mjs`).
   - Stock clips are downloaded once, scaled and cropped to the frame, and looped when they are shorter than their shot.
-  - Graphics shots become simple text cards. Designed motion graphics come later.
+  - Graphics shots become text cards. Their style comes from the scene's FX field: FX-PAPER is a cream paper ground with serif ink, FX-KINETIC makes the text rise as it fades in, and FX-COUNTER runs numbers up. Maps and split screens are not drawn yet.
   - A written cut to black stays black.
   - Narration from `--voice` (files named `SC0001.mp3` ...) sits in its own scene. It is sped up by at most 15% to fit, otherwise it is cut and a warning is written.
   - Loudness is -14 LUFS.
