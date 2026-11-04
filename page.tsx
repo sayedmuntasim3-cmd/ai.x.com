@@ -34,9 +34,14 @@ export default function ZuponaAiLandingPage() {
           <span className="grid size-10 place-items-center rounded-xl bg-lime-300 text-lg font-black text-[#07100c]">Z</span>
           <span className="text-lg font-semibold tracking-tight">zupona<span className="text-lime-300">.ai</span></span>
         </a>
-        <a href="#how-it-works" className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:border-lime-300/60 hover:text-lime-200">
-          Explore
-        </a>
+        <div className="flex items-center gap-3">
+          <a href="#how-it-works" className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:border-lime-300/60 hover:text-lime-200">
+            Explore
+          </a>
+          <a href="/studio/" className="rounded-full bg-lime-300 px-4 py-2 text-sm font-semibold text-[#09110c] transition hover:bg-lime-200">
+            Studio
+          </a>
+        </div>
       </header>
 
       <section className="relative z-10 mx-auto grid min-h-[78vh] w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-12 sm:px-8 md:grid-cols-[1.05fr_0.95fr] md:py-20 lg:px-12">
@@ -54,8 +59,8 @@ export default function ZuponaAiLandingPage() {
             Meet Zupona AI — a creative space for turning imagination into video. From a spark of an idea to a story worth watching, your next scene starts here.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-4">
-            <a href="#how-it-works" className="inline-flex items-center gap-3 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-semibold text-[#09110c] transition hover:-translate-y-0.5 hover:bg-lime-200">
-              Discover the vision <span aria-hidden="true">↗</span>
+            <a href="/studio/" className="inline-flex items-center gap-3 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-semibold text-[#09110c] transition hover:-translate-y-0.5 hover:bg-lime-200">
+              Open the studio <span aria-hidden="true">↗</span>
             </a>
             <span className="text-sm text-white/45">Made for curious creators</span>
           </div>
