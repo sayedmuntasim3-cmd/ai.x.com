@@ -17,14 +17,20 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
     - footage desk: Claude judges 320 px thumbnails, six shots per call (`createFootageJudge` in `film-run.mjs`); it is included in the estimate.
     - re-make one scene: `engine/src/scene-remake.mjs`, `POST /api/films/:id/scenes/:sc`, and a form in the studio.
     - channel originality guard: `engine/src/originality.mjs`, the `originality` stage, fingerprints in R2 `channel/fingerprints.json`.
-  - Checks: `npm test` (87 engine + 4 worker/render), `npm run check` (wrangler dry-run) and `cd engine && npm run typecheck` pass.
+    - music bed (cues from MUS, looped, faded, ducked under the voice); on-screen titles, source chips, master grade, grain; counter cards; clips from their steady middle.
+    - thumbnails (`render/thumbnails.mjs`, the three S7 briefs) and Shorts/Facebook cuts (`render/cuts.mjs`, 9:16 and 4:5 with hook and burned-in captions).
+    - GitHub render: `.github/workflows/render-film.yml` (works from the phone once merged into `main`); the Worker starts it after a run when `GITHUB_TOKEN`, `GITHUB_REPO` and `SITE_URL` are set (`worker/github.mjs`); the studio has a "Render the video" button. CI now runs the render tests with ffmpeg on GitHub.
+  - Checks: `npm test` (88 engine + 9 worker/render), `npm run check` (wrangler dry-run) and `cd engine && npm run typecheck` pass.
 - **Not done:** the film API has never run against the real Claude API. It needs the owner's Cloudflare connection and API key (`docs/CONNECT.md`).
 - **Next, in order:**
   1. If the owner says Cloudflare is connected: run one 2–10 minute English test film from `/studio/`, read `run.json` and the files, fix what breaks (prompts, timeouts, parsing), and report the real cost.
   2. ~~Media step~~ (done) (buildable without keys, fakes in tests): for each S5 shot, search Pexels and Pixabay with its queries through `engine/src/documentary-media-fetch.mjs`, keep only free-licence items with their licence record, never repeat a clip within 10 minutes, and write `media-C1.json` ... per chapter.
   3. ~~A readable page per run~~ (done) (like `productions/ramesh-babu/build.mjs`), served from `/api/films/:id/page`.
   4. ~~Link from the landing page~~ (done) (`public/index.html`) to `/studio/`.
-  5. ~~Render, footage desk, scene re-make, originality guard~~ (built, see above). Next: the music bed with ducking under the voice, designed cards for graphics shots (kinetic text, lower thirds, source chips), and then a hosted render (the owner chooses Cloudflare Containers or a VM; until then `render/` runs on the owner's computer).
+  5. ~~Render, footage desk, scene re-make, originality guard, music, titles and chips, thumbnails, Shorts, GitHub render~~ (built, see above).
+  6. The owner merges `ccr-cb190ece-ukm6vg` into `main` (their decision, by a pull request), so the Render button appears in GitHub Actions.
+  7. After the first real run, check: Workflow step timeouts for long S5 chapters (30 min each today), real footage-desk quality and cost, ElevenLabs pronunciation of names (the S4 lexicon is not applied yet), and the real render time on GitHub.
+  8. Still plain: maps and timelines (graphics shots are text cards, counters only).
 - **Save credits:** no extra agents, no web research, long outputs written to files in parts, commit and push after every step, replies of 2–3 lines in Bangla.
 
 ## 1. The owner's mission and standard
