@@ -17,13 +17,21 @@ Each scene's `MUS` field names a cue (`M01` ...), and S4's music plan gives each
 
 The renderer plays each cue across its scenes, honours "in at", "hard stop at" and "drops out", and loops a short track to fill its segment, with fades in and out. The music sits low and ducks further whenever the narrator speaks. A cue with no file plays as silence and is listed in the report.
 
-## 3. Render
+## 3. Sound effects (optional)
+
+S4's sound bible names every sound with a token and search phrases: `SND-AMB-01` (ambience), `SND-FX-05` (effects), `SND-DES-03` (designed hits). Download free ones (Pixabay, Mixkit), name each after its token (`SND-FX-05.mp3` ...) and pass the folder with `--sfx sfx/`.
+
+- Ambience is looped quietly under its whole scene.
+- An effect lands on the cut it names ("on cut 2") or the word it names ("on \"put up\"", estimated from the narration), and otherwise at the scene's start.
+- Tokens with no file are listed in the report.
+
+## 4. Render
 
 `render-film.mjs` turns a film run into a video file with ffmpeg. It runs anywhere ffmpeg 6 or newer and Node 22 are installed: the owner's own computer (free), a small VM, or a container. It cannot run inside the Cloudflare Worker.
 
 ```sh
 # From the run's files on the deployed site:
-node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --out film.mp4
+node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --sfx sfx/ --out film.mp4
 # From a folder of run files (s3-chapters.json, s5-C1.md ..., media-C1.json ...):
 node render/render-film.mjs --run productions/ramesh-babu/USA --out usa.mp4 --width 1280 --height 720
 ```

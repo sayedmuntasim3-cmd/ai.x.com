@@ -21,10 +21,14 @@ test("a film renders to MP4 with picture, voice in its slots, captions and a rep
     await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=f=330:d=6", voice2]);
     const m01 = join(dir, "M01.wav");
     await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=f=220:d=3", m01]);
+    const amb = join(dir, "SND-AMB-01.wav");
+    const hit = join(dir, "SND-FX-05.wav");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "anoisesrc=d=1:a=0.3", amb]);
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=f=1200:d=0.2", hit]);
     const md = [
       `**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: The mill opens at dawn. | W 5/5 | ANCHOR: x | SHOTS: (1) 0:00:00-0:00:04 R3 mill | MOTION: 1.05x push | MUS: M01 in at 0:00:00 | LOOK: L`,
       `**SC0002** | 0:00:04-0:00:08 | C1 | b | E | C01 | NARR: By noon the wheel has stopped for good. | W 8/8 | ANCHOR: x | SHOTS: (1) R3 river; (2) R1 card "1887" | OST: "THE LAST DAY" | MUS: M01 | LOOK: L`,
-      `**SC0003** | 0:00:08-0:00:10 | C1 | b | E | — | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 cut to black | MUS: M01 drops out with the black | LOOK: L`,
+      `**SC0003** | 0:00:08-0:00:10 | C1 | b | E | — | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 cut to black | MUS: M01 drops out with the black | SFX: SND-AMB-01 room tone; SND-FX-05 snip on cut 1; SND-FX-99 missing | LOOK: L`,
     ].join("\n");
     const pick = (/** @type {string} */ scene) => ({ scene, shot: 1, start: 0, end: 4, rung: "R3", description: "", queries: ["q"], status: "found", query: "q", alternates: [], trace: [], pick: { id: scene, source: "pexels", mediaUrl: "https://videos.example/" + scene + ".mp4", previewUrl: null, sourcePageUrl: "https://www.pexels.com/video/" + scene, creator: null, durationSeconds: 2, width: 640, height: 360, licence: { licenseId: "PEXELS", name: "Pexels License", licenseUrl: null, attributionRequired: false, creator: null, sourcePageUrl: "" } } });
     const media = { chapter: "C1", providers: ["pexels"], repeatWindowSeconds: 600, stats: { shots: 2, found: 2, missing: 0, noQuery: 0 }, shots: [pick("SC0001"), pick("SC0002")] };
@@ -32,7 +36,7 @@ test("a film renders to MP4 with picture, voice in its slots, captions and a rep
     const out = join(dir, "out", "film.mp4");
     /** @type {string[]} */
     const fetched = [];
-    const options = { timeline, workDir: join(dir, "work"), outFile: out, voice: { SC0001: voice1, SC0002: voice2 }, music: { M01: m01 }, fetchClip: async (/** @type {string} */ url) => { fetched.push(url); return clip; }, concurrency: 2 };
+    const options = { timeline, workDir: join(dir, "work"), outFile: out, voice: { SC0001: voice1, SC0002: voice2 }, music: { M01: m01 }, sfx: { "SND-AMB-01": amb, "SND-FX-05": hit }, fetchClip: async (/** @type {string} */ url) => { fetched.push(url); return clip; }, concurrency: 2 };
     const report = await renderFilm(options);
 
     assert.ok(Math.abs((await mediaDuration(out)) - 10) < 0.1, "the film is exactly as long as the timeline");
@@ -48,7 +52,10 @@ test("a film renders to MP4 with picture, voice in its slots, captions and a rep
     const musicOnly = await level(2.5, 3.5);
     const silent = await level(8.6, 9.6);
     assert.ok(musicOnly > -40, `music plays where nobody speaks (${musicOnly} dB)`);
-    assert.ok(silent < -60, `the black is silent (${silent} dB)`);
+    assert.ok(silent > -60 && silent < -25, `the black now holds only the scripted room tone and snip, quietly (${silent} dB)`);
+    assert.deepEqual(report.soundEffects, { scripted: 3, played: 2 });
+    assert.ok(report.warnings.some((w) => w.includes("SND-FX-99")), "a missing effect is reported");
+    assert.deepEqual(timeline.sfx.map((e) => [e.token, e.kind, e.start]), [["SND-AMB-01", "bed", 8], ["SND-FX-05", "hit", 8], ["SND-FX-99", "hit", 8]]);
     assert.match(readFileSync(join(dir, "out", "film.srt"), "utf8"), /^1\n00:00:00,000 --> 00:00:04,000\nThe mill opens at dawn\.\n/);
     assert.ok(existsSync(join(dir, "out", "film.report.json")));
 

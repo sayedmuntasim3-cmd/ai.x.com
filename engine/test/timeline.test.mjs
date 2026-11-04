@@ -54,3 +54,11 @@ test("music cues follow the MUS field: in at, hard stop, drop-outs, and one segm
   const t = buildTimeline({ chapters });
   assert.deepEqual(t.music.slice(0, 3), [{ cue: "M01", start: 0, end: 15 }, { cue: "M01", start: 22, end: 29 }, { cue: "M02", start: 30, end: 75 }]);
 });
+
+test("sound effects land on their cut or word; ambience lies under the scene", async () => {
+  const { sceneSounds } = await import("../src/timeline.mjs");
+  const scene = { sc: "SC0004", start: 22, end: 30, narration: "He kept the shop open and put up the sign again" };
+  const events = sceneSounds('SND-AMB-03 rain on glass; SND-FX-05 snip on cut 2; SND-FX-06 heavy door thud on "put up"; all sound out at the end', scene, [22, 25, 27.5]);
+  assert.deepEqual(events.map((e) => [e.token, e.kind, e.start]), [["SND-AMB-03", "bed", 22], ["SND-FX-05", "hit", 25], ["SND-FX-06", "hit", 22 + (8 * 6) / 11]].map(([t, k, s]) => [t, k, Math.round(Number(s) * 1000) / 1000]));
+  assert.deepEqual(sceneSounds("", scene, []), []);
+});

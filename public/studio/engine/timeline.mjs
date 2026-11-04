@@ -19,7 +19,9 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
+ * @typedef {{ token: string, kind: "bed" | "hit", scene: string, start: number, end: number }} SoundEvent
+ *   bed: ambience under the whole scene; hit: a one-shot from start (end is the scene's end)
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
  */
 
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
@@ -86,6 +88,36 @@ export function sceneMusic(mus, start, end) {
 }
 
 /**
+ * The sounds of one scene from its SFX field ("SND-FX-05 snip on cut 1;
+ * SND-AMB-02 street wash; SND-FX-06 thud on \"put up\""). Ambience (AMB) lies
+ * under the whole scene; effects (FX, DES) land on the cut or word they name,
+ * else at the scene's start. "All sound out" adds nothing.
+ * @param {string} field @param {{ sc: string, start: number, end: number, narration: string }} scene @param {number[]} shotStarts start of shot 1, 2 ...
+ * @returns {SoundEvent[]}
+ */
+export function sceneSounds(field, scene, shotStarts) {
+  /** @type {SoundEvent[]} */
+  const out = [];
+  const words = scene.narration.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const item of field.split(/;\s*/)) {
+    const token = /\bSND-(AMB|FX|DES)-\d{2,3}\b/.exec(item);
+    if (!token) continue;
+    if (token[1] === "AMB") { out.push({ token: token[0], kind: "bed", scene: scene.sc, start: scene.start, end: scene.end }); continue; }
+    let at = scene.start;
+    const cut = /\bon cut (\d+)/i.exec(item);
+    const word = /\bon ["“]([^"”]+)["”]/i.exec(item);
+    if (cut && shotStarts[Number(cut[1]) - 1] !== undefined) at = shotStarts[Number(cut[1]) - 1];
+    else if (word && words.length) {
+      const first = word[1].toLowerCase().split(/\s+/)[0].replace(/[^\p{L}\p{N}']/gu, "");
+      const i = words.findIndex((w) => w.replace(/[^\p{L}\p{N}']/gu, "") === first);
+      if (i >= 0) at = scene.start + ((scene.end - scene.start) * i) / words.length;
+    }
+    out.push({ token: token[0], kind: "hit", scene: scene.sc, start: Math.round(at * 1000) / 1000, end: scene.end });
+  }
+  return out;
+}
+
+/**
  * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number }> }} o
  * @returns {Timeline}
  */
@@ -102,6 +134,8 @@ export function buildTimeline(o) {
   const captions = [];
   /** @type {MusicSegment[]} */
   const music = [];
+  /** @type {SoundEvent[]} */
+  const sfx = [];
   /** @type {string[]} */
   const notes = [];
   let scenes = 0;
@@ -170,6 +204,8 @@ export function buildTimeline(o) {
         }
       }
 
+      sfx.push(...sceneSounds(s.fields.SFX ?? "", s, shots.map((x) => x.start ?? s.start)));
+
       const cue = sceneMusic(s.fields.MUS ?? "", s.start, s.end);
       if (cue) {
         const last = music[music.length - 1];
@@ -190,7 +226,7 @@ export function buildTimeline(o) {
   }
   const frames = video.reduce((n, v) => n + v.frames, 0);
   return {
-    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, notes,
+    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, notes,
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },
   };
 }

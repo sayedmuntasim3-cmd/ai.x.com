@@ -11,6 +11,7 @@ name: Render a film
 # Optional repository secrets (Settings > Secrets and variables > Actions):
 #   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
 # Optional music: commit one track per cue as music/<film id>/M01.mp3 ...
+# Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
 
 on:
   workflow_dispatch:
@@ -68,7 +69,7 @@ jobs:
           fi
       - name: Render
         run: |
-          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice voice/ --music "music/$FILM_ID" \
+          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice voice/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" \
             --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out "out/$FILM_ID.mp4"
       - name: Summary
         if: always()
