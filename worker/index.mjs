@@ -86,7 +86,8 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
         save: async (list) => { await env.FILMS.put("channel/fingerprints.json", JSON.stringify(list)); },
       },
       log: (line) => console.log(`[${film.id}] ${line}`),
-      step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "30 minutes" }, fn),
+      // A long chapter (64k output tokens, up to four continued parts) can take well over 30 minutes; a timeout would pay for it twice.
+      step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, fn),
     });
     // The finished film goes straight to the renderer when GitHub is connected.
     if (env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL) {
