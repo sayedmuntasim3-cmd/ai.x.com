@@ -20,7 +20,7 @@ The first real runs will break things: prompts, parsing, timeouts and cost. Unti
 | Voice | Multilingual v2 is stable but flat for drama. There is no per-scene emotion direction, the pronunciation lexicon is not applied, and every character has the same voice. | Emotional scenes do not land as hard as they could. |
 | Music | The owner must pick a track per cue by hand. Some free library tracks are claimed in Content ID by third parties. | It is slow, and there is a risk of claims. |
 | Footage check | The footage desk judges one thumbnail per clip. | A clip can change after its first frame (text, logos, a face). |
-| Captions | Caption timing is estimated from text length. The ElevenLabs character timings are saved but not used yet. | Captions can drift a little. Word-by-word captions for Shorts are not possible yet. |
+| Captions | Fixed on 4 Nov: captions follow the voice's character timings, and Shorts have word-by-word highlighted captions. Owner recordings have no timings yet, so their captions are estimated. | Small drift on the owner's own takes only. |
 | Platform | There is one owner token, with no accounts, billing, quotas or editor. Film files are public to anyone with the ID. | It cannot serve customers yet. |
 | Render hosting | The render uses GitHub Actions (free, but for one owner). | It does not scale to many users. |
 | Originality guard | It compares scripts only, not visuals or music. | A channel could still repeat its look too much. |
@@ -32,6 +32,7 @@ The first real runs will break things: prompts, parsing, timeouts and cost. Unti
 - **Formats in the film run.** The film run accepts any of the 15 formats or "auto": motivational life story, invented story, history epic, rags to riches and the rest. Story mode has its own research, ledger and rules. The description note is added in code, and a title that claims truth is flagged.
 - **Written to be felt.** Each chapter has one scene built to move the viewer, with silence before it and a swell after. Machine-sounding or preachy writing is flagged.
 - **A look per format.** Stories and motivation get a cinematic grade with 2.39:1 bars, history gets an archive grade. Chapter breaks dip through black and show the chapter title. Slow motion follows the script.
+- **Captions on the word.** Film captions follow the voice's own timings. Shorts burn word-by-word captions in which the spoken word lights up, which is how they work with the sound off.
 - The 39 links are saved in `docs/YOUTUBE_BENCHMARKS.md`.
 
 ## 4. Not done
@@ -57,7 +58,7 @@ Views at the scale of tens of millions cannot be promised by any tool. They come
 - A motion-graphics engine: HTML and CSS templates rendered to frames in headless Chromium, which this project already has. It covers maps (MapTiler), charts, timelines, lower thirds, quote cards, document highlights and true cross-dissolves.
 - Expressive voice: v3 delivery tags written by S5 per scene.
 - Licensed music generated to each cue's exact length and mood.
-- Captions aligned to the recorded voice, with word-by-word animated captions for Shorts.
+- Captions aligned to the owner's own recordings too (forced alignment), since ElevenLabs takes are already aligned.
 
 **Phase 3: visual storytelling for stories.** Consistent-character scenes for invented stories and reconstructions, from a cast bible with reference images and a cost cap per film. They are disclosed in YouTube Studio, with nothing on screen. This needs the owner's decision.
 
