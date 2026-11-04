@@ -11,7 +11,7 @@
  *
  *   node render/render-film.mjs --run productions/x/USA --voice voice/ --out film.mp4
  *   node render/render-film.mjs --api https://ai.zupona.com --id <film id> --out film.mp4
- *   options: --width 1920 --height 1080 --fps 30 --work .render --font /path/font.ttf
+ *   options: --voice <SC0001.mp3 ...> --music <M01.mp3 ...> --width 1920 --height 1080 --fps 30 --work .render --font /path/font.ttf
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -105,7 +105,7 @@ async function downloadClip(url, dir) {
 
 /**
  * @typedef {import("../engine/src/timeline.mjs").Timeline} Timeline
- * @typedef {{ timeline: Timeline, workDir: string, outFile: string, voice?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void }} RenderOptions
+ * @typedef {{ timeline: Timeline, workDir: string, outFile: string, voice?: Record<string, string>, music?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void }} RenderOptions
  */
 
 /**
@@ -217,14 +217,58 @@ export async function renderFilm(o) {
   await run(ffmpeg, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", audioList, "-c", "copy", narrationFile]);
   log("narration: joined");
 
-  // 3. Mux, with the narration normalised to the platform loudness.
+  // 3. Music: each cue looped to its segment, faded in and out, silence between cues.
+  /** @type {string | null} */
+  let musicFile = null;
+  const cues = (t.music ?? []).filter((m) => o.music?.[m.cue]);
+  for (const m of t.music ?? []) if (!o.music?.[m.cue]) warnings.push(`${m.cue}: no music file, ${(m.end - m.start).toFixed(0)} s from ${m.start.toFixed(1)} s play without music.`);
+  if (cues.length) {
+    const musicFiles = [];
+    let at = 0;
+    for (const m of [...cues].sort((a, b) => a.start - b.start)) {
+      const start = Math.max(m.start, at);
+      if (start > at + 1e-6) musicFiles.push(await audioPiece(null, Math.round(start * SAMPLE_RATE) - Math.round(at * SAMPLE_RATE)));
+      const samples = Math.round(m.end * SAMPLE_RATE) - Math.round(start * SAMPLE_RATE);
+      if (samples > 0) musicFiles.push(await audioPiece(/** @type {string} */ (o.music?.[m.cue]), samples, true));
+      at = Math.max(at, m.end);
+    }
+    const tail = Math.round(t.durationSeconds * SAMPLE_RATE) - Math.round(at * SAMPLE_RATE);
+    if (tail > 0) musicFiles.push(await audioPiece(null, tail));
+    const musicList = join(o.workDir, "music.txt");
+    writeFileSync(musicList, musicFiles.map((f) => `file '${resolve(f).replace(/'/g, "'\\''")}'`).join("\n") + "\n");
+    musicFile = join(o.workDir, "music.wav");
+    await run(ffmpeg, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", musicList, "-c", "copy", musicFile]);
+    log("music: joined");
+  }
+
+  /**
+   * One music or silence piece of an exact sample count, cached.
+   * @param {string | null} file @param {number} samples @param {boolean} [loop]
+   */
+  async function audioPiece(file, samples, loop = false) {
+    const key = hash({ music: file ? resolve(file) : null, samples });
+    const out = join(dirs.audio, `m-${key}.wav`);
+    if (existsSync(out)) return out;
+    const seconds = samples / SAMPLE_RATE;
+    const input = file ? [...(loop ? ["-stream_loop", "-1"] : []), "-i", file] : ["-f", "lavfi", "-i", `anullsrc=r=${SAMPLE_RATE}:cl=mono`];
+    const fade = file ? `,afade=t=in:d=${Math.min(1, seconds / 4).toFixed(3)},afade=t=out:st=${Math.max(0, seconds - Math.min(1.5, seconds / 4)).toFixed(3)}:d=${Math.min(1.5, seconds / 4).toFixed(3)}` : "";
+    await run(ffmpeg, ["-v", "error", "-y", ...input, "-af", `aresample=${SAMPLE_RATE},apad,atrim=end_sample=${samples}${fade}`, "-ac", "1", "-c:a", "pcm_s16le", out + ".part.wav"]);
+    renameSync(out + ".part.wav", out);
+    stats.audioRendered += 1;
+    return out;
+  }
+
+  // 4. Mux: the music sits low and ducks further whenever the narrator speaks; the mix is normalised to the platform loudness.
   mkdirSync(dirname(resolve(o.outFile)), { recursive: true });
-  await run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", String(SAMPLE_RATE), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
+  const mix = musicFile
+    ? ["-i", musicFile, "-filter_complex", "[1:a]asplit=2[voice][key];[2:a]volume=0.3[bed];[bed][key]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=350[ducked];[voice][ducked]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]", "-map", "0:v", "-map", "[a]"]
+    : ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"];
+  await run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, ...mix, "-c:v", "copy", "-ar", String(SAMPLE_RATE), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
   renameSync(o.outFile + ".part.mp4", o.outFile);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
-  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, licences, warnings };
+  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, licences, warnings };
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;
@@ -248,6 +292,15 @@ export async function loadRunFiles(from) {
   }));
 }
 
+/** Music files named after their cue (M01.mp3 ...) in a folder. @param {string | undefined} dir */
+export function musicFolder(dir) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  if (!dir || !existsSync(dir)) return out;
+  for (const f of readdirSync(dir)) { const m = /^(M\d{2,3})\.(mp3|wav|m4a|aac|ogg|flac)$/i.exec(f); if (m) out[m[1].toUpperCase()] = join(dir, f); }
+  return out;
+}
+
 /** Voice files named after their scene (SC0001.mp3, SC0001.wav ...) in a folder. @param {string | undefined} dir */
 export function voiceFolder(dir) {
   /** @type {Record<string, string>} */
@@ -261,7 +314,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const chapters = await loadRunFiles(args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id });
@@ -271,6 +324,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const spoken = {};
   for (const [scene, file] of Object.entries(voice)) spoken[scene] = { durationSeconds: await mediaDuration(file) };
   const timeline = buildTimeline({ chapters, voice: spoken, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
-  const report = await renderFilm({ timeline, voice, workDir: args.work ?? ".render", outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
+  const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), workDir: args.work ?? ".render", outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
   console.log(JSON.stringify({ ...report, licences: report.licences.length, warnings: report.warnings.length }, null, 1));
 }

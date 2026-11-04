@@ -15,7 +15,8 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
  * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, brief: string }} VideoSegment
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ start: number, end: number, text: string }} Caption
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
+ * @typedef {{ cue: string, start: number, end: number }} MusicSegment
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
  */
 
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
@@ -58,6 +59,22 @@ export function captionLines(text, start, end, maxChars = 42) {
 }
 
 /**
+ * The music under each scene, from its MUS field: the first cue ID (M01 ...)
+ * plays; "in at" and "stop at" / "out at" times move its edges; a field that
+ * names no cue, or says it drops out, is silence.
+ * @param {string} mus @param {number} start @param {number} end
+ * @returns {MusicSegment | null}
+ */
+export function sceneMusic(mus, start, end) {
+  const cue = /\b(M\d{2,3})\b/.exec(mus)?.[1] ?? null;
+  if (!cue || /^\s*(none|silence|no music)\b/i.test(mus) || /\bdrops? out\b/i.test(mus)) return null;
+  const at = (/** @type {RegExp} */ re) => { const m = re.exec(mus); const t = m ? toSeconds(m[1]) : NaN; return Number.isFinite(t) ? clamp(t, start, end) : null; };
+  const from = at(/\bin at (\d+:\d{2}:\d{2}(?:\.\d+)?)/i) ?? start;
+  const to = at(/\b(?:stop|out|ends?) at (\d+:\d{2}:\d{2}(?:\.\d+)?)/i) ?? end;
+  return to > from ? { cue, start: from, end: to } : null;
+}
+
+/**
  * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number }> }} o
  * @returns {Timeline}
  */
@@ -72,6 +89,8 @@ export function buildTimeline(o) {
   const narration = [];
   /** @type {Caption[]} */
   const captions = [];
+  /** @type {MusicSegment[]} */
+  const music = [];
   /** @type {string[]} */
   const notes = [];
   let scenes = 0;
@@ -132,6 +151,14 @@ export function buildTimeline(o) {
         }
       }
 
+      const cue = sceneMusic(s.fields.MUS ?? "", s.start, s.end);
+      if (cue) {
+        const last = music[music.length - 1];
+        // The same cue across touching scenes is one continuous segment.
+        if (last && last.cue === cue.cue && Math.abs(last.end - cue.start) < 0.001) last.end = cue.end;
+        else music.push(cue);
+      }
+
       if (!s.wordless) {
         const spoken = o.voice?.[s.sc]?.durationSeconds;
         const end = spoken ? Math.min(s.end, s.start + spoken) : s.end;
@@ -144,7 +171,7 @@ export function buildTimeline(o) {
   }
   const frames = video.reduce((n, v) => n + v.frames, 0);
   return {
-    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, notes,
+    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, notes,
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },
   };
 }

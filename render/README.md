@@ -11,13 +11,19 @@ ELEVENLABS_API_KEY=... node render/voice.mjs --run productions/ramesh-babu/USA -
 - A scene that still holds an unresolved number such as `[C12 low]` is skipped and listed, so the voice never reads a placeholder.
 - Files that already exist are kept. A stopped recording resumes, and the owner's own takes, saved by hand under the same names (`SC0004.wav`), are never overwritten. The owner's voice is never processed.
 
-## 2. Render
+## 2. Music (optional)
+
+Each scene's `MUS` field names a cue (`M01` ...), and S4's music plan gives each cue a search brief. Download one track per cue from Pixabay Music or Mixkit (free licence), name it after its cue (`M01.mp3` ...) and pass the folder with `--music music/`.
+
+The renderer plays each cue across its scenes, honours "in at", "hard stop at" and "drops out", and loops a short track to fill its segment, with fades in and out. The music sits low and ducks further whenever the narrator speaks. A cue with no file plays as silence and is listed in the report.
+
+## 3. Render
 
 `render-film.mjs` turns a film run into a video file with ffmpeg. It runs anywhere ffmpeg 6 or newer and Node 22 are installed: the owner's own computer (free), a small VM, or a container. It cannot run inside the Cloudflare Worker.
 
 ```sh
 # From the run's files on the deployed site:
-node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --out film.mp4
+node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --out film.mp4
 # From a folder of run files (s3-chapters.json, s5-C1.md ..., media-C1.json ...):
 node render/render-film.mjs --run productions/ramesh-babu/USA --out usa.mp4 --width 1280 --height 720
 ```

@@ -42,3 +42,14 @@ test("captions break at sentence ends and SRT is well formed", () => {
   assert.equal(c[c.length - 1].end, 10);
   assert.equal(toSrt([{ start: 0, end: 1.5, text: "Hi" }, { start: 3661.25, end: 3662, text: "There" }]), "1\n00:00:00,000 --> 00:00:01,500\nHi\n\n2\n01:01:01,250 --> 01:01:02,000\nThere\n");
 });
+
+test("music cues follow the MUS field: in at, hard stop, drop-outs, and one segment across scenes", async () => {
+  const { sceneMusic } = await import("../src/timeline.mjs");
+  assert.deepEqual(sceneMusic("M01 in at 0:00:02, 120 BPM pulse", 0, 8), { cue: "M01", start: 2, end: 8 });
+  assert.deepEqual(sceneMusic("M01 hard stop at 0:00:29.0, then 1 s SIL-2", 22, 30), { cue: "M01", start: 22, end: 29 });
+  assert.equal(sceneMusic("M01 drops out with the black (SIL-3)", 15, 22), null);
+  assert.equal(sceneMusic("none", 0, 5), null);
+  assert.equal(sceneMusic("", 0, 5), null);
+  const t = buildTimeline({ chapters });
+  assert.deepEqual(t.music.slice(0, 3), [{ cue: "M01", start: 0, end: 15 }, { cue: "M01", start: 22, end: 29 }, { cue: "M02", start: 30, end: 75 }]);
+});
