@@ -219,3 +219,23 @@ test("the footage desk sees the thumbnails, its verdict picks the clip, and its 
   assert.equal(state.usage["media-judge:C1"].calls, 1);
   assert.equal(state.status, "done");
 });
+
+test("the finished film is compared with the channel's earlier films and added to them", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f5");
+  assert.ok(made.ok);
+  /** @type {any[]} */
+  let saved = [];
+  const channel = { load: async () => saved, save: async (/** @type {any[]} */ list) => { saved = list; } };
+  const first = await runFilm({ film: made.film, manual: "M", model: scriptedModel(), store: memoryStore(), channel });
+  assert.equal(first.status, "done");
+  assert.equal(saved.length, 1);
+  const again = newFilm({ topic: "The old mill, again", minutes: 2 }, "f6");
+  assert.ok(again.ok);
+  const store = memoryStore();
+  const second = await runFilm({ film: again.film, manual: "M", model: scriptedModel(), store, channel });
+  const report = JSON.parse(store.m.get("originality.json"));
+  assert.equal(report.verdict, "fail", "the same script twice on one channel is caught");
+  assert.equal(second.status, "done-with-gaps");
+  assert.ok(second.gaps.some((/** @type {string} */ g) => g.startsWith("originality (fail)")));
+  assert.equal(saved.length, 2);
+});

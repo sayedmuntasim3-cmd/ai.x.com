@@ -219,10 +219,10 @@ function table(rows) {
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
  * @typedef {import("./film-media.mjs").ShotMedia} ShotMedia
  * @typedef {{ id: string, title: string, start: string, end: string, firstScene?: string, lastScene?: string }} PlanChapter
- * @typedef {{ run: any, chapters: PlanChapter[], s5: Record<string, string>, media: Record<string, ChapterMedia>, research: any, filmCheck: any, qa: any, fixLog: any[] | null, docs: Record<string, string | null> }} PageData
+ * @typedef {{ run: any, chapters: PlanChapter[], s5: Record<string, string>, media: Record<string, ChapterMedia>, research: any, filmCheck: any, qa: any, fixLog: any[] | null, docs: Record<string, string | null>, originality?: any }} PageData
  */
 
-const STAGE_LABEL = /** @type {Record<string, string>} */ ({ s01: "S0–S1 plan", research: "Research", s2: "S2 claim ledger", s3: "S3 structure", s4: "S4 bibles", qa: "QA", s6: "S6 report", s7: "S7 publishing" });
+const STAGE_LABEL = /** @type {Record<string, string>} */ ({ originality: "Originality", s01: "S0–S1 plan", research: "Research", s2: "S2 claim ledger", s3: "S3 structure", s4: "S4 bibles", qa: "QA", s6: "S6 report", s7: "S7 publishing" });
 const STATUS_TONE = /** @type {Record<string, string>} */ ({ done: "ok", "done-with-gaps": "warn", failed: "bad", "stopped-budget": "warn" });
 const STATUS_LABEL = /** @type {Record<string, string>} */ ({ done: "Done", "done-with-gaps": "Done*", failed: "Failed", "stopped-budget": "Paused", running: "Running", queued: "Queued" });
 
@@ -256,8 +256,8 @@ export async function loadFilmPage(store) {
   /** @type {Record<string, string | null>} */
   const docs = {};
   await Promise.all(["s01", "s2", "s3", "s4", "s6", "s7"].map(async (k) => { docs[k] = await store.get(`${k}.md`); }));
-  const [research, filmCheck, qa, fixLog] = await Promise.all([json("research.json"), json("film-check.json"), json("qa.json"), json("fix-log.json")]);
-  return { run, chapters, s5, media, research, filmCheck, qa, fixLog: Array.isArray(fixLog) ? fixLog : null, docs };
+  const [research, filmCheck, qa, fixLog, originality] = await Promise.all([json("research.json"), json("film-check.json"), json("qa.json"), json("fix-log.json"), json("originality.json")]);
+  return { run, chapters, s5, media, research, filmCheck, qa, fixLog: Array.isArray(fixLog) ? fixLog : null, docs, originality };
 }
 
 /** @param {number} n */
@@ -338,7 +338,7 @@ function chapterHtml(text, media) {
 function stageChips(d) {
   const ids = d.chapters.map((c) => c.id);
   const mediaUsed = Object.keys(d.run.stages ?? {}).some((k) => k.startsWith("media:")) || Object.keys(d.media).length > 0;
-  const expected = ["s01", "research", "s2", "s3", "s4", ...ids.map((c) => `s5:${c}`), "qa", ...(mediaUsed ? ids.map((c) => `media:${c}`) : []), "s6", "s7"];
+  const expected = ["s01", "research", "s2", "s3", "s4", ...ids.map((c) => `s5:${c}`), "qa", ...(mediaUsed ? ids.map((c) => `media:${c}`) : []), "s6", "s7", ...(d.run.stages?.originality ? ["originality"] : [])];
   const label = (/** @type {string} */ k) => STAGE_LABEL[k] ?? (k.startsWith("s5:") ? `S5 ${k.slice(3)}` : k.startsWith("media:") ? `Footage ${k.slice(6)}` : k);
   const items = expected.map((k) => (d.run.stages?.[k]?.status === "done" ? chip("ok", `✓ ${label(k)}`) : chip("", label(k))));
   if (!mediaUsed && typeof d.run.media === "string") items.push(chip("warn", `Footage ${d.run.media}`));
@@ -397,6 +397,7 @@ export function renderFilmPage(d) {
     tile(d.filmCheck ? (d.filmCheck.ok ? "pass" : `${d.filmCheck.errors?.length ?? 0} errors`) : "—", "code check: clock, IDs, words, sources", d.filmCheck ? (d.filmCheck.ok ? "ok" : "bad") : ""),
     tile(applied === null ? "—" : `${applied}/${d.qa?.mustFix?.length ?? applied}`, "QA fixes applied"),
     tile(allMedia.length ? `${found}/${shots}` : "—", allMedia.length ? "stock shots with a free clip, none repeated within 10 min" : "footage not searched yet", allMedia.length ? (found === shots ? "ok" : "warn") : ""),
+    tile(d.originality ? String(d.originality.verdict) : "—", d.originality ? `channel originality, against ${d.originality.compared} earlier films` : "channel originality (not checked yet)", d.originality ? ({ pass: "ok", review: "warn", fail: "bad" })[/** @type {"pass" | "review" | "fail"} */ (d.originality.verdict)] ?? "" : ""),
     tile(String(gaps.length), "open items", gaps.length ? "warn" : "ok"),
   ].join("");
   const runtime = Number.isFinite(film.durationSeconds) ? toClock(film.durationSeconds) : "";

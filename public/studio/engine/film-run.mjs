@@ -15,6 +15,7 @@
  * so a run survives restarts: a finished stage is never paid for twice.
  */
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
+import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { applyFixes, checkChapter, checkFilm, toClock, toSeconds } from "./scene-lines.mjs";
 import { getVersion } from "./versions.mjs";
 
@@ -183,7 +184,9 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * PEXELS_API_KEY or PIXABAY_API_KEY) the step is left for a later resume.
  * media.review (default true) shows the model small thumbnails of each
  * shot's top candidates and keeps only a clip it says fits.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * channel (optional) holds the fingerprints of the channel's earlier films;
+ * the finished film is compared with them (originality.json) and added.
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -437,6 +440,21 @@ export async function runFilm(o) {
       await store.put("s7.md", text);
       return { chars: text.length };
     });
+
+    if (o.channel) {
+      const channel = o.channel;
+      await stage("originality", async () => {
+        const chapters = await Promise.all(plan.chapters.map((c) => read(`s5-${c.id}.md`)));
+        const title = /\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(await read("s7.md"))?.[1]?.trim();
+        const fingerprint = fingerprintFilm({ id: film.id, topic: film.topic, title, chapters });
+        const earlier = await channel.load();
+        const report = checkOriginality(fingerprint, earlier);
+        await store.put("originality.json", JSON.stringify({ ...report, title: fingerprint.title, titleSkeleton: fingerprint.titleSkeleton }, null, 1));
+        if (report.verdict !== "pass") state.gaps.push(...report.reasons.map((r) => `originality (${report.verdict}): ${r}`));
+        await channel.save([...earlier.filter((e) => e.id !== film.id), fingerprint].slice(-500));
+        return { verdict: report.verdict, compared: report.compared };
+      });
+    }
 
     state.status = state.gaps.length ? "done-with-gaps" : "done";
   } catch (error) {

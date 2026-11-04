@@ -74,6 +74,11 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       store: r2Store(env.FILMS, film.id),
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY }) },
+      channel: {
+        // One channel per deployment for now; a per-client channel key comes with client accounts.
+        load: async () => { const obj = await env.FILMS.get("channel/fingerprints.json"); return obj ? JSON.parse(await obj.text()) : []; },
+        save: async (list) => { await env.FILMS.put("channel/fingerprints.json", JSON.stringify(list)); },
+      },
       log: (line) => console.log(`[${film.id}] ${line}`),
       step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "30 minutes" }, fn),
     });
