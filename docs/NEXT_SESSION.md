@@ -1,6 +1,21 @@
-# Next session brief (written 3 November 2026 from the whole first chat)
+# Next session brief (first written 3 November 2026; section 0 updated 4 November 2026)
 
-Read this, `docs/HANDOFF.md` and `docs/YOUTUBE_BENCHMARKS.md`. Do not re-analyse the old chat, the repository history or the web.
+Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not re-analyse old chats, the repository history or the web. The "Next steps" in `docs/HANDOFF.md` are superseded by section 0 below.
+
+## 0. Start here
+
+- **Branch:** `ccr-cb190ece-ukm6vg` holds everything (it already merged `claude/studio-first-screen-y4tp15`). A new session first runs `git fetch origin && git merge origin/ccr-cb190ece-ukm6vg`. Never push to `main`.
+- **Done:**
+  - USA Ramesh Babu film: C1–C6, QA (14 fixes), S6, S7 and the page `productions/ramesh-babu/ramesh-babu-usa.html`.
+  - Platform, English (USA) path in code: `engine/src/film-run.mjs` (S0–S7 from one topic, resumable, budget stop), `engine/src/scene-lines.mjs` (every S5 chapter checked in code), `worker/` (Cloudflare Worker + Workflow + Claude API, token-protected) and section 3 of `/studio/` (cost estimate, start, progress, files).
+  - Checks: `npm test` (66 engine + 1 worker) and `npm run check` (wrangler dry-run) pass.
+- **Not done:** the film API has never run against the real Claude API. It needs the owner's Cloudflare connection and API key (`docs/CONNECT.md`).
+- **Next, in order:**
+  1. If the owner says Cloudflare is connected: run one 2–10 minute English test film from `/studio/`, read `run.json` and the files, fix what breaks (prompts, timeouts, parsing), and report the real cost.
+  2. Media step (buildable without keys, fakes in tests): for each S5 shot, search Pexels and Pixabay with its queries through `engine/src/documentary-media-fetch.mjs`, keep only free-licence items with their licence record, never repeat a clip within 10 minutes, and write `media-C1.json` ... per chapter.
+  3. A readable page per run (like `productions/ramesh-babu/build.mjs`), served from `/api/films/:id/page`.
+  4. Link from the landing page (`public/index.html`) to `/studio/`.
+- **Save credits:** no extra agents, no web research, long outputs written to files in parts, commit and push after every step, replies of 2–3 lines in Bangla.
 
 ## 1. The owner's mission and standard
 
@@ -27,13 +42,13 @@ Every film must feel human-made and Hollywood or Bollywood level. Films can be a
 
 | Track | What it is | Where |
 |---|---|---|
-| A. The platform | The website and engine clients will use | `engine/` (formats, versions, voice, Quran, story mode, 151-role roster, run plans; tests); the first screen at `/studio/` on branch `claude/studio-first-screen-y4tp15` |
+| A. The platform | The website and engine clients will use | `engine/` (formats, versions, voice, Quran, story mode, 151-role roster, run plans; tests); the studio page `/studio/` and the film API in `worker/` |
 | B. The Ramesh Babu film | A sample 45-minute documentary script made with the engine prompts, in two fully separate versions. It shows the quality the platform must reach | `productions/ramesh-babu/` |
 
 The owner's current priority (3 Nov 2026):
 
-1. Finish the **USA version** of the Ramesh Babu film.
-2. Then put the effort into the platform for the **US market** (English first).
+1. Finish the **USA version** of the Ramesh Babu film. **Done (3 Nov 2026).**
+2. Then put the effort into the platform for the **US market** (English first). **In progress: see section 0.**
 
 **The Bangladesh version of the film is postponed to save credits; do not start it.** Arabic and Bangla stay in the platform's design, but they are built after the English path works end to end.
 
