@@ -10,6 +10,7 @@
  *   GET  /api/films/:id              run state: stages, usage, cost, gaps
  *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
  *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
+ *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
  *
  * Needs (set by the owner when Cloudflare is connected):
  *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
@@ -21,6 +22,7 @@ import { WorkflowEntrypoint } from "cloudflare:workers";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { loadFilmPage, PAGE_CSP, renderFilmPage } from "../engine/src/film-page.mjs";
+import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
 
@@ -106,6 +108,22 @@ export default {
         await store.put("film.json", JSON.stringify(made.film, null, 1));
         await env.FILM_RUN.create({ id, params: { film: made.film } });
         return json({ id, film: made.film, estimate: estimateRun(made.film.durationSeconds, env.MODEL || "claude-opus-5-5") }, 202);
+      }
+      const remake = /^\/api\/films\/([0-9a-f-]{36})\/scenes\/(SC\d{4,5})$/i.exec(url.pathname);
+      if (remake && request.method === "POST") {
+        if (!env.ANTHROPIC_API_KEY || !env.FILMS) return json({ error: "The studio is not connected yet (Claude API key or R2 bucket missing)." }, 503);
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your credits." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const body = /** @type {any} */ (await request.json().catch(() => null));
+        const result = await remakeScene({
+          store: r2Store(env.FILMS, remake[1]),
+          model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5" }),
+          manual: MANUAL,
+          scene: remake[2],
+          instruction: typeof body?.instruction === "string" ? body.instruction : "",
+          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY }),
+        });
+        return json(result, result.ok ? 200 : 422);
       }
       const page = /^\/api\/films\/([0-9a-f-]{36})\/page$/.exec(url.pathname);
       if (page && request.method === "GET") {

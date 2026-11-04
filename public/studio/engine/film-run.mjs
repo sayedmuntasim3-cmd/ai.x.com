@@ -393,23 +393,6 @@ export async function runFilm(o) {
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };
     });
 
-    /**
-     * The footage desk: which candidates fit each shot, judged from thumbnails.
-     * @type {import("./film-media.mjs").MediaJudge}
-     */
-    async function judgeFootage(chapterId, shots) {
-      /** @type {Block[]} */
-      const content = [{ text: "You are the footage desk. For each shot below, look at its candidate thumbnails and list the ones that work as documentary B-roll for exactly that shot: the right subject and setting, plausible for the place and period described. Reject a candidate that shows an identifiable face when the shot says no face, a readable brand, logo or licence plate where the shot avoids them, a watermark or burned-in text, an obviously staged stock-model look, or a clearly different country or period. Order the fitting candidates best first." }];
-      for (const s of shots) {
-        content.push({ text: `SHOT ${s.key}: ${s.description} (searched "${s.query}")` });
-        for (const cand of s.candidates) { content.push({ text: `${s.key} candidate ${cand.index}:` }); content.push({ text: "", image: cand.previewUrl }); }
-      }
-      content.push({ text: "Output ONE fenced ```json object and nothing else, mapping every shot key to the candidate numbers that fit, best first, or [] when none fits. Example: {\"SC0001-1\": [2, 0], \"SC0001-2\": []}" });
-      const verdict = safeJson(await ask(`media-judge:${chapterId}`, content, 2000, { effort: "low" }));
-      if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("The footage verdict was not a JSON object.");
-      return verdict;
-    }
-
     // Media: free stock footage for every shot, in film order, so no clip
     // repeats within 10 minutes across chapters (earlier picks are reloaded).
     if (o.media?.providers.length) {
@@ -418,7 +401,7 @@ export async function runFilm(o) {
       for (const c of plan.chapters) {
         const key = `media-${c.id}.json`;
         await stage(`media:${c.id}`, async () => {
-          const judge = o.media?.review === false ? undefined : judgeFootage;
+          const judge = o.media?.review === false ? undefined : createFootageJudge(ask);
           const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, judge, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep });
           await store.put(key, JSON.stringify(media, null, 1));
           if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no fitting free clip yet (see ${key}).`);
@@ -464,6 +447,27 @@ export async function runFilm(o) {
   }
   await save();
   return state;
+}
+
+/**
+ * The footage desk: which candidates fit each shot, judged from thumbnails.
+ * `ask` is the run's model call (stage, content, maxTokens, extra) -> text.
+ * @param {(stage: string, content: Block[], maxTokens: number, extra?: { effort?: string }) => Promise<string>} ask
+ * @returns {import("./film-media.mjs").MediaJudge}
+ */
+export function createFootageJudge(ask) {
+  return async (chapterId, shots) => {
+    /** @type {Block[]} */
+    const content = [{ text: "You are the footage desk. For each shot below, look at its candidate thumbnails and list the ones that work as documentary B-roll for exactly that shot: the right subject and setting, plausible for the place and period described. Reject a candidate that shows an identifiable face when the shot says no face, a readable brand, logo or licence plate where the shot avoids them, a watermark or burned-in text, an obviously staged stock-model look, or a clearly different country or period. Order the fitting candidates best first." }];
+    for (const s of shots) {
+      content.push({ text: `SHOT ${s.key}: ${s.description} (searched "${s.query}")` });
+      for (const cand of s.candidates) { content.push({ text: `${s.key} candidate ${cand.index}:` }); content.push({ text: "", image: cand.previewUrl }); }
+    }
+    content.push({ text: "Output ONE fenced ```json object and nothing else, mapping every shot key to the candidate numbers that fit, best first, or [] when none fits. Example: {\"SC0001-1\": [2, 0], \"SC0001-2\": []}" });
+    const verdict = safeJson(await ask(`media-judge:${chapterId}`, content, 2000, { effort: "low" }));
+    if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("The footage verdict was not a JSON object.");
+    return verdict;
+  };
 }
 
 /** Thrown when a run stops at its budget; the run can be resumed with a higher one. */

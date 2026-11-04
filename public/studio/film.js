@@ -19,6 +19,13 @@ const T = {
     spent: "এখন পর্যন্ত খরচ",
     files: "ফাইল",
     page: "পুরো ফিল্মের পেজ খোলো (স্ক্রিপ্ট, শট, ক্লিপ, সোর্স, খরচ)",
+    remake: "একটা দৃশ্য আবার বানাও",
+    remakeHint: "শুধু ওই দৃশ্যটা নতুন করে লেখা হবে, কোডে যাচাই হবে, নতুন ফুটেজ পাবে। বাকি ফিল্ম যেমন আছে তেমন থাকবে।",
+    remakeScene: "দৃশ্যের ID (যেমন SC0012)",
+    remakeWhat: "কী বদলাতে চান",
+    remakeGo: "দৃশ্যটা আবার বানাও",
+    remakeDone: "হয়ে গেছে। খরচ",
+    remakeFailed: "হয়নি:",
     footage: "ফুটেজ",
     gaps: "বাকি কাজ (GAP)",
     stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
@@ -38,6 +45,13 @@ const T = {
     spent: "Spent so far",
     files: "Files",
     page: "Open the film page (script, shots, clips, sources, cost)",
+    remake: "Re-make one scene",
+    remakeHint: "Only that scene is rewritten, checked in code and given fresh footage. The rest of the film stays as it is.",
+    remakeScene: "Scene ID (e.g. SC0012)",
+    remakeWhat: "What to change",
+    remakeGo: "Re-make the scene",
+    remakeDone: "Done. Cost",
+    remakeFailed: "Not done:",
     footage: "Footage",
     gaps: "Open items (GAPs)",
     stages: { s01: "S0–S1 titles and plan", research: "Web research", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
@@ -138,6 +152,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   page.rel = "noopener";
   page.className = "go";
   out.append(page);
+  if (run.status === "done" || run.status === "done-with-gaps") out.append(remakeForm(id));
   out.append(h("h4", l.files));
   const p = document.createElement("p");
   for (const f of files) {
@@ -149,6 +164,54 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
     p.append(a, " ");
   }
   out.append(p);
+}
+
+/** The owner's re-make of one scene, through the token-protected API. @param {string} id */
+function remakeForm(id) {
+  const l = L();
+  const form = document.createElement("form");
+  form.className = "card";
+  form.noValidate = true;
+  const title = document.createElement("h4");
+  title.textContent = l.remake;
+  const hint = document.createElement("p");
+  hint.className = "small";
+  hint.textContent = l.remakeHint;
+  const field = (/** @type {string} */ label, /** @type {HTMLInputElement | HTMLTextAreaElement} */ input) => { const w = document.createElement("label"); w.append(label, input); return w; };
+  const scene = document.createElement("input");
+  scene.required = true;
+  scene.pattern = "[Ss][Cc][0-9]{4,5}";
+  scene.placeholder = "SC0012";
+  scene.autocomplete = "off";
+  const what = document.createElement("textarea");
+  what.required = true;
+  what.maxLength = 2000;
+  what.rows = 3;
+  what.dir = "auto";
+  const go = document.createElement("button");
+  go.type = "submit";
+  go.className = "go";
+  go.textContent = l.remakeGo;
+  const result = document.createElement("p");
+  result.setAttribute("aria-live", "polite");
+  form.append(title, hint, field(l.remakeScene, scene), field(l.remakeWhat, what), go, result);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+    if (!/^sc\d{4,5}$/i.test(scene.value.trim()) || what.value.trim().length < 3 || !token) { result.textContent = `${l.remakeFailed} ${l.remakeScene} / ${l.remakeWhat} / ${l.token}`; return; }
+    go.disabled = true;
+    result.textContent = "…";
+    try {
+      const res = await fetch(`/api/films/${id}/scenes/${scene.value.trim().toUpperCase()}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ instruction: what.value.trim() }) });
+      const r = await res.json();
+      result.textContent = r.ok ? `${l.remakeDone} $${r.costUsd}. ${r.after}` : `${l.remakeFailed} ${r.error ?? res.status}`;
+    } catch (error) {
+      result.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
+    } finally {
+      go.disabled = false;
+    }
+  });
+  return form;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
