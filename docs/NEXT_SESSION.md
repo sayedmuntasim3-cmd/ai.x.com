@@ -147,7 +147,7 @@ The owner sent 39 example videos. `docs/YOUTUBE_BENCHMARKS.md` is meant to hold 
 
 1. No human approval step inside a run. The owner publishes.
 2. Three native versions: Arabic (Islamic outlook), English (USA), Bangla.
-3. No "fictional story" label on screen. Invented stories get only a one-line note in the description; never call them true or attach them to a real person. Real people's stories are told from sources.
+3. Nothing is written on the video or thumbnail to mark fiction, AI or illustration. Invented stories get only a one-line note in the description; never call them true or attach them to a real person. Real people's stories are told from sources.
 4. Quran:
    - verbatim Tanzil text only;
    - nothing laid under a recitation;
@@ -155,7 +155,9 @@ The owner sent 39 example videos. `docs/YOUTUBE_BENCHMARKS.md` is meant to hold 
    - never synthesised;
    - prophets, Companions, angels and Allah never depicted;
    - stories of prophets never told as fiction.
-5. The owner's own voice is never altered. ElevenLabs: Multilingual v2 for English and Arabic, v3 for Bangla.
+5. The owner's own voice is never altered. ElevenLabs: Multilingual v2 for English and Arabic documentaries, v3 for Bangla. **Updated 4 Nov 2026 (owner's permission):** v3 with per-scene delivery tags for stories and motivation in English, for emotional delivery.
 6. Footage only from legal free sources or with the creator's written permission. No downloading from Facebook, X, YouTube or TikTok.
 7. Never push to zupona's `main`. No PR unless the owner asks. Run `cd engine && npm test` before every push.
 8. Cloudflare will be connected later by the owner. The code only has to be ready, and `npx wrangler deploy --dry-run` passes.
+9. **AI scenes (owner's permission, 4 Nov 2026):** invented stories may use AI scenes with one consistent cast (CHR tokens from the S4 bible). Never the likeness of a real person, never a child as the focus, never a real brand. Disclosed in YouTube Studio's altered-or-synthetic setting; nothing on screen. Documentaries about real people stay on real footage.
+10. **AI music (owner's permission, 4 Nov 2026):** scores can be generated per cue with ElevenLabs Music (instrumental, commercial use on a paid plan), with a record of each prompt. Hand-picked library tracks remain possible and win when present.
