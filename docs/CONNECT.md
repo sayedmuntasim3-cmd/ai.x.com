@@ -43,7 +43,7 @@ When a film run is done, GitHub renders the MP4 on its own machines. The free pl
 2. Optional music: commit one track per cue as `music/<film id>/M01.mp3` ... (free tracks from Pixabay Music or Mixkit, chosen from the S4 music plan).
 3. GitHub shows the **Run workflow** button only for workflows on the default branch. So the work on `ccr-cb190ece-ukm6vg` has to be merged into `main` once, by you (a pull request you open and merge).
 4. Open the GitHub app or website and go to Actions > **Render a film** > Run workflow. Enter the film ID (the long ID in the film page's address), the site address and the picture size.
-5. When it finishes, download the artifact `film-<id>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload), `<id>.TH-A.jpg` / `TH-B` / `TH-C` (three thumbnails for YouTube's Test & Compare), `<id>.SH-01.mp4` … (vertical Shorts with hook and burned-in captions), `<id>.FB-01.mp4` (the Facebook cut) and `<id>.report.json` (every clip with its licence page, and every warning).
+5. When it finishes, open the repository's **Releases** (private, like the repository) and download the release `film-<first 8 characters of the id>-<run number>`. It holds `<id>.mp4`, `<id>.srt` (captions for the YouTube upload), `<id>.TH-A.jpg` / `TH-B` / `TH-C` (three thumbnails for YouTube's Test & Compare), `<id>.SH-01.mp4` … (vertical Shorts with hook and burned-in captions), `<id>.FB-01.mp4` (the Facebook cut) and `<id>.report.json` (every clip with its licence page, and every warning).
 
 **Automatic render (optional):** to have every finished film start this render by itself, and to enable the studio's "Render the video" button:
 

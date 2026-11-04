@@ -6,6 +6,7 @@
  * burned in large, so it works with the sound off.
  */
 import { renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { toSeconds } from "../engine/src/scene-lines.mjs";
 import { toSrt } from "../engine/src/timeline.mjs";
 import { run } from "./render-film.mjs";
@@ -52,7 +53,7 @@ export function captionsFor(captions, start, end) {
 }
 
 /**
- * @param {{ film: string, briefs: CutBrief[], captions: Caption[], outBase: string, font?: string, ffmpeg?: string }} o
+ * @param {{ film: string, briefs: CutBrief[], captions: Caption[], outBase: string, workDir?: string, font?: string, ffmpeg?: string }} o
  * @returns {Promise<{ id: string, file: string, seconds: number, width: number, height: number }[]>}
  */
 export async function renderCuts(o) {
@@ -63,7 +64,7 @@ export async function renderCuts(o) {
     const seconds = b.end - b.start;
     const srt = `${o.outBase}.${b.id}.srt`;
     writeFileSync(srt, toSrt(captionsFor(o.captions, b.start, b.end)));
-    const hookFile = `${o.outBase}.${b.id}.hook.txt`;
+    const hookFile = o.workDir ? join(o.workDir, `cut.${b.id}.hook.txt`) : `${o.outBase}.${b.id}.hook.txt`;
     writeFileSync(hookFile, wrap(b.hook, 22).join("\n"));
     const W = b.width;
     const H = b.height;
@@ -79,7 +80,7 @@ export async function renderCuts(o) {
         `,subtitles='${esc(srt)}':force_style='FontName=DejaVu Sans,Bold=1,Fontsize=${subSize},PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=${Math.round(288 * 0.14)}'[v]`,
     ].join(";");
     const file = `${o.outBase}.${b.id}.mp4`;
-    const args = (/** @type {string} */ g) => ["-v", "error", "-y", "-ss", b.start.toFixed(3), "-t", seconds.toFixed(3), "-i", o.film, "-filter_complex", g, "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", file + ".part.mp4"];
+    const args = (/** @type {string} */ g) => ["-v", "error", "-y", "-ss", b.start.toFixed(3), "-t", seconds.toFixed(3), "-i", o.film, "-filter_complex", g, "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "8000k", "-bufsize", "16000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", file + ".part.mp4"];
     // Centred hook lines need ffmpeg 6.1+; older builds get the block centred instead.
     try { await run(ffmpeg, args(graph)); } catch { await run(ffmpeg, args(graph.replace(":text_align=C", ""))); }
     renameSync(file + ".part.mp4", file);

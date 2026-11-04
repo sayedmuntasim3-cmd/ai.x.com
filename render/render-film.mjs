@@ -141,13 +141,18 @@ export async function renderFilm(o) {
   const stats = { segmentsRendered: 0, segmentsCached: 0, audioRendered: 0, clipsFailed: 0 };
   const fetchClip = o.fetchClip ?? ((url) => downloadClip(url, dirs.clips));
   const limit = o.concurrency ?? Math.max(1, cpus().length - 1);
-  const enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-r", String(t.fps), "-video_track_timescale", "90000", "-an"];
+  // Quality-led encoding with a ceiling: about 6 Mbit/s at 1080p30 (scaled by frame size and rate),
+  // so a 45-minute film stays near 2 GB at worst and far below it for calm footage.
+  const ceiling = Math.max(400, Math.round((6000 * t.width * t.height * t.fps) / (1920 * 1080 * 30)));
+  const enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", `${ceiling}k`, "-bufsize", `${ceiling * 2}k`, "-pix_fmt", "yuv420p", "-r", String(t.fps), "-video_track_timescale", "90000", "-an"];
   const frame = `scale=${t.width}:${t.height}:force_original_aspect_ratio=increase,crop=${t.width}:${t.height},fps=${t.fps},setsar=1`;
   const color = (/** @type {string} */ c) => ["-f", "lavfi", "-i", `color=c=${c}:s=${t.width}x${t.height}:r=${t.fps}`];
 
-  // The house look: one gentle grade and light grain on every picture, so clips from many sources read as one film.
-  const LOOK = "eq=contrast=1.06:saturation=0.92:gamma=0.98,noise=alls=5:allf=t";
-  const CARD_BG = (/** @type {number} */ frames) => `vignette=PI/4,noise=alls=7:allf=t,fade=t=in:st=0:d=${Math.min(0.25, frames / t.fps / 4).toFixed(3)}`;
+  // The house look: one gentle grade on every picture, so clips from many sources read as one film.
+  // No synthetic grain: random grain on every frame cannot be compressed (a 45-minute film grew past
+  // 1.5 GB at 360p) and YouTube's own encoder smears it away anyway.
+  const LOOK = "eq=contrast=1.06:saturation=0.92:gamma=0.98";
+  const CARD_BG = (/** @type {number} */ frames) => `vignette=PI/4,fade=t=in:st=0:d=${Math.min(0.25, frames / t.fps / 4).toFixed(3)}`;
   const mono = FONT_CANDIDATES.map((f) => f.replace("DejaVuSans-Bold", "DejaVuSansMono")).find((f) => existsSync(f) && /Mono/.test(f)) ?? font;
   const escPath = (/** @type {string} */ p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
   /**
@@ -164,7 +169,7 @@ export async function renderFilm(o) {
   /** @type {string[]} */
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
-    const key = hash({ v: 2, in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 3, in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -386,10 +391,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     mkdirSync(clipsDir, { recursive: true });
     const font = args.font ?? FONT_CANDIDATES.find((f) => existsSync(f));
     const base = args.out.replace(/\.mp4$/i, "");
-    const thumbs = await renderThumbnails({ briefs: thumbnailBriefs(s7), timeline, fetchClip: (url) => downloadClip(url, clipsDir), outBase: base, font });
+    const thumbs = await renderThumbnails({ briefs: thumbnailBriefs(s7), timeline, fetchClip: (url) => downloadClip(url, clipsDir), outBase: base, workDir, font });
     console.log(`thumbnails: ${thumbs.map((t) => t.id).join(", ")}`);
     // The Shorts and the Facebook cut, vertical, with their hooks and burned-in captions.
-    const cuts = await renderCuts({ film: args.out, briefs: cutBriefs(s7).filter((b) => b.end <= timeline.durationSeconds), captions: timeline.captions, outBase: base, font });
+    const cuts = await renderCuts({ film: args.out, briefs: cutBriefs(s7).filter((b) => b.end <= timeline.durationSeconds), captions: timeline.captions, outBase: base, workDir, font });
     console.log(`cuts: ${cuts.map((c) => c.id).join(", ")}`);
     writeFileSync(base + ".report.json", JSON.stringify({ ...report, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })), cuts: cuts.map((c) => ({ id: c.id, file: basename(c.file), seconds: c.seconds, size: `${c.width}x${c.height}` })) }, null, 1));
   }

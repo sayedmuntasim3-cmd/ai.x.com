@@ -46,6 +46,10 @@ test("the USA film renders every scene, with each shot's clip and licence or the
   assert.ok(!/javascript:/i.test(html), "unsafe URLs are dropped, not linked");
   assert.ok(html.includes('id="credits"') && html.includes("pexels.com/video/razor-1/"));
   assert.ok(html.includes("1/2") && html.includes("$7.40"));
+  assert.ok(!html.includes("Video render:"), "no render line before a render is started");
+  store.m.set("render.json", JSON.stringify({ ok: true, actionsUrl: "https://github.com/o/r/actions/workflows/render-film.yml", at: "2026-11-04T03:10:00.000Z" }));
+  const withRender = renderFilmPage(/** @type {any} */ (await loadFilmPage(store)));
+  assert.ok(withRender.includes("started on GitHub (2026-11-04 03:10 UTC)") && withRender.includes('href="https://github.com/o/r/actions/workflows/render-film.yml"'));
 });
 
 test("a run that has only started still gets a page; an unknown run gets none", async () => {

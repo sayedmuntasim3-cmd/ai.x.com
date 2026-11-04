@@ -2,8 +2,11 @@ name: Render a film
 
 # Render a finished film run to MP4 on GitHub's machines, started by hand
 # (Actions tab > Render a film > Run workflow; this also works from the
-# GitHub mobile app). The MP4, its captions and its licence report are
-# attached to the run as a downloadable artifact for 30 days.
+# GitHub mobile app) or by the studio when GitHub is connected.
+# The film, its Shorts and thumbnails are published as a release of this
+# repository (private when the repository is private; release files do not
+# count against the 500 MB Actions storage of the free plan). The small files
+# (thumbnails, captions, report) are also attached to the run for 30 days.
 #
 # Optional repository secrets (Settings > Secrets and variables > Actions):
 #   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
@@ -26,7 +29,7 @@ on:
         default: "1920x1080"
 
 permissions:
-  contents: read
+  contents: write  # to publish the release with the film
 
 concurrency:
   group: render-${{ github.event.inputs.film_id }}
@@ -73,10 +76,27 @@ jobs:
           if [ -f "out/$FILM_ID.report.json" ]; then
             node -e 'const r=require(process.argv[1]);const s=r.stats;console.log(`## ${r.file}\n\n${Math.round(r.durationSeconds/60)} min, ${r.width}×${r.height}. ${s.clips} clips, ${s.cards} cards, ${r.voicedScenes}/${r.narratedScenes} scenes voiced, ${r.musicCues.played}/${r.musicCues.scripted} music cues, ${r.licences.length} licensed clips.\n\n${r.warnings.length} warnings (see the report in the artifact).`)' "$PWD/out/$FILM_ID.report.json" >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Publish the film as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=()
+          for f in out/*.mp4 out/*.jpg out/*.srt out/*.json; do
+            if [ "$(stat -c %s "$f")" -ge 2147000000 ]; then echo "::warning::$f is over 2 GB and was not published; render at 1280x720."; else files+=("$f"); fi
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "::error::Nothing was rendered."; exit 1; }
+          tag="film-${FILM_ID:0:8}-${GITHUB_RUN_NUMBER}"
+          printf 'Film %s, rendered from %s.\n\nThe .mp4 is the film; SH-* are the Shorts (9:16), FB-* the Facebook cut (4:5), TH-* the thumbnails for YouTube Test & Compare, and the .report.json lists every clip with its licence page.\n' "$FILM_ID" "$SITE" > notes.md
+          gh release create "$tag" "${files[@]}" --prerelease --title "Film $FILM_ID" --notes-file notes.md --target "$GITHUB_SHA"
+          echo "Release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: film-${{ inputs.film_id }}
-          path: out/
+          path: |
+            out/*.jpg
+            out/*.srt
+            out/*.json
           retention-days: 30
           if-no-files-found: warn

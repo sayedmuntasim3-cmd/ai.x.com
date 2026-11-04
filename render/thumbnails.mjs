@@ -35,7 +35,7 @@ export function thumbnailBriefs(s7) {
 }
 
 /**
- * @param {{ briefs: ThumbnailBrief[], timeline: Timeline, fetchClip: (url: string) => Promise<string>, outBase: string, font?: string, ffmpeg?: string }} o
+ * @param {{ briefs: ThumbnailBrief[], timeline: Timeline, fetchClip: (url: string) => Promise<string>, outBase: string, workDir?: string, font?: string, ffmpeg?: string }} o
  * @returns {Promise<{ id: string, file: string, frameFrom: string, bytes: number }[]>}
  */
 export async function renderThumbnails(o) {
@@ -66,7 +66,7 @@ export async function renderThumbnails(o) {
     } else {
       input = ["-f", "lavfi", "-i", "color=c=0x0b110e:s=1280x720"];
     }
-    const textFile = `${o.outBase}.${b.id}.txt`;
+    const textFile = o.workDir ? join(o.workDir, `thumb.${b.id}.txt`) : `${o.outBase}.${b.id}.txt`;
     const lines = wrap(b.words.toUpperCase(), 14);
     writeFileSync(textFile, lines.join("\n"));
     const longest = Math.max(...lines.map((l) => l.length));

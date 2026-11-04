@@ -219,7 +219,7 @@ function table(rows) {
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
  * @typedef {import("./film-media.mjs").ShotMedia} ShotMedia
  * @typedef {{ id: string, title: string, start: string, end: string, firstScene?: string, lastScene?: string }} PlanChapter
- * @typedef {{ run: any, chapters: PlanChapter[], s5: Record<string, string>, media: Record<string, ChapterMedia>, research: any, filmCheck: any, qa: any, fixLog: any[] | null, docs: Record<string, string | null>, originality?: any }} PageData
+ * @typedef {{ run: any, chapters: PlanChapter[], s5: Record<string, string>, media: Record<string, ChapterMedia>, research: any, filmCheck: any, qa: any, fixLog: any[] | null, docs: Record<string, string | null>, originality?: any, render?: any }} PageData
  */
 
 const STAGE_LABEL = /** @type {Record<string, string>} */ ({ originality: "Originality", s01: "S0–S1 plan", research: "Research", s2: "S2 claim ledger", s3: "S3 structure", s4: "S4 bibles", qa: "QA", s6: "S6 report", s7: "S7 publishing" });
@@ -256,8 +256,8 @@ export async function loadFilmPage(store) {
   /** @type {Record<string, string | null>} */
   const docs = {};
   await Promise.all(["s01", "s2", "s3", "s4", "s6", "s7"].map(async (k) => { docs[k] = await store.get(`${k}.md`); }));
-  const [research, filmCheck, qa, fixLog, originality] = await Promise.all([json("research.json"), json("film-check.json"), json("qa.json"), json("fix-log.json"), json("originality.json")]);
-  return { run, chapters, s5, media, research, filmCheck, qa, fixLog: Array.isArray(fixLog) ? fixLog : null, docs, originality };
+  const [research, filmCheck, qa, fixLog, originality, render] = await Promise.all([json("research.json"), json("film-check.json"), json("qa.json"), json("fix-log.json"), json("originality.json"), json("render.json")]);
+  return { run, chapters, s5, media, research, filmCheck, qa, fixLog: Array.isArray(fixLog) ? fixLog : null, docs, originality, render };
 }
 
 /** @param {number} n */
@@ -433,6 +433,7 @@ export function renderFilmPage(d) {
   ${stageChips(d)}
   ${gaps.length ? `<details class="block"><summary>Open items (${gaps.length})</summary><div class="md"><ul class="gaps">${gaps.slice(0, 200).map((/** @type {unknown} */ g) => `<li>${inline(g)}</li>`).join("")}</ul></div></details>` : ""}
   ${d.run.error ? `<p class="small">Stopped: ${esc(d.run.error)}</p>` : ""}
+  ${d.render ? `<p class="small">Video render: ${d.render.ok && safeUrl(d.render.actionsUrl) ? `started on GitHub${d.render.at ? ` (${esc(String(d.render.at).slice(0, 16).replace("T", " "))} UTC)` : ""}, ${link(/** @type {string} */ (safeUrl(d.render.actionsUrl)), "follow it and download the MP4, Shorts and thumbnails")}` : `not started: ${esc(d.render.error ?? "unknown error")}`}</p>` : ""}
 </header>
 <section id="script"><div class="section-head"><h2>Script and shots</h2><p class="small">Narration as the voice will read it, then each shot with the clip found for it.</p></div>${chaptersHtml || `<p class="small">No chapter written yet.</p>`}</section>
 <section id="sources"><div class="section-head"><h2>Sources</h2><p class="small">The research file every chapter was written from. Conflicting sources are shown, never resolved silently.</p></div>${sourcesHtml(d)}</section>
