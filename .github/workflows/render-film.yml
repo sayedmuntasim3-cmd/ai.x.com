@@ -12,7 +12,8 @@ name: Render a film
 #   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
 #   FREESOUND_API_KEY                        sound effects fetched automatically (CC0 only)
 # Optional own voice: commit your recordings as voice/<film id>/SC0001.wav ... (script: /api/films/<id>/script)
-# Optional music: commit one track per cue as music/<film id>/M01.mp3 ...
+# Music: composed per cue with ElevenLabs Music when ELEVENLABS_API_KEY is set (repository variable MUSIC_AUTO=off
+#   turns it off); tracks committed as music/<film id>/M01.mp3 ... always win.
 # Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
 
 on:
@@ -87,6 +88,17 @@ jobs:
           else
             echo "No FREESOUND_API_KEY secret: only sound effects committed under sfx/$FILM_ID/ are used."
           fi
+      - name: Compose the score (ElevenLabs Music, for cues without a track)
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          MUSIC_AUTO: ${{ vars.MUSIC_AUTO }}
+        run: |
+          mkdir -p "music/$FILM_ID"
+          if [ -n "$ELEVENLABS_API_KEY" ] && [ "$MUSIC_AUTO" != "off" ]; then
+            node render/music-kit.mjs --api "$SITE" --id "$FILM_ID" --out "music/$FILM_ID/" || echo "::warning::Some cues could not be composed; they play without music."
+          else
+            echo "Music: only tracks committed under music/$FILM_ID/ are used."
+          fi
       - name: Render
         run: |
           node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" \
@@ -104,6 +116,7 @@ jobs:
           shopt -s nullglob
           files=()
           [ -f "sfx/$FILM_ID/sound-kit.json" ] && cp "sfx/$FILM_ID/sound-kit.json" "out/$FILM_ID.sound-kit.json"
+          [ -f "music/$FILM_ID/music-kit.json" ] && cp "music/$FILM_ID/music-kit.json" "out/$FILM_ID.music-kit.json"
           for f in out/*.mp4 out/*.jpg out/*.srt out/*.json; do
             if [ "$(stat -c %s "$f")" -ge 2147000000 ]; then echo "::warning::$f is over 2 GB and was not published; render at 1280x720."; else files+=("$f"); fi
           done

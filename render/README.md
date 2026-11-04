@@ -11,9 +11,14 @@ ELEVENLABS_API_KEY=... node render/voice.mjs --run productions/ramesh-babu/USA -
 - A scene that still holds an unresolved number such as `[C12 low]` is skipped and listed, so the voice never reads a placeholder.
 - Files that already exist are kept. A stopped recording resumes, and the owner's own takes, saved by hand under the same names (`SC0004.wav`), are never overwritten. The owner's voice is never processed.
 
-## 2. Music (optional)
+## 2. Music
 
-Each scene's `MUS` field names a cue (`M01` ...), and S4's music plan gives each cue a search brief. Download one track per cue from Pixabay Music or Mixkit (free licence), name it after its cue (`M01.mp3` ...) and pass the folder with `--music music/`.
+Each scene's `MUS` field names a cue (`M01` ...), and S4's music plan gives each cue its mood, instruments and tempo.
+
+- **Automatic (owner's decision, 4 Nov 2026):** `ELEVENLABS_API_KEY=... node render/music-kit.mjs --run <folder> --out music/` composes one instrumental track per cue with ElevenLabs Music, written from the cue's own brief. Each track is as long as the cue's longest stretch in the film (10 s to 5 min; longer stretches loop). Every prompt is recorded in `music/music-kit.json`. ElevenLabs allows commercial use on its paid plans.
+- **By hand:** download a track per cue (Pixabay Music, Mixkit), name it after its cue (`M01.mp3` …) and put it in the same folder. A track that exists always wins; the composer skips it.
+
+Pass the folder with `--music music/`.
 
 The renderer plays each cue across its scenes, honours "in at", "hard stop at" and "drops out", and loops a short track to fill its segment, with fades in and out. The music sits low and ducks further whenever the narrator speaks. A cue with no file plays as silence and is listed in the report.
 
