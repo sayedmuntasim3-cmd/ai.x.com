@@ -33,7 +33,7 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
   5. ~~Render, footage desk, scene re-make, originality guard, music, titles and chips, thumbnails, Shorts, GitHub render~~ (built, see above).
   6. The owner merges `ccr-cb190ece-ukm6vg` into `main` (their decision, by a pull request), so the Render button appears in GitHub Actions.
   7. After the first real run, check: Workflow step timeouts for long S5 chapters (30 min each today), real footage-desk quality and cost, ElevenLabs pronunciation of names (the S4 lexicon is not applied yet), and the real render time on GitHub.
-  8. Still plain: maps (FX-MAP, about 10 per film) and split screens (FX-SPLIT, about 18 per film). Maps need coordinates in the script and a renderer (Natural Earth data is public domain).
+  8. Still plain: maps (FX-MAP, about 10 per film) and split screens (FX-SPLIT, about 18 per film). The script asks for street-level OpenStreetMap fly-ins; OSM's public tile servers forbid this use at product scale, so maps need a tile and geocoding provider with a key (MapTiler has a free tier): the owner's decision.
 - **Save credits:** no extra agents, no web research, long outputs written to files in parts, commit and push after every step, replies of 2–3 lines in Bangla.
 
 ## 1. The owner's mission and standard
