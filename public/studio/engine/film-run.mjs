@@ -37,6 +37,8 @@ export const PRICES = Object.freeze({
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 4 },
   "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 10 },
   "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 10 },
+  // Gemini's free tier costs nothing (its daily limits apply instead).
+  "gemini-2.5-flash": { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 });
 
 /** US dollars per web search (server tool). */

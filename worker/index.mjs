@@ -22,7 +22,7 @@
  *   POST /api/films/:id/resume       { budgetUsd? } -> continue a failed or budget-stopped film; finished stages are kept   (Bearer STUDIO_TOKEN)
  *
  * Needs (set by the owner when Cloudflare is connected):
- *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
+ *   secrets ANTHROPIC_API_KEY (or, free: GEMINI_API_KEY, optional var GEMINI_MODEL), STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
  *   Optional vars: MODEL (default claude-opus-5-5), BUDGET_USD (default 60).
  *   Optional secrets PEXELS_API_KEY, PIXABAY_API_KEY: the media step (free
  *   stock footage per shot, media-C1.json ...). Without them it is skipped.
@@ -42,6 +42,7 @@ import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicBatchModel, anthropicModel, permanentError, savingModel } from "./anthropic.mjs";
 import { dispatchRender } from "./github.mjs";
+import { geminiModel } from "./gemini.mjs";
 import { listFilms } from "./films.mjs";
 import { radarSearch } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
@@ -95,14 +96,22 @@ function sameToken(a, b) {
   return diff === 0;
 }
 
+/** The writer: Claude when its key is set, else Google Gemini (free tier) when GEMINI_API_KEY is set. @param {any} env */
+function writer(env) {
+  if (env.ANTHROPIC_API_KEY) return anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined });
+  return geminiModel({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined });
+}
+/** @param {any} env */
+const hasWriter = (env) => Boolean(env.ANTHROPIC_API_KEY || env.GEMINI_API_KEY);
+
 export class FilmRunWorkflow extends WorkflowEntrypoint {
   /** @param {any} event @param {any} step */
   async run(event, step) {
     const /** @type {any} */ env = this.env;
     const film = event.payload.film;
-    const fast = anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined });
+    const fast = writer(env);
     // Half-price mode: the writing stages go through the Batch API; batch ids live in the film's own storage.
-    const model = film.saving ? savingModel(fast, anthropicBatchModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, store: r2Store(env.FILMS, film.id) })) : fast;
+    const model = film.saving && env.ANTHROPIC_API_KEY ? savingModel(fast, anthropicBatchModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, store: r2Store(env.FILMS, film.id) })) : fast;
     // A resume may raise the budget for this film; otherwise the deployment's BUDGET_USD applies.
     const budget = Number(event.payload.budgetUsd ?? env.BUDGET_USD);
     await runFilm({
@@ -157,7 +166,7 @@ export default {
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
       if (url.pathname === "/api/health") {
-        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: env.MODEL || "claude-opus-5-5" });
+        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: env.MODEL || "claude-opus-5-5" });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
@@ -182,7 +191,7 @@ export default {
         return json({ films: await listFilms(env.FILMS) });
       }
       if (url.pathname === "/api/films" && request.method === "POST") {
-        if (!env.ANTHROPIC_API_KEY || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
+        if (!hasWriter(env) || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your credits." }, 503);
         const auth = request.headers.get("authorization") ?? "";
         if (!sameToken(auth.replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
@@ -198,13 +207,13 @@ export default {
       }
       const remake = /^\/api\/films\/([0-9a-f-]{36})\/scenes\/(SC\d{4,5})$/i.exec(url.pathname);
       if (remake && request.method === "POST") {
-        if (!env.ANTHROPIC_API_KEY || !env.FILMS) return json({ error: "The studio is not connected yet (Claude API key or R2 bucket missing)." }, 503);
+        if (!hasWriter(env) || !env.FILMS) return json({ error: "The studio is not connected yet (Claude API key or R2 bucket missing)." }, 503);
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your credits." }, 503);
         if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
         const body = /** @type {any} */ (await request.json().catch(() => null));
         const result = await remakeScene({
           store: r2Store(env.FILMS, remake[1]),
-          model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined }),
+          model: writer(env),
           manual: MANUAL,
           scene: remake[2],
           instruction: typeof body?.instruction === "string" ? body.instruction : "",
@@ -265,7 +274,7 @@ export default {
       }
       const resume = /^\/api\/films\/([0-9a-f-]{36})\/resume$/.exec(url.pathname);
       if (resume && request.method === "POST") {
-        if (!env.ANTHROPIC_API_KEY || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
+        if (!hasWriter(env) || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
         if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
         const store = r2Store(env.FILMS, resume[1]);
