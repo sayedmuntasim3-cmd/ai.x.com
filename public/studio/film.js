@@ -4,25 +4,6 @@
 import { estimateRun } from "./engine/film-run.mjs";
 import { FORMATS } from "./engine/formats.mjs";
 
-/** Format names in Bangla (the English names come from formats.mjs). */
-const FORMAT_BN = {
-  "true-story-reenactment": "সত্য ঘটনার পুনর্নির্মাণ",
-  "rags-to-riches": "শূন্য থেকে শীর্ষে, শীর্ষ থেকে পতন",
-  "motivational-life-story": "অনুপ্রেরণার সত্যিকারের জীবনকাহিনি",
-  "place-nobody-can-visit": "যেখানে কেউ যেতে পারে না",
-  "deadliest-journey": "সবচেয়ে বিপজ্জনক যাত্রা",
-  "history-epic": "ইতিহাসের মহাকাব্য",
-  "history-in-minutes": "কয়েক মিনিটে পুরো ইতিহাস",
-  "other-side": "বিখ্যাত ঘটনার অন্য দিক",
-  "inner-circle": "ভেতরের মানুষদের উত্থান, বিশ্বাসঘাতকতা ও পতন",
-  "dark-business-expose": "ব্যবসার অন্ধকার দিক",
-  "money-explainer": "টাকা আসলে কীভাবে কাজ করে",
-  "big-question-science": "বিজ্ঞানের বড় প্রশ্ন",
-  "mystery-investigation": "রহস্যের অনুসন্ধান",
-  "numbered-compilation": "নম্বর দেওয়া সংকলন",
-  "dramatized-story": "আইডিয়া থেকে নিজস্ব গল্প",
-};
-
 const T = {
   bn: {
     title: "পুরো ফিল্ম বানাও (English, USA)",
@@ -145,7 +126,7 @@ function formatOptions() {
   const select = /** @type {HTMLSelectElement} */ ($("film-format"));
   const keep = select.value || "auto";
   const option = (/** @type {string} */ value, /** @type {string} */ label) => { const o = document.createElement("option"); o.value = value; o.textContent = label; return o; };
-  select.replaceChildren(option("auto", l.formatAuto), option("", l.formatPlain), ...FORMATS.map((f) => option(f.id, lang() === "bn" ? FORMAT_BN[/** @type {keyof typeof FORMAT_BN} */ (f.id)] ?? f.name : f.name)));
+  select.replaceChildren(option("auto", l.formatAuto), option("", l.formatPlain), ...FORMATS.map((f) => option(f.id, lang() === "bn" ? f.bn : f.name)));
   select.value = keep;
 }
 

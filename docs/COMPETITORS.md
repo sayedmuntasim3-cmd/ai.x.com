@@ -27,3 +27,24 @@ Status, 4 Nov 2026: items 1–4 are built and tested with fakes (render runs on 
 3. **Re-make one scene only:** let the owner regenerate a single scene or shot from the page, charged only for that scene. Competitors make users re-render whole videos.
 4. **Channel originality guard:** compare each new film with the channel's earlier films (structure, hooks, title patterns, phrases) and flag templated sameness before upload. This protects against channel-level "inauthentic content" action, and no rival offers it.
 5. **No charge for failure:** a failed stage costs the client nothing. Our own cost is logged, and the client is billed only for delivered stages. Today the run already never pays twice.
+
+## Documentary specialists (5 November 2026)
+
+The owner named **Kutly** as the rival to beat. A second scan found a new class of tools built for exactly our job, long faceless documentaries. Kutly's own site could not be opened from the build session (its domain is outside the session's network), so the rows below come from search summaries of its pages and of reviews; they are signals, not verified facts.
+
+| Tool | What it offers | Price signal | Weak points reported | Source |
+|---|---|---|---|---|
+| **Kutly** | One prompt in: script, AI voice, footage, "motion design", thumbnail and SEO metadata; also builds visuals around your own recorded narration. 8 to 30 minutes, 1080p. Shows a cost receipt before rendering. | Starter $29/month ($24 yearly) for 600 credits; a reviewer reports about $9.54 for a 30-minute video. Credits roll over up to 2x. | Footage licensing and voice languages are not stated; reviewers ask how relevant stock is for history topics and whether channels stay monetised. | [kutly.io](https://kutly.io/), [pricing](https://kutly.io/pricing/), [docs](https://docs.kutly.io/settings/length-and-credits/), [ViCut's comparison](https://vicut.io/compare/kutly), [review video](https://www.youtube.com/watch?v=a_ZblwfgZ80) |
+| **ViCut** | 8 to 35 minutes with licensed footage, AI narration and subtitles; the user approves every shot. | Listed from $25/month. | Only third-party listings found. | [AlternativeTo](https://alternativeto.net/software/vicut/about/) |
+| **VidRush** | Five agents (researcher, scriptwriter, motion designer, editor, sound designer); presenter and avatar modes on Pro. | Reports range from $0.76 to $2.72 per finished minute. | Cheapest tier makes image-only visuals. | [vidrush.ai](https://vidrush.ai/ai-presenter), [docs](https://docs.vidrush.ai/docs/generation-model) |
+| Agent Opus, DocuViralPro, Morphic, HeyGen | Script or URL to narrated documentary; HeyGen leans on avatars. | Not compared. | Vendor pages only. | [opus.pro](https://www.opus.pro/agent/workflows/ai-documentary-video-maker), [Morphic](https://morphic.com/resources/tools/ai-documentary-video-maker), [HeyGen](https://www.heygen.com/video/documentary-style-video-maker) |
+
+**What they all sell:** speed and one-prompt convenience at about $10 per 30 minutes. **What none of them shows:** a source for every claim, a licence record for every picture, real archive photographs of the actual subject, protection against YouTube's channel-level "inauthentic content" rule, or films longer than about 35 minutes.
+
+**How we win (and what is built):**
+1. **Truth as the product:** a sourced claim ledger and code-checked script (built). Rivals' weak point is "AI slop" that viewers and YouTube punish.
+2. **Pictures of the real thing:** Wikimedia Commons and NASA archive photos, licence-checked item by item and credited automatically, animated in the edit (built 5 Nov). Rivals answer history topics with generic stock.
+3. **Length:** 1 to 300 minutes (built); rivals stop at 30 to 35.
+4. **Price:** shown before the run, never paid twice, half price in saving mode (built). A 45-minute film is estimated at about $4 to $9 in saving mode, close to Kutly's per-video price for 1.5 times the length, with no subscription.
+5. **Channel safety:** originality guard across the channel's films, own-voice mode, AI disclosure handled in YouTube Studio (built).
+6. **Still to build to pass them:** a public, hosted self-serve product (accounts, billing, one-click start; today the owner runs it), motion design at their level (maps and data graphics), a shot-by-shot approval and swap view like ViCut's, and Bangla and Arabic versions (no rival serves them natively).
