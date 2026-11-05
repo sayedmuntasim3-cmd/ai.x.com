@@ -308,6 +308,34 @@ test("the Edit Director's moves are drawn: a punch-in holds, a shake jitters and
   }
 });
 
+test("motion graphics: a bar chart grows from the shot's own numbers, a highlighter sweeps only the marked words", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-mograph-"));
+  try {
+    const md = [
+      "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 FX-CHART \"Revenue\" 2019: 1; 2020: 4 | FX: FX-CHART | LOOK: L",
+      "**SC0002** | 0:00:03-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 FX-PAPER record, highlight \"guilty\" | FX: FX-PAPER | OST: \"Found guilty\" | LOOK: L",
+    ].join("\n");
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+    assert.deepEqual(timeline.video[0].chart?.bars.map((b) => b.value), [1, 4]);
+    assert.equal(timeline.video[1].highlight, "guilty");
+    const out = join(dir, "t.mp4");
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    const row = (/** @type {number} */ s, /** @type {number} */ y) => [...spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-vf", `crop=320:2:0:${y}`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout.subarray(0, 320 * 3)];
+    // The taller bar (2020) stands in the right half; at 0.1 s nothing has grown yet, by 2.5 s it is up.
+    const gold = (/** @type {number[]} */ r) => { let n = 0; for (let i = 0; i < r.length; i += 3) if (r[i] > 180 && r[i + 1] > 130 && r[i + 2] < 120) n += 1; return n; };
+    assert.equal(gold(row(0.1, 100)), 0, "bars start at the baseline");
+    assert.ok(gold(row(2.5, 100)) > 20, `the bar has grown (${gold(row(2.5, 100))} gold pixels)`);
+    // The marker band sits behind "guilty" only: the right part of the line, not "Found".
+    const yellow = (/** @type {number[]} */ r, /** @type {number} */ from, /** @type {number} */ to) => { let n = 0; for (let i = from * 3; i < to * 3; i += 3) if (r[i] > 200 && r[i + 1] > 170 && r[i + 2] < 140) n += 1; return n; };
+    const line = row(5.5, 90);
+    assert.ok(yellow(line, 160, 260) > 15, "the marked word is highlighted");
+    assert.equal(yellow(line, 60, 140), 0, "the word before it is not");
+    assert.equal(yellow(row(3.2, 90), 0, 320), 0, "the sweep starts after the words land");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a thumbnail can come from an archive photograph (one frame, nothing to seek into)", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
   const { renderThumbnails } = await import("./thumbnails.mjs");
   const dir = mkdtempSync(join(tmpdir(), "zupona-thumb-"));

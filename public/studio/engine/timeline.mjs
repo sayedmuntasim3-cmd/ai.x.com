@@ -13,9 +13,10 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch"} Transition
  *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera;
+ *   highlight: words on a card swept by a highlighter (paper) or an underline (FX-HIGHLIGHT); chart: an animated bar chart (FX-CHART);
  *   fileHash: the content hash of a local file the owner provided, so a replaced picture is rendered again
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
@@ -24,6 +25,7 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
  *   fadeIn / fadeOut: seconds of dip through black at a chapter break or a written dissolve or fade;
  *   speed: below 1 for slow motion written in MOTION; chapterTitle: shown on a chapter's first shot;
  *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
+ * @typedef {{ title: string, bars: { label: string, value: number, text: string }[] }} Chart
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
  * @typedef {{ text: string, start: number, end: number }} TimedWord
  * @typedef {{ start: number, end: number, text: string, words?: TimedWord[] }} Caption
@@ -72,6 +74,42 @@ export function splitPanels(text) {
 /** Quoted texts with at least one letter or digit, in order. @param {string} text */
 function quotes(text) {
   return [...text.matchAll(/["“]([^"”]{1,160})["”]/g)].map((m) => m[1].trim()).filter((q) => /[\p{L}\p{N}]/u.test(q));
+}
+
+/**
+ * An animated bar chart from an FX-CHART shot: "R1 FX-CHART \"Revenue, $ billions\"
+ * 2019: 1.2; 2020: 3.4; 2021: 8.9". Two to six "label: number" pairs, none
+ * negative; the first quote is the title. Null when the shot gives no data,
+ * so a chart is never drawn from invented numbers.
+ * @param {string} text
+ * @returns {Chart | null}
+ */
+export function chartData(text) {
+  const t = String(text ?? "");
+  const title = /["“]([^"”]{2,80})["”]/.exec(t)?.[1]?.trim() ?? "";
+  const body = t.replace(/["“][^"”]*["”]/g, " ").replace(/\bFX-CHART\b|^R\d\b/gi, " ");
+  /** @type {Chart["bars"]} */
+  const bars = [];
+  for (const m of body.matchAll(/([\p{L}\p{N}][\p{L}\p{N} .'&/-]{0,20}?)\s*[:=]\s*([$€£]?)(\d[\d,]*(?:\.\d+)?)\s*(%|[kKmMbB]n?\b|million\b|billion\b|thousand\b)?/gu)) {
+    const value = Number(m[3].replace(/,/g, ""));
+    if (!Number.isFinite(value) || value < 0) continue;
+    const label = m[1].trim().replace(/^(?:and|then|in|by)\s+/i, "").slice(0, 16);
+    if (!label) continue;
+    bars.push({ label, value, text: `${m[2]}${m[3]}${m[4] ? (m[4] === "%" ? "%" : ` ${m[4]}`) : ""}` });
+  }
+  return bars.length >= 2 && bars.length <= 6 && bars.some((b) => b.value > 0) ? { title, bars } : null;
+}
+
+/**
+ * The words a highlighter sweeps on a card: 'highlight "the key words"' in the
+ * shot or on-screen text, else the card's whole text when FX-HIGHLIGHT is
+ * asked for; "" when neither.
+ * @param {string} shotText @param {string} ost @param {string} fx @param {string} cardWords
+ */
+export function highlightFor(shotText, ost, fx, cardWords) {
+  const named = /\bhighlight(?:s|ed|ing)?\s+["“]([^"”]{2,60})["”]/i.exec(`${shotText} ${ost}`)?.[1]?.trim();
+  if (named && cardWords.toLowerCase().includes(named.toLowerCase())) return named;
+  return /FX-HIGHLIGHT/i.test(`${fx} ${shotText}`) && cardWords ? cardWords : "";
 }
 
 /**
@@ -306,7 +344,7 @@ export function autoSounds(video, placed = []) {
     if (v.transition === "whip" || v.transition === "slide" || v.transition === "zoom") add("AUTO-WHOOSH", v.start - 0.2, before, 0.55);
     else if (v.transition === "flash") add("AUTO-BOOM", v.start, v.scene, 2.4);
     else if (v.transition === "glitch") add("AUTO-GLITCH", v.start, v.scene, 0.4);
-    else if (v.map && !(prev?.map)) add("AUTO-WHOOSH", v.start - 0.15, before, 0.55);
+    else if ((v.map && !(prev?.map)) || v.chart) add("AUTO-WHOOSH", v.start - 0.15, before, 0.55);
     if (v.counter || (v.kinetic && v.type === "card")) add("AUTO-IMPACT", v.start + 0.05, v.scene, 1.1);
     else if (v.still && !prev?.still) add("AUTO-CLICK", v.start + 0.02, v.scene, 0.18);
   });
@@ -448,7 +486,10 @@ export function buildTimeline(o) {
           const isMap = !black && !panels && /FX-MAP|\bmap\b|\blocator\b/i.test(`${fx} ${shot.text}`);
           const route = isMap ? mapRoute(shot.text) : null;
           const place = route ? { ...route.from, to: route.to } : isMap ? mapPlace(shot.text) : null;
-          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: !panels && !place && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}) });
+          // A chart only from numbers the shot itself writes; a highlighter only on words the card shows.
+          const chart = !black && !panels && !place && /FX-CHART/i.test(`${fx} ${shot.text}`) ? chartData(shot.text) : null;
+          const marked = !black && !panels && !place && !chart ? highlightFor(shot.text, ost, fx, words) : "";
+          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: chart ? chart.title || words : words, counter: !panels && !place && !chart && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}), ...(chart ? { chart } : {}), ...(marked ? { highlight: marked } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
           const shotSeconds = frames / fps;

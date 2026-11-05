@@ -128,6 +128,27 @@ function wrap(text, n) {
 }
 
 /**
+ * Run a command and return its stdout as bytes (a raw frame to measure).
+ * @param {string} bin @param {string[]} args
+ * @returns {Promise<Buffer>}
+ */
+function runBytes(bin, args) {
+  return new Promise((ok, fail) => {
+    const p = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    /** @type {Buffer[]} */
+    const out = [];
+    let err = "";
+    p.stdout.on("data", (d) => out.push(d));
+    p.stderr.on("data", (d) => { err = (err + d).slice(-2000); });
+    p.on("error", fail);
+    p.on("close", (code) => (code === 0 ? ok(Buffer.concat(out)) : fail(new Error(`${bin} exited ${code}: ${err}`))));
+  });
+}
+
+/** Ease out (cubic): fast start, soft landing, as a motion designer keys a grow. @param {number} x */
+const easeOut = (x) => 1 - (1 - Math.min(1, Math.max(0, x))) ** 3;
+
+/**
  * Run tasks with at most `limit` at a time.
  * @template T @param {T[]} items @param {number} limit @param {(item: T, index: number) => Promise<void>} fn
  */
@@ -271,6 +292,33 @@ export async function renderFilm(o) {
     return file;
   };
   const text = (words, key, style) => `drawtext=textfile='${escPath(writeText(words, key))}':${style}:alpha='min(1,t/0.35)'`;
+  /** @type {Map<string, number>} */
+  const measured = new Map();
+  /**
+   * The drawn width of one line in pixels, measured by drawing it once, so a
+   * highlighter or an underline fits the words exactly.
+   * @param {string} words @param {string} face @param {number} size
+   */
+  const measureText = async (words, face, size) => {
+    const key = hash({ words, face, size });
+    const known = measured.get(key);
+    if (known !== undefined) return known;
+    const w = Math.ceil((size * words.length * 0.9 + 40) / 2) * 2;
+    const h = Math.ceil(size * 1.6 / 2) * 2;
+    const raw = await runBytes(ffmpeg, ["-v", "error", "-f", "lavfi", "-i", `color=c=black:s=${w}x${h}`, "-vf", `drawtext=textfile='${escPath(writeText(words, "measure"))}':fontfile='${escPath(face)}':fontsize=${size}:fontcolor=white:x=10:y=${Math.round(size * 0.2)}`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]);
+    let min = w;
+    let max = -1;
+    for (let i = 0; i < raw.length; i += 1) if (raw[i] > 60) { const x = i % w; if (x < min) min = x; if (x > max) max = x; }
+    const width = max >= min ? max - min + 1 : Math.round(size * words.length * 0.55);
+    measured.set(key, width);
+    return width;
+  };
+  /** Animated boxes are keyed frame by frame through sendcmd (drawbox has no time variable). @param {string[]} lines */
+  const commands = (lines) => {
+    const file = join(dirs.cards, `${hash(lines)}.cmd`);
+    writeFileSync(file, lines.join("\n") + "\n");
+    return `sendcmd=f='${escPath(file)}'`;
+  };
   const serif = SERIF_CANDIDATES.find((f) => existsSync(f)) ?? font;
   // Kinetic type rises 4% of the frame while it fades in (FX-KINETIC); otherwise it stays put.
   const rise = (/** @type {boolean | undefined} */ kinetic, /** @type {string} */ y) => (kinetic ? `y='${y}+h*0.04*(1-min(1,t/0.45))'` : `y=${y}`);
@@ -281,7 +329,7 @@ export async function renderFilm(o) {
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
-    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}) };
+    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}) };
     const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
@@ -424,6 +472,86 @@ export async function renderFilm(o) {
             const col = `w*${(k / n).toFixed(4)}+(w/${n}-text_w)/2`;
             chain.push(text(wrap(panel, n === 2 ? 18 : 12), `panel${k}`, `fontfile='${face}':text_align=C:fontcolor=${muted}:fontsize=${Math.round(H * (n === 2 ? 0.055 : 0.045))}:line_spacing=${Math.round(H * 0.015)}:x=${col}:${rise(v.kinetic, "h*0.59-text_h/2")}`));
           });
+        } else if (v.chart && font) {
+          // An animated bar chart: bars grow from the baseline one after another, eased, their values land on top.
+          const W = t.width;
+          const ink = paper ? "0x1d1a16" : "0xe4ede7";
+          const muted = paper ? "0x4a443c" : "0xb8c2bb";
+          const accent = paper ? "0x8c3b2a" : "0xe8b04a";
+          const face = escPath((paper ? serif : font) ?? "");
+          const bars = v.chart.bars;
+          const max = Math.max(...bars.map((b) => b.value)) || 1;
+          const left = W * 0.16;
+          const slot = (W * 0.68) / bars.length;
+          const bw = Math.round(slot * 0.56);
+          const base = Math.round(H * 0.8);
+          const room = Math.round(H * 0.44);
+          const grow = Math.min(0.9, (v.frames / t.fps) * 0.3);
+          const stagger = Math.min(0.15, (v.frames / t.fps) * 0.05);
+          const steps = Math.max(2, Math.round(grow * t.fps));
+          /** @type {string[]} */
+          const cmds = [];
+          /** @type {string[]} */
+          const boxes = [];
+          /** @type {string[]} */
+          const labels = [];
+          bars.forEach((b, k) => {
+            const full = Math.max(2, Math.round((room * b.value) / max));
+            const x = Math.round(left + slot * k + (slot - bw) / 2);
+            const from = 0.25 + stagger * k;
+            boxes.push(`drawbox@bar${k}=x=${x}:y=${base}:w=${bw}:h=1:color=${accent}:t=fill`);
+            for (let f = 0; f <= steps; f += 1) {
+              const hgt = Math.max(1, Math.round(full * easeOut(f / steps)));
+              cmds.push(`${(from + f / t.fps).toFixed(3)} drawbox@bar${k} y ${base - hgt};`, `${(from + f / t.fps).toFixed(3)} drawbox@bar${k} h ${hgt};`);
+            }
+            const cx = x + bw / 2;
+            labels.push(`drawtext=textfile='${escPath(writeText(b.label, `bar-label-${k}`))}':fontfile='${face}':fontcolor=${muted}:fontsize=${Math.round(H * 0.035)}:x=${Math.round(cx)}-text_w/2:y=${base + Math.round(H * 0.025)}:alpha='min(1,t/0.35)'`);
+            labels.push(`drawtext=textfile='${escPath(writeText(b.text, `bar-value-${k}`))}':fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.042)}:x=${Math.round(cx)}-text_w/2:y=${base - full - Math.round(H * 0.065)}:alpha='min(1,max(0,(t-${(from + grow * 0.8).toFixed(3)})/0.25))'`);
+          });
+          if (v.text) chain.push(text(wrap(v.text, 34), "chart-title", `fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.055)}:x=(w-text_w)/2:${rise(v.kinetic, "h*0.12")}`));
+          chain.push(commands(cmds), ...boxes, `drawbox=x=${Math.round(left)}:y=${base}:w=${Math.round(W * 0.68)}:h=${Math.max(2, Math.round(H * 0.004))}:color=${muted}:t=fill`, ...labels);
+        } else if (v.text && font && v.highlight) {
+          // A highlighter sweeps the key words on a document (a marker band behind them); on a dark card an underline draws itself.
+          const W = t.width;
+          const face = (paper ? serif : font) ?? "";
+          const size = Math.round(H * 0.065);
+          const lineH = Math.round(size * 1.32);
+          const lines = wrap(v.text, 26).split("\n");
+          const norm = (/** @type {string} */ w) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+          const whole = v.highlight.trim().toLowerCase() === v.text.trim().toLowerCase();
+          const wanted = new Set(v.highlight.split(/\s+/).map(norm).filter((w) => w.length >= 2));
+          const top = Math.round((H - lines.length * lineH) / 2);
+          /** @type {string[]} */
+          const cmds = [];
+          /** @type {string[]} */
+          const bands = [];
+          let at = 0.45;
+          const sweep = Math.min(0.55, (v.frames / t.fps) * 0.2);
+          const steps = Math.max(2, Math.round(sweep * t.fps));
+          for (const [k, line] of lines.entries()) {
+            // Only the marked words: from the first to the last of them on this line, measured where they are drawn.
+            const words = line.split(" ");
+            const hits = words.map((w, i) => (whole || wanted.has(norm(w)) ? i : -1)).filter((i) => i >= 0);
+            if (!hits.length) continue;
+            const [i, j] = [hits[0], hits[hits.length - 1]];
+            const y = top + k * lineH;
+            const pad = Math.round(size * 0.18);
+            const lineW = await measureText(line, face, size);
+            const end = await measureText(words.slice(0, j + 1).join(" "), face, size);
+            const span = await measureText(words.slice(i, j + 1).join(" "), face, size);
+            const full = span + 2 * pad;
+            const x0 = Math.round((W - lineW) / 2 + end - span - pad);
+            const [y0, bh, c] = paper ? [y - Math.round(size * 0.12), Math.round(size * 1.24), "0xffd84a@0.72"] : [y + Math.round(size * 1.08), Math.max(3, Math.round(size * 0.09)), "0xe8b04a"];
+            bands.push(`drawbox@hl${k}=x=-100:y=${y0}:w=1:h=${bh}:color=${c}:t=fill`);
+            for (let f = 0; f <= steps; f += 1) {
+              const when = (at + f / t.fps).toFixed(3);
+              if (f === 0) cmds.push(`${when} drawbox@hl${k} x ${x0};`);
+              cmds.push(`${when} drawbox@hl${k} w ${Math.max(1, Math.round(full * easeOut(f / steps)))};`);
+            }
+            at += sweep + 0.1;
+          }
+          if (bands.length) chain.push(commands(cmds), ...bands);
+          lines.forEach((line, k) => chain.push(`drawtext=textfile='${escPath(writeText(line, `hl-line-${k}`))}':fontfile='${escPath(face)}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${size}:x=(w-text_w)/2:${rise(v.kinetic, String(top + k * lineH))}:alpha='min(1,t/0.35)'`));
         } else if (v.text && font && count) {
           // The number runs up for the first part of the shot, then the text settles exactly as written.
           const runFor = Math.min(1.2, (v.frames / t.fps) * 0.6).toFixed(2);

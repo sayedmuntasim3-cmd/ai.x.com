@@ -339,8 +339,8 @@ export const ROLE_STATUS = Object.freeze({
 
   "animation-motion-director": ["model", "S4 motion-graphics style"],
   "animation-map-motion": ["code", "maps.mjs: animated maps from public-domain Natural Earth shapes (country lit, pin, name, push-in) and route lines that draw themselves between two places, for FX-MAP shots with coordinates"],
-  "animation-data-graphics": ["code", "renderer: counter cards only; no charts yet"],
-  "animation-kinetic-type": ["code", "renderer: FX-KINETIC kinetic type, line by line"],
+  "animation-data-graphics": ["code", "renderer: counter cards and animated bar charts (FX-CHART, eased bars from the shot's own numbers)"],
+  "animation-kinetic-type": ["code", "renderer: FX-KINETIC kinetic type, line by line; highlighter sweeps on documents and underlines (FX-HIGHLIGHT), measured to the words"],
   "animation-diagram-builder": ["planned", "not built yet"],
   "animation-2d-animation": ["planned", "not built yet"],
   "animation-3d-visualization": ["planned", "not built yet"],

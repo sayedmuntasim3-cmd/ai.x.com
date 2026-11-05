@@ -176,3 +176,13 @@ test("the edit's sound design follows the edit: whoosh into whips, boom under fl
   const quiet = build({ chapters: [{ id: "C1", markdown: c1 }], autoSound: false });
   assert.equal(quiet.sfx.filter((e) => e.token.startsWith("AUTO-")).length, 0, "it can be switched off");
 });
+
+test("a chart is drawn only from numbers the shot writes; a highlight only on words the card shows", async () => {
+  const { chartData, highlightFor } = await import("../src/timeline.mjs");
+  assert.deepEqual(chartData("R1 FX-CHART \"Users\" Facebook: 3,000 million; TikTok: 1,500 million")?.bars, [{ label: "Facebook", value: 3000, text: "3,000 million" }, { label: "TikTok", value: 1500, text: "1,500 million" }]);
+  assert.equal(chartData("R1 FX-CHART a growth chart"), null, "no data, no chart");
+  assert.equal(chartData("R1 FX-CHART \"x\" A: 1"), null, "one bar is not a chart");
+  assert.equal(highlightFor("R1 FX-PAPER, highlight \"on all counts\"", "", "FX-PAPER", "Guilty on all counts"), "on all counts");
+  assert.equal(highlightFor("R1 card, highlight \"not there\"", "", "", "Guilty"), "", "a phrase the card does not show is ignored");
+  assert.equal(highlightFor("R1 card", "", "FX-HIGHLIGHT", "He lost everything"), "He lost everything");
+});
