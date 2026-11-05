@@ -30,6 +30,10 @@ Optional: to see every Claude call (time, tokens, errors) in Cloudflare's dashbo
 
 **If a film stops.** A wrong or revoked API key, or a request the API refuses, stops the film at once with the reason on the film's card in the studio (it is no longer retried for minutes). Outages and overload are retried automatically, and while that happens the card shows the last error. Fix the cause, then press **Resume where it stopped** on the card (or `POST /api/films/<id>/resume`): finished stages are kept and not paid for again. A film stopped by its budget resumes the same way, optionally with a higher budget for that film only.
 
+## Saving mode (half the Claude cost)
+
+The studio's **Saving mode** box (on by default) sends every writing stage through Anthropic's Message Batches API, which bills every token at 50%. Same model, same prompts, same quality; slower, because each stage waits for its batch (usually minutes, at most 24 hours), so a full film can take a few hours. The footage desk stays on the fast API. Batch ids are stored with the film, so a retried or resumed stage never buys the same batch twice. The cost estimate shows both prices (45 minutes: about $7-15 normally, $4-9 in saving mode). Untick the box for a fast run.
+
 ## Media step (optional, free)
 
 After QA the run searches free stock footage for every S5 stock shot, with the scene's own queries, and writes `media-C1.json` ... per chapter: one pick per shot with its licence record (licence, source page, creator), up to three alternates, and the search trace. Only Pexels License and Pixabay Content License items are kept, and no clip is used twice within 10 minutes of film time. Shots with no free clip are listed as GAPs.
@@ -37,7 +41,9 @@ After QA the run searches free stock footage for every S5 stock shot, with the s
 1. Pexels: create a free key at https://www.pexels.com/api/ and run `npx wrangler secret put PEXELS_API_KEY` (limit 200 searches per hour).
 2. Pixabay: log in, copy your key from https://pixabay.com/api/docs/ and run `npx wrangler secret put PIXABAY_API_KEY` (limit 100 searches per minute).
 
-One key is enough; both give more choice. Without either the step is skipped (`run.json` says so) and runs when the film is resumed with a key. `GET /api/health` shows `pexels` and `pixabay` as true once set.
+One key is enough; both give more choice. `GET /api/health` shows `pexels` and `pixabay` as true once set.
+
+**Free archives, no key needed:** every run also searches Wikimedia Commons and the NASA Image and Video Library for real photographs, documents and video of the actual people, places and events. Evidence shots (R2) look there first; other shots prefer moving stock footage and fall back to an archive photo. Only public-domain, CC0 and CC BY files are used; share-alike, non-commercial, no-derivatives, personality-restricted or trademark-restricted files and third-party credits (ESA, agencies) are refused. Every archive picture used is credited in the film's description automatically (CC BY requires it). Photos are animated in the edit (slow push, pull or pan over a blurred fill), as top documentary channels do. Nothing is ever taken from YouTube, Facebook, Instagram, TikTok, X, Google Images or paid stock without a licence: a copyright strike costs far more than any picture.
 
 ## Topic radar (optional, free)
 

@@ -63,6 +63,97 @@ export function anthropicModel({ apiKey, model = "claude-opus-5-5", maxRetries =
   };
 }
 
+/** @param {string} text */
+async function sha256(text) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Half-price mode: every call goes through the Message Batches API, which
+ * bills every token at 50%. Same model, same prompts, same quality; slower,
+ * because a batch usually ends within minutes to an hour (at most 24 hours).
+ * Each call is a batch of one request, keyed by a hash of the request:
+ * - the batch id is stored before waiting, so a retried or resumed step
+ *   polls the same batch instead of paying for a second one;
+ * - a result is counted once; replaying it later returns zero usage;
+ * - an expired or canceled batch is forgotten so the retry submits again,
+ *   and a request the API rejects fails with status 400 (not retried).
+ * Server-side fallbacks are not available in batches; a declined request
+ * stops the stage with the reason, like any refusal.
+ * @param {{ apiKey: string, model?: string, maxRetries?: number, fetch?: typeof fetch, baseURL?: string, store: { get(key: string): Promise<string | null>, put(key: string, text: string): Promise<void> }, pollMs?: number, sleep?: (ms: number) => Promise<void> }} o
+ * @returns {import("../engine/src/film-run.mjs").Model}
+ */
+export function anthropicBatchModel(o) {
+  const model = o.model ?? "claude-opus-5-5";
+  const client = new Anthropic({ apiKey: o.apiKey, maxRetries: o.maxRetries ?? 4, ...(o.fetch ? { fetch: o.fetch } : {}), ...(o.baseURL ? { baseURL: o.baseURL } : {}) });
+  const sleep = o.sleep ?? ((/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const pollMs = o.pollMs ?? 30_000;
+  return {
+    name: model,
+    async call(req) {
+      /** @type {any[]} */
+      const messages = req.messages.map((m) => ({ role: m.role, content: m.content.map(block) }));
+      const tools = req.webSearch ? [{ type: "web_search_20260209", name: "web_search", max_uses: req.webSearch.maxUses }] : undefined;
+      const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, web_search_requests: 0, batch: 1 };
+      let text = "";
+      let stopReason = "end_turn";
+      let served = model;
+      for (let part = 0; part < 6; part += 1) {
+        /** @type {any} */
+        const params = { model, max_tokens: req.maxTokens, system: req.system.map(block), messages, thinking: { type: "adaptive" }, output_config: { effort: req.effort } };
+        if (tools) params.tools = tools;
+        const key = `batches/${await sha256(JSON.stringify(params))}.json`;
+        /** @type {{ id: string, stage: string, at: string, counted?: boolean } | null} */
+        let record = JSON.parse((await o.store.get(key)) ?? "null");
+        if (!record) {
+          const created = await client.messages.batches.create({ requests: [{ custom_id: "r", params }] });
+          record = { id: created.id, stage: req.stage, at: new Date().toISOString() };
+          await o.store.put(key, JSON.stringify(record));
+        }
+        for (;;) {
+          const batch = await client.messages.batches.retrieve(record.id);
+          if (batch.processing_status === "ended") break;
+          await sleep(pollMs);
+        }
+        /** @type {any} */
+        let result = null;
+        for await (const r of await client.messages.batches.results(record.id)) if (r.custom_id === "r") result = r.result;
+        if (!result || result.type !== "succeeded") {
+          await o.store.put(key, "null");
+          const detail = String(result?.error?.error?.message ?? result?.error?.message ?? "");
+          const invalid = result?.type === "errored" && /invalid_request/.test(JSON.stringify(result.error ?? {}));
+          throw Object.assign(new Error(`The batch request ${result?.type ?? "returned nothing"}${detail ? `: ${detail}` : ""}.`), invalid ? { status: 400 } : {});
+        }
+        const message = result.message;
+        if (!record.counted) {
+          for (const k of /** @type {const} */ (["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"])) usage[k] += Number(message.usage?.[k] ?? 0);
+          usage.web_search_requests += Number(message.usage?.server_tool_use?.web_search_requests ?? 0);
+          await o.store.put(key, JSON.stringify({ ...record, counted: true }));
+        }
+        served = message.model ?? served;
+        stopReason = message.stop_reason ?? "end_turn";
+        text += (message.content ?? []).filter((/** @type {any} */ b) => b.type === "text").map((/** @type {any} */ b) => b.text).join("");
+        if (stopReason !== "pause_turn") break;
+        messages.push({ role: "assistant", content: message.content });
+      }
+      return { text, stopReason, usage, model: served };
+    },
+  };
+}
+
+/**
+ * Half-price mode for the film's writing stages; the footage desk's many
+ * small look-at-thumbnails calls stay on the fast API, so the media step
+ * does not wait for a batch per six shots.
+ * @param {import("../engine/src/film-run.mjs").Model} fast
+ * @param {import("../engine/src/film-run.mjs").Model} batch
+ * @returns {import("../engine/src/film-run.mjs").Model}
+ */
+export function savingModel(fast, batch) {
+  return { name: batch.name, call: (req) => (req.stage.startsWith("media-judge") ? fast.call(req) : batch.call(req)) };
+}
+
 /**
  * An API error that the same request will hit again (wrong key, no access,
  * unknown model, a request the API rejects): retrying it only costs time.

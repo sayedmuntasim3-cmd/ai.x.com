@@ -327,3 +327,28 @@ test("the final title is checked in code: length, all-caps, and words that would
   assert.ok(titleProblems("Is Acme Corp a Scam?").some((p) => /court or regulator/.test(p)), "a question mark is no defence");
   assert.match(PACKAGING_RULES, /Test & Compare/);
 });
+
+test("archive pictures are credited in the description from their licence records", async () => {
+  const { pictureCredits } = await import("../src/film-run.mjs");
+  const credits = pictureCredits([{ shots: [
+    { pick: { id: "wikimedia:14", source: "wikimedia", title: "Saturn V on the pad", creator: "Ann Lee", sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Saturn_V_on_the_pad.jpg", licence: { licenseId: "CC-BY", licenseUrl: "https://creativecommons.org/licenses/by/2.0", creator: "Ann Lee" } } },
+    { pick: { id: "nasa:as11", source: "nasa", title: "Buzz Aldrin on the Moon", creator: "NASA JSC", sourcePageUrl: "https://images.nasa.gov/details/as11", licence: { licenseId: "US-GOV-PD" } } },
+    { pick: { id: "pexels:video:5", source: "pexels", title: "beach", sourcePageUrl: "https://www.pexels.com/video/5/", licence: { licenseId: "PEXELS" } } },
+    { pick: { id: "wikimedia:14", source: "wikimedia", title: "Saturn V on the pad", sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Saturn_V_on_the_pad.jpg", licence: { licenseId: "CC-BY" } } },
+  ] }]).split("\n");
+  assert.deepEqual(credits, [
+    "\"Saturn V on the pad\" by Ann Lee, CC BY (https://creativecommons.org/licenses/by/2.0), via Wikimedia Commons: https://commons.wikimedia.org/wiki/File:Saturn_V_on_the_pad.jpg",
+    "\"Buzz Aldrin on the Moon\" by NASA JSC, courtesy of NASA, via NASA: https://images.nasa.gov/details/as11",
+  ], "one line per archive item, stock needs none");
+});
+
+test("saving mode is the owner's choice per film and halves the token part of the estimate", () => {
+  const plain = newFilm({ topic: "The old mill", minutes: 45 }, "a");
+  const cheap = newFilm({ topic: "The old mill", minutes: 45, saving: true }, "b");
+  assert.ok(plain.ok && cheap.ok);
+  assert.equal(plain.film.saving, false, "off unless asked for");
+  assert.equal(cheap.film.saving, true);
+  const e = estimateRun(45 * 60);
+  assert.ok(e.savingUsdLow < e.usdLow * 0.6 && e.savingUsdLow > e.usdLow * 0.45, `${e.savingUsdLow} vs ${e.usdLow}`);
+  assert.ok(e.savingUsdHigh < e.usdHigh);
+});

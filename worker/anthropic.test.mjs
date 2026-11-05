@@ -96,3 +96,94 @@ test("web searches are counted for the bill", async () => {
   assert.equal(costOf({ web_search_requests: 3 }, "claude-opus-5-5"), 0.03);
   assert.ok(costOf({ output_tokens: 1e6 }, "claude-some-future-model") >= 25, "an unknown model is charged at the highest listed price, never $0");
 });
+
+/** A fake Message Batches API: a batch ends after `polls` status checks; results come as JSONL. */
+function fakeBatches(/** @type {{ polls?: number, result?: any }} */ o = {}) {
+  /** @type {{ method: string, url: string, body?: any }[]} */
+  const calls = [];
+  /** @type {Map<string, { checks: number, params: any }>} */
+  const batches = new Map();
+  let n = 0;
+  const batchObject = (/** @type {string} */ id, /** @type {boolean} */ ended) => ({ id, type: "message_batch", processing_status: ended ? "ended" : "in_progress", request_counts: { processing: ended ? 0 : 1, succeeded: ended ? 1 : 0, errored: 0, canceled: 0, expired: 0 }, created_at: "2026-11-05T00:00:00Z", expires_at: "2026-11-06T00:00:00Z", ended_at: ended ? "2026-11-05T00:05:00Z" : null, cancel_initiated_at: null, archived_at: null, results_url: ended ? `https://api.anthropic.com/v1/messages/batches/${id}/results` : null });
+  const f = /** @type {typeof fetch} */ (async (url, init) => {
+    const u = String(url);
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({ method, url: u, ...(body ? { body } : {}) });
+    if (method === "POST" && /\/v1\/messages\/batches(\?|$)/.test(u)) {
+      n += 1;
+      const id = `msgbatch_${n}`;
+      batches.set(id, { checks: 0, params: body.requests[0].params });
+      return Response.json(batchObject(id, false));
+    }
+    const results = /\/batches\/(msgbatch_\d+)\/results/.exec(u);
+    if (results) {
+      const r = o.result ?? { type: "succeeded", message: { id: "msg", type: "message", role: "assistant", model: "claude-opus-5-5", content: [{ type: "text", text: "Batch answer." }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 100, output_tokens: 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } };
+      return new Response(JSON.stringify({ custom_id: "r", result: r }) + "\n", { headers: { "content-type": "application/binary" } });
+    }
+    const status = /\/batches\/(msgbatch_\d+)(\?|$)/.exec(u);
+    if (status) {
+      const b = batches.get(status[1]);
+      if (!b) return Response.json({ type: "error", error: { type: "not_found_error", message: "no" } }, { status: 404 });
+      b.checks += 1;
+      return Response.json(batchObject(status[1], b.checks > (o.polls ?? 1)));
+    }
+    return new Response("{}", { status: 404 });
+  });
+  return { f, calls };
+}
+
+test("half-price mode: one batch per call, stored before waiting, never paid twice, counted at half price", async () => {
+  const { anthropicBatchModel, savingModel } = await import("./anthropic.mjs");
+  const { costOf } = await import("../engine/src/film-run.mjs");
+  /** @type {Map<string, string>} */
+  const kept = new Map();
+  const store = { get: async (/** @type {string} */ k) => kept.get(k) ?? null, put: async (/** @type {string} */ k, /** @type {string} */ v) => { kept.set(k, v); } };
+  const api = fakeBatches({ polls: 2 });
+  /** @type {number[]} */
+  const waits = [];
+  const model = anthropicBatchModel({ apiKey: "test", fetch: api.f, maxRetries: 0, store, sleep: async (ms) => { waits.push(ms); } });
+  const req = { stage: "s2", system: [{ text: "MANUAL", cache: true }], messages: [{ role: /** @type {const} */ ("user"), content: [{ text: "Write S2" }] }], maxTokens: 32000, effort: "medium" };
+  const out = await model.call(req);
+  assert.equal(out.text, "Batch answer.");
+  assert.equal(waits.length, 2, "it waits while the batch runs");
+  const create = api.calls.find((c) => c.method === "POST");
+  assert.equal(create?.body.requests.length, 1);
+  const params = create?.body.requests[0].params;
+  assert.equal(params.model, "claude-opus-5-5");
+  assert.deepEqual(params.output_config, { effort: "medium" });
+  assert.ok(!("fallbacks" in params) && !("stream" in params), "batches take no fallbacks and no streaming");
+  assert.deepEqual(params.system[0].cache_control, { type: "ephemeral", ttl: "1h" });
+  assert.equal(out.usage.output_tokens, 1000);
+  assert.equal(costOf(out.usage, "claude-opus-5-5"), costOf({ ...out.usage, batch: 0 }, "claude-opus-5-5") / 2, "billed at half price");
+  assert.equal([...kept.keys()].filter((k) => k.startsWith("batches/")).length, 1, "the batch id is kept with the film");
+
+  // A retried step: the same request polls the same batch and counts nothing twice.
+  const posts = api.calls.filter((c) => c.method === "POST").length;
+  const again = await model.call(req);
+  assert.equal(again.text, "Batch answer.");
+  assert.equal(api.calls.filter((c) => c.method === "POST").length, posts, "no second batch is bought");
+  assert.equal(again.usage.output_tokens, 0, "the result was already counted");
+
+  // The footage desk stays on the fast API.
+  /** @type {string[]} */
+  const routed = [];
+  const both = savingModel({ name: "fast", call: async (r) => { routed.push(`fast:${r.stage}`); return { text: "", stopReason: "end_turn", usage: {} }; } }, { name: "claude-opus-5-5", call: async (r) => { routed.push(`batch:${r.stage}`); return { text: "", stopReason: "end_turn", usage: {} }; } });
+  await both.call({ ...req, stage: "media-judge:C1" });
+  await both.call({ ...req, stage: "s5:C1" });
+  assert.deepEqual(routed, ["fast:media-judge:C1", "batch:s5:C1"]);
+});
+
+test("half-price mode: an expired batch is bought again on retry; a rejected request stops the film", async () => {
+  const { anthropicBatchModel, permanentError } = await import("./anthropic.mjs");
+  /** @type {Map<string, string>} */
+  const kept = new Map();
+  const store = { get: async (/** @type {string} */ k) => kept.get(k) ?? null, put: async (/** @type {string} */ k, /** @type {string} */ v) => { kept.set(k, v); } };
+  const req = { stage: "s3", system: [{ text: "M" }], messages: [{ role: /** @type {const} */ ("user"), content: [{ text: "x" }] }], maxTokens: 1000, effort: "high" };
+  const expired = fakeBatches({ result: { type: "expired" } });
+  await assert.rejects(anthropicBatchModel({ apiKey: "t", fetch: expired.f, maxRetries: 0, store, sleep: async () => {} }).call(req), /expired/);
+  assert.ok([...kept.values()].every((v) => v === "null"), "the expired batch is forgotten, so the retry submits a new one");
+  const rejected = fakeBatches({ result: { type: "errored", error: { type: "error", error: { type: "invalid_request_error", message: "prompt is too long" } } } });
+  const error = await anthropicBatchModel({ apiKey: "t", fetch: rejected.f, maxRetries: 0, store, sleep: async () => {} }).call(req).catch((e) => e);
+  assert.match(String(permanentError(error)), /rejected the request \(400\).*prompt is too long/);
+});

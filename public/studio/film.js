@@ -43,6 +43,8 @@ const T = {
     format: "ভিডিওর ধরন",
     formatAuto: "বিষয় দেখে নিজে বেছে নাও",
     formatPlain: "সাধারণ ডকুমেন্টারি",
+    saving: "সাশ্রয়ী মোড: Claude-এর খরচ অর্ধেক (Anthropic Batch), মান একই; তবে ধীরে, পুরো ফিল্মে কয়েক ঘণ্টা লাগতে পারে",
+    savingPrice: "সাশ্রয়ী মোডে",
     ai: "গল্পের চরিত্র AI দৃশ্যে দেখাও (একই চেহারা সব দৃশ্যে; আসল কোনো মানুষ নয়; YouTube Studio-তে ঘোষণা, স্ক্রিনে কিছু লেখা নয়)",
     token: "স্টুডিও টোকেন",
     tokenHint: "Cloudflare-এ যে STUDIO_TOKEN দিয়েছেন। শুধু এই ব্রাউজারে থাকে।",
@@ -95,6 +97,8 @@ const T = {
     format: "Kind of film",
     formatAuto: "Choose from the topic",
     formatPlain: "General documentary",
+    saving: "Saving mode: half the Claude cost (Anthropic Batch API), same quality; slower, a full film can take a few hours",
+    savingPrice: "in saving mode",
     ai: "Show the story's characters in AI scenes (the same look in every scene; never a real person; disclosed in YouTube Studio, nothing on screen)",
     token: "Studio token",
     tokenHint: "The STUDIO_TOKEN you set in Cloudflare. It stays in this browser only.",
@@ -158,7 +162,7 @@ function showEstimate() {
   const minutes = Number(/** @type {HTMLInputElement} */ ($("film-minutes")).value);
   if (!(minutes >= 1 && minutes <= 300)) { $("film-estimate").textContent = ""; return; }
   const e = estimateRun(Math.round(minutes * 60));
-  $("film-estimate").textContent = `${L().estimate}: $${e.usdLow}–$${e.usdHigh} (${e.chapters} ch, ${e.model})`;
+  $("film-estimate").textContent = `${L().estimate}: $${e.usdLow}–$${e.usdHigh} · ${L().savingPrice} $${e.savingUsdLow}–$${e.savingUsdHigh} (${e.chapters} ch, ${e.model})`;
 }
 
 /** @param {string} msg */
@@ -181,8 +185,9 @@ async function start(/** @type {SubmitEvent} */ ev) {
   try {
     const formatId = /** @type {HTMLSelectElement} */ ($("film-format")).value;
     const allowAi = /** @type {HTMLInputElement} */ ($("film-ai")).checked;
+    const saving = /** @type {HTMLInputElement} */ ($("film-saving")).checked;
     const notes = idea && idea.topic === topic ? idea.note : undefined;
-    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes }) });
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes, saving }) });
     const body = await res.json().catch(() => ({}));
     const isApi = (res.headers.get("content-type") ?? "").includes("json");
     if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }

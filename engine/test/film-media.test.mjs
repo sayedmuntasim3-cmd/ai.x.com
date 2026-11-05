@@ -48,8 +48,8 @@ test("Pexels and Pixabay results map to licensed candidates; keys go only where 
   const pb = await pixabayProvider({ apiKey: "PB", fetch: f }).search("old mill", "video", signal);
   assert.equal(pb[0].source, "pixabay");
   assert.ok(calls[1].url.includes("key=PB") && !calls[0].url.includes("PB"));
-  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["pixabay"]);
-  assert.deepEqual(mediaProviders({}), []);
+  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "pixabay"], "the free archives need no key");
+  assert.deepEqual(mediaProviders({ archives: false }), []);
 });
 
 test("a chapter gets a free clip per shot, with its licence record, and never repeats one within 10 minutes", async () => {
@@ -80,7 +80,7 @@ test("a clip may come back after 10 minutes; non-free and rate-limited results a
   assert.ok(media.shots.every((s) => s.pick?.id !== "nc:1"));
 
   const limited = fakeFetch({ status: 429 });
-  const none = await chapterMedia({ chapter: "C1", markdown: md, providers: mediaProviders({ pexelsKey: "PX", fetch: limited.f }), sleep: async () => {} });
+  const none = await chapterMedia({ chapter: "C1", markdown: md, providers: mediaProviders({ pexelsKey: "PX", fetch: limited.f, archives: false }), sleep: async () => {} });
   assert.equal(none.stats.found, 0);
   assert.equal(none.shots[0].trace[0].outcome, "rate_limited");
   assert.equal(limited.calls.length, 1, "after a 429 the provider is closed instead of hammered");
@@ -113,4 +113,55 @@ test("Pexels previews are asked for at 320 px, so the judge's images stay cheap"
   const u = new URL(String(r.previewUrl));
   assert.equal(u.searchParams.get("w"), "320");
   assert.equal(u.searchParams.get("h"), null);
+});
+
+// Shaped like the real Commons and NASA answers (the APIs are not reachable from the build sandbox).
+const COMMONS = { batchcomplete: true, query: { pages: [
+  { pageid: 11, ns: 6, title: "File:Apollo 11 launch.jpg", index: 2, imageinfo: [{ size: 1, width: 3000, height: 2000, thumburl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Apollo_11_launch.jpg/1920px-Apollo_11_launch.jpg", url: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Apollo_11_launch.jpg", descriptionurl: "https://commons.wikimedia.org/wiki/File:Apollo_11_launch.jpg", mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "Public domain" }, License: { value: "pd" }, Artist: { value: "<a href=\"//nasa.gov\">NASA</a>" }, Restrictions: { value: "" } } }] },
+  { pageid: 12, ns: 6, title: "File:Crowd at the launch.jpg", index: 1, imageinfo: [{ size: 1, width: 4000, height: 3000, thumburl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Crowd.jpg/1920px-Crowd.jpg", url: "https://upload.wikimedia.org/c.jpg", descriptionurl: "https://commons.wikimedia.org/wiki/File:Crowd_at_the_launch.jpg", mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY 4.0" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by/4.0" }, Artist: { value: "Jane Roe" }, AttributionRequired: { value: "true" }, Restrictions: { value: "personality" } } }] },
+  { pageid: 13, ns: 6, title: "File:Rocket model.jpg", index: 3, imageinfo: [{ size: 1, width: 2400, height: 1600, thumburl: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Rocket.jpg/1920px-Rocket.jpg", url: "https://upload.wikimedia.org/e.jpg", descriptionurl: "https://commons.wikimedia.org/wiki/File:Rocket_model.jpg", mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by-sa/4.0" }, Artist: { value: "John Doe" }, AttributionRequired: { value: "true" }, Restrictions: { value: "" } } }] },
+  { pageid: 14, ns: 6, title: "File:Saturn V on the pad.jpg", index: 4, imageinfo: [{ size: 1, width: 2800, height: 2100, thumburl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/SaturnV.jpg/1920px-SaturnV.jpg", url: "https://upload.wikimedia.org/s.jpg", descriptionurl: "https://commons.wikimedia.org/wiki/File:Saturn_V_on_the_pad.jpg", mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY 2.0" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by/2.0" }, Artist: { value: "Ann Lee" }, AttributionRequired: { value: "true" }, Restrictions: { value: "" } } }] },
+] } };
+const NASA = { collection: { items: [
+  { href: "https://images-assets.nasa.gov/image/as11-40-5903/collection.json", data: [{ nasa_id: "as11-40-5903", media_type: "image", title: "Buzz Aldrin on the Moon", center: "JSC", description: "Astronaut on the lunar surface." }], links: [{ href: "https://images-assets.nasa.gov/image/as11-40-5903/as11-40-5903~thumb.jpg", rel: "preview", render: "image" }] },
+  { href: "https://images-assets.nasa.gov/image/esa-1/collection.json", data: [{ nasa_id: "esa-1", media_type: "image", title: "Comet", secondary_creator: "ESA/Rosetta", description: "Image courtesy of ESA." }], links: [{ href: "https://images-assets.nasa.gov/image/esa-1/esa-1~thumb.jpg", rel: "preview" }] },
+] } };
+
+test("free archives: Commons and NASA results carry their own rights; share-alike, restricted and third-party items are refused", async () => {
+  /** @type {{ url: string, headers: any }[]} */
+  const calls = [];
+  const f = /** @type {any} */ (async (/** @type {string} */ url, /** @type {any} */ init) => { calls.push({ url, headers: init?.headers ?? {} }); return Response.json(url.includes("wikimedia") ? COMMONS : NASA); });
+  const { wikimediaProvider, nasaProvider, verifyArchiveItem } = await import("../src/film-media.mjs");
+  const { classifyLicense } = await import("../src/documentary-media-fetch.mjs");
+  const commons = await wikimediaProvider({ fetch: f }).search("apollo 11 launch", "image", AbortSignal.timeout(1000));
+  assert.deepEqual(commons.map((c) => c.id), ["wikimedia:12", "wikimedia:11", "wikimedia:13", "wikimedia:14"], "search order kept");
+  assert.match(calls[0].url, /filetype%3Abitmap/);
+  assert.match(String(calls[0].headers["user-agent"]), /^ZuponaStudio/, "Commons is told who is asking");
+  const pd = commons[1];
+  assert.equal(pd.mediaUrl, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Apollo_11_launch.jpg/1920px-Apollo_11_launch.jpg");
+  assert.equal(pd.previewUrl, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Apollo_11_launch.jpg/320px-Apollo_11_launch.jpg", "the judge sees a 320 px preview");
+  assert.equal(pd.creator, "NASA", "HTML is stripped from the author");
+  const verdict = async (/** @type {any} */ c) => { const rights = classifyLicense(c); return rights.allowed && (await verifyArchiveItem({ ...c, layer: 1, rights })); };
+  assert.deepEqual(await Promise.all(commons.map(verdict)), [false, true, false, true], "personality-restricted and share-alike files are refused; public domain and CC BY pass");
+  assert.equal(classifyLicense(commons[3]).licenseId, "CC-BY");
+  const nasa = await nasaProvider({ fetch: f }).search("moon landing", "image", AbortSignal.timeout(1000));
+  assert.equal(nasa[0].mediaUrl, "https://images-assets.nasa.gov/image/as11-40-5903/as11-40-5903~large.jpg");
+  assert.equal(nasa[0].sourcePageUrl, "https://images.nasa.gov/details/as11-40-5903");
+  assert.deepEqual(await Promise.all(nasa.map(verdict)), [true, false], "an ESA-credited picture is not NASA's to give");
+});
+
+test("an evidence shot (R2) takes a real archive photo first; a stock shot still prefers moving footage", async () => {
+  const md = [
+    "**SC0001** | 0:00:00-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R2 Apollo 11 launch, July 1969 | SRC: Commons · Q1 \"apollo 11 launch\" | LOOK: L",
+    "**SC0002** | 0:00:06-0:00:12 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 a crowd on a beach at dawn | SRC: Pexels · Q1 \"crowd beach dawn\" | LOOK: L",
+  ].join("\n");
+  const f = /** @type {any} */ (async (/** @type {string} */ url) => Response.json(url.includes("wikimedia") ? COMMONS : url.includes("nasa") ? { collection: { items: [] } } : { videos: [{ id: 5, url: "https://www.pexels.com/video/5/", image: "https://images.pexels.com/5.jpg", duration: 9, user: { name: "Ana" }, video_files: [{ link: "https://v/5-hd.mp4", file_type: "video/mp4", width: 1920, height: 1080 }] }] }));
+  const { mediaProviders: providersFor } = await import("../src/film-media.mjs");
+  const media = await chapterMedia({ chapter: "C1", markdown: md, providers: providersFor({ pexelsKey: "PX", fetch: f }), sleep: async () => {} });
+  const [evidence, stockShot] = media.shots;
+  assert.equal(evidence.pick?.source, "wikimedia");
+  assert.equal(evidence.pick?.kind, "image");
+  assert.equal(evidence.pick?.licence.licenseId, "PUBLIC-DOMAIN");
+  assert.equal(stockShot.pick?.id, "pexels:video:5");
+  assert.equal(stockShot.pick?.kind, "video");
 });

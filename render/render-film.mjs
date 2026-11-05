@@ -143,7 +143,9 @@ async function downloadClip(url, dir) {
     if (existsSync(local)) return local;
     throw new Error(`Local clip not found: ${local}`);
   }
-  const file = join(dir, hash(url) + ".mp4");
+  // Pictures keep their extension, so ffmpeg reads them as images.
+  const ext = /\.(jpe?g|png|webp|tiff?)(?:$|[?#])/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "mp4";
+  const file = join(dir, hash(url) + "." + ext);
   if (existsSync(file)) return file;
   let lastError;
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -226,7 +228,7 @@ export async function renderFilm(o) {
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
-    const key = hash({ v: 6, look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 7, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -235,7 +237,30 @@ export async function renderFilm(o) {
     /** @type {string[]} */
     const chain = [];
     let type = v.type;
-    if (type === "clip" && v.url) {
+    if (type === "clip" && v.url && v.still) {
+      try {
+        // A photograph: framed once over a blurred copy of itself (so a portrait or odd shape fills the frame),
+        // then moved slowly (push in, pull out or pan, in turn) so it lives on screen like footage.
+        const plate = join(dirs.cards, `${hash({ still: v.url, w: t.width, h: t.height })}.png`);
+        if (!existsSync(plate)) {
+          const W2 = t.width * 2;
+          const H2 = t.height * 2;
+          await run(ffmpeg, ["-v", "error", "-y", "-i", await fetchClip(v.url), "-frames:v", "1", "-vf", `split=2[bg][fg];[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=-0.07:saturation=0.8[bgb];[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`, plate]);
+        }
+        input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
+        const n = v.frames;
+        const moves = [
+          `zoompan=z='1+0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
+          `zoompan=z='1.09-0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
+          `zoompan=z='1.08':x='(iw-iw/zoom)*on/${n}':y='ih/2-(ih/zoom/2)'`,
+        ];
+        chain.push(`${moves[i % moves.length]}:d=1:s=${t.width}x${t.height}:fps=${t.fps}`, "setsar=1", LOOK);
+      } catch (error) {
+        stats.clipsFailed += 1;
+        warnings.push(`${v.id}: picture could not be downloaded (${error instanceof Error ? error.message : error}); a text card stands in.`);
+        type = "card";
+      }
+    } else if (type === "clip" && v.url) {
       try {
         input = [...(v.sourceIn ? ["-ss", String(v.sourceIn)] : []), "-stream_loop", "-1", "-i", await fetchClip(v.url)];
         // Slow motion written in the script stretches the clip before it is framed.

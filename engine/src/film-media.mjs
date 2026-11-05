@@ -15,8 +15,29 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 /** No clip may appear twice within this many seconds of film time. */
 export const REPEAT_WINDOW_SECONDS = 600;
 
-/** Licences a pick may carry: free for commercial use, no item-page check needed. */
-export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0"]);
+/**
+ * Licences a pick may carry: free for commercial use. Public-domain, NASA and
+ * CC BY items come from archives whose search result carries the file's own
+ * rights metadata, checked item by item (verifyArchiveItem); CC BY needs the
+ * credit that the run writes into the description.
+ */
+export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0", "PDM-1.0", "PUBLIC-DOMAIN", "US-GOV-PD", "CC-BY"]);
+
+/** Archives searched without a key: real, historical and scientific pictures, free for commercial use. */
+export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa"]);
+
+/**
+ * The item-level rights check of an archive result. Commons returns the file
+ * page's own metadata with the search, so a file with any restriction
+ * (personality rights, trademark, insignia ...) is refused here; NASA items
+ * credited to a third party were already refused by classifyLicense.
+ * @param {import("./documentary-media-fetch.mjs").MediaCandidate} c
+ */
+export async function verifyArchiveItem(c) {
+  if (c.source === "wikimedia") return !c.restrictions;
+  if (c.source === "nasa") return c.rights.allowed;
+  return false;
+}
 
 /**
  * @typedef {import("./documentary-media-fetch.mjs").MediaProvider} MediaProvider
@@ -24,7 +45,7 @@ export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0"]);
  * @typedef {import("./documentary-media-fetch.mjs").MediaKind} MediaKind
  * @typedef {{ scene: string, shot: number, start: number, end: number, rung: string | null, description: string, queries: string[] }} StockShot
  * @typedef {{ licenseId: string, name: string, licenseUrl: string | null, attributionRequired: boolean, creator: string | null, sourcePageUrl: string }} LicenceRecord
- * @typedef {{ id: string, source: string, mediaUrl: string | null, previewUrl: string | null, sourcePageUrl: string, creator: string | null, durationSeconds: number | null, width: number | null, height: number | null, licence: LicenceRecord }} MediaPick
+ * @typedef {{ id: string, source: string, kind?: MediaKind, title?: string, mediaUrl: string | null, previewUrl: string | null, sourcePageUrl: string, creator: string | null, durationSeconds: number | null, width: number | null, height: number | null, licence: LicenceRecord }} MediaPick
  * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], review?: "fit" | "none-fit" | "unreviewed", trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[] }} ShotMedia
  * @typedef {{ chapter: string, providers: string[], repeatWindowSeconds: number, shots: ShotMedia[], stats: { shots: number, found: number, missing: number, noQuery: number } }} ChapterMedia
  * @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike
@@ -128,7 +149,7 @@ export const JUDGE_POOL = 4;
 /** @param {import("./documentary-media-fetch.mjs").MediaCandidate} c @returns {MediaPick} */
 function toPick(c) {
   return {
-    id: c.id, source: c.source, mediaUrl: c.mediaUrl, previewUrl: c.previewUrl, sourcePageUrl: c.sourcePageUrl,
+    id: c.id, source: c.source, kind: c.mediaType, title: c.title, mediaUrl: c.mediaUrl, previewUrl: c.previewUrl, sourcePageUrl: c.sourcePageUrl,
     creator: c.creator, durationSeconds: c.durationSeconds, width: c.width, height: c.height,
     licence: { licenseId: c.rights.licenseId, name: c.rights.reason, licenseUrl: c.licenseUrl, attributionRequired: c.attributionRequired, creator: c.creator, sourcePageUrl: c.sourcePageUrl },
   };
@@ -146,7 +167,22 @@ function toPick(c) {
 export async function chapterMedia(o) {
   const history = o.history ?? createUseHistory();
   const limiter = o.limiter ?? createRateLimiter();
-  const kind = o.kind ?? "video";
+  const archives = o.providers.filter((p) => ARCHIVE_SOURCES.includes(p.id));
+  const stock = o.providers.filter((p) => !ARCHIVE_SOURCES.includes(p.id));
+  /**
+   * Where to look, in order. Evidence shots (R2) want the real thing, so
+   * archive photos come first; other shots want moving stock footage, then
+   * archive video, then a still photo animated in the edit.
+   * @param {string | null} rung
+   * @returns {{ kind: MediaKind, providers: MediaProvider[] }[]}
+   */
+  const plan = (rung) => {
+    if (o.kind) return [{ kind: o.kind, providers: o.providers }];
+    const steps = rung === "R2"
+      ? [{ kind: /** @type {MediaKind} */ ("image"), providers: o.providers }, { kind: /** @type {MediaKind} */ ("video"), providers: o.providers }]
+      : [{ kind: /** @type {MediaKind} */ ("video"), providers: stock }, { kind: /** @type {MediaKind} */ ("video"), providers: archives }, { kind: /** @type {MediaKind} */ ("image"), providers: o.providers }];
+    return steps.filter((s) => s.providers.some((p) => p.kinds.includes(s.kind)));
+  };
   /** @type {ShotMedia[]} */
   const shots = [];
   /** @type {Map<ShotMedia, import("./documentary-media-fetch.mjs").MediaCandidate[]>} */
@@ -154,22 +190,23 @@ export async function chapterMedia(o) {
   for (const shot of stockShots(o.markdown)) {
     /** @type {ShotMedia} */
     const row = { ...shot, status: shot.queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
-    for (const query of shot.queries) {
+    search: for (const step of plan(shot.rung)) for (const query of shot.queries) {
       const found = await fetchShotMedia(
-        { shotId: `${shot.scene}-${shot.shot}`, query, kind },
-        { providers: o.providers, limiter, used: { has: (id) => history.blocked(id, shot.start) }, minCandidates: 1, maxWaitMs: o.maxWaitMs, timeoutMs: o.timeoutMs, sleep: o.sleep },
+        { shotId: `${shot.scene}-${shot.shot}`, query, kind: step.kind },
+        { providers: step.providers, limiter, used: { has: (id) => history.blocked(id, shot.start) }, verifyItem: verifyArchiveItem, minCandidates: 1, maxWaitMs: o.maxWaitMs, timeoutMs: o.timeoutMs, sleep: o.sleep },
       );
       row.trace.push(...found.trace.map((t) => ({ query, ...t })));
-      const free = found.candidates.filter((c) => c.rights.allowed && !c.rights.needsPageCheck && FREE_LICENCES.includes(c.rights.licenseId));
+      // Every candidate here passed its item-level rights check inside fetchShotMedia.
+      const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId));
       if (!free.length) continue;
       row.query = query;
-      if (o.judge) { pools.set(row, free); break; }
+      if (o.judge) { pools.set(row, free); break search; }
       const [best, ...rest] = free;
       row.status = "found";
       row.pick = toPick(best);
       row.alternates = rest.slice(0, 3).map((c) => c.id);
       history.add(best.id, shot.start);
-      break;
+      break search;
     }
     shots.push(row);
   }
@@ -306,14 +343,111 @@ export function pixabayProvider(o) {
   };
 }
 
+/** @param {unknown} html */
+function plain(html) {
+  return typeof html === "string" ? html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/\s+/g, " ").trim() : "";
+}
+
+/** Commons asks every client to say who it is. */
+const COMMONS_UA = "ZuponaStudio/1.0 (documentary media search; https://github.com/sayedmuntasim3-cmd/ai.x.com)";
+
 /**
- * The providers a run can use, from whichever keys are set.
- * @param {{ pexelsKey?: string, pixabayKey?: string, fetch?: FetchLike }} keys
+ * Wikimedia Commons: real photographs of people, places and events, maps and
+ * historical documents, plus some video. No key. Each result carries its file
+ * page's rights metadata (licence, author, restrictions), so the item check
+ * needs no second request. Images come as 1920 px renditions.
+ * @param {{ fetch?: FetchLike, perPage?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function wikimediaProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  const perPage = o.perPage ?? 20;
+  return {
+    id: "wikimedia", layer: 1, kinds: ["image", "video"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 60 },
+    async search(query, kind, signal) {
+      const params = new URLSearchParams({
+        action: "query", format: "json", formatversion: "2", generator: "search", gsrnamespace: "6", gsrlimit: String(perPage),
+        gsrsearch: `${query.slice(0, 200)} filetype:${kind === "video" ? "video" : "bitmap"}`,
+        prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "1920",
+        iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName",
+      });
+      const res = await get(`https://commons.wikimedia.org/w/api.php?${params}`, { headers: { "user-agent": COMMONS_UA, "api-user-agent": COMMONS_UA }, signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      const pages = Array.isArray(data?.query?.pages) ? data.query.pages : Object.values(data?.query?.pages ?? {});
+      return pages.sort((/** @type {any} */ a, /** @type {any} */ b) => (a.index ?? 0) - (b.index ?? 0)).flatMap((/** @type {any} */ p) => {
+        const info = p.imageinfo?.[0];
+        if (!info) return [];
+        const meta = info.extmetadata ?? {};
+        const isVideo = /^video\//.test(info.mime ?? "");
+        if ((kind === "video") !== isVideo || !(isVideo || /^image\/(jpeg|png|webp|tiff)$/.test(info.mime ?? ""))) return [];
+        const thumb = typeof info.thumburl === "string" ? info.thumburl : null;
+        const small = thumb ? thumb.replace(/\/(\d+)px-/, "/320px-") : null;
+        const title = plain(meta.ObjectName?.value) || String(p.title ?? "").replace(/^File:/, "").replace(/\.[a-z0-9]+$/i, "");
+        return [{
+          id: `wikimedia:${p.pageid}`, source: "wikimedia", mediaType: kind, title,
+          previewUrl: small, mediaUrl: isVideo ? info.url ?? null : thumb ?? info.url ?? null,
+          sourcePageUrl: info.descriptionurl ?? `https://commons.wikimedia.org/wiki/${encodeURIComponent(String(p.title ?? ""))}`,
+          creator: plain(meta.Artist?.value) || plain(meta.Credit?.value) || null,
+          license: plain(meta.LicenseShortName?.value) || plain(meta.License?.value) || null,
+          licenseUrl: plain(meta.LicenseUrl?.value) || null,
+          attributionRequired: String(meta.AttributionRequired?.value ?? "").toLowerCase() === "true",
+          restrictions: plain(meta.Restrictions?.value) || null,
+          durationSeconds: isVideo && Number.isFinite(Number(info.duration)) ? Number(info.duration) : null,
+          width: info.width ?? null, height: info.height ?? null,
+        }];
+      });
+    },
+  };
+}
+
+/**
+ * NASA Image and Video Library: space, Earth, aviation and science. No key.
+ * NASA's own media is not copyrighted in the US (no endorsement may be
+ * implied); items credited to anyone else are refused by classifyLicense.
+ * @param {{ fetch?: FetchLike, perPage?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function nasaProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  const perPage = o.perPage ?? 20;
+  return {
+    id: "nasa", layer: 1, kinds: ["image", "video"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 60 },
+    async search(query, kind, signal) {
+      const res = await get(`https://images-api.nasa.gov/search?${new URLSearchParams({ q: query.slice(0, 200), media_type: kind, page_size: String(perPage) })}`, { signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      return (data?.collection?.items ?? []).flatMap((/** @type {any} */ item) => {
+        const d = item.data?.[0];
+        if (!d?.nasa_id || d.media_type !== kind) return [];
+        const id = String(d.nasa_id);
+        const preview = (item.links ?? []).find((/** @type {any} */ l) => l.rel === "preview")?.href ?? null;
+        const folder = `https://images-assets.nasa.gov/${kind}/${encodeURIComponent(id)}/${encodeURIComponent(id)}`;
+        // The credit fields go into the licence text, so a third-party credit is caught by classifyLicense.
+        const credit = [d.center, d.photographer, d.secondary_creator, plain(d.description).slice(0, 400)].filter(Boolean).join(" · ");
+        return [{
+          id: `nasa:${id}`, source: "nasa", mediaType: kind, title: plain(d.title) || id,
+          previewUrl: preview, mediaUrl: kind === "video" ? `${folder}~orig.mp4` : `${folder}~large.jpg`,
+          sourcePageUrl: `https://images.nasa.gov/details/${encodeURIComponent(id)}`,
+          creator: d.photographer || d.secondary_creator || `NASA${d.center ? ` ${d.center}` : ""}`,
+          license: `NASA media. ${credit}`, licenseUrl: "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+          attributionRequired: false, durationSeconds: null, width: null, height: null,
+        }];
+      });
+    },
+  };
+}
+
+/**
+ * The providers a run can use: the free archives (no key) and whichever
+ * stock keys are set.
+ * @param {{ pexelsKey?: string, pixabayKey?: string, fetch?: FetchLike, archives?: boolean }} keys
  * @returns {MediaProvider[]}
  */
 export function mediaProviders(keys) {
   /** @type {MediaProvider[]} */
   const out = [];
+  if (keys.archives !== false) out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }));
   if (keys.pexelsKey) out.push(pexelsProvider({ apiKey: keys.pexelsKey, fetch: keys.fetch }));
   if (keys.pixabayKey) out.push(pixabayProvider({ apiKey: keys.pixabayKey, fetch: keys.fetch }));
   return out;

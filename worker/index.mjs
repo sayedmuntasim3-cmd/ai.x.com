@@ -33,7 +33,7 @@ import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../engine/src/film-page.mjs";
 import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
-import { anthropicModel, permanentError } from "./anthropic.mjs";
+import { anthropicBatchModel, anthropicModel, permanentError, savingModel } from "./anthropic.mjs";
 import { dispatchRender } from "./github.mjs";
 import { listFilms } from "./films.mjs";
 import { radarSearch } from "./youtube.mjs";
@@ -91,7 +91,9 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
   async run(event, step) {
     const /** @type {any} */ env = this.env;
     const film = event.payload.film;
-    const model = anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined });
+    const fast = anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined });
+    // Half-price mode: the writing stages go through the Batch API; batch ids live in the film's own storage.
+    const model = film.saving ? savingModel(fast, anthropicBatchModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, store: r2Store(env.FILMS, film.id) })) : fast;
     // A resume may raise the budget for this film; otherwise the deployment's BUDGET_USD applies.
     const budget = Number(event.payload.budgetUsd ?? env.BUDGET_USD);
     await runFilm({
@@ -108,7 +110,8 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       },
       log: (line) => console.log(`[${film.id}] ${line}`),
       // A long chapter (64k output tokens, up to four continued parts) can take well over 30 minutes; a timeout would pay for it twice.
-      step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, async () => {
+      // In half-price mode a step can wait hours for its batch: each attempt polls for up to an hour, and a retry polls the same batch again.
+      step: (name, fn) => step.do(name, film.saving ? { retries: { limit: 30, delay: "1 minute", backoff: "constant" }, timeout: "1 hour" } : { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, async () => {
         try {
           return await fn();
         } catch (error) {

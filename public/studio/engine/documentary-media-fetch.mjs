@@ -10,7 +10,7 @@
 /**
  * @typedef {"image" | "video"} MediaKind
  * @typedef {1 | 2 | 3 | 4 | 5} MediaLayer
- * @typedef {{ id: string, source: string, mediaType: MediaKind, title: string, previewUrl: string | null, mediaUrl: string | null, sourcePageUrl: string, creator: string | null, license: string | null, licenseUrl: string | null, durationSeconds: number | null, width: number | null, height: number | null, attributionRequired: boolean }} MediaResult
+ * @typedef {{ id: string, source: string, mediaType: MediaKind, title: string, previewUrl: string | null, mediaUrl: string | null, sourcePageUrl: string, creator: string | null, license: string | null, licenseUrl: string | null, durationSeconds: number | null, width: number | null, height: number | null, attributionRequired: boolean, restrictions?: string | null }} MediaResult
  * @typedef {"CC0-1.0" | "PDM-1.0" | "PUBLIC-DOMAIN" | "CC-BY" | "FREE-WITH-CREDIT" | "US-GOV-PD" | "PEXELS" | "PIXABAY" | "MUSEUM-OPEN-ACCESS" | "ZUPONA-PROCEDURAL" | "ZUPONA-GENERATED" | "UNKNOWN"} LicenseId
  * @typedef {{ licenseId: LicenseId, allowed: boolean, needsPageCheck: boolean, reason: string }} LicenseDecision
  * @typedef {MediaResult & { layer: MediaLayer, rights: LicenseDecision }} MediaCandidate

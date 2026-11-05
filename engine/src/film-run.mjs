@@ -40,10 +40,10 @@ export const PRICES = Object.freeze({
 export const WEB_SEARCH_USD = 0.01;
 
 /**
- * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string, formatId?: string | null }} Film
+ * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string, formatId?: string | null, saving?: boolean }} Film
  * @typedef {{ text: string, cache?: boolean, image?: string }} Block  image: an https image URL; text is ignored then
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
- * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number }} Usage
+ * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number, batch?: number }} Usage
  * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string }} ModelReply
  * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply> }} Model
  * @typedef {{ get: (key: string) => Promise<string | null>, put: (key: string, text: string) => Promise<void> }} Store
@@ -55,7 +55,7 @@ export const WEB_SEARCH_USD = 0.01;
  * Validate a new film request. formatId picks one of the format presets
  * (formats.mjs: motivational life story, dramatized story, history epic ...);
  * "auto" lets the topic choose; none keeps the general documentary.
- * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown }} input
+ * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown, saving?: unknown }} input
  * @param {string} id
  * @returns {{ ok: true, film: Film } | { ok: false, error: string }}
  */
@@ -72,7 +72,9 @@ export function newFilm(input, id) {
   if (asked && !format) return { ok: false, error: `Unknown format "${asked}".` };
   // Invented stories use AI scenes with one cast unless the owner turns them off (owner's decision, 4 Nov 2026).
   const allowAi = typeof input.allowAi === "boolean" ? input.allowAi : format?.mode === "story";
-  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null } };
+  // Half-price mode (Batch API): same model and quality, slower; the owner chooses per film.
+  const saving = input.saving === true;
+  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null, saving } };
 }
 
 /**
@@ -106,7 +108,7 @@ export function filmBrief(film) {
     story
       ? `1. STORY MODE: the story is invented. Never name, depict or imply a real private person, and never attach an invented act to any real person, company or town; invented characters get names no famous real person has. Real-world details (prices, wages, laws, distances, jobs, era) come from the research file and the S2 realism ledger and must be exact. Never call the story true, real or "based on a true story" in narration, title, thumbnail or description. Nothing is written on the video to say it is invented; S7 ends the description with this exact line: "${note}"`
       : "1. Facts only from the research file and the S2 ledger. Where sources conflict, never pick silently: say \"reports differ\" or use wording every source supports. Quotes are paraphrased with attribution (\"he told X in 2014 that ...\"), never presented as verbatim. Unknown means unknown.",
-    "2. Footage only from free stock: Pexels, Pixabay, Videvo (free licence, commercial use, never Editorial Use Only or Premium), Coverr (downloaded by hand) and Mixkit (Free Licence), plus graphics the editor builds (R1: OpenStreetMap maps credited \"© OpenStreetMap contributors\", kinetic type, counters, timelines, document-style cards rebuilt from public facts). Music and SFX only from Pixabay and Mixkit. Never social media, agency, archive or screenshot material.",
+    "2. Pictures only from sources the media step licenses item by item. Real archive pictures come first for evidence: R2 public-domain, CC0 and CC BY photographs, documents and video from Wikimedia Commons and NASA, showing the actual people, places, objects and events; write those shots as R2 with an exact, searchable description (who or what, where, when: 'Apollo 11 launch, Kennedy Space Center, July 1969'), and the photo is animated in the edit. Never a share-alike, non-commercial or restricted file. Then footage from free stock: Pexels, Pixabay, Videvo (free licence, commercial use, never Editorial Use Only or Premium), Coverr (downloaded by hand) and Mixkit (Free Licence), plus graphics the editor builds (R1: OpenStreetMap maps credited \"© OpenStreetMap contributors\", kinetic type, counters, timelines, document-style cards rebuilt from public facts). Music and SFX only from Pixabay and Mixkit. Never social media, agency, archive or screenshot material.",
     film.allowAi && story
       ? "3. AI SCENES (R9) carry the story's people: one consistent cast from the S4 bible. Every shot of a character is an R9 shot that names its token (CHR-01) and describes, in one concrete sentence, the action, the place, the light and the camera. Places and objects may still come from stock (R3). Never a real person's likeness, a child as the focus, a real brand, gore or nudity. The film is disclosed in YouTube Studio's altered-or-synthetic setting; nothing is written on the video."
       : film.allowAi ? "3. AI imagery only where the engine allows it, never a real person's likeness, disclosed in YouTube Studio's altered-or-synthetic setting; nothing written on the video." : "3. No AI imagery or AI audio (AI cap = 0 s).",
@@ -196,8 +198,11 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
   // Footage desk: about 6.3 stock shots a minute, judged six at a time from 320 px thumbnails.
   const judgeCalls = Math.ceil((minutes * 6.3) / 6);
   const judgeUsd = (judgeCalls * (30000 * price.cacheRead + 3500 * price.input + 400 * price.output)) / 1e6;
-  const usd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6 + searches * 0.01 + judgeUsd;
-  return { model, chapters, outputTokens, inputTokens: cachedIn + freshIn, judgeCalls, usdLow: round2(usd * 0.7), usdHigh: round2(usd * 1.5) };
+  const tokenUsd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6;
+  const usd = tokenUsd + searches * WEB_SEARCH_USD + judgeUsd;
+  // Half-price mode: the writing stages go through the Batch API (50% of every token); the footage desk stays fast.
+  const saving = tokenUsd * 0.5 + searches * WEB_SEARCH_USD + judgeUsd;
+  return { model, chapters, outputTokens, inputTokens: cachedIn + freshIn, judgeCalls, usdLow: round2(usd * 0.7), usdHigh: round2(usd * 1.5), savingUsdLow: round2(saving * 0.7), savingUsdHigh: round2(saving * 1.5) };
 }
 
 /**
@@ -208,7 +213,9 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
  */
 export function costOf(u, model) {
   const p = PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? Object.values(PRICES).reduce((a, b) => (b.output > a.output ? b : a));
-  return ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6 + (u.web_search_requests ?? 0) * WEB_SEARCH_USD;
+  // The Batch API (half-price mode) bills every token at 50%.
+  const tokens = ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6;
+  return tokens * (u.batch ? 0.5 : 1) + (u.web_search_requests ?? 0) * WEB_SEARCH_USD;
 }
 
 /** Effort per stage: the writing and checking stages think hardest. */
@@ -495,10 +502,13 @@ export async function runFilm(o) {
 
     await stage("s7", async () => {
       const chapterTimes = plan.chapters.map((c) => `${c.start} ${c.title}`).join("\n");
+      // Credits for the archive pictures the film uses, built from their licence records, never from memory.
+      const credits = pictureCredits((await Promise.all(plan.chapters.map((c) => read(`media-${c.id}.json`)))).filter(Boolean).map((t) => JSON.parse(t)));
       let text = await ask("s7", [
-        { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) },
+        { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) + (credits ? "\n" + ctx("PICTURE_CREDITS", credits) + "\nThe description's credits block includes every PICTURE_CREDITS line exactly as written (the CC BY licences require it)." : "") },
         { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, written on one line as **Final title: ...**, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") + "\n\n" + PACKAGING_RULES },
       ], 16000);
+      if (credits && !credits.split("\n").every((line) => text.includes(line))) text += `\n\n### Picture credits (required by the licences)\n\n${credits}\n`;
       const title = (/\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(text)?.[1] ?? "").trim();
       state.gaps.push(...titleProblems(title).map((p) => `S7: ${p}`));
       if (isStoryFilm(film)) {
@@ -589,6 +599,32 @@ export function titleProblems(title) {
   const hit = DEFAMATORY.exec(title);
   if (hit) out.push(`the title says "${hit[1]}": allowed only about a court or regulator finding; check the named-subject rule before upload.`);
   return out;
+}
+
+/** @type {Record<string, string>} */
+const ARCHIVE_NAMES = { wikimedia: "Wikimedia Commons", nasa: "NASA" };
+
+/**
+ * The credit lines for every archive picture a film uses (Commons, NASA),
+ * one per item, from its licence record. CC BY items must be credited; public
+ * domain items are credited too, as good practice. Stock (Pexels, Pixabay)
+ * needs no credit.
+ * @param {{ shots?: { pick?: any }[] }[]} chapters media-C1.json ... contents
+ */
+export function pictureCredits(chapters) {
+  /** @type {Map<string, string>} */
+  const lines = new Map();
+  for (const ch of chapters) {
+    for (const shot of ch.shots ?? []) {
+      const p = shot.pick;
+      if (!p || !ARCHIVE_NAMES[p.source] || lines.has(p.id)) continue;
+      const what = p.title ? `"${String(p.title).slice(0, 120)}"` : "Picture";
+      const who = p.licence?.creator || p.creator;
+      const licence = p.licence?.licenseId === "CC-BY" ? `CC BY${p.licence?.licenseUrl ? ` (${p.licence.licenseUrl})` : ""}` : p.source === "nasa" ? "courtesy of NASA" : "public domain";
+      lines.set(p.id, `${what}${who ? ` by ${String(who).slice(0, 80)}` : ""}, ${licence}, via ${ARCHIVE_NAMES[p.source]}: ${p.sourcePageUrl}`);
+    }
+  }
+  return [...lines.values()].join("\n");
 }
 
 /** The one-line description note of an invented story, in the film's language. @param {Film} film */

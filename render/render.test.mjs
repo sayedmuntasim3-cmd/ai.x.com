@@ -199,3 +199,30 @@ test("Shorts captions light up the word being spoken (ASS), shifted to the cut's
   assert.equal((ass.match(/^Dialogue:/gm) ?? []).length, 4, "one event per word");
   assert.doesNotMatch(toAss([{ start: 0, end: 1, text: "a {\\b1}b" }], { width: 1080, height: 1920 }), /\{\\b1\}/, "override codes in the text are neutralised");
 });
+
+test("an archive photograph moves like footage: framed over its own blur, pushed, pulled or panned", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-still-"));
+  try {
+    const photo = join(dir, "portrait.jpg");
+    // A tall picture with detail, so a move shows up between the first and last frame.
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=600x900:d=1", "-frames:v", "1", photo]);
+    const md = "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R2 the launch pad, 1969 | SRC: Commons · Q1 \"launch pad\" | LOOK: L";
+    const media = { chapter: "C1", shots: [{ scene: "SC0001", shot: 1, status: "found", pick: { id: "wikimedia:1", source: "wikimedia", kind: "image", mediaUrl: "https://upload.wikimedia.org/x/1920px-pad.jpg", sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Pad.jpg", durationSeconds: null, licence: { licenseId: "PUBLIC-DOMAIN", name: "Commons public-domain file" } } }] };
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md, media }], width: 320, height: 180, fps: 10 });
+    assert.equal(timeline.video[0].still, true);
+    assert.equal(timeline.video[0].motion, "push");
+    const out = join(dir, "still.mp4");
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, fetchClip: async () => photo });
+    assert.equal(report.stats.clipsFailed, 0);
+    assert.ok(Math.abs((await mediaDuration(out)) - 3) < 0.15);
+    const frameAt = (/** @type {number} */ s) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout;
+    const first = frameAt(0.1);
+    const last = frameAt(2.8);
+    let diff = 0;
+    for (let k = 0; k < first.length; k += 1) diff += Math.abs(first[k] - last[k]);
+    assert.ok(first.length > 0 && diff / first.length > 2, `the picture moves (${(diff / first.length).toFixed(1)})`);
+    assert.ok(!report.warnings.some((w) => w.startsWith("Black picture")), report.warnings.join("\n"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
