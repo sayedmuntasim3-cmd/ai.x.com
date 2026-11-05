@@ -28,6 +28,17 @@ const T = {
     title: "পুরো ফিল্ম বানাও (English, USA)",
     lead: "বিষয় দিলে ইঞ্জিন নিজে রিসার্চ, তথ্য যাচাই, স্ক্রিপ্ট, শট লিস্ট, QA আর পাবলিশিং প্যাক বানাবে। প্রতিটি চ্যাপ্টার কোড দিয়ে যাচাই হয়।",
     topic: "বিষয় (ইংরেজিতে বা বাংলায়)",
+    ideas: "প্রমাণিত বিষয় খুঁজে দাও (YouTube টপিক রাডার)",
+    ideasHint: "একটা ধরন লিখুন। গত ১২ মাসের লম্বা ভিডিওর মধ্যে যেগুলো নিজের চ্যানেলের গড় ভিউয়ের অনেক গুণ বেশি পেয়েছে, সেগুলো দেখাবে: মানে দর্শক এই বিষয়টা চায়। এটা শুধু বিষয়ের ধারণা; আমাদের ফিল্ম নতুন নাম, নতুন দৃষ্টিভঙ্গি আর নিজের স্ক্রিপ্টে বানানো হবে, কারও ভিডিও কপি নয়।",
+    ideasNiche: "ধরন (যেমন motivation life story)",
+    ideasGo: "খুঁজো",
+    ideasUse: "এই বিষয়ে ফিল্ম",
+    ideasNone: "কিছু পাওয়া যায়নি। অন্য শব্দে খুঁজুন।",
+    ideasTimes: "× চ্যানেলের গড়",
+    ideasViews: "ভিউ",
+    ideasPerDay: "ভিউ/দিন",
+    ideasCached: "আজকের আগের খোঁজ থেকে (কোটা খরচ হয়নি)",
+    ideasPicked: "বিষয় বসানো হয়েছে। ইঞ্জিনকে বলা হবে: নিজের নতুন ফিল্ম, ওই ভিডিওর কপি নয়।",
     minutes: "দৈর্ঘ্য (মিনিট)",
     format: "ভিডিওর ধরন",
     formatAuto: "বিষয় দেখে নিজে বেছে নাও",
@@ -63,6 +74,17 @@ const T = {
     title: "Make the full film (English, USA)",
     lead: "Give a topic and the engine researches, fact-checks and writes the script, shot list, QA and publishing pack. Every chapter is checked in code.",
     topic: "Topic",
+    ideas: "Find proven topics (YouTube topic radar)",
+    ideasHint: "Type a niche. It shows long videos from the last 12 months that earned many times their own channel's average views: proof the audience wants the topic. It is only the topic; our film gets a new title, a new angle and its own script, never a copy of anyone's video.",
+    ideasNiche: "Niche (e.g. motivation life story)",
+    ideasGo: "Search",
+    ideasUse: "Film this topic",
+    ideasNone: "Nothing found. Try other words.",
+    ideasTimes: "× channel average",
+    ideasViews: "views",
+    ideasPerDay: "views/day",
+    ideasCached: "from an earlier search today (no quota spent)",
+    ideasPicked: "Topic filled in. The engine is told: our own new film, never a copy of that video.",
     minutes: "Length (minutes)",
     format: "Kind of film",
     formatAuto: "Choose from the topic",
@@ -147,7 +169,8 @@ async function start(/** @type {SubmitEvent} */ ev) {
   try {
     const formatId = /** @type {HTMLSelectElement} */ ($("film-format")).value;
     const allowAi = /** @type {HTMLInputElement} */ ($("film-ai")).checked;
-    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi }) });
+    const notes = idea && idea.topic === topic ? idea.note : undefined;
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes }) });
     const body = await res.json().catch(() => ({}));
     const isApi = (res.headers.get("content-type") ?? "").includes("json");
     if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }
@@ -215,6 +238,63 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
     p.append(a, " ");
   }
   out.append(p);
+}
+
+/**
+ * The topic picked from the radar, with the note the engine gets: the proven
+ * demand and the rule that our film is its own (dropped if the topic is edited).
+ * @type {{ topic: string, note: string } | null}
+ */
+let idea = null;
+
+/** Search the topic radar and list the outliers; "Film this topic" fills the topic. */
+async function findIdeas() {
+  const l = L();
+  const list = $("ideas-list");
+  const note = $("ideas-note");
+  const q = /** @type {HTMLInputElement} */ ($("ideas-q")).value.trim();
+  const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+  list.replaceChildren();
+  note.textContent = "";
+  if (q.length < 2) { note.textContent = `${l.remakeFailed} ${l.ideasNiche}`; return; }
+  if (!token) { note.textContent = `${l.remakeFailed} ${l.token}`; return; }
+  store.set("studio-token", token);
+  const go = /** @type {HTMLButtonElement} */ ($("ideas-go"));
+  go.disabled = true;
+  note.textContent = "…";
+  try {
+    const res = await fetch(`/api/ideas?${new URLSearchParams({ q, months: "12" })}`, { headers: { authorization: `Bearer ${token}` } });
+    const r = await res.json().catch(() => ({ error: l.notConnected }));
+    if (!res.ok) { note.textContent = `${l.remakeFailed} ${r.error ?? res.status}`; return; }
+    note.textContent = r.picks.length ? (r.cached ? l.ideasCached : "") : l.ideasNone;
+    const n = new Intl.NumberFormat(lang() === "bn" ? "bn-BD" : "en-US", { notation: "compact", maximumFractionDigits: 1 });
+    for (const p of r.picks) {
+      const li = document.createElement("li");
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "chip";
+      use.textContent = l.ideasUse;
+      use.addEventListener("click", () => {
+        const topic = String(p.title).trim().slice(0, 500);
+        /** @type {HTMLInputElement} */ ($("film-topic")).value = topic;
+        idea = { topic, note: `PROVEN DEMAND (topic radar): the video "${p.title}" by ${p.channelTitle} earned ${p.outlier}x its channel's average views (${p.views} views, about ${p.perDay} a day). The audience wants this topic. Make our own, better film on it: a new title, a new angle, our own research, script and structure. Never copy that video's title, script, structure or thumbnail.` };
+        note.textContent = l.ideasPicked;
+        $("film-topic").focus();
+      });
+      const link = document.createElement("a");
+      link.href = `https://www.youtube.com/watch?v=${encodeURIComponent(p.id)}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = p.title;
+      const minutes = Math.round(p.durationSeconds / 60);
+      li.append(use, link, ` · ${p.outlier}${l.ideasTimes} · ${n.format(p.views)} ${l.ideasViews} · ${n.format(p.perDay)} ${l.ideasPerDay} · ${minutes} min · ${p.channelTitle}`);
+      list.append(li);
+    }
+  } catch (error) {
+    note.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
+  } finally {
+    go.disabled = false;
+  }
 }
 
 /** The owner's films, newest first; choosing one shows it below. */
@@ -337,6 +417,10 @@ document.addEventListener("DOMContentLoaded", () => {
   $("film-form").addEventListener("submit", start);
   $("film-minutes").addEventListener("input", showEstimate);
   $("film-list-btn").addEventListener("click", showFilms);
+  $("ideas-go").addEventListener("click", findIdeas);
+  // Enter in the niche box searches; it must not start a film.
+  $("ideas-q").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); findIdeas(); } });
+  $("film-topic").addEventListener("input", () => { if (idea && idea.topic !== /** @type {HTMLInputElement} */ ($("film-topic")).value.trim()) idea = null; });
   // AI scenes are on by default for invented stories only; the owner can change it for any film.
   const syncAi = () => { /** @type {HTMLInputElement} */ ($("film-ai")).checked = /** @type {HTMLSelectElement} */ ($("film-format")).value === "dramatized-story"; };
   $("film-format").addEventListener("change", syncAi);

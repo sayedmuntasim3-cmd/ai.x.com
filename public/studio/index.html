@@ -103,6 +103,17 @@
       <p class="muted small" data-f="lead"></p>
       <label><span data-f="topic"></span>
         <input id="film-topic" type="text" maxlength="500" required dir="auto" placeholder="Ramesh Babu: From Barber to Rolls-Royce"></label>
+      <details class="ideas" id="ideas">
+        <summary data-f="ideas"></summary>
+        <p class="muted small" data-f="ideasHint"></p>
+        <div class="ideas-row">
+          <label><span data-f="ideasNiche"></span>
+            <input id="ideas-q" type="text" maxlength="200" dir="auto" placeholder="motivation life story" autocomplete="off"></label>
+          <button type="button" class="chip" id="ideas-go" data-f="ideasGo"></button>
+        </div>
+        <p class="small" id="ideas-note" aria-live="polite"></p>
+        <ol id="ideas-list" class="small ideas-list"></ol>
+      </details>
       <label><span data-f="minutes"></span>
         <input id="film-minutes" type="number" min="1" max="300" value="45" inputmode="numeric"></label>
       <label><span data-f="format"></span>

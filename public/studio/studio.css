@@ -139,3 +139,10 @@ details summary { cursor: pointer; color: var(--muted); }
 
 label.tick { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; }
 label.tick input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+.ideas { border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; }
+.ideas[open] { display: grid; gap: 10px; }
+.ideas-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.ideas-row label { flex: 1 1 220px; }
+.ideas-list { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
+.ideas-list li { overflow-wrap: anywhere; }
+.ideas-list .chip { margin-right: 6px; }

@@ -40,13 +40,13 @@ The first real runs will break things: prompts, parsing, timeouts and cost. Unti
 1. Real runs, with tuning from them (blocked on Cloudflare and the keys).
 2. Maps. These need a tile and geocoding provider with a key, such as MapTiler; OSM's public servers forbid product use.
 3. A motion-graphics engine for designed templates: maps, charts, timelines, lower thirds, quote cards, document highlights, true dissolves.
-4. Consistent-character visuals for stories: AI scenes with one cast, disclosed in Studio, never real people. This is **the owner's decision**, because the current rule is no AI imagery.
-5. Expressive narration: ElevenLabs v3 with delivery tags per scene, and character voices. Also **the owner's decision**, because the current rule is v2 for English.
-6. Automatic licensed music: ElevenLabs Music (cleared for commercial use) or a paid library. **The owner's decision** (AI audio).
+4. Consistent-character visuals for stories: AI scenes with one cast, disclosed in Studio, never real people. **Built 4 Nov 2026** with the owner's permission (`render/ai-scenes.mjs`, needs `FAL_KEY`).
+5. Expressive narration: ElevenLabs v3 with delivery tags per scene. **Built 4 Nov 2026** with the owner's permission (`render/voice.mjs`). Character voices are still to come.
+6. Automatic licensed music: ElevenLabs Music (cleared for commercial use on a paid plan). **Built 4 Nov 2026** with the owner's permission (`render/music-kit.mjs`); the owner's own tracks win when present.
 7. YouTube upload and scheduling through the API, plus YouTube Analytics (retention per scene, CTR).
 8. Bangla and Arabic runs (postponed by the owner), and more languages written natively.
 9. Accounts, billing, quotas, a scene-timeline editor with preview, and a hosted render farm.
-10. A topic radar that finds topics with proven demand (outlier videos in the niche) before writing.
+10. A topic radar that finds topics with proven demand (outlier videos in the niche) before writing. **Built 5 Nov 2026** (`GET /api/ideas`, studio panel; needs `YOUTUBE_API_KEY`).
 
 ## 5. What it takes to reach the top
 

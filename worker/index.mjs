@@ -6,6 +6,7 @@
  * Routes
  *   GET  /api/health                 what is connected (no secrets shown)
  *   GET  /api/estimate?minutes=45    cost estimate before a run
+ *   GET  /api/ideas?q=niche&months=12  proven topics: videos that beat their own channel   (Bearer STUDIO_TOKEN)
  *   POST /api/films                  { topic, minutes, versionId?, notes? } -> { id }   (Bearer STUDIO_TOKEN)
  *   GET  /api/films                  my films, newest first   (Bearer STUDIO_TOKEN)
  *   GET  /api/films/:id              run state: stages, usage, cost, gaps
@@ -22,6 +23,7 @@
  *   stock footage per shot, media-C1.json ...). Without them it is skipped.
  *   Optional GITHUB_TOKEN secret + GITHUB_REPO and SITE_URL vars: a finished
  *   film starts the "Render a film" GitHub workflow by itself (render.json).
+ *   Optional YOUTUBE_API_KEY secret: the topic radar (/api/ideas), cached a day in R2.
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { mediaProviders } from "../engine/src/film-media.mjs";
@@ -32,6 +34,7 @@ import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { anthropicModel } from "./anthropic.mjs";
 import { dispatchRender } from "./github.mjs";
 import { listFilms } from "./films.mjs";
+import { radarSearch } from "./youtube.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
@@ -105,12 +108,24 @@ export default {
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
       if (url.pathname === "/api/health") {
-        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), model: env.MODEL || "claude-opus-5-5" });
+        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), model: env.MODEL || "claude-opus-5-5" });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
         if (!(minutes >= 1 && minutes <= 300)) return json({ error: "Length must be 1 to 300 minutes." }, 400);
         return json(estimateRun(Math.round(minutes * 60), env.MODEL || "claude-opus-5-5"));
+      }
+      if (url.pathname === "/api/ideas" && request.method === "GET") {
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your YouTube quota." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const cache = env.FILMS ? {
+          /** @param {string} key */
+          get: async (key) => { const obj = await env.FILMS.get(key); return obj ? obj.text() : null; },
+          /** @param {string} key @param {string} text */
+          put: async (key, text) => { await env.FILMS.put(key, text); },
+        } : undefined;
+        const result = await radarSearch({ apiKey: env.YOUTUBE_API_KEY, query: url.searchParams.get("q"), months: url.searchParams.get("months") ?? undefined, language: url.searchParams.get("lang") ?? undefined, cache });
+        return result.ok ? json(result) : json({ error: result.error }, result.status);
       }
       if (url.pathname === "/api/films" && request.method === "GET") {
         if (!env.FILMS || !env.STUDIO_TOKEN) return json({ error: "The studio is not connected yet." }, 503);

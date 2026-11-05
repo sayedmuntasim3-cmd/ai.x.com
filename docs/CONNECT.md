@@ -35,6 +35,15 @@ After QA the run searches free stock footage for every S5 stock shot, with the s
 
 One key is enough; both give more choice. Without either the step is skipped (`run.json` says so) and runs when the film is resumed with a key. `GET /api/health` shows `pexels` and `pixabay` as true once set.
 
+## Topic radar (optional, free)
+
+Before writing, the studio can show which topics in a niche have proven demand: long videos (over 4 minutes) from the last 12 months that earned many times their own channel's average views. The score weighs that ratio, dampens tiny channels whose average is noise, and favours demand that is still fresh. "Film this topic" fills the topic and tells the engine to make its own, better film on it: a new title, a new angle and its own script, never a copy of that video.
+
+1. In Google Cloud Console, create a project, enable **YouTube Data API v3** and create an API key (APIs & Services > Credentials). Restrict the key to that API.
+2. `npx wrangler secret put YOUTUBE_API_KEY` (paste the key).
+
+The free quota is 10,000 units a day; one radar search costs about 102, so about 90 searches a day. The same search is answered from R2 for a day without spending quota. `GET /api/health` shows `youtube: true` once set. The search is protected by the studio token.
+
 ## Render the video (from the phone, free)
 
 When a film run is done, GitHub renders the MP4 on its own machines. The free plan includes 2,000 minutes a month for a private repository, and a 45-minute film takes roughly 30–90 minutes.
