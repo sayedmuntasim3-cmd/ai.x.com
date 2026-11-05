@@ -20,7 +20,7 @@ import { chapterMedia, createUseHistory } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
-import { applyFixes, checkChapter, checkFilm, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
+import { applyFixes, checkChapter, checkFilm, hookFindings, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
 import { checkSources, sourceGaps } from "./source-check.mjs";
 import { getVersion } from "./versions.mjs";
 
@@ -464,9 +464,17 @@ export async function runFilm(o) {
     await stage("qa", async () => {
       const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId) })));
       const machine = checkFilm(chapters, { durationSeconds: film.durationSeconds });
+      // Craft that code can measure: the hook, and how much of each chapter is planned text cards rather than pictures.
+      const hook = hookFindings(parseSceneLines(chapters[0]?.markdown ?? ""));
+      const mix = chapters.map((c) => {
+        const t = buildTimeline({ chapters: [{ id: c.id, markdown: c.markdown }], autoSound: false });
+        const cards = t.video.filter((v) => v.type === "card" && /^R1\b/.test(v.brief)).reduce((n, v) => n + v.end - v.start, 0);
+        return { chapter: c.id, cardShare: t.durationSeconds ? Math.round((cards / t.durationSeconds) * 100) : 0 };
+      });
+      const craft = [...hook, ...mix.filter((m) => m.cardShare > 40).map((m) => ({ code: "card-heavy", detail: `${m.chapter}: ${m.cardShare}% of the time is text cards; swap some for real pictures (R2 archive, R3 footage) so the eye has something to see.` }))];
       const reply = await ask("qa", [
         { text: ctx("S2", await read("s2.md")) + "\n" + chapters.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
-        { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(machine.errors.slice(0, 60)) + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
+        { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(machine.errors.slice(0, 60)) + (craft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(craft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
       ], 32000);
       const qa = safeJson(reply) ?? { mustFix: [], passed: [], notChecked: ["The QA reply was not valid JSON."] };
       /** @type {{ chapter: string, scene: string, status: string }[]} */
@@ -486,6 +494,10 @@ export async function runFilm(o) {
         await store.put(`s5-${c.id}.md`, text);
         applied.forEach((a, i) => fixLog.push({ chapter: c.id, scene: fixes[i]?.scene, status: a.status }));
       }
+      // The hook is checked again after the fixes; what is still wrong is a gap the owner sees.
+      const hookLeft = hookFindings(parseSceneLines((await read(`s5-${plan.chapters[0]?.id}.md`)) || chapters[0]?.markdown || ""));
+      state.gaps.push(...hookLeft.map((h) => `hook (${h.code}): ${h.detail}`));
+      qa.codeCraft = { hook: hook.map((h) => h.code), hookLeft: hookLeft.map((h) => h.code), cardShare: mix };
       await store.put("qa.json", JSON.stringify(qa, null, 1));
       await store.put("fix-log.json", JSON.stringify(fixLog, null, 1));
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };

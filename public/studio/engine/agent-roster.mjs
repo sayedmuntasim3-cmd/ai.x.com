@@ -317,7 +317,7 @@ export const ROLE_STATUS = Object.freeze({
 
   "story-transcript-integrity": ["planned", "films start from a topic; a supplied transcript is not taken yet"],
   "story-chapter-arc": ["model", "S3; code checks that the chapters tile the film"],
-  "story-opening-hook": ["model", "S3 and S5 (30-second hook rule)"],
+  "story-opening-hook": ["model", "S3 and S5 (30-second hook rule); code reads the hook (no announcing opener, one concrete number, name or place, a first sentence that lands) and what QA leaves wrong is a gap"],
   "story-open-loops": ["code", "S3 loop ledger; code checks every opened loop is paid"],
   "story-exposition": ["planned", "no separate clarity pass yet"],
   "story-narration": ["model", "S5; code checks words per scene and banned phrases"],
@@ -365,7 +365,7 @@ export const ROLE_STATUS = Object.freeze({
   "editing-cut-logic": ["model", "S5 transitions; the Edit Director stage (edit-C1.json per chapter) re-chooses each scene's transition, checked in code (known words, never two named in a row)"],
   "editing-timeline-integrity": ["code", "timeline.mjs: frame-exact edit list"],
   "editing-continuity-match": ["planned", "not built yet"],
-  "editing-b-roll-balance": ["planned", "not built yet"],
+  "editing-b-roll-balance": ["code", "QA is given each chapter's share of planned text cards; over 40% it must swap cards for real pictures"],
   "editing-chapter-transitions": ["code", "renderer: chapter dips and chapter titles"],
   "editing-intro-outro": ["planned", "not built yet"],
   "editing-edit-qc": ["code", "renderer checks the finished master for black stretches"],

@@ -18,6 +18,32 @@ export const BANNED_EN = Object.freeze([
   "smash that like button", "amazing", "unbelievable", "secrets",
 ]);
 
+/** Openings that lose a viewer in the first seconds (they announce instead of showing). */
+const GENERIC_OPENERS = [/^in (this|today's) (video|film|documentary)\b/i, /^welcome\b/i, /^(hi|hello|hey)\b/i, /^today,? (we|i)('ll| will| are| want)\b/i, /^have you ever\b/i, /^imagine (a world|if)\b/i, /^this is the (story|tale) of\b/i, /^(so|okay|ok|alright|well),/i, /^throughout history\b/i, /^since the dawn of\b/i];
+const NUMBER_WORDS = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|dollars?|percent)\b/i;
+
+/**
+ * Code's look at the hook, the film's first 30 seconds, where most viewers
+ * decide to stay: an opening that announces instead of showing, a hook with
+ * no concrete number, name or place, and a first sentence too long to land.
+ * @param {SceneLine[]} scenes the first chapter's scenes
+ * @returns {Finding[]}
+ */
+export function hookFindings(scenes) {
+  /** @type {Finding[]} */
+  const out = [];
+  const first = scenes.find((s) => !s.wordless && s.narration.trim());
+  if (!first) return out;
+  const opener = first.narration.replace(/\[[^\]]*\]/g, "").trim();
+  if (GENERIC_OPENERS.some((re) => re.test(opener))) out.push({ code: "hook-generic-opener", scene: first.sc, detail: `The film opens with "${opener.slice(0, 50)}": open on the event, the number or the person instead.` });
+  const hook = scenes.filter((s) => s.start < 30 && !s.wordless).map((s) => s.narration.replace(/\[[^\]]*\]/g, "")).join(" ");
+  const named = hook.split(/(?<=[.!?])\s+/).some((sentence) => sentence.split(/\s+/).slice(1).some((w) => /^[A-Z][\p{L}'’-]{2,}/u.test(w) && !/^(I|I'm|I've|I'd)$/.test(w)));
+  if (hook && !/\d/.test(hook) && !NUMBER_WORDS.test(hook) && !named) out.push({ code: "hook-vague", scene: first.sc, detail: "The first 30 seconds name no number, person or place: give the viewer one concrete detail to hold." });
+  const sentence = opener.split(/(?<=[.!?])\s+/)[0] ?? "";
+  if (sentence.split(/\s+/).length > 25) out.push({ code: "hook-long-sentence", scene: first.sc, detail: `The first sentence has ${sentence.split(/\s+/).length} words; a hook lands in 6 to 15.` });
+  return out;
+}
+
 /** Footage hosts the production rules never allow as a source. */
 export const FORBIDDEN_SOURCES = Object.freeze([
   "youtube.com", "youtu.be", "facebook.com", "fb.watch", "instagram.com", "tiktok.com", "x.com/", "twitter.com",

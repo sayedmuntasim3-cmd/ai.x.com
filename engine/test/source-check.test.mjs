@@ -48,3 +48,13 @@ test("the source desk opens every cited page: gone pages strike facts, numbers a
   assert.deepEqual(r.summary.facts, { kept: 5, dropped: 1, verified: 1, opened: 1, unconfirmed: 2, unreachable: 1 });
   assert.match(sourceGaps(r)[0], /1 fact was dropped .* F03/);
 });
+
+test("code reads the hook: an opening that announces, a hook with nothing concrete, a first sentence too long", async () => {
+  const { hookFindings, parseSceneLines } = await import("../src/scene-lines.mjs");
+  const line = (/** @type {number} */ n, /** @type {number} */ a, /** @type {string} */ narr) => `**SC000${n}** | 0:00:${String(a).padStart(2, "0")}-0:00:${String(a + 10).padStart(2, "0")} | C1 | b | E | C01 | NARR: ${narr} | W 10/10 | ANCHOR: x | SHOTS: (1) R3 x | LOOK: L`;
+  const codes = (/** @type {string[]} */ narr) => hookFindings(parseSceneLines(narr.map((t, i) => line(i + 1, i * 10, t)).join("\n"))).map((f) => f.code);
+  assert.deepEqual(codes(["In this video we look at a man who changed everything.", "It was a quiet life until it was not."]), ["hook-generic-opener", "hook-vague"]);
+  assert.deepEqual(codes(["At nine, Ramesh lost his father.", "The family had forty rupees left."]), [], "a name and a number in the first seconds");
+  assert.deepEqual(codes(["The barber kept the receipt for 1987 in a tin box under the counter of the shop where his father had cut hair for twenty years before him."]), ["hook-long-sentence"]);
+  assert.deepEqual(codes(["(wordless)"]), []);
+});
