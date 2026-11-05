@@ -403,7 +403,7 @@ export const ROLE_STATUS = Object.freeze({
   "quality-accessibility-qc": ["planned", "not built yet"],
   "quality-release-gate": ["code", "a film is done only with no GAP; every GAP is listed"],
 
-  "audience-retention": ["model", "S3 retention map and the retention rule"],
+  "audience-retention": ["model", "S3 retention map and the retention rule; code ties each published film's YouTube retention curve to its scenes (retention.mjs) and S3, S5 and the Edit Director read the channel's lessons"],
   "audience-audience-fit": ["model", "S1 angle and audience, against the videos that already won on the topic (market.json)"],
   "audience-title": ["model", "S1 titles and S7, given the topic's proven YouTube outliers (market stage, with YOUTUBE_API_KEY); code flags an invented story whose title claims truth and a title too close to an existing video"],
   "audience-thumbnail": ["code", "S1/S7 briefs; thumbnails.mjs makes three for Test & Compare"],

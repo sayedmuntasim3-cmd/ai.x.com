@@ -49,6 +49,12 @@ const T = {
     remakeGo: "দৃশ্যটা আবার বানাও",
     remakeDone: "হয়ে গেছে। খরচ",
     remakeFailed: "হয়নি:",
+    learn: "পাবলিশ হওয়া ভিডিও থেকে শেখো",
+    learnHint: "ইউটিউবে ফিল্মটা পাবলিশ হওয়ার এক-দুই দিন পর এর লিংক দিন। দর্শক কোন দৃশ্যে চলে গেছে আর কোথায় থেকেছে, সেটা পরের ফিল্মের লেখক আর এডিটর শিখবে। প্রথমবার \"YouTube কানেক্ট\" চাপুন (শুধু দেখার অনুমতি)।",
+    learnVideo: "ইউটিউব ভিডিওর লিংক",
+    learnGo: "শেখো",
+    learnConnect: "YouTube কানেক্ট",
+    learnDone: "শেখা হয়েছে। ০:৩০-এ দেখছিল",
     picture: "একটা শটে নিজের ছবি",
     pictureHint: "ফিল্ম পেজে প্রতিটা শটের আইডি আছে (যেমন SC0012-1)। আপনার বাছাই করা ছবি বা ক্লিপের সরাসরি লিংক দিন; রেন্ডারের সময় সেটা নামিয়ে ওই শটে বসানো হবে। লিংক খালি রাখলে আগেরটা মুছে যাবে। ছবির অধিকার আপনার দায়িত্ব।",
     pictureShot: "শটের আইডি (যেমন SC0012-1)",
@@ -111,6 +117,12 @@ const T = {
     remakeGo: "Re-make the scene",
     remakeDone: "Done. Cost",
     remakeFailed: "Not done:",
+    learn: "Learn from the published video",
+    learnHint: "A day or two after the film is on YouTube, give its link. Where viewers left and where they stayed goes to the writers and the editor of the next films. The first time, press \"Connect YouTube\" (read-only access).",
+    learnVideo: "YouTube video link",
+    learnGo: "Learn",
+    learnConnect: "Connect YouTube",
+    learnDone: "Learned. Watching at 0:30:",
     picture: "Your own picture for a shot",
     pictureHint: "Every shot has an id on the film page (e.g. SC0012-1). Paste the direct link of a picture or clip you chose; the render downloads it and puts it in that shot. An empty link removes the earlier one. Its rights are your responsibility.",
     pictureShot: "Shot id (e.g. SC0012-1)",
@@ -246,7 +258,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   page.rel = "noopener";
   page.className = "go";
   out.append(page);
-  if (run.status === "done" || run.status === "done-with-gaps") out.append(renderButton(id), remakeForm(id), pictureForm(id));
+  if (run.status === "done" || run.status === "done-with-gaps") out.append(renderButton(id), remakeForm(id), pictureForm(id), learnForm(id));
   out.append(h("h4", l.files));
   const p = document.createElement("p");
   for (const f of files) {
@@ -465,6 +477,61 @@ function remakeForm(id) {
       const res = await fetch(`/api/films/${id}/scenes/${scene.value.trim().toUpperCase()}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ instruction: what.value.trim() }) });
       const r = await res.json().catch(() => ({ error: l.notConnected }));
       result.textContent = r.ok ? `${l.remakeDone} $${r.costUsd}. ${r.after}` : `${l.remakeFailed} ${r.error ?? res.status}`;
+    } catch (error) {
+      result.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
+    } finally {
+      go.disabled = false;
+    }
+  });
+  return form;
+}
+
+/**
+ * Learn from the published film: its YouTube retention, tied to its scenes.
+ * @param {string} id
+ */
+function learnForm(id) {
+  const l = L();
+  const form = document.createElement("form");
+  form.className = "card";
+  form.noValidate = true;
+  const title = document.createElement("h4");
+  title.textContent = l.learn;
+  const hint = document.createElement("p");
+  hint.className = "small";
+  hint.textContent = l.learnHint;
+  const video = document.createElement("input");
+  video.type = "url";
+  video.placeholder = "https://youtu.be/...";
+  const label = document.createElement("label");
+  label.append(l.learnVideo, video);
+  const go = document.createElement("button");
+  go.type = "submit";
+  go.className = "go";
+  go.textContent = l.learnGo;
+  const connect = document.createElement("button");
+  connect.type = "button";
+  connect.textContent = l.learnConnect;
+  const result = document.createElement("p");
+  result.setAttribute("aria-live", "polite");
+  const token = () => /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+  connect.addEventListener("click", async () => {
+    if (!token()) { result.textContent = `${l.remakeFailed} ${l.token}`; return; }
+    const res = await fetch("/api/youtube/connect", { headers: { authorization: `Bearer ${token()}` } }).catch(() => null);
+    const r = res ? await res.json().catch(() => ({})) : { error: l.notConnected };
+    if (r.url && /^https:\/\/accounts\.google\.com\//.test(r.url)) window.open(r.url, "_blank", "noopener");
+    else result.textContent = `${l.remakeFailed} ${r.error ?? l.notConnected}`;
+  });
+  form.append(title, hint, label, go, connect, result);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!video.value.trim() || !token()) { result.textContent = `${l.remakeFailed} ${l.learnVideo} / ${l.token}`; return; }
+    go.disabled = true;
+    result.textContent = "…";
+    try {
+      const res = await fetch(`/api/films/${id}/retention`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token()}` }, body: JSON.stringify({ video: video.value.trim() }) });
+      const r = await res.json().catch(() => ({ error: l.notConnected }));
+      result.textContent = r.ok ? `${l.learnDone} ${r.report.at30 ?? "?"}%, 1:00 ${r.report.at60 ?? "?"}%, ${r.report.drops} drops, ${r.report.holds} holds.` : `${l.remakeFailed} ${r.error ?? res.status}`;
     } catch (error) {
       result.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
     } finally {

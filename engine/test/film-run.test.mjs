@@ -433,3 +433,15 @@ test("the viewer panel's fix that breaks the word budget is not applied, and a l
   assert.match(String(viewer.reverted ?? ""), /broke a code check/);
   assert.ok(state.gaps.some((/** @type {string} */ g) => g.startsWith("viewer panel: the opening scored 3/10")));
 });
+
+test("the channel's lessons reach S3, every S5 chapter and the Edit Director", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "les");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  /** @type {Record<string, string>} */
+  const prompts = {};
+  const model = { ...base, call: async (/** @type {any} */ r) => { prompts[r.stage] = r.messages[0].content.map((/** @type {any} */ b) => b.text).join("\n"); return base.call(r); } };
+  await runFilm({ film: made.film, manual: "M", model, store: memoryStore(), lessons: { load: async () => "LEFT at 1:00 (4%/min): said \"the law of 1972\"" } });
+  for (const st of ["s3", "s5:C1", "s5:C2", "edit:C1"]) assert.match(prompts[st], /CHANNEL_LESSONS[\s\S]*the law of 1972/, st);
+  assert.ok(!/CHANNEL_LESSONS/.test(prompts.s01), "only where the film is shaped and cut");
+});

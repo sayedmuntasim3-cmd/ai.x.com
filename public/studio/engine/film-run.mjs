@@ -270,7 +270,7 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * checked in code; edit: false leaves the edit to the script alone.
  * channel (optional) holds the fingerprints of the channel's earlier films;
  * the finished film is compared with them (originality.json) and added.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -356,6 +356,10 @@ export async function runFilm(o) {
 
   await save();
   try {
+    // What the channel's own published films taught: where its viewers left and where they stayed.
+    const lessons = o.lessons ? await o.lessons.load().catch(() => "") : "";
+    const learned = lessons ? "\n\n" + ctx("CHANNEL_LESSONS", lessons) + "\nCHANNEL_LESSONS is our own audience's retention on recent films (LEFT: where viewers left fast; HELD: where they stayed). Avoid the patterns that lost them and use the ones that held them; never copy a line." : "";
+
     // The market desk: what already works on this topic on YouTube (titles that beat their own channels).
     if (o.market) {
       const market = o.market;
@@ -428,7 +432,7 @@ export async function runFilm(o) {
     const plan = await stage("s3", async () => {
       const content = [
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("S2", await read("s2.md")) },
-        { text: `Write S3, the story architecture (section 7): arc, chapter plan, scene allocation and clock, retention map, interrupt plan, progress motif, title-contract binding, open-loop ledger, emotion curve, music arc, Shorts candidates. Then end with ONE fenced \`\`\`json block: an array of chapters, each {"id": "C1", "title", "start": "0:00:00", "end": "h:mm:ss", "firstScene": "SC0001", "lastScene": "SC00nn", "brief": "a self-contained brief for that chapter's writer: scene count, word budget, beats with exact times and claim IDs, loops opened and paid, what it must hand to the next chapter"}. Chapters tile 0:00:00 to ${toClock(film.durationSeconds)} with no gap; scene IDs run from SC0001 with no gap. Chapters of 5 to 9 minutes; a film under 10 minutes has 1 to 3 chapters.` },
+        { text: `Write S3, the story architecture (section 7): arc, chapter plan, scene allocation and clock, retention map, interrupt plan, progress motif, title-contract binding, open-loop ledger, emotion curve, music arc, Shorts candidates. Then end with ONE fenced \`\`\`json block: an array of chapters, each {"id": "C1", "title", "start": "0:00:00", "end": "h:mm:ss", "firstScene": "SC0001", "lastScene": "SC00nn", "brief": "a self-contained brief for that chapter's writer: scene count, word budget, beats with exact times and claim IDs, loops opened and paid, what it must hand to the next chapter"}. Chapters tile 0:00:00 to ${toClock(film.durationSeconds)} with no gap; scene IDs run from SC0001 with no gap. Chapters of 5 to 9 minutes; a film under 10 minutes has 1 to 3 chapters.` + learned },
       ];
       let text = await ask("s3", content, 32000);
       let chapters = safeJson(text);
@@ -466,6 +470,7 @@ export async function runFilm(o) {
           SCENE_LINE_EXAMPLE,
           `Rules the code will check: the first scene starts at ${ch.start} and the last ends at ${ch.end}; each scene starts where the previous one ends; scene IDs have no gap; every narrated scene has (seconds × ${(getVersion(film.versionId)?.narrationWpm.target ?? 150) / 60}) words ±10% (wordless scenes say NARR: (wordless)); the W field states written/target; every line has NARR, ANCHOR, SHOTS and LOOK; no banned phrase (section 16); footage only from the allowed sites.`,
           "Start with a header line, the word budget and the chapter's reuse log; end with one QA line.",
+          learned,
           ctx("CHAPTER_BRIEF", JSON.stringify(ch, null, 1)),
           previousTail ? ctx("PREVIOUS_CHAPTER_END", previousTail) : "",
         ].filter(Boolean).join("\n\n");
@@ -595,7 +600,7 @@ export async function runFilm(o) {
           // Code measures where one picture holds too long; the director is told, and what it leaves uncovered is a gap.
           const laid = buildTimeline({ chapters: [{ id: c.id, markdown }], autoSound: false });
           const holds = longHolds(laid.video, new Set(laid.narration.map((n) => n.scene)));
-          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style, holds) }], 16000);
+          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style, holds) + learned }], 16000);
           const parsed = safeJson(reply);
           const edit = validateEditPlan(parsed, markdown, c.id);
           if (parsed === null) state.gaps.push(`${c.id} edit: the Edit Director's reply was not valid JSON; this chapter's edit follows the script alone.`);

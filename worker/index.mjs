@@ -15,6 +15,9 @@
  *   GET  /api/films/:id/script       the narration script for recording it yourself (one line per scene file)
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/pictures     { shot: "SC0012-1", url } -> the owner's own picture for a shot (empty url removes it); the render downloads it   (Bearer STUDIO_TOKEN)
+ *   GET  /api/youtube/connect        -> { url } Google sign-in for read-only YouTube Analytics   (Bearer STUDIO_TOKEN)
+ *   GET  /api/youtube/callback       Google returns here; the refresh token is kept in R2
+ *   POST /api/films/:id/retention    { video } -> learn where viewers left the published film   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/render       start the GitHub render (MP4, Shorts, thumbnails)   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/resume       { budgetUsd? } -> continue a failed or budget-stopped film; finished stages are kept   (Bearer STUDIO_TOKEN)
  *
@@ -26,6 +29,7 @@
  *   Optional GITHUB_TOKEN secret + GITHUB_REPO and SITE_URL vars: a finished
  *   film starts the "Render a film" GitHub workflow by itself (render.json).
  *   Optional YOUTUBE_API_KEY secret: the topic radar (/api/ideas), cached a day in R2.
+ *   Optional GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET secrets: YouTube Analytics retention, so new films learn from published ones.
  *   Optional SMITHSONIAN_API_KEY secret (api.data.gov): Smithsonian Open Access (CC0) in the media step.
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
@@ -40,6 +44,8 @@ import { anthropicBatchModel, anthropicModel, permanentError, savingModel } from
 import { dispatchRender } from "./github.mjs";
 import { listFilms } from "./films.mjs";
 import { radarSearch } from "./youtube.mjs";
+import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
+import { lessonsText } from "../engine/src/retention.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
@@ -106,6 +112,8 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       store: r2Store(env.FILMS, film.id),
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
+      // What the channel's published films taught (where viewers left and stayed), for the writers and the editor.
+      lessons: { load: async () => { const o = await env.FILMS.get("channel/lessons.json"); return o ? lessonsText(JSON.parse(await o.text())) : ""; } },
       // The source desk opens every page the research cites.
       sources: { fetch: (url, init) => fetch(url, init) },
       // The market desk: proven videos on this topic (YouTube Data API, about 102 quota units, cached a day).
@@ -203,6 +211,35 @@ export default {
           providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }),
         });
         return json(result, result.ok ? 200 : 422);
+      }
+      if (url.pathname === "/api/youtube/connect" && request.method === "GET") {
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.FILMS) return json({ error: "Connect Google first: the GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET secrets (docs/CONNECT.md)." }, 503);
+        return json({ url: authUrl({ clientId: env.GOOGLE_CLIENT_ID, redirectUri: `${url.origin}/api/youtube/callback`, state: await signState(env.STUDIO_TOKEN) }) });
+      }
+      if (url.pathname === "/api/youtube/callback" && request.method === "GET") {
+        const page = (/** @type {string} */ msg, /** @type {number} */ status) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>YouTube</title><p style="font:18px system-ui;margin:40px">${msg}</p>`, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" } });
+        if (!env.STUDIO_TOKEN || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.FILMS) return page("The studio is not connected to Google yet.", 503);
+        if (!(await verifyState(env.STUDIO_TOKEN, url.searchParams.get("state")))) return page("This sign-in did not start from your studio, or it took longer than 15 minutes. Start again from the studio.", 400);
+        const code = url.searchParams.get("code");
+        if (!code) return page("Google did not give access (it was refused or cancelled).", 400);
+        try {
+          const tokens = await exchangeCode({ clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, redirectUri: `${url.origin}/api/youtube/callback`, code });
+          await env.FILMS.put("channel/youtube-oauth.json", JSON.stringify({ refreshToken: tokens.refreshToken, at: new Date().toISOString() }));
+          return page("YouTube Analytics is connected (read-only). You can close this tab and go back to the studio.", 200);
+        } catch (error) {
+          return page(error instanceof Error ? error.message.replace(/[<>&]/g, "") : "Google sign-in failed.", 502);
+        }
+      }
+      const retention = /^\/api\/films\/([0-9a-f-]{36})\/retention$/.exec(url.pathname);
+      if (retention && request.method === "POST") {
+        if (!env.FILMS || !env.STUDIO_TOKEN) return json({ error: "The studio is not connected yet." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const body = /** @type {any} */ (await request.json().catch(() => null));
+        const channel = { get: async (/** @type {string} */ k) => { const o = await env.FILMS.get(k); return o ? o.text() : null; }, put: async (/** @type {string} */ k, /** @type {string} */ v) => { await env.FILMS.put(k, v); } };
+        const result = await learnFromVideo({ store: r2Store(env.FILMS, retention[1]), channel, filmId: retention[1], video: body?.video, clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET }).catch((error) => ({ ok: /** @type {const} */ (false), status: 502, error: error instanceof Error ? error.message : String(error) }));
+        return result.ok ? json(result) : json({ error: result.error }, result.status);
       }
       const pictures = /^\/api\/films\/([0-9a-f-]{36})\/pictures$/.exec(url.pathname);
       if (pictures && request.method === "POST") {

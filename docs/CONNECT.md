@@ -45,6 +45,15 @@ One key is enough; both give more choice. `GET /api/health` shows `pexels` and `
 
 **Free archives, no key needed:** every run also searches Wikimedia Commons, the NASA Image and Video Library, the Library of Congress (only items marked "No known restrictions on publication"), The Met and the Art Institute of Chicago (public-domain objects, CC0) and Openverse (CC0, Public Domain Mark and CC BY only, as each source states them) for real photographs, documents, paintings and video of the actual people, places and events. Optional: a free api.data.gov key (https://api.data.gov/signup/) as `npx wrangler secret put SMITHSONIAN_API_KEY` adds Smithsonian Open Access (CC0 only). Openverse limits anonymous use, so on a long film it may be skipped part way; the other archives carry on. Evidence shots (R2) look there first; other shots prefer moving stock footage and fall back to an archive photo. Only public-domain, CC0 and CC BY files are used; share-alike, non-commercial, no-derivatives, personality-restricted or trademark-restricted files and third-party credits (ESA, agencies) are refused. Every archive picture used is credited in the film's description automatically (CC BY requires it). Photos are animated in the edit (slow push, pull or pan over a blurred fill), as top documentary channels do. Nothing is ever taken from YouTube, Facebook, Instagram, TikTok, X, Google Images or paid stock without a licence: a copyright strike costs far more than any picture.
 
+## Learn from published films (optional, free)
+
+A day or two after a film is on YouTube, the studio's "Learn from the published video" reads its audience retention (YouTube Analytics, read-only), ties every drop to the scene on screen, and gives the lessons of the last five films to the writers (S3, S5) and the Edit Director of every new film.
+
+1. In Google Cloud Console (the same project as the YouTube key is fine): APIs & Services > Library > enable **YouTube Analytics API**.
+2. APIs & Services > OAuth consent screen: External, add yourself as a test user. Then Credentials > Create credentials > OAuth client ID > Web application, with the redirect URI `https://<your site>/api/youtube/callback`.
+3. `npx wrangler secret put GOOGLE_CLIENT_ID` and `npx wrangler secret put GOOGLE_CLIENT_SECRET` (from that client).
+4. In the studio, open a finished film, press **Connect YouTube** once and allow read-only access with the Google account that owns the channel; then paste the video's link and press **Learn**.
+
 ## Topic radar (optional, free)
 
 Before writing, the studio can show which topics in a niche have proven demand: long videos (over 4 minutes) from the last 12 months that earned many times their own channel's average views. The score weighs that ratio, dampens tiny channels whose average is noise, and favours demand that is still fresh. "Film this topic" fills the topic and tells the engine to make its own, better film on it: a new title, a new angle and its own script, never a copy of that video.
