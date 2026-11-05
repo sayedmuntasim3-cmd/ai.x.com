@@ -228,7 +228,7 @@ export async function renderFilm(o) {
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
-    const key = hash({ v: 7, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 8, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -237,24 +237,53 @@ export async function renderFilm(o) {
     /** @type {string[]} */
     const chain = [];
     let type = v.type;
+    // Two inputs (a parallax photo) need a filter graph instead of a simple filter chain.
+    let complex = false;
     if (type === "clip" && v.url && v.still) {
       try {
         // A photograph: framed once over a blurred copy of itself (so a portrait or odd shape fills the frame),
         // then moved slowly (push in, pull out or pan, in turn) so it lives on screen like footage.
-        const plate = join(dirs.cards, `${hash({ still: v.url, w: t.width, h: t.height })}.png`);
-        if (!existsSync(plate)) {
-          const W2 = t.width * 2;
-          const H2 = t.height * 2;
-          await run(ffmpeg, ["-v", "error", "-y", "-i", await fetchClip(v.url), "-frames:v", "1", "-vf", `split=2[bg][fg];[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=-0.07:saturation=0.8[bgb];[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`, plate]);
-        }
-        input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
+        const src = await fetchClip(v.url);
         const n = v.frames;
-        const moves = [
-          `zoompan=z='1+0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
-          `zoompan=z='1.09-0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
-          `zoompan=z='1.08':x='(iw-iw/zoom)*on/${n}':y='ih/2-(ih/zoom/2)'`,
-        ];
-        chain.push(`${moves[i % moves.length]}:d=1:s=${t.width}x${t.height}:fps=${t.fps}`, "setsar=1", LOOK);
+        const W = t.width;
+        const H = t.height;
+        const [pw, ph] = (await run(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", src])).trim().split(",").map(Number);
+        const plateKey = hash({ still: v.url, w: W, h: H });
+        if (pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
+          // A portrait or square photograph: 2.5D parallax. The sharp picture grows and drifts one way,
+          // its blurred copy behind it the other way, so the photo seems to float in depth.
+          const bg = join(dirs.cards, `${plateKey}-bg.png`);
+          const fg = join(dirs.cards, `${plateKey}-fg.png`);
+          const bw = Math.round(W * 1.2 / 2) * 2;
+          const bh = Math.round(H * 1.2 / 2) * 2;
+          if (!existsSync(bg)) await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=${bw}:${bh}:force_original_aspect_ratio=increase,crop=${bw}:${bh},boxblur=26:2,eq=brightness=-0.09:saturation=0.75,setsar=1`, bg]);
+          if (!existsSync(fg)) await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=-2:${Math.round(H * 0.86 / 2) * 2},setsar=1`, fg]);
+          input = ["-loop", "1", "-framerate", String(t.fps), "-i", bg, "-loop", "1", "-framerate", String(t.fps), "-i", fg];
+          complex = true;
+          const dir = i % 2 ? -1 : 1;
+          chain.push(
+            `[0]zoompan=z='1+0.05*on/${n}':x='iw/2-(iw/zoom/2)+${dir}*iw*0.03*on/${n}':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${t.fps}[pbg];` +
+            `[1]scale=w='trunc(iw*(1+0.07*n/${n})/2)*2':h=-2:eval=frame[pfg];` +
+            `[pbg][pfg]overlay=x='(W-w)/2-${dir}*W*0.025*n/${n}':y='(H-h)/2'`,
+            "setsar=1", LOOK,
+          );
+        } else {
+          // A landscape photograph: framed over a blurred copy of itself, then moved slowly
+          // (push in, pull out or pan, in turn) so it lives on screen like footage.
+          const plate = join(dirs.cards, `${plateKey}.png`);
+          if (!existsSync(plate)) {
+            const W2 = W * 2;
+            const H2 = H * 2;
+            await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `split=2[bg][fg];[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=-0.07:saturation=0.8[bgb];[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`, plate]);
+          }
+          input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
+          const moves = [
+            `zoompan=z='1+0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
+            `zoompan=z='1.09-0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
+            `zoompan=z='1.08':x='(iw-iw/zoom)*on/${n}':y='ih/2-(ih/zoom/2)'`,
+          ];
+          chain.push(`${moves[i % moves.length]}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
+        }
       } catch (error) {
         stats.clipsFailed += 1;
         warnings.push(`${v.id}: picture could not be downloaded (${error instanceof Error ? error.message : error}); a text card stands in.`);
@@ -299,6 +328,17 @@ export async function renderFilm(o) {
           const runFor = Math.min(1.2, (v.frames / t.fps) * 0.6).toFixed(2);
           chain.push(text(`${count.before}%{eif:min(${count.value},${count.value}*t/${runFor}):d}${count.after}`, "count", `${cardStyle}:expansion=normal:enable='lt(t,${runFor})'`));
           chain.push(text(wrap(v.text, 26), "card", `${cardStyle}:enable='gte(t,${runFor})'`));
+        } else if (v.text && font && v.kinetic && wrap(v.text, 26).includes("\n")) {
+          // Kinetic type, line by line: each line rises in after the one before it.
+          const lines = wrap(v.text, 26).split("\n");
+          const size = Math.round(H * 0.065);
+          const lineH = Math.round(size * 1.32);
+          const step = Math.min(0.35, (v.frames / t.fps) * 0.5 / lines.length);
+          lines.forEach((line, k) => {
+            const at = (k * step).toFixed(3);
+            const y = `(h-${lines.length * lineH})/2+${k * lineH}+h*0.04*(1-min(1,max(0,t-${at})/0.45))`;
+            chain.push(`drawtext=textfile='${escPath(writeText(line, `kinetic-${k}`))}':fontfile='${escPath((paper ? serif : font) ?? "")}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${size}:x=(w-text_w)/2:y='${y}':alpha='min(1,max(0,(t-${at})/0.35))'`);
+          });
         } else if (v.text && font) chain.push(text(wrap(v.text, 26), "card", cardStyle));
       }
     }
@@ -320,7 +360,7 @@ export async function renderFilm(o) {
     if (v.fadeIn) chain.push(`fade=t=in:st=0:d=${v.fadeIn.toFixed(3)}`);
     if (v.fadeOut) chain.push(`fade=t=out:st=${Math.max(0, seconds - v.fadeOut).toFixed(3)}:d=${v.fadeOut.toFixed(3)}`);
     const vf = chain.length ? chain.join(",") : "null";
-    const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
+    const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), complex ? "-filter_complex" : "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
     // Centred lines (text_align) need ffmpeg 6.1+; older builds centre the block instead.
     try { await encode(vf); } catch (error) { if (!vf.includes("text_align")) throw error; await encode(vf.replaceAll(":text_align=C", "")); }
     renameSync(file + ".part.mp4", file);

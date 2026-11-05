@@ -226,3 +226,33 @@ test("an archive photograph moves like footage: framed over its own blur, pushed
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("kinetic type rises in line by line; a landscape photo keeps the Ken Burns move", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-kinetic-"));
+  try {
+    const wide = join(dir, "wide.jpg");
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=1200x700:d=1", "-frames:v", "1", wide]);
+    const md = [
+      "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 kinetic card \"THE TAX AFTER IT NEARLY BROKE HIM, HE SAID\" | FX: FX-KINETIC | LOOK: L",
+      "**SC0002** | 0:00:03-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R2 the harbour, 1920 | SRC: Commons · Q1 \"harbour 1920\" | LOOK: L",
+    ].join("\n");
+    const media = { chapter: "C1", shots: [{ scene: "SC0002", shot: 1, status: "found", pick: { id: "w:2", source: "wikimedia", kind: "image", mediaUrl: "https://upload.wikimedia.org/x/harbour.jpg", sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Harbour.jpg", durationSeconds: null, licence: { licenseId: "PUBLIC-DOMAIN", name: "PD" } } }] };
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md, media }], width: 320, height: 180, fps: 10 });
+    assert.equal(timeline.video[0].kinetic, true);
+    const out = join(dir, "k.mp4");
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, fetchClip: async () => wide });
+    assert.equal(report.stats.clipsFailed, 0, report.warnings.join("\n"));
+    const bright = (/** @type {number} */ s) => { const f = spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout; let n = 0; for (const b of f) if (b > 160) n += 1; return n; };
+    const early = bright(0.2);
+    const late = bright(1.8);
+    assert.ok(late > early * 1.4, `more lines are on screen later (${early} -> ${late})`);
+    const frameAt = (/** @type {number} */ s) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout;
+    const a = frameAt(3.2);
+    const b = frameAt(5.8);
+    let diff = 0;
+    for (let k = 0; k < a.length; k += 1) diff += Math.abs(a[k] - b[k]);
+    assert.ok(diff / a.length > 2, "the landscape photo moves");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
