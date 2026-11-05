@@ -84,3 +84,36 @@ test("stories read with ElevenLabs v3: each scene's DELIVERY tags lead the line,
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("hard names are read as S4's lexicon spells them, and the captions still show them as written", async () => {
+  const { parseLexicon, applyLexicon } = await import("./voice.mjs");
+  const { wordsFromAlignment } = await import("../engine/src/timeline.mjs");
+  const s4 = [
+    "### 8.6 Pronunciation lexicon (American English)", "", "| Term (on screen) | Narrator says | Note |", "|---|---|---|",
+    "| Ramesh Babu | ruh-MAYSH BAH-boo | Even stress |", "| Bowring Institute | BOW-ring (BOW as in \"now\") | **Verify** |",
+    "| crore | KROR (rhymes with \"core\") | |", "| The Weekend Leader | As written | |", "| PUC | \"pre-university\" | Never letters |", "", "### 8.7 Continuity",
+  ].join("\n");
+  const lexicon = parseLexicon(s4);
+  assert.deepEqual(lexicon, [{ term: "Ramesh Babu", say: "ruh-MAYSH BAH-boo" }, { term: "crore", say: "KROR" }, { term: "PUC", say: "pre-university" }], "a respelling that would drop a word, and 'as written', are left out");
+  assert.equal(applyLexicon("Scrore and Ramesh Babu's crore.", lexicon).text, "Scrore and ruh-MAYSH BAH-boo's KROR.", "whole words only");
+
+  const dir = mkdtempSync(join(tmpdir(), "zupona-lex-"));
+  try {
+    /** @type {string[]} */
+    const sent = [];
+    const fake = /** @type {typeof fetch} */ (async (_url, init) => {
+      const text = JSON.parse(String(init?.body)).text;
+      sent.push(text);
+      const chars = [...text];
+      return Response.json({ audio_base64: Buffer.from("ID3").toString("base64"), alignment: { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.05), character_end_times_seconds: chars.map((_, i) => (i + 1) * 0.05) } });
+    });
+    const lines = [{ scene: "SC0001", text: "Ramesh Babu earned one crore.", previous: "", next: "" }];
+    await recordVoice({ apiKey: "K", voiceId: "v", outDir: dir, lines, lexicon, fetch: fake });
+    assert.deepEqual(sent, ["ruh-MAYSH BAH-boo earned one KROR."]);
+    const words = wordsFromAlignment(JSON.parse(readFileSync(join(dir, "SC0001.alignment.json"), "utf8")));
+    assert.deepEqual(words.map((w) => w.text), ["Ramesh", "Babu", "earned", "one", "crore."]);
+    assert.ok(words[1].end <= words[2].start + 1e-9 && Math.abs(words[1].end - 0.85) < 0.06, "the name keeps the time the voice took to say it");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

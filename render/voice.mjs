@@ -11,6 +11,7 @@
  *   ELEVENLABS_API_KEY=... node render/voice.mjs --run <folder> --voice-id <id> --out voice/
  *   options: --api <site> --id <film id> instead of --run; --version en-US; --model eleven_v3; --concurrency 2
  *   Stories and motivation films are read with ElevenLabs v3 and each scene's DELIVERY tags.
+ *   Hard names are read as S4's pronunciation lexicon spells them; captions still show the names as written.
  */
 import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -23,9 +24,11 @@ import { loadRunFiles, loadRunText } from "./render-film.mjs";
 const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/;
 
 /**
+ * @typedef {{ term: string, say: string }} LexiconEntry
+ * @typedef {{ characters: string[], character_start_times_seconds: number[], character_end_times_seconds: number[] }} Alignment
  * @typedef {{ scene: string, text: string, previous: string, next: string, delivery?: string }} VoiceLine
  *   delivery: the scene's DELIVERY field, performance direction for ElevenLabs v3 ("[softly] [serious]"); never read aloud by v2
- * @typedef {{ apiKey: string, voiceId: string, versionId?: string, modelId?: string, outDir: string, lines: VoiceLine[], fetch?: typeof fetch, concurrency?: number, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void }} VoiceOptions
+ * @typedef {{ apiKey: string, voiceId: string, versionId?: string, modelId?: string, outDir: string, lines: VoiceLine[], lexicon?: LexiconEntry[], fetch?: typeof fetch, concurrency?: number, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void }} VoiceOptions
  */
 
 /**
@@ -64,6 +67,93 @@ export function deliveryTags(delivery) {
 }
 
 /**
+ * The S4 pronunciation lexicon (section 8.6, a table "| Term | Narrator says |
+ * Note |"), as the narrator should say each term. Entries read "as written",
+ * and ones whose spelling would drop words of the term (a respelling of only
+ * its first word), are left out, so nothing is ever cut from the narration.
+ * @param {string} s4
+ * @returns {LexiconEntry[]}
+ */
+export function parseLexicon(s4) {
+  const text = String(s4 ?? "");
+  const at = text.search(/^#{2,4}[^\n]*pronunciation lexicon/im);
+  if (at < 0) return [];
+  /** @type {LexiconEntry[]} */
+  const out = [];
+  for (const line of text.slice(at).split("\n").slice(1)) {
+    if (/^#{1,4}\s/.test(line)) break;
+    const cells = line.split("|").map((c) => c.trim());
+    if (cells.length < 4 || /^-+$/.test(cells[1].replace(/:/g, "")) || /^term\b/i.test(cells[1])) continue;
+    const say = cells[2].replace(/\*\*[^*]*\*\*/g, "").replace(/\([^)]*\)/g, "").replace(/["“”]/g, "").replace(/\s+/g, " ").trim();
+    if (!say || /^as written$/i.test(say)) continue;
+    const terms = cells[1].split(/\s*,\s*/).filter(Boolean);
+    const says = say.split(/\s*,\s*/).filter(Boolean);
+    terms.forEach((term, i) => {
+      const s = says.length === terms.length ? says[i] : terms.length === 1 ? say : "";
+      if (!s || !/^[\p{L}\p{N}][\p{L}\p{N} .'&-]*$/u.test(term)) return;
+      if (s.split(" ").length < term.split(" ").length) return;
+      out.push({ term, say: s });
+    });
+  }
+  return out;
+}
+
+/**
+ * Put the lexicon's spellings into a line for the voice, and remember where,
+ * so the voice's timings can be mapped back to the words as written.
+ * @param {string} text @param {LexiconEntry[]} lexicon
+ * @returns {{ text: string, spans: { start: number, end: number, original: string }[] }}
+ */
+export function applyLexicon(text, lexicon) {
+  if (!lexicon.length) return { text, spans: [] };
+  const sorted = [...lexicon].sort((a, b) => b.term.length - a.term.length);
+  const esc = (/** @type {string} */ s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(${sorted.map((e) => esc(e.term)).join("|")})(?![\\p{L}\\p{N}])`, "gu");
+  const say = new Map(sorted.map((e) => [e.term, e.say]));
+  /** @type {{ start: number, end: number, original: string }[]} */
+  const spans = [];
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    out += text.slice(last, m.index);
+    const s = say.get(m[1]) ?? m[1];
+    spans.push({ start: out.length, end: out.length + s.length, original: m[1] });
+    out += s;
+    last = (m.index ?? 0) + m[1].length;
+  }
+  return { text: out + text.slice(last), spans };
+}
+
+/**
+ * The voice's timings with each respelled name turned back into the name as
+ * written (its time spread over the name's letters), so captions show
+ * "Ramesh Babu", not "ruh-MAYSH BAH-boo". Null when the timings do not match
+ * the text that was sent (then captions are estimated instead).
+ * @param {Alignment} alignment @param {string} sent @param {{ start: number, end: number, original: string }[]} spans offsets in the text sent
+ * @returns {Alignment | null}
+ */
+export function restoreAlignment(alignment, sent, spans) {
+  const chars = alignment?.characters ?? [];
+  if (!spans.length) return alignment;
+  if (chars.join("") !== sent) return null;
+  const starts = alignment.character_start_times_seconds;
+  const ends = alignment.character_end_times_seconds;
+  /** @type {Alignment} */
+  const out = { characters: [], character_start_times_seconds: [], character_end_times_seconds: [] };
+  let i = 0;
+  for (const span of [...spans].sort((a, b) => a.start - b.start)) {
+    for (; i < span.start; i += 1) { out.characters.push(chars[i]); out.character_start_times_seconds.push(starts[i]); out.character_end_times_seconds.push(ends[i]); }
+    const t0 = Number(starts[span.start]);
+    const t1 = Number(ends[span.end - 1]);
+    const n = span.original.length;
+    [...span.original].forEach((c, k) => { out.characters.push(c); out.character_start_times_seconds.push(t0 + ((t1 - t0) * k) / n); out.character_end_times_seconds.push(t0 + ((t1 - t0) * (k + 1)) / n); });
+    i = span.end;
+  }
+  for (; i < chars.length; i += 1) { out.characters.push(chars[i]); out.character_start_times_seconds.push(starts[i]); out.character_end_times_seconds.push(ends[i]); }
+  return out;
+}
+
+/**
  * Record every line that has no file yet. Returns what was recorded, kept and failed.
  * @param {VoiceOptions} o
  */
@@ -87,7 +177,9 @@ export async function recordVoice(o) {
         const data = await speak(line);
         writeFileSync(file + ".part", Buffer.from(data.audio_base64, "base64"));
         renameSync(file + ".part", file);
-        if (data.alignment) writeFileSync(join(o.outDir, `${line.scene}.alignment.json`), JSON.stringify(data.alignment));
+        // Timings are saved against the words as written (respelled names mapped back), or not at all.
+        const timings = data.alignment ? restoreAlignment(/** @type {Alignment} */ (data.alignment), data.sent, data.spans) : null;
+        if (timings) writeFileSync(join(o.outDir, `${line.scene}.alignment.json`), JSON.stringify(timings));
         result.recorded += 1;
         result.characters += line.text.length;
         if (result.recorded % 20 === 0) log(`voice: ${result.recorded} recorded`);
@@ -96,19 +188,24 @@ export async function recordVoice(o) {
       }
     }
   };
-  /** @param {VoiceLine} line @returns {Promise<{ audio_base64: string, alignment?: unknown }>} */
+  const lexicon = o.lexicon ?? [];
+  /** @param {VoiceLine} line @returns {Promise<{ audio_base64: string, alignment?: unknown, sent: string, spans: { start: number, end: number, original: string }[] }>} */
   async function speak(line) {
     const tags = model.modelId === V3 ? deliveryTags(line.delivery) : "";
-    const body = JSON.stringify({ text: tags ? `${tags} ${line.text}` : line.text, model_id: model.modelId, previous_text: model.stitching ? line.previous || undefined : undefined, next_text: model.stitching ? line.next || undefined : undefined, voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0, use_speaker_boost: true } });
+    const said = applyLexicon(line.text, lexicon);
+    const prefix = tags ? `${tags} ` : "";
+    const sent = prefix + said.text;
+    const spans = said.spans.map((s) => ({ ...s, start: s.start + prefix.length, end: s.end + prefix.length }));
+    const body = JSON.stringify({ text: sent, model_id: model.modelId, previous_text: model.stitching ? applyLexicon(line.previous, lexicon).text || undefined : undefined, next_text: model.stitching ? applyLexicon(line.next, lexicon).text || undefined : undefined, voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0, use_speaker_boost: true } });
     const headers = { "xi-api-key": o.apiKey, "content-type": "application/json" };
     const base = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(o.voiceId)}`;
     for (let attempt = 0; ; attempt += 1) {
       const res = await get(`${base}/with-timestamps?output_format=mp3_44100_128`, { method: "POST", headers, body });
-      if (res.ok) return /** @type {any} */ (await res.json());
+      if (res.ok) return { .../** @type {any} */ (await res.json()), sent, spans };
       // A model that cannot return timings still records the line; its captions are then estimated.
       if ([400, 404, 422].includes(res.status) && model.modelId === V3) {
         const plain = await get(`${base}?output_format=mp3_44100_128`, { method: "POST", headers, body });
-        if (plain.ok) return { audio_base64: Buffer.from(await plain.arrayBuffer()).toString("base64") };
+        if (plain.ok) return { audio_base64: Buffer.from(await plain.arrayBuffer()).toString("base64"), sent, spans };
         throw new Error(`ElevenLabs ${plain.status}: ${(await plain.text()).slice(0, 200)}`);
       }
       const retryable = res.status === 429 || res.status >= 500;
@@ -137,7 +234,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const film = JSON.parse((await loadRunText(from, "film.json")) ?? (await loadRunText(from, "run.json")) ?? "{}");
   const modelId = args.model ?? (lookFor(film.formatId ?? film.film?.formatId) === "cinematic" ? V3 : undefined);
   if (modelId) console.log(`voice model: ${modelId}`);
-  const r = await recordVoice({ apiKey, voiceId: args["voice-id"], versionId: args.version, modelId, outDir: args.out, lines, concurrency: Number(args.concurrency ?? 2), log: (l) => console.log(l) });
+  // S4's pronunciation lexicon: hard names are read as it spells them.
+  const lexicon = parseLexicon((await loadRunText(from, "s4.md")) ?? "");
+  if (lexicon.length) console.log(`pronunciation lexicon: ${lexicon.length} names`);
+  const r = await recordVoice({ apiKey, voiceId: args["voice-id"], versionId: args.version, modelId, outDir: args.out, lines, lexicon, concurrency: Number(args.concurrency ?? 2), log: (l) => console.log(l) });
   console.log(JSON.stringify({ ...r, skipped: skipped.length }, null, 1));
   if (r.failed.length) process.exit(1);
 }
