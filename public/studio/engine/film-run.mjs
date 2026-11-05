@@ -21,6 +21,7 @@ import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
 import { applyFixes, checkChapter, checkFilm, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
+import { checkSources, sourceGaps } from "./source-check.mjs";
 import { getVersion } from "./versions.mjs";
 
 /** Versions the run can produce today. Arabic and Bangla follow once English works end to end. */
@@ -130,6 +131,9 @@ export function filmBrief(film) {
 export const SCENE_LINE_EXAMPLE =
   "**SC0001** | 0:00:00-0:00:08 | C1 | HOOK B1 | E | C01, C02 | NARR: Final, speakable narration, numbers spelled out for the voice. | W 20/20 | ANCHOR: \"key word\" -> what appears on screen 0:00:02.5 | SHOTS: (1) 0:00:00-0:00:04 R3 OBJ-01 description, no face; (2) 0:00:04-0:00:08 R1 kinetic card | EV: R1 1 / R3 1 | RUNG: R3/L2 -> R1/L4 | FX: FX-KINETIC, FX-SOURCECHIP | SRC: Pexels https://www.pexels.com/video/... · Q1 \"exact query\" · Q2 \"exact query\" | MOTION: 1.08x push | TRANS: hard cut on the beat | OST: on-screen text; source chip | SFX: SND-FX-01 | MUS: M01 | LOOK: LOOK-M";
 
+/** How S2 treats the source desk's marks (research facts carry check.status when code opened their pages). */
+export const CHECKED_FACTS = " Facts may carry check.status, set by code that opened their source pages: verified (a page shows the number), opened (a page opened; nothing numeric to look for), unconfirmed (the pages opened but none shows the number: never write it as FACT; give it as REPORTED or ESTIMATE with the source named, or leave it out) and unreachable (no page could be read: attribute it to its source). A number whose check.sites is 1 rests on one site: name that site when it is said.";
+
 /**
  * Pull the last fenced JSON block out of a reply.
  * @param {string} text
@@ -234,12 +238,15 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * PEXELS_API_KEY or PIXABAY_API_KEY) the step is left for a later resume.
  * media.review (default true) shows the model small thumbnails of each
  * shot's top candidates and keeps only a clip it says fits.
+ * sources (optional, { fetch }) adds the source desk after research: every
+ * cited page is opened in code, facts whose pages are all gone are dropped,
+ * and each fact is marked verified, opened, unconfirmed or unreachable.
  * edit (default true) adds the Edit Director after QA: one call per chapter
  * that writes edit-C1.json ... (transitions, punch-ins, shakes, sound hits),
  * checked in code; edit: false leaves the edit to the script alone.
  * channel (optional) holds the fingerprints of the channel's earlier films;
  * the finished film is compared with them (originality.json) and added.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -350,12 +357,24 @@ export async function runFilm(o) {
       return { facts: sourced.length };
     });
 
+    // The source desk: code opens every page the research cites (a model can cite a page that does not exist).
+    if (o.sources) {
+      const sources = o.sources;
+      await stage("sources", async () => {
+        const r = await checkSources(JSON.parse(await read("research.json")), { fetch: sources.fetch });
+        await store.put("research.json", JSON.stringify(r.research, null, 1));
+        await store.put("sources-check.json", JSON.stringify({ summary: r.summary, dropped: r.dropped }, null, 1));
+        state.gaps.push(...sourceGaps(r));
+        return r.summary.facts;
+      });
+    }
+
     await stage("s2", async () => {
       const text = await ask("s2", [
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("RESEARCH", await read("research.json")) },
         { text: isStoryFilm(film)
-          ? "Write S2 for an invented story: (a) the realism ledger, one row per real-world detail the story uses, with ID (C01...), detail, exact value, sources and chapter use, from the research file only; (b) the story bible: each invented character's name (no famous real person's name), age, want, wound, fear and the price they pay; (c) if money is involved, the money path: every jump in wealth with its cause and the exact figures, adding up."
-          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources, confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." },
+          ? "Write S2 for an invented story: (a) the realism ledger, one row per real-world detail the story uses, with ID (C01...), detail, exact value, sources and chapter use, from the research file only; (b) the story bible: each invented character's name (no famous real person's name), age, want, wound, fear and the price they pay; (c) if money is involved, the money path: every jump in wealth with its cause and the exact figures, adding up." + CHECKED_FACTS
+          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources, confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." + CHECKED_FACTS },
       ], 32000);
       await store.put("s2.md", text);
       return { claims: (text.match(/\bC\d{2,3}\b/g) ?? []).length };

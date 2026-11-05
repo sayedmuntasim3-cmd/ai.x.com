@@ -106,6 +106,8 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       store: r2Store(env.FILMS, film.id),
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
+      // The source desk opens every page the research cites.
+      sources: { fetch: (url, init) => fetch(url, init) },
       channel: {
         // One channel per deployment for now; a per-client channel key comes with client accounts.
         load: async () => { const obj = await env.FILMS.get("channel/fingerprints.json"); return obj ? JSON.parse(await obj.text()) : []; },

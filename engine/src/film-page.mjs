@@ -222,7 +222,7 @@ function table(rows) {
  * @typedef {{ run: any, chapters: PlanChapter[], s5: Record<string, string>, media: Record<string, ChapterMedia>, research: any, filmCheck: any, qa: any, fixLog: any[] | null, docs: Record<string, string | null>, originality?: any, render?: any }} PageData
  */
 
-const STAGE_LABEL = /** @type {Record<string, string>} */ ({ originality: "Originality", s01: "S0–S1 plan", research: "Research", s2: "S2 claim ledger", s3: "S3 structure", s4: "S4 bibles", qa: "QA", s6: "S6 report", s7: "S7 publishing" });
+const STAGE_LABEL = /** @type {Record<string, string>} */ ({ originality: "Originality", s01: "S0–S1 plan", research: "Research", sources: "Sources checked", s2: "S2 claim ledger", s3: "S3 structure", s4: "S4 bibles", qa: "QA", s6: "S6 report", s7: "S7 publishing" });
 const STATUS_TONE = /** @type {Record<string, string>} */ ({ done: "ok", "done-with-gaps": "warn", failed: "bad", "stopped-budget": "warn" });
 const STATUS_LABEL = /** @type {Record<string, string>} */ ({ done: "Done", "done-with-gaps": "Done*", failed: "Failed", "stopped-budget": "Paused", running: "Running", queued: "Queued" });
 
@@ -340,7 +340,7 @@ function stageChips(d) {
   const mediaUsed = Object.keys(d.run.stages ?? {}).some((k) => k.startsWith("media:")) || Object.keys(d.media).length > 0;
   // Runs made before the Edit Director existed have no edit stages; they are not shown as missing.
   const editUsed = Object.keys(d.run.stages ?? {}).some((k) => k.startsWith("edit:"));
-  const expected = ["s01", "research", "s2", "s3", "s4", ...ids.map((c) => `s5:${c}`), "qa", ...(editUsed ? ids.map((c) => `edit:${c}`) : []), ...(mediaUsed ? ids.map((c) => `media:${c}`) : []), "s6", "s7", ...(d.run.stages?.originality ? ["originality"] : [])];
+  const expected = ["s01", "research", ...(d.run.stages?.sources ? ["sources"] : []), "s2", "s3", "s4", ...ids.map((c) => `s5:${c}`), "qa", ...(editUsed ? ids.map((c) => `edit:${c}`) : []), ...(mediaUsed ? ids.map((c) => `media:${c}`) : []), "s6", "s7", ...(d.run.stages?.originality ? ["originality"] : [])];
   const label = (/** @type {string} */ k) => STAGE_LABEL[k] ?? (k.startsWith("s5:") ? `S5 ${k.slice(3)}` : k.startsWith("media:") ? `Footage ${k.slice(6)}` : k.startsWith("edit:") ? `Edit ${k.slice(5)}` : k);
   const items = expected.map((k) => (d.run.stages?.[k]?.status === "done" ? chip("ok", `✓ ${label(k)}`) : chip("", label(k))));
   if (!mediaUsed && typeof d.run.media === "string") items.push(chip("warn", `Footage ${d.run.media}`));

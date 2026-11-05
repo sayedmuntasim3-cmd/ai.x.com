@@ -371,3 +371,22 @@ test("saving mode is the owner's choice per film and halves the token part of th
   assert.ok(e.savingUsdLow < e.usdLow * 0.6 && e.savingUsdLow > e.usdLow * 0.45, `${e.savingUsdLow} vs ${e.usdLow}`);
   assert.ok(e.savingUsdHigh < e.usdHigh);
 });
+
+test("the source desk runs after research: a cited page that is gone strikes its fact, and S2 is told how to treat the marks", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "src");
+  assert.ok(made.ok);
+  const model = scriptedModel();
+  const store = memoryStore();
+  /** @type {string[]} */
+  const opened = [];
+  const fetch = /** @type {any} */ (async (/** @type {string} */ url) => { opened.push(url); return url.endsWith("/0") ? new Response("gone", { status: 404 }) : new Response("<p>the mill</p>", { headers: { "content-type": "text/html" } }); });
+  const state = await runFilm({ film: made.film, manual: "M", model, store, sources: { fetch } });
+  assert.equal(opened.length, 9, "every cited page is opened once");
+  const research = JSON.parse(store.m.get("research.json"));
+  assert.equal(research.facts.length, 8, "the fact whose page is gone is dropped");
+  assert.ok(research.facts.every((/** @type {any} */ f) => f.check.status === "opened"));
+  assert.equal(JSON.parse(store.m.get("sources-check.json")).summary.facts.dropped, 1);
+  assert.ok(state.gaps.some((/** @type {string} */ g) => g.includes("dropped")) && state.gaps.some((/** @type {string} */ g) => g.includes("rest on 1 site")));
+  assert.equal(state.stages.sources.status, "done");
+  assert.ok(model.calls.indexOf("s2") > model.calls.indexOf("research"));
+});

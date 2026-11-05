@@ -304,7 +304,7 @@ export function getAgent(id) {
  * @type {Readonly<Record<string, readonly ["code" | "model" | "planned", string]>>}
  */
 export const ROLE_STATUS = Object.freeze({
-  "research-primary-source": ["model", "research stage: web search; code drops every fact without a source URL"],
+  "research-primary-source": ["model", "research stage: web search; code drops every fact without a source URL, then opens every cited page (source-check.mjs) and drops facts whose pages are gone"],
   "research-fact-ledger": ["model", "S2 claim ledger"],
   "research-date-check": ["model", "S2 ledger and the QA facts pass"],
   "research-statistics": ["model", "S2 ledger: values, units and conversions"],
@@ -312,7 +312,7 @@ export const ROLE_STATUS = Object.freeze({
   "research-counterevidence": ["model", "research stage records conflicts between sources"],
   "research-geography": ["planned", "places are not verified separately yet"],
   "research-people-orgs": ["model", "research stage (people not to confuse) and the named-subject rules"],
-  "research-source-diversity": ["planned", "no check that sources are independent yet"],
+  "research-source-diversity": ["code", "source-check.mjs counts sites per fact and per film; numbers resting on one site are named in S2, under 4 sites is a gap"],
   "research-freshness": ["planned", "no re-check of facts that change over time yet"],
 
   "story-transcript-integrity": ["planned", "films start from a topic; a supplied transcript is not taken yet"],
@@ -392,7 +392,7 @@ export const ROLE_STATUS = Object.freeze({
   "color-encode": ["code", "renderer: H.264 with a bitrate cap"],
   "color-final-master": ["code", "renderer: MP4 master, SRT and licence report"],
 
-  "quality-hallucination": ["model", "QA facts pass against the S2 ledger"],
+  "quality-hallucination": ["model", "QA facts pass against the S2 ledger; code first looks for every number on its cited pages (verified / unconfirmed)"],
   "quality-defamation": ["model", "named-subject rules and the QA rights pass"],
   "quality-sensitive-context": ["model", "sensitive-subject rules and the QA passes"],
   "quality-artifact-qc": ["planned", "not built yet"],

@@ -65,7 +65,7 @@ const T = {
     footage: "ফুটেজ",
     edit: "এডিট",
     gaps: "বাকি কাজ (GAP)",
-    stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
+    stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", sources: "সোর্স যাচাই", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
   },
   en: {
     title: "Make the full film (English, USA)",
@@ -127,7 +127,7 @@ const T = {
     footage: "Footage",
     edit: "Edit",
     gaps: "Open items (GAPs)",
-    stages: { s01: "S0–S1 titles and plan", research: "Web research", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
+    stages: { s01: "S0–S1 titles and plan", research: "Web research", sources: "Sources checked", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
   },
 };
 
@@ -237,7 +237,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   const stages = Object.keys(run.stages ?? {});
   // Only files whose stage has finished exist; the rest would be dead links.
   /** @type {Record<string, string[]>} */
-  const made = { s01: ["s01.md"], research: ["research.json"], s2: ["s2.md"], s3: ["s3.md"], s4: ["s4.md"], qa: ["qa.json", "fix-log.json"], s6: ["film-check.json", "s6.md"], s7: ["s7.md"], originality: ["originality.json"] };
+  const made = { s01: ["s01.md"], research: ["research.json"], sources: ["sources-check.json"], s2: ["s2.md"], s3: ["s3.md"], s4: ["s4.md"], qa: ["qa.json", "fix-log.json"], s6: ["film-check.json", "s6.md"], s7: ["s7.md"], originality: ["originality.json"] };
   const files = stages.flatMap((s) => (s.startsWith("s5:") ? [`s5-${s.slice(3)}.md`] : s.startsWith("media:") ? [`media-${s.slice(6)}.json`] : s.startsWith("edit:") ? [`edit-${s.slice(5)}.json`] : made[s] ?? []));
   const page = document.createElement("a");
   page.href = `/api/films/${id}/page`;
