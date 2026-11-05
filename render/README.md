@@ -61,7 +61,10 @@ What it makes:
   - Narration from `--voice` (files named `SC0001.mp3` ...) sits in its own scene. It is sped up by at most 15% to fit, otherwise it is cut and a warning is written.
   - Loudness is -14 LUFS.
 - `film.srt`: captions for the YouTube upload.
-- Archive photographs (`still` segments) are framed over a blurred copy of themselves and moved slowly (push in, pull out or pan, in turn).
+- Archive photographs (`still` segments) are framed over a blurred copy of themselves and moved slowly (push in, pull out or pan, in turn); portrait and square photos float in 2.5D parallax.
+- Map shots (`R1 FX-MAP Cairo, Egypt (30.04, 31.23)`) become animated maps drawn by `maps.mjs` from public-domain Natural Earth shapes (`assets/`): the country lit, a pin, the name, a slow push-in. A journey (`route A (lat, lon) to B (lat, lon)`) draws its line from A to B. Needs an ffmpeg built with librsvg (Ubuntu's is).
+- Transitions from the TRANS field: whip pan (with motion blur), slide, zoom-through and white flash; dissolves and chapter breaks dip through black. A transition never shifts the film's clock.
+- Kinetic type (FX-KINETIC) rises in line by line.
 - `film.report.json`: counts, every clip with its licence page, the master's measured loudness, true peak and black stretches (`master`), and every warning (missing clips, voice too long, unresolved numbers, loudness off target, black picture the script does not ask for).
 - `film.SH-01.mp4` … and `film.FB-01.mp4`: the Shorts (9:16) and the Facebook cut (4:5) from S7, cut at their exact source times. Each has the full frame centred over a blurred fill and its own hook on screen for the first 3.5 s. The captions are burned in word by word: the line stays up while it is spoken and the current word lights up, so the cut works with the sound off. Each cut also gets its own `.srt`.
 - Captions follow the voice's own timings when the take has them (`SC0001.alignment.json`, written by `voice.mjs`), sped up exactly as the voice is. Otherwise they are estimated from the text.

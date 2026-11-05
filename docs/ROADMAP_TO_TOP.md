@@ -40,7 +40,7 @@ The first real runs will break things: prompts, parsing, timeouts and cost. Unti
 ## 4. Not done
 
 1. Real runs, with tuning from them (blocked on Cloudflare and the keys).
-2. Maps. These need a tile and geocoding provider with a key, such as MapTiler; OSM's public servers forbid product use.
+2. Maps. **Built 5 Nov 2026 without any provider:** animated maps and route lines drawn from public-domain Natural Earth shapes; the script gives the coordinates. Street-level maps would still need a tile provider.
 3. A motion-graphics engine for designed templates: maps, charts, timelines, lower thirds, quote cards, document highlights, true dissolves.
 4. Consistent-character visuals for stories: AI scenes with one cast, disclosed in Studio, never real people. **Built 4 Nov 2026** with the owner's permission (`render/ai-scenes.mjs`, needs `FAL_KEY`).
 5. Expressive narration: ElevenLabs v3 with delivery tags per scene. **Built 4 Nov 2026** with the owner's permission (`render/voice.mjs`). Character voices are still to come.
