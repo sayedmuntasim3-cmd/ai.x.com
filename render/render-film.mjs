@@ -665,7 +665,9 @@ export async function loadRunFiles(from) {
   const plan = JSON.parse((await get("s3-chapters.json")) ?? "[]");
   return Promise.all(plan.map(async (/** @type {any} */ c) => {
     const media = await get(`media-${c.id}.json`);
-    return { id: c.id, title: typeof c.title === "string" ? c.title : "", markdown: (await get(`s5-${c.id}.md`)) ?? "", media: media ? JSON.parse(media) : null };
+    // The Edit Director's plan (edit-C1.json); without it the edit follows the script alone.
+    const edit = await get(`edit-${c.id}.json`);
+    return { id: c.id, title: typeof c.title === "string" ? c.title : "", markdown: (await get(`s5-${c.id}.md`)) ?? "", media: media ? JSON.parse(media) : null, edit: edit ? JSON.parse(edit) : null };
   }));
 }
 

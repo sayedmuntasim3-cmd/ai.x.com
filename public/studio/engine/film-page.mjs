@@ -338,8 +338,10 @@ function chapterHtml(text, media) {
 function stageChips(d) {
   const ids = d.chapters.map((c) => c.id);
   const mediaUsed = Object.keys(d.run.stages ?? {}).some((k) => k.startsWith("media:")) || Object.keys(d.media).length > 0;
-  const expected = ["s01", "research", "s2", "s3", "s4", ...ids.map((c) => `s5:${c}`), "qa", ...(mediaUsed ? ids.map((c) => `media:${c}`) : []), "s6", "s7", ...(d.run.stages?.originality ? ["originality"] : [])];
-  const label = (/** @type {string} */ k) => STAGE_LABEL[k] ?? (k.startsWith("s5:") ? `S5 ${k.slice(3)}` : k.startsWith("media:") ? `Footage ${k.slice(6)}` : k);
+  // Runs made before the Edit Director existed have no edit stages; they are not shown as missing.
+  const editUsed = Object.keys(d.run.stages ?? {}).some((k) => k.startsWith("edit:"));
+  const expected = ["s01", "research", "s2", "s3", "s4", ...ids.map((c) => `s5:${c}`), "qa", ...(editUsed ? ids.map((c) => `edit:${c}`) : []), ...(mediaUsed ? ids.map((c) => `media:${c}`) : []), "s6", "s7", ...(d.run.stages?.originality ? ["originality"] : [])];
+  const label = (/** @type {string} */ k) => STAGE_LABEL[k] ?? (k.startsWith("s5:") ? `S5 ${k.slice(3)}` : k.startsWith("media:") ? `Footage ${k.slice(6)}` : k.startsWith("edit:") ? `Edit ${k.slice(5)}` : k);
   const items = expected.map((k) => (d.run.stages?.[k]?.status === "done" ? chip("ok", `✓ ${label(k)}`) : chip("", label(k))));
   if (!mediaUsed && typeof d.run.media === "string") items.push(chip("warn", `Footage ${d.run.media}`));
   return `<ul class="stages">${items.map((c) => `<li>${c}</li>`).join("")}</ul>`;

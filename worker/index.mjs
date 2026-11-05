@@ -10,7 +10,7 @@
  *   POST /api/films                  { topic, minutes, versionId?, notes? } -> { id }   (Bearer STUDIO_TOKEN)
  *   GET  /api/films                  my films, newest first   (Bearer STUDIO_TOKEN)
  *   GET  /api/films/:id              run state: stages, usage, cost, gaps
- *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, ...)
+ *   GET  /api/films/:id/files/:name  one output file (s5-C1.md, qa.json, edit-C1.json, ...)
  *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
  *   GET  /api/films/:id/script       the narration script for recording it yourself (one line per scene file)
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)

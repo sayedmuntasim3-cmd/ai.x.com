@@ -56,6 +56,7 @@ const T = {
     resumeBudget: "এই ফিল্মের নতুন বাজেট (ডলার, খালি রাখলে আগেরটা)",
     resumed: "আবার চালু হয়েছে।",
     footage: "ফুটেজ",
+    edit: "এডিট",
     gaps: "বাকি কাজ (GAP)",
     stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
   },
@@ -110,6 +111,7 @@ const T = {
     resumeBudget: "New budget for this film (USD, empty keeps the old one)",
     resumed: "Resumed.",
     footage: "Footage",
+    edit: "Edit",
     gaps: "Open items (GAPs)",
     stages: { s01: "S0–S1 titles and plan", research: "Web research", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
   },
@@ -208,7 +210,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   if (run.status === "failed" || run.status === "stopped-budget") out.append(resumeForm(id));
   const list = document.createElement("ul");
   for (const [stage, info] of Object.entries(run.stages ?? {})) {
-    const label = stage.startsWith("s5:") ? `S5 ${stage.slice(3)}` : stage.startsWith("media:") ? `${l.footage} ${stage.slice(6)}` : l.stages[stage] ?? stage;
+    const label = stage.startsWith("s5:") ? `S5 ${stage.slice(3)}` : stage.startsWith("media:") ? `${l.footage} ${stage.slice(6)}` : stage.startsWith("edit:") ? `${l.edit} ${stage.slice(5)}` : l.stages[stage] ?? stage;
     list.append(h("li", `✓ ${label}${info.result && info.result.ok === false ? " (GAP)" : ""}`));
   }
   out.append(list);
@@ -222,7 +224,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   // Only files whose stage has finished exist; the rest would be dead links.
   /** @type {Record<string, string[]>} */
   const made = { s01: ["s01.md"], research: ["research.json"], s2: ["s2.md"], s3: ["s3.md"], s4: ["s4.md"], qa: ["qa.json", "fix-log.json"], s6: ["film-check.json", "s6.md"], s7: ["s7.md"], originality: ["originality.json"] };
-  const files = stages.flatMap((s) => (s.startsWith("s5:") ? [`s5-${s.slice(3)}.md`] : s.startsWith("media:") ? [`media-${s.slice(6)}.json`] : made[s] ?? []));
+  const files = stages.flatMap((s) => (s.startsWith("s5:") ? [`s5-${s.slice(3)}.md`] : s.startsWith("media:") ? [`media-${s.slice(6)}.json`] : s.startsWith("edit:") ? [`edit-${s.slice(5)}.json`] : made[s] ?? []));
   const page = document.createElement("a");
   page.href = `/api/films/${id}/page`;
   page.textContent = l.page;

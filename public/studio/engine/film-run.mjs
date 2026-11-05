@@ -14,6 +14,7 @@
  * - step(name, fn)                                       (Cloudflare Workflows step.do, or fn() in tests)
  * so a run survives restarts: a finished stage is never paid for twice.
  */
+import { editInstruction, editSheet, editStats, validateEditPlan } from "./edit-director.mjs";
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
@@ -192,10 +193,11 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
   const chapters = Math.max(1, Math.round(minutes / 7.5));
   const outPerChapter = Math.max(4000, (minutes / chapters) * 2000) * 1.5;
   const fixedOut = 6 * 12000 * 1.5; // S0-S4, QA, S6, S7
-  const outputTokens = Math.round(chapters * outPerChapter * 1.2 + fixedOut); // 1.2: repairs
-  const cachedIn = 30000 * (chapters + 8); // manual + brief + ledger + bibles, read from cache
+  // Edit Director: one call per chapter, about 3k tokens out (with thinking) from a short scene sheet.
+  const outputTokens = Math.round(chapters * outPerChapter * 1.2 + fixedOut + chapters * 3000 * 1.5); // 1.2: repairs
+  const cachedIn = 30000 * (chapters * 2 + 8); // manual + brief + ledger + bibles, read from cache (S5 and the edit per chapter)
   const searches = 30; // research stage: web_search max_uses
-  const freshIn = Math.round(chapters * 12000 + 8 * 15000 + minutes * 3000 + searches * 10000); // stage inputs, QA reads the film, search results
+  const freshIn = Math.round(chapters * 12000 + minutes * 600 + 8 * 15000 + minutes * 3000 + searches * 10000); // stage inputs, edit sheets, QA reads the film, search results
   // Footage desk: about 6.3 stock shots a minute, judged six at a time from 320 px thumbnails.
   const judgeCalls = Math.ceil((minutes * 6.3) / 6);
   const judgeUsd = (judgeCalls * (30000 * price.cacheRead + 3500 * price.input + 400 * price.output)) / 1e6;
@@ -220,7 +222,7 @@ export function costOf(u, model) {
 }
 
 /** Effort per stage: the writing and checking stages think hardest. */
-export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "medium", s3: "high", s4: "medium", s5: "high", repair: "medium", qa: "high", s6: "medium", s7: "medium" });
+export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "medium", s3: "high", s4: "medium", s5: "high", repair: "medium", qa: "high", edit: "medium", s6: "medium", s7: "medium" });
 
 /**
  * Run (or resume) a film. Returns the final run state.
@@ -231,9 +233,12 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * PEXELS_API_KEY or PIXABAY_API_KEY) the step is left for a later resume.
  * media.review (default true) shows the model small thumbnails of each
  * shot's top candidates and keeps only a clip it says fits.
+ * edit (default true) adds the Edit Director after QA: one call per chapter
+ * that writes edit-C1.json ... (transitions, punch-ins, shakes, sound hits),
+ * checked in code; edit: false leaves the edit to the script alone.
  * channel (optional) holds the fingerprints of the channel's earlier films;
  * the finished film is compared with them (originality.json) and added.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -465,6 +470,21 @@ export async function runFilm(o) {
       await store.put("fix-log.json", JSON.stringify(fixLog, null, 1));
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };
     });
+
+    // The Edit Director: the edit on top of the script, per chapter, checked in code.
+    if (o.edit !== false) {
+      for (const c of plan.chapters) {
+        await stage(`edit:${c.id}`, async () => {
+          const markdown = await read(`s5-${c.id}.md`);
+          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown)) }], 8000);
+          const parsed = safeJson(reply);
+          const edit = validateEditPlan(parsed, markdown, c.id);
+          if (parsed === null) state.gaps.push(`${c.id} edit: the Edit Director's reply was not valid JSON; this chapter's edit follows the script alone.`);
+          await store.put(`edit-${c.id}.json`, JSON.stringify(edit, null, 1));
+          return editStats(edit);
+        });
+      }
+    }
 
     // Media: free stock footage for every shot, in film order, so no clip
     // repeats within 10 minutes across chapters (earlier picks are reloaded).

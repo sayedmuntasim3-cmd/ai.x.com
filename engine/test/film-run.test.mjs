@@ -109,6 +109,13 @@ function scriptedModel() {
           return reply("```json\n" + JSON.stringify([{ find: `NARR: ${bad[1]} | W 10/25`, replace: `NARR: ${[`Marker9`, ...FILLER].slice(0, 25).join(" ")}. | W 25/25` }]) + "\n```");
         }
         case "qa": return reply("```json\n" + JSON.stringify({ mustFix: [{ lens: "facts", chapter: "C1", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }], passed: ["p"], notChecked: [] }) + "\n```");
+        case "edit:C1":
+          assert.ok(r.messages[0].content[0].text.includes("SC0002 0:00:10.0-0:00:20.0"), "the director sees the scene sheet");
+          return reply("```json\n" + JSON.stringify({ scenes: [
+            { scene: "SC0002", transition: "whip", punchIns: ["0:00:14.0"], shakes: [], hits: [{ at: "0:00:14.0", sound: "impact" }], why: "the turn" },
+            { scene: "SC0003", transition: "glitch", punchIns: ["0:00:21.0"] },
+          ] }) + "\n```");
+        case "edit:C2": return reply("```json\n" + JSON.stringify({ scenes: [{ scene: "SC0099", transition: "whip" }, { scene: "SC0008", shakes: ["0:01:15.0"] }] }) + "\n```");
         case "s6": return reply("## S6");
         case "s7": return reply("## S7\n**Final title: The Old Mill at Dawn**");
         default: throw new Error("unexpected stage " + r.stage);
@@ -129,7 +136,7 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   const store = memoryStore();
   const state = await runFilm({ film: made.film, manual: "MANUAL", model, store });
   assert.equal(state.status, "done", JSON.stringify(state.gaps));
-  assert.deepEqual(model.calls, ["s01", "research", "s2", "s3", "s4", "s4", "s5:C1", "s5:C2", "repair:C2", "qa", "s6", "s7"]);
+  assert.deepEqual(model.calls, ["s01", "research", "s2", "s3", "s4", "s4", "s5:C1", "s5:C2", "repair:C2", "qa", "edit:C1", "edit:C2", "s6", "s7"]);
   for (const f of ["s01.md", "research.json", "s2.md", "s3.md", "s3-chapters.json", "s4.md", "s5-C1.md", "s5-C2.md", "qa.json", "fix-log.json", "film-check.json", "s6.md", "s7.md", "run.json"]) assert.ok(store.m.has(f), f);
   assert.equal(store.m.get("s4.md"), "## S4\nnarrator\nsound bible\n", "a cut-off reply is continued after its last complete line");
   assert.ok(store.m.get("s5-C1.md").includes("NARR: Marker2 a"), "the QA fix is applied");
@@ -140,7 +147,15 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
 
   const again = await runFilm({ film: made.film, manual: "MANUAL", model, store });
   assert.equal(again.status, "done");
-  assert.equal(model.calls.length, 12, "a finished run makes no new model calls");
+  assert.equal(model.calls.length, 14, "a finished run makes no new model calls");
+  // The Edit Director's plans, checked in code: the glitch right after a whip is refused, an unknown scene is dropped.
+  const e1 = JSON.parse(store.m.get("edit-C1.json"));
+  assert.deepEqual(e1.scenes.map((/** @type {any} */ x) => [x.scene, x.transition ?? null, x.punchIns]), [["SC0002", "whip", [14]], ["SC0003", null, [21]]]);
+  assert.ok(e1.problems.some((/** @type {string} */ p) => p.startsWith("SC0003") && p.includes("right after another named transition")));
+  const e2 = JSON.parse(store.m.get("edit-C2.json"));
+  assert.deepEqual(e2.scenes.map((/** @type {any} */ x) => [x.scene, x.shakes]), [["SC0008", [75]]]);
+  assert.ok(e2.problems.some((/** @type {string} */ p) => p.startsWith("SC0099")));
+  assert.deepEqual(state.stages["edit:C1"].result, { scenes: 2, transitions: 1, punchIns: 2, shakes: 0, hits: 1, dropped: 1 });
 });
 
 test("a run stops at its budget and resumes where it stopped", async () => {
@@ -152,10 +167,10 @@ test("a run stops at its budget and resumes where it stopped", async () => {
   const stopped = JSON.parse(store.m.get("run.json"));
   assert.equal(stopped.status, "stopped-budget");
   const spent = model.calls.length;
-  assert.ok(spent >= 1 && spent < 12);
+  assert.ok(spent >= 1 && spent < 14);
   const done = await runFilm({ film: made.film, manual: "M", model, store });
   assert.equal(done.status, "done");
-  assert.equal(model.calls.length, 12, "nothing already paid for is asked again");
+  assert.equal(model.calls.length, 14, "nothing already paid for is asked again");
 });
 
 test("the media step writes media-C1.json per chapter, never repeats a clip, and resumes without searching again", async () => {

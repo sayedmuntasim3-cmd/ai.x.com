@@ -7,13 +7,15 @@
  * shot, overlaps are trimmed), and times are snapped to whole frames, so a
  * 45-minute film never drifts by a frame however many cuts it has.
  */
+import { EDIT_SOUNDS } from "./edit-director.mjs";
 import { shotParts } from "./film-media.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
- * @typedef {"whip" | "slide" | "zoom" | "flash"} Transition
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch"} Transition
+ *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
  *   style: "paper" for FX-PAPER cards (document look); kinetic: text moves in (FX-KINETIC);
@@ -280,16 +282,17 @@ export function transitionFor(trans) {
  * a riser into each new chapter; a soft click on the first archive photo of
  * a run; a whoosh as a map opens. Never two within 1.5 seconds, so the edit
  * breathes. Tokens AUTO-* are synthesised by the renderer (render/sfx-synth.mjs).
- * @param {VideoSegment[]} video
+ * Sounds already placed (the Edit Director's hits) keep the same distance.
+ * @param {VideoSegment[]} video @param {SoundEvent[]} [placed]
  * @returns {SoundEvent[]}
  */
-export function autoSounds(video) {
+export function autoSounds(video, placed = []) {
   /** @type {SoundEvent[]} */
   const out = [];
   let last = -Infinity;
   const add = (/** @type {string} */ token, /** @type {number} */ start, /** @type {string} */ scene, /** @type {number} */ length) => {
     const at = Math.max(0, start);
-    if (at - last < 1.5) return;
+    if (at - last < 1.5 || placed.some((p) => Math.abs(p.start - at) < 1.5)) return;
     last = at;
     out.push({ token, kind: "hit", scene, start: Math.round(at * 1000) / 1000, end: Math.round((at + length) * 1000) / 1000 });
   };
@@ -307,6 +310,9 @@ export function autoSounds(video) {
   });
   return out;
 }
+
+/** How long each synthesised sound lasts (render/sfx-synth.mjs). @type {Record<string, number>} */
+export const SOUND_SECONDS = Object.freeze({ "AUTO-WHOOSH": 0.55, "AUTO-IMPACT": 1.1, "AUTO-BOOM": 2.4, "AUTO-RISER": 1.6, "AUTO-CLICK": 0.18, "AUTO-GLITCH": 0.4 });
 
 /** Seconds of the dip through black at a chapter break, and at a written dissolve or fade. */
 export const CHAPTER_DIP = 0.4;
@@ -330,7 +336,7 @@ export function slowMotion(motion) {
 }
 
 /**
- * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook, autoSound?: boolean }} o
+ * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string, edit?: import("./edit-director.mjs").EditPlan | null }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook, autoSound?: boolean }} o
  * @returns {Timeline}
  */
 export function buildTimeline(o) {
@@ -352,9 +358,14 @@ export function buildTimeline(o) {
   const notes = [];
   let scenes = 0;
   let filmEnd = 0;
+  /** @type {SoundEvent[]} the Edit Director's sound hits; their scene is settled once the picture is laid */
+  const directed = [];
+  /** @type {number[]} film times of the director's camera shakes */
+  const shakeTimes = [];
 
   for (const [chapterIndex, chapter] of o.chapters.entries()) {
     const picks = new Map((chapter.media?.shots ?? []).map((s) => [`${s.scene}#${s.shot}`, s]));
+    const edits = new Map((chapter.edit?.scenes ?? []).map((e) => [e.scene, e]));
     let chapterStart = chapterIndex > 0;
     for (const s of parseSceneLines(chapter.markdown)) {
       scenes += 1;
@@ -396,6 +407,8 @@ export function buildTimeline(o) {
       const speed = slowMotion(s.fields.MOTION ?? "");
       // A chapter break dips through black; so does a dissolve or fade the script writes into this scene.
       const dip = chapterStart ? CHAPTER_DIP : /\b(cross[- ]?)?dissolve\b|\bdip\b|\bfade (to|from|in|out)\b/i.test(s.fields.TRANS ?? "") ? SCENE_DIP : 0;
+      const edit = edits.get(s.sc);
+      const firstSegment = video.length;
       let first = true;
       for (const shot of shots) {
         const start = shot.start ?? s.start;
@@ -414,7 +427,9 @@ export function buildTimeline(o) {
           base.fadeIn = Math.min(dip, frames / fps / 3);
         }
         // A whip, slide, zoom or flash into the scene (never on top of a dip).
-        const into = lead && !dip ? transitionFor(s.fields.TRANS ?? "") : null;
+        // The Edit Director's choice wins over the script's ("cut" removes a written one).
+        const asked = edit?.transition;
+        const into = lead && !dip ? (asked === "cut" ? null : asked ?? transitionFor(s.fields.TRANS ?? "")) : null;
         if (into && video.length) base.transition = into;
         if (lead && chapterStart && chapter.title) base.chapterTitle = `${chapter.id.replace(/^C/, "Chapter ")} · ${chapter.title}`;
         if (lead) chapterStart = false;
@@ -442,6 +457,28 @@ export function buildTimeline(o) {
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
           video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: cardText(shot.text, ost) });
+        }
+      }
+
+      if (edit) {
+        // Punch-ins and shakes go to the shot on screen at that moment, as seconds from its start.
+        const laid = video.slice(firstSegment).filter((v) => v.type !== "black");
+        const place = (/** @type {number} */ t, /** @type {"punchIns" | "shakes"} */ key) => {
+          if (!(t >= s.start && t < s.end)) return false;
+          const v = laid.find((x) => t >= x.start && t < x.end);
+          if (!v) return false;
+          (v[key] ??= []).push(round3(t - v.start));
+          return true;
+        };
+        for (const t of edit.punchIns ?? []) place(t, "punchIns");
+        for (const t of edit.shakes ?? []) if (place(t, "shakes")) shakeTimes.push(t);
+        for (const h of edit.hits ?? []) {
+          const token = EDIT_SOUNDS[h.sound];
+          if (!token || !(h.at >= s.start && h.at < s.end)) continue;
+          const length = SOUND_SECONDS[token] ?? 1;
+          // A whoosh leads into its moment and a riser ends on it; the rest land on it.
+          const start = token === "AUTO-RISER" ? h.at - length : token === "AUTO-WHOOSH" ? h.at - 0.2 : h.at;
+          directed.push({ token, kind: "hit", scene: s.sc, start: round3(Math.max(0, start)), end: round3(Math.max(0, start) + length) });
         }
       }
 
@@ -473,7 +510,17 @@ export function buildTimeline(o) {
   }
   const frames = video.reduce((n, v) => n + v.frames, 0);
   // The edit's own sound design (synthesised by the renderer): whooshes, impacts, risers, booms.
-  if (o.autoSound !== false) sfx.push(...autoSounds(video));
+  // A sound that starts before its moment's shot belongs to the scene on screen when it starts.
+  for (const d of directed) d.scene = video.find((v) => d.start >= v.start && d.start < v.end)?.scene ?? d.scene;
+  sfx.push(...directed);
+  const auto = o.autoSound !== false ? autoSounds(video, directed) : [];
+  sfx.push(...auto);
+  // A camera shake is an impact: it gets one unless a sound already lands there.
+  for (const t of shakeTimes) {
+    if ([...directed, ...auto].some((e) => Math.abs(e.start - t) < 0.35)) continue;
+    const scene = video.find((v) => t >= v.start && t < v.end)?.scene ?? "";
+    sfx.push({ token: "AUTO-IMPACT", kind: "hit", scene, start: round3(t), end: round3(t + SOUND_SECONDS["AUTO-IMPACT"]) });
+  }
   return {
     width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, look: o.look ?? "documentary", notes,
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },

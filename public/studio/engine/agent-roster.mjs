@@ -360,9 +360,9 @@ export const ROLE_STATUS = Object.freeze({
   "footage-rights-gate": ["code", "nothing without a licence record is rendered"],
 
   "editing-runtime": ["code", "scene-lines.mjs clock and the frame-exact timeline"],
-  "editing-pace": ["model", "S3 retention map; code checks words per scene"],
+  "editing-pace": ["model", "S3 retention map; code checks words per scene; the Edit Director places punch-ins, shakes and sound hits, capped and spaced in code"],
   "editing-coverage": ["code", "media step lists every shot with no fitting clip as a GAP"],
-  "editing-cut-logic": ["model", "S5 transitions"],
+  "editing-cut-logic": ["model", "S5 transitions; the Edit Director stage (edit-C1.json per chapter) re-chooses each scene's transition, checked in code (known words, never two named in a row)"],
   "editing-timeline-integrity": ["code", "timeline.mjs: frame-exact edit list"],
   "editing-continuity-match": ["planned", "not built yet"],
   "editing-b-roll-balance": ["planned", "not built yet"],

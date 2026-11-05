@@ -40,6 +40,8 @@ function fakeModel() {
       if (stage === "s5:C1") return reply("# C1\n" + [1, 2, 3, 4, 5, 6].map(scene).join("\n"));
       if (stage === "s5:C2") return reply("# C2\n" + [7, 8, 9, 10, 11, 12].map(scene).join("\n"));
       if (stage === "qa") return reply("```json\n" + JSON.stringify({ mustFix: [], passed: ["all"], notChecked: [] }) + "\n```");
+      if (stage === "edit:C1") return reply("```json\n" + JSON.stringify({ scenes: [{ scene: "SC0003", transition: "whip", punchIns: ["0:00:22.0"], hits: [{ at: "0:00:27.0", sound: "impact" }] }] }) + "\n```");
+      if (stage === "edit:C2") return reply("```json\n" + JSON.stringify({ scenes: [] }) + "\n```");
       if (stage === "s7") return reply([
         "**Final title (A): The Last Day of the Old Mill**",
         "| ID | Pairs with | Image | Words | Source |", "|---|---|---|---|---|",
@@ -85,6 +87,11 @@ test("topic in, MP4 out: run, footage, page, timeline, render, thumbnail and Sho
     const timeline = buildTimeline({ chapters, width: 192, height: 108, fps: 10 });
     assert.equal(timeline.durationSeconds, 120);
     assert.equal(timeline.stats.clips, 12, "every stock shot has its clip");
+    // The Edit Director's plan travels with the run's files into the timeline.
+    const sc3 = timeline.video.find((v) => v.id === "SC0003-1");
+    assert.equal(sc3?.transition, "whip");
+    assert.deepEqual(sc3?.punchIns, [2]);
+    assert.ok(timeline.sfx.some((e) => e.token === "AUTO-IMPACT" && e.start === 27));
     const clip = join(dir, "clip.mp4");
     await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "testsrc=s=320x180:r=10:d=6", "-pix_fmt", "yuv420p", clip]);
     const out = join(dir, "out", "film.mp4");
