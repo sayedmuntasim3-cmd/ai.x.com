@@ -277,3 +277,21 @@ test("a whip pan moves from the last frame of the shot before; the film keeps it
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a thumbnail can come from an archive photograph (one frame, nothing to seek into)", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const { renderThumbnails } = await import("./thumbnails.mjs");
+  const dir = mkdtempSync(join(tmpdir(), "zupona-thumb-"));
+  try {
+    const photo = join(dir, "p.jpg");
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=900x1200:d=1", "-frames:v", "1", photo]);
+    const timeline = /** @type {any} */ ({ video: [{ id: "SC0001-1", scene: "SC0001", type: "clip", url: "https://upload.wikimedia.org/x.jpg", still: true, start: 0, end: 4 }] });
+    const font = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"].find((f) => existsSync(f));
+    const made = await renderThumbnails({ briefs: [{ id: "TH-A", words: "He bought a Rolls-Royce with $50", image: "SC0001", scenes: ["SC0001"] }], timeline, fetchClip: async () => photo, outBase: join(dir, "film"), workDir: dir, font });
+    assert.equal(made[0].frameFrom, "SC0001");
+    assert.ok(made[0].bytes > 10_000 && made[0].bytes < 2_000_000, `a real JPEG under YouTube's 2 MB (${made[0].bytes})`);
+    const size = (await run("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", made[0].file])).trim();
+    assert.equal(size, "1280,720");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

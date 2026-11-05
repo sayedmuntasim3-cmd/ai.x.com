@@ -122,7 +122,7 @@ export default function ZuponaAiLandingPage() {
             />
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a href="/studio/" className="inline-flex items-center gap-2 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-semibold text-[#09110c] transition hover:-translate-y-0.5 hover:bg-lime-200">
+            <a href="/studio/#film" className="inline-flex items-center gap-2 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-semibold text-[#09110c] transition hover:-translate-y-0.5 hover:bg-lime-200">
               <L en="Start a film" bn="ফিল্ম বানানো শুরু করুন" /> <span aria-hidden="true">→</span>
             </a>
             <a href="#how" className="inline-flex items-center gap-2 rounded-full border border-white/15 px-6 py-3.5 text-sm font-medium text-white/85 transition hover:border-lime-300/60 hover:text-lime-200">
@@ -379,7 +379,7 @@ export default function ZuponaAiLandingPage() {
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl"><L en="Your first documentary starts with one topic." bn="আপনার প্রথম ডকুমেন্টারি শুরু হয় একটা বিষয় দিয়ে।" /></h2>
             <p className="mt-2 text-sm text-white/55"><L en="Research, script, pictures, voice, music and render, in one run." bn="রিসার্চ, স্ক্রিপ্ট, ছবি, কণ্ঠ, মিউজিক আর রেন্ডার, এক রানেই।" /></p>
           </div>
-          <a href="/studio/" className="inline-flex shrink-0 items-center gap-2 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-semibold text-[#09110c] transition hover:bg-lime-200">
+          <a href="/studio/#film" className="inline-flex shrink-0 items-center gap-2 rounded-full bg-lime-300 px-6 py-3.5 text-sm font-semibold text-[#09110c] transition hover:bg-lime-200">
             <L en="Open the studio" bn="স্টুডিও খুলুন" /> <span aria-hidden="true">→</span>
           </a>
         </div>

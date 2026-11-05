@@ -58,7 +58,8 @@ export async function renderThumbnails(o) {
     if (seg?.url) {
       try {
         const file = await o.fetchClip(seg.url);
-        input = ["-ss", String(Math.min(2, (seg.end - seg.start) / 2).toFixed(2)), "-i", file];
+        // A photograph has one frame: seeking into it would leave nothing to draw.
+        input = seg.still ? ["-i", file] : ["-ss", String(Math.min(2, (seg.end - seg.start) / 2).toFixed(2)), "-i", file];
         from = seg.scene;
       } catch {
         input = ["-f", "lavfi", "-i", "color=c=0x0b110e:s=1280x720"];
@@ -66,20 +67,26 @@ export async function renderThumbnails(o) {
     } else {
       input = ["-f", "lavfi", "-i", "color=c=0x0b110e:s=1280x720"];
     }
-    const textFile = o.workDir ? join(o.workDir, `thumb.${b.id}.txt`) : `${o.outBase}.${b.id}.txt`;
     const lines = wrap(b.words.toUpperCase(), 14);
-    writeFileSync(textFile, lines.join("\n"));
     const longest = Math.max(...lines.map((l) => l.length));
     const size = Math.round(Math.min(150, 1100 / Math.max(6, longest) * 1.7));
+    const lineH = Math.round(size * 1.08);
     const esc = (/** @type {string} */ p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
-    const filter = [
-      "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1",
-      "eq=contrast=1.18:saturation=1.15:brightness=-0.03",
-      "vignette=PI/3.5",
-      o.font ? `drawtext=fontfile='${esc(o.font)}':textfile='${esc(textFile)}':fontcolor=0xFFD23F:fontsize=${size}:line_spacing=${Math.round(size * 0.12)}:borderw=${Math.round(size / 14)}:bordercolor=black:x=64:y=h-text_h-64` : "null",
-    ].join(",");
+    // The look documentary thumbnails use now: a punchy, sharpened frame, a dark fade behind the words,
+    // white lines with the last (the payoff) in yellow, thick black outline, readable at phone size.
+    const words = lines.map((line, k) => {
+      const textFile = o.workDir ? join(o.workDir, `thumb.${b.id}.${k}.txt`) : `${o.outBase}.${b.id}.${k}.txt`;
+      writeFileSync(textFile, line);
+      const last = k === lines.length - 1 && lines.length > 1;
+      return `drawtext=fontfile='${esc(o.font ?? "")}':textfile='${esc(textFile)}':fontcolor=${last ? "0xFFD23F" : "0xFFFFFF"}:fontsize=${size}:borderw=${Math.round(size / 13)}:bordercolor=black:shadowcolor=black@0.6:shadowx=4:shadowy=6:x=64:y=h-64-${(lines.length - k) * lineH}`;
+    });
+    const graph = [
+      "[0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,eq=contrast=1.2:saturation=1.2:brightness=-0.02,unsharp=5:5:0.9,vignette=PI/3.6[pic]",
+      "gradients=s=1280x720:c0=0x00000000:c1=0x000000D0:x0=0:y0=300:x1=0:y1=720:nb_colors=2,format=rgba[shade]",
+      `[pic][shade]overlay=format=auto${o.font ? "," + words.join(",") : ""}`,
+    ].join(";");
     const file = `${o.outBase}.${b.id}.jpg`;
-    await run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", "1", "-vf", filter, "-q:v", "3", file + ".part.jpg"]);
+    await run(ffmpeg, ["-v", "error", "-y", ...input, "-filter_complex", graph, "-frames:v", "1", "-q:v", "3", file + ".part.jpg"]);
     renameSync(file + ".part.jpg", file);
     out.push({ id: b.id, file, frameFrom: from, bytes: existsSync(file) ? statSync(file).size : 0 });
   }
