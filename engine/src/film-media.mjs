@@ -30,6 +30,13 @@ export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0", "PDM
 export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa", "loc", "smithsonian", "met", "artic", "openverse"]);
 
 /**
+ * Archives of historical evidence and museum objects: searched for evidence
+ * shots (R2) only. A B-roll shot ("a crowd on a beach at dawn") gains nothing
+ * from them, and every search there costs requests a Worker step has few of.
+ */
+export const EVIDENCE_SOURCES = Object.freeze(["loc", "smithsonian", "met", "artic"]);
+
+/**
  * The item-level rights check of an archive result. Commons returns the file
  * page's own metadata with the search, so a file with any restriction
  * (personality rights, trademark, insignia ...) is refused here; NASA items
@@ -186,7 +193,7 @@ export async function chapterMedia(o) {
     if (o.kind) return [{ kind: o.kind, providers: o.providers }];
     const steps = rung === "R2"
       ? [{ kind: /** @type {MediaKind} */ ("image"), providers: o.providers }, { kind: /** @type {MediaKind} */ ("video"), providers: o.providers }]
-      : [{ kind: /** @type {MediaKind} */ ("video"), providers: stock }, { kind: /** @type {MediaKind} */ ("video"), providers: archives }, { kind: /** @type {MediaKind} */ ("image"), providers: o.providers }];
+      : [{ kind: /** @type {MediaKind} */ ("video"), providers: stock }, { kind: /** @type {MediaKind} */ ("video"), providers: archives }, { kind: /** @type {MediaKind} */ ("image"), providers: o.providers.filter((p) => !EVIDENCE_SOURCES.includes(p.id)) }];
     return steps.filter((s) => s.providers.some((p) => p.kinds.includes(s.kind)));
   };
   /** @type {ShotMedia[]} */
@@ -228,6 +235,13 @@ export async function chapterMedia(o) {
       /** @type {Record<string, number[]> | null} */
       let answer = null;
       try { answer = asked.length ? await o.judge(o.chapter, asked.map((x) => x.shot)) : null; } catch { answer = null; }
+      // One picture the judge cannot open fails the whole batch: ask shot by shot, so only that shot goes unreviewed.
+      if (answer === null && asked.length > 1) {
+        answer = {};
+        for (const x of asked) {
+          try { Object.assign(answer, await o.judge(o.chapter, [x.shot])); } catch { /* this shot stays unreviewed */ }
+        }
+      }
       for (const { row, shot } of asked) {
         const order = answer?.[shot.key];
         verdicts.set(row, Array.isArray(order) ? order.filter((n) => Number.isInteger(n) && n >= 0 && n < shot.candidates.length) : null);
@@ -468,7 +482,7 @@ export function locProvider(o = {}) {
       const res = await get(`https://www.loc.gov/photos/?${new URLSearchParams({ q: query.slice(0, 200), fo: "json", c: String(o.perPage ?? 20), fa: "online-format:image" })}`, { headers: { "user-agent": COMMONS_UA }, signal });
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
-      const hits = (Array.isArray(data?.results) ? data.results : []).filter((/** @type {any} */ r) => typeof r?.id === "string" && Array.isArray(r.image_url) && r.image_url.length).slice(0, o.details ?? 6);
+      const hits = (Array.isArray(data?.results) ? data.results : []).filter((/** @type {any} */ r) => typeof r?.id === "string" && Array.isArray(r.image_url) && r.image_url.length).slice(0, o.details ?? 4);
       const items = await Promise.all(hits.map((/** @type {any} */ r) => jsonOrNull(get, `${r.id.replace(/^http:/, "https:").replace(/\/?$/, "/")}?fo=json`, { headers: { "user-agent": COMMONS_UA }, signal })));
       return hits.flatMap((/** @type {any} */ r, /** @type {number} */ i) => {
         const item = items[i]?.item;
@@ -543,7 +557,7 @@ export function metProvider(o = {}) {
       const res = await get(`${base}/search?${new URLSearchParams({ hasImages: "true", q: query.slice(0, 200) })}`, { signal });
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
-      const ids = (Array.isArray(data?.objectIDs) ? data.objectIDs : []).slice(0, o.details ?? 6);
+      const ids = (Array.isArray(data?.objectIDs) ? data.objectIDs : []).slice(0, o.details ?? 4);
       const objects = await Promise.all(ids.map((/** @type {number} */ id) => jsonOrNull(get, `${base}/objects/${id}`, { signal })));
       return objects.flatMap((/** @type {any} */ x) => {
         if (!x || x.isPublicDomain !== true || typeof x.primaryImage !== "string" || !x.primaryImage) return [];

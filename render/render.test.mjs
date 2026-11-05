@@ -149,7 +149,7 @@ test("counter cards run up to quantities, never to years, ranges or decimals", {
   assert.deepEqual(counterParts("$20,000 a year"), { before: "$", value: 20000, after: " a year" });
   assert.deepEqual(counterParts("400 cars"), { before: "", value: 400, after: " cars" });
   for (const t of ["Year 2011", "500–750 haircuts", "1.5 million", "no number", "50% off"].slice(0, 4)) assert.equal(counterParts(t), null, t);
-  assert.deepEqual(counterParts("50% more"), { before: "", value: 50, after: "%% more" }, "a literal % is escaped for drawtext");
+  assert.deepEqual(counterParts("50% more"), { before: "", value: 50, after: "\\% more" }, "a literal % is escaped for drawtext (a backslash; %% is not an escape there)");
   const md = `**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card | FX: FX-COUNTER | OST: "$20,000 a year" | LOOK: L`;
   const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
   assert.equal(timeline.video[0].counter, true);
@@ -354,6 +354,26 @@ test("archive photos as the Edit Director asks: a print in a white border, a foc
     assert.equal(near(frame(3), white), 0, "a plain photo has none");
     const warm = (/** @type {Buffer} */ f) => { let n = 0; for (let i = 0; i < f.length; i += 3) n += f[i] - f[i + 2]; return n / (f.length / 3); };
     assert.ok(warm(frame(4.15)) > warm(frame(5.5)) + 15, `the light leak warms the frame, then passes (${warm(frame(4.15)).toFixed(0)} vs ${warm(frame(5.5)).toFixed(0)})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("words with a percent sign are drawn, on cards and on counters (drawtext would blank them)", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-pct-"));
+  try {
+    const md = [
+      "**SC0001** | 0:00:00-0:00:02 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"45% of people\" | LOOK: L",
+      "**SC0002** | 0:00:02-0:00:04 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"50% more\" | FX: FX-COUNTER | LOOK: L",
+    ].join("\n");
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+    assert.equal(timeline.video[1].counter, true);
+    const out = join(dir, "t.mp4");
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    const lit = (/** @type {number} */ s) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout.filter((b) => b > 140).length;
+    assert.ok(lit(1.5) > 150, `the card's words are on screen (${lit(1.5)} lit pixels)`);
+    assert.ok(lit(2.6) > 100, `the counter runs with its % (${lit(2.6)})`);
+    assert.ok(lit(3.8) > 150, `and settles on the words as written (${lit(3.8)})`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

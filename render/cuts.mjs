@@ -122,7 +122,7 @@ export async function renderCuts(o) {
       `[a]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},boxblur=24:2,eq=brightness=-0.18[bg]`,
       `[b]scale=${W}:-2[fg]`,
       `[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1` +
-        (b.hook && o.font ? `,drawtext=fontfile='${esc(o.font)}':textfile='${esc(hookFile)}':text_align=C:fontcolor=white:fontsize=${size}:line_spacing=${Math.round(size * 0.15)}:borderw=${Math.round(size / 12)}:bordercolor=black:x=(w-text_w)/2:y=h*0.1:enable='lt(t,3.5)'` : "") +
+        (b.hook && o.font ? `,drawtext=expansion=none:fontfile='${esc(o.font)}':textfile='${esc(hookFile)}':text_align=C:fontcolor=white:fontsize=${size}:line_spacing=${Math.round(size * 0.15)}:borderw=${Math.round(size / 12)}:bordercolor=black:x=(w-text_w)/2:y=h*0.1:enable='lt(t,3.5)'` : "") +
         `,subtitles='${esc(ass)}'[v]`,
     ].join(";");
     const file = `${o.outBase}.${b.id}.mp4`;

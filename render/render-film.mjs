@@ -107,7 +107,9 @@ export function counterParts(text) {
   const value = Number(m[2].replace(/,/g, ""));
   if (!Number.isSafeInteger(value) || value < 2) return null;
   if (!m[2].includes(",") && value >= 1500 && value <= 2100) return null; // a year, not a quantity
-  return { before: m[1].replace(/%/g, "%%"), value, after: m[3].split("\n")[0].replace(/%/g, "%%").slice(0, 40) };
+  // The counter's text is expanded by drawtext (its number is %{eif:...}), where a backslash makes the next character literal.
+  const lit = (/** @type {string} */ s) => s.replace(/[\\%]/g, "\\$&");
+  return { before: lit(m[1]), value, after: lit(m[3].split("\n")[0].slice(0, 40)) };
 }
 
 /** @param {unknown} v */
@@ -323,7 +325,7 @@ export async function renderFilm(o) {
     writeFileSync(file, words);
     return file;
   };
-  const text = (words, key, style) => `drawtext=textfile='${escPath(writeText(words, key))}':${style}:alpha='min(1,t/0.35)'`;
+  const text = (words, key, style) => `drawtext=expansion=none:textfile='${escPath(writeText(words, key))}':${style}:alpha='min(1,t/0.35)'`;
   /** @type {Map<string, number>} */
   const measured = new Map();
   /**
@@ -337,7 +339,7 @@ export async function renderFilm(o) {
     if (known !== undefined) return known;
     const w = Math.ceil((size * words.length * 0.9 + 40) / 2) * 2;
     const h = Math.ceil(size * 1.6 / 2) * 2;
-    const raw = await runBytes(ffmpeg, ["-v", "error", "-f", "lavfi", "-i", `color=c=black:s=${w}x${h}`, "-vf", `drawtext=textfile='${escPath(writeText(words, "measure"))}':fontfile='${escPath(face)}':fontsize=${size}:fontcolor=white:x=10:y=${Math.round(size * 0.2)}`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]);
+    const raw = await runBytes(ffmpeg, ["-v", "error", "-f", "lavfi", "-i", `color=c=black:s=${w}x${h}`, "-vf", `drawtext=expansion=none:textfile='${escPath(writeText(words, "measure"))}':fontfile='${escPath(face)}':fontsize=${size}:fontcolor=white:x=10:y=${Math.round(size * 0.2)}`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]);
     let min = w;
     let max = -1;
     for (let i = 0; i < raw.length; i += 1) if (raw[i] > 60) { const x = i % w; if (x < min) min = x; if (x > max) max = x; }
@@ -465,7 +467,7 @@ export async function renderFilm(o) {
         input = ["-loop", "1", "-framerate", String(t.fps), "-i", basePng, "-loop", "1", "-framerate", String(t.fps), "-i", linePng];
         complex = true;
         chain.push(`[1]format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*lte(((X-${ax})*${dx}+(Y-${ay})*${dy})/${len2},T/${draw})'[rl];[0]format=rgba[rb];[rb][rl]overlay=format=auto,format=yuv420p`, "setsar=1", LOOK);
-        const label = (/** @type {string} */ words, /** @type {number} */ x, /** @type {number} */ y, /** @type {string} */ from, /** @type {string} */ name) => (words && font ? `drawtext=textfile='${escPath(writeText(words.toUpperCase(), name))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.04)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.012)}:x=${Math.min(W - Math.round(W * 0.25), x + Math.round(H * 0.04))}:y=${Math.max(Math.round(H * 0.04), y - Math.round(H * 0.09))}:alpha='min(1,max(0,(t-${from})/0.4))'` : "");
+        const label = (/** @type {string} */ words, /** @type {number} */ x, /** @type {number} */ y, /** @type {string} */ from, /** @type {string} */ name) => (words && font ? `drawtext=expansion=none:textfile='${escPath(writeText(words.toUpperCase(), name))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.04)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.012)}:x=${Math.min(W - Math.round(W * 0.25), x + Math.round(H * 0.04))}:y=${Math.max(Math.round(H * 0.04), y - Math.round(H * 0.09))}:alpha='min(1,max(0,(t-${from})/0.4))'` : "");
         chain.push(...[label(v.map.label, ax, ay, "0.15", "route-from"), label(v.map.to.label, bx, by, draw, "route-to")].filter(Boolean));
         mapped = true;
       } catch (error) {
@@ -482,7 +484,7 @@ export async function renderFilm(o) {
         }
         input = ["-loop", "1", "-framerate", String(t.fps), "-i", png];
         chain.push(`zoompan=z='1+0.14*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}`, "setsar=1", LOOK);
-        if (v.map.label && font) chain.push(`drawtext=textfile='${escPath(writeText(v.map.label.toUpperCase(), "map-label"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.045)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.014)}:x=w/2+${Math.round(H * 0.06)}:y=h/2-${Math.round(H * 0.1)}:alpha='min(1,max(0,(t-0.35)/0.4))'`);
+        if (v.map.label && font) chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(v.map.label.toUpperCase(), "map-label"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.045)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.014)}:x=w/2+${Math.round(H * 0.06)}:y=h/2-${Math.round(H * 0.1)}:alpha='min(1,max(0,(t-0.35)/0.4))'`);
         mapped = true;
       } catch (error) {
         warnings.push(`${v.id}: the map could not be drawn (${error instanceof Error ? error.message : error}); a text card stands in.`);
@@ -540,8 +542,8 @@ export async function renderFilm(o) {
               cmds.push(`${(from + f / t.fps).toFixed(3)} drawbox@bar${k} y ${base - hgt};`, `${(from + f / t.fps).toFixed(3)} drawbox@bar${k} h ${hgt};`);
             }
             const cx = x + bw / 2;
-            labels.push(`drawtext=textfile='${escPath(writeText(b.label, `bar-label-${k}`))}':fontfile='${face}':fontcolor=${muted}:fontsize=${Math.round(H * 0.035)}:x=${Math.round(cx)}-text_w/2:y=${base + Math.round(H * 0.025)}:alpha='min(1,t/0.35)'`);
-            labels.push(`drawtext=textfile='${escPath(writeText(b.text, `bar-value-${k}`))}':fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.042)}:x=${Math.round(cx)}-text_w/2:y=${base - full - Math.round(H * 0.065)}:alpha='min(1,max(0,(t-${(from + grow * 0.8).toFixed(3)})/0.25))'`);
+            labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.label, `bar-label-${k}`))}':fontfile='${face}':fontcolor=${muted}:fontsize=${Math.round(H * 0.035)}:x=${Math.round(cx)}-text_w/2:y=${base + Math.round(H * 0.025)}:alpha='min(1,t/0.35)'`);
+            labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.text, `bar-value-${k}`))}':fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.042)}:x=${Math.round(cx)}-text_w/2:y=${base - full - Math.round(H * 0.065)}:alpha='min(1,max(0,(t-${(from + grow * 0.8).toFixed(3)})/0.25))'`);
           });
           if (v.text) chain.push(text(wrap(v.text, 34), "chart-title", `fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.055)}:x=(w-text_w)/2:${rise(v.kinetic, "h*0.12")}`));
           chain.push(commands(cmds), ...boxes, `drawbox=x=${Math.round(left)}:y=${base}:w=${Math.round(W * 0.68)}:h=${Math.max(2, Math.round(H * 0.004))}:color=${muted}:t=fill`, ...labels);
@@ -586,7 +588,7 @@ export async function renderFilm(o) {
             at += sweep + 0.1;
           }
           if (bands.length) chain.push(commands(cmds), ...bands);
-          lines.forEach((line, k) => chain.push(`drawtext=textfile='${escPath(writeText(line, `hl-line-${k}`))}':fontfile='${escPath(face)}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${size}:x=(w-text_w)/2:${rise(v.kinetic, String(top + k * lineH))}:alpha='min(1,t/0.35)'`));
+          lines.forEach((line, k) => chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(line, `hl-line-${k}`))}':fontfile='${escPath(face)}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${size}:x=(w-text_w)/2:${rise(v.kinetic, String(top + k * lineH))}:alpha='min(1,t/0.35)'`));
         } else if (v.text && font && count) {
           // The number runs up for the first part of the shot, then the text settles exactly as written.
           const runFor = Math.min(1.2, (v.frames / t.fps) * 0.6).toFixed(2);
@@ -601,7 +603,7 @@ export async function renderFilm(o) {
           lines.forEach((line, k) => {
             const at = (k * step).toFixed(3);
             const y = `(h-${lines.length * lineH})/2+${k * lineH}+h*0.04*(1-min(1,max(0,t-${at})/0.45))`;
-            chain.push(`drawtext=textfile='${escPath(writeText(line, `kinetic-${k}`))}':fontfile='${escPath((paper ? serif : font) ?? "")}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${size}:x=(w-text_w)/2:y='${y}':alpha='min(1,max(0,(t-${at})/0.35))'`);
+            chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(line, `kinetic-${k}`))}':fontfile='${escPath((paper ? serif : font) ?? "")}':fontcolor=${paper ? "0x1d1a16" : "0xe4ede7"}:fontsize=${size}:x=(w-text_w)/2:y='${y}':alpha='min(1,max(0,(t-${at})/0.35))'`);
           });
         } else if (v.text && font) chain.push(text(wrap(v.text, 26), "card", cardStyle));
       }
@@ -619,8 +621,8 @@ export async function renderFilm(o) {
       const fadeAlpha = `alpha='min(1,max(0,(t-0.3)/0.4))*min(1,max(0,(${show.toFixed(2)}-t)/0.5))'`;
       const [label, ...rest] = v.chapterTitle.split(" · ");
       const top = Math.max(bar, 0) + Math.round(H * 0.07);
-      chain.push(`drawtext=textfile='${escPath(writeText(label.toUpperCase(), "chapter-label"))}':fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.024))}:x=w*0.06:y=${top}:${fadeAlpha}`);
-      chain.push(`drawtext=textfile='${escPath(writeText(wrap(rest.join(" · "), 30), "chapter-title"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.05)}:x=w*0.06:y=${top + Math.round(H * 0.04)}:shadowcolor=black@0.6:shadowx=2:shadowy=2:${fadeAlpha}`);
+      chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(label.toUpperCase(), "chapter-label"))}':fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.024))}:x=w*0.06:y=${top}:${fadeAlpha}`);
+      chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(wrap(rest.join(" · "), 30), "chapter-title"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.05)}:x=w*0.06:y=${top + Math.round(H * 0.04)}:shadowcolor=black@0.6:shadowx=2:shadowy=2:${fadeAlpha}`);
     }
     // Dips through black at chapter breaks and written dissolves: the shot fades out, the next fades in.
     const seconds = v.frames / t.fps;

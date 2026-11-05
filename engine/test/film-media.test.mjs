@@ -259,3 +259,29 @@ test("an evidence shot can be filled from a museum, and the description credits 
   const { pictureCredits } = await import("../src/film-run.mjs");
   assert.equal(pictureCredits([media]), "\"Wheat Field with Cypresses, 1889\" by Vincent van Gogh, CC0, via The Metropolitan Museum of Art: https://www.metmuseum.org/art/collection/search/436535");
 });
+
+test("one picture the judge cannot open costs only its own shot's review; museum archives are searched for evidence shots only", async () => {
+  const md = [0, 20, 40].map((t, i) => `**SC000${i + 1}** | 0:00:${String(t).padStart(2, "0")}-0:00:${String(t + 10).padStart(2, "0")} | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 old mill wheel turning | SRC: Pexels · Q1 "old mill" | LOOK: L`).join("\n");
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const stock = { id: "pexels", layer: 2, kinds: ["video"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search() {
+    return [1, 2, 3].map((n) => ({ id: `pexels:video:${n}`, source: "pexels", mediaType: "video", title: `clip ${n}`, previewUrl: `https://images.pexels.com/${n}.jpg?w=320`, mediaUrl: `https://v/${n}.mp4`, sourcePageUrl: `https://www.pexels.com/video/${n}/`, creator: null, license: "Pexels License", licenseUrl: null, durationSeconds: 8, width: 1920, height: 1080, attributionRequired: false }));
+  } };
+  let calls = 0;
+  const media = await chapterMedia({ chapter: "C1", markdown: md, providers: [stock], judge: async (_c, shots) => {
+    calls += 1;
+    if (shots.some((s) => s.key === "SC0002-1")) throw new Error("could not fetch an image");
+    return Object.fromEntries(shots.map((s) => [s.key, [0, 1, 2]]));
+  } });
+  assert.deepEqual(media.shots.map((s) => s.review), ["fit", "unreviewed", "fit"]);
+  assert.equal(calls, 4, "one batch, then shot by shot");
+
+  /** @type {string[]} */
+  const searched = [];
+  const museum = /** @type {import("../src/film-media.mjs").MediaProvider} */ ({ id: "met", layer: 1, kinds: ["image"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search(/** @type {string} */ q) { searched.push(q); return []; } });
+  const both = [
+    "**SC0001** | 0:00:00-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R2 a painted harvest, 1889 | SRC: Met · Q1 \"wheat field painting\" | LOOK: L",
+    "**SC0002** | 0:00:06-0:00:12 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 a crowd on a beach | SRC: Pexels · Q1 \"crowd beach dawn\" | LOOK: L",
+  ].join("\n");
+  await chapterMedia({ chapter: "C1", markdown: both, providers: [museum], sleep: async () => {} });
+  assert.deepEqual(searched, ["wheat field painting"], "the B-roll shot never searches the museum");
+});

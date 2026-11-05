@@ -78,7 +78,7 @@ export async function renderThumbnails(o) {
       const textFile = o.workDir ? join(o.workDir, `thumb.${b.id}.${k}.txt`) : `${o.outBase}.${b.id}.${k}.txt`;
       writeFileSync(textFile, line);
       const last = k === lines.length - 1 && lines.length > 1;
-      return `drawtext=fontfile='${esc(o.font ?? "")}':textfile='${esc(textFile)}':fontcolor=${last ? "0xFFD23F" : "0xFFFFFF"}:fontsize=${size}:borderw=${Math.round(size / 13)}:bordercolor=black:shadowcolor=black@0.6:shadowx=4:shadowy=6:x=64:y=h-64-${(lines.length - k) * lineH}`;
+      return `drawtext=expansion=none:fontfile='${esc(o.font ?? "")}':textfile='${esc(textFile)}':fontcolor=${last ? "0xFFD23F" : "0xFFFFFF"}:fontsize=${size}:borderw=${Math.round(size / 13)}:bordercolor=black:shadowcolor=black@0.6:shadowx=4:shadowy=6:x=64:y=h-64-${(lines.length - k) * lineH}`;
     });
     const graph = [
       "[0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,eq=contrast=1.2:saturation=1.2:brightness=-0.02,unsharp=5:5:0.9,vignette=PI/3.6[pic]",
