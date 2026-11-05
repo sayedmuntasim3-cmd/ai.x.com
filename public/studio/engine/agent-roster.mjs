@@ -338,14 +338,14 @@ export const ROLE_STATUS = Object.freeze({
   "cinematography-accessibility": ["planned", "no contrast or flashing check yet"],
 
   "animation-motion-director": ["model", "S4 motion-graphics style"],
-  "animation-map-motion": ["planned", "maps render as text cards; a map provider key is needed"],
+  "animation-map-motion": ["code", "maps.mjs: animated maps from public-domain Natural Earth shapes (country lit, pin, name, push-in) for FX-MAP shots with coordinates; no route lines yet"],
   "animation-data-graphics": ["code", "renderer: counter cards only; no charts yet"],
-  "animation-kinetic-type": ["code", "renderer: FX-KINETIC kinetic type"],
+  "animation-kinetic-type": ["code", "renderer: FX-KINETIC kinetic type, line by line"],
   "animation-diagram-builder": ["planned", "not built yet"],
   "animation-2d-animation": ["planned", "not built yet"],
   "animation-3d-visualization": ["planned", "not built yet"],
-  "animation-parallax": ["planned", "not built yet"],
-  "animation-transition-logic": ["code", "renderer: fades, dips to black, chapter dips"],
+  "animation-parallax": ["code", "renderer: 2.5D parallax on portrait and square archive photos"],
+  "animation-transition-logic": ["code", "renderer: whip pans, slides, zoom-throughs, flashes, dips to black and chapter dips from the TRANS field"],
   "animation-fx-qc": ["planned", "not built yet"],
 
   "footage-asset-strategist": ["model", "S5: search queries per shot"],

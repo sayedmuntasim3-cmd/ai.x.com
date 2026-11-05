@@ -295,3 +295,28 @@ test("a thumbnail can come from an archive photograph (one frame, nothing to see
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("maps: Natural Earth shapes decode, a place finds its country, and a map shot renders with its pin at the centre", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const { countries, countryAt, mapSvg } = await import("./maps.mjs");
+  assert.ok(countries().length > 200);
+  assert.equal(countryAt(77.59, 12.97)?.name, "India");
+  assert.equal(countryAt(31.23, 30.04)?.name, "Egypt");
+  assert.equal(countryAt(-98, 39)?.name, "United States of America");
+  assert.equal(countryAt(-30, 0), null, "the open Atlantic is no country");
+  const svg = mapSvg({ lat: 12.97, lon: 77.59, width: 640, height: 360 });
+  assert.match(svg, /stroke="#bef264"/, "the place's country is lit");
+  const dir = mkdtempSync(join(tmpdir(), "zupona-map-"));
+  try {
+    const md = "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 FX-MAP Bengaluru (12.97, 77.59) | LOOK: L";
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+    const out = join(dir, "map.mp4");
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    assert.ok(!report.warnings.some((w) => /map could not/.test(w)), report.warnings.join("\n"));
+    assert.ok(Math.abs((await mediaDuration(out)) - 3) < 0.15);
+    const rgb = spawnSync("ffmpeg", ["-v", "error", "-ss", "1.5", "-i", out, "-frames:v", "1", "-vf", "crop=4:4:158:88", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout;
+    const g = rgb[1];
+    assert.ok(g > 150 && g > rgb[2] + 40, `the pin (lime) sits at the centre (rgb ${rgb[0]},${rgb[1]},${rgb[2]})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

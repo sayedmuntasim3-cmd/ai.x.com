@@ -12,7 +12,7 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, map?: { lat: number, lon: number, label: string } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash"} Transition
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
@@ -213,6 +213,28 @@ export function sceneSounds(field, scene, shotStarts) {
 }
 
 /**
+ * Read a place from an FX-MAP shot: "(12.97, 77.59)", "12.97°N 77.59°E" or
+ * "lat 12.97 lon 77.59", with the name written before it or in quotes.
+ * @param {string} text
+ * @returns {{ lat: number, lon: number, label: string } | null}
+ */
+export function mapPlace(text) {
+  const t = String(text ?? "");
+  const deg = /(\d{1,2}(?:\.\d+)?)\s*°?\s*([NS])[,;\s]+(\d{1,3}(?:\.\d+)?)\s*°?\s*([EW])/i.exec(t);
+  const pair = /\(\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*\)/.exec(t);
+  const words = /\blat(?:itude)?\s*(-?\d{1,2}(?:\.\d+)?)[,;\s]+lon(?:gitude)?\s*(-?\d{1,3}(?:\.\d+)?)/i.exec(t);
+  let lat = NaN;
+  let lon = NaN;
+  let at = -1;
+  if (deg) { lat = Number(deg[1]) * (/s/i.test(deg[2]) ? -1 : 1); lon = Number(deg[3]) * (/w/i.test(deg[4]) ? -1 : 1); at = deg.index; } else if (pair) { lat = Number(pair[1]); lon = Number(pair[2]); at = pair.index; } else if (words) { lat = Number(words[1]); lon = Number(words[2]); at = words.index; }
+  if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return null;
+  const quoted = /["“]([^"”]{2,60})["”]/.exec(t)?.[1];
+  const before = t.slice(0, at).replace(/^R\d\s+/, "").replace(/\bFX-MAP\b|\bmap\b|\bpin\b|\blocator\b|\bon\b|[-:–]/gi, " ").replace(/\b(?:LOC|OBJ|CHR)-\d+\b/g, " ").replace(/\s+/g, " ").replace(/^[,\s]+|[,\s]+$/g, "");
+  const label = (quoted ?? before.split(/\s+/).slice(-4).join(" ")).replace(/^[,\s]+|[,\s]+$/g, "");
+  return { lat, lon, label: label.slice(0, 40) };
+}
+
+/**
  * The transition a scene's TRANS field asks for into its first shot, when it
  * is not a cut or a dip: a whip pan, a slide, a zoom through, or a white flash.
  * @param {string} trans
@@ -346,7 +368,9 @@ export function buildTimeline(o) {
             const marked = /\b(?:header|question|title|heading)\s*["“]([^"”]{2,80})["”]/i.exec(shot.text)?.[1];
             words = marked ?? quotes(shot.text).find((q) => !q.includes(" / ") && !panels.some((p) => q.includes(p) || p.includes(q))) ?? "";
           }
-          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: !panels && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}) });
+          // A map shot with the place's coordinates becomes an animated map; without them it stays a card.
+          const place = !black && !panels && /FX-MAP|\bmap\b|\blocator\b/i.test(`${fx} ${shot.text}`) ? mapPlace(shot.text) : null;
+          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: !panels && !place && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
           const shotSeconds = frames / fps;

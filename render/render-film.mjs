@@ -13,6 +13,7 @@
  *   node render/render-film.mjs --api https://ai.zupona.com --id <film id> --out film.mp4
  *   options: --voice <SC0001.mp3 ...> --music <M01.mp3 ...> --sfx <SND-FX-01.mp3 ...> --width 1920 --height 1080 --fps 30 --work .render --font /path/font.ttf
  */
+import { mapSvg } from "./maps.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -228,7 +229,7 @@ export async function renderFilm(o) {
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
-    const key = hash({ v: 8, transition: v.transition === "flash" ? "flash" : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 8, map: v.map ?? null, transition: v.transition === "flash" ? "flash" : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -304,7 +305,25 @@ export async function renderFilm(o) {
       }
     }
     const H = t.height;
-    if (type !== "clip" || !input.length) {
+    let mapped = false;
+    if (type === "card" && v.map) {
+      try {
+        // An animated map: the place's country lit, a pin at the centre, a slow push-in and the place's name.
+        const png = join(dirs.cards, `${hash({ map: v.map, w: t.width, h: t.height, v: 1 })}.png`);
+        if (!existsSync(png)) {
+          const svg = png.replace(/\.png$/, ".svg");
+          writeFileSync(svg, mapSvg({ lat: v.map.lat, lon: v.map.lon, width: t.width * 2, height: t.height * 2 }));
+          await run(ffmpeg, ["-v", "error", "-y", "-i", svg, "-frames:v", "1", png]);
+        }
+        input = ["-loop", "1", "-framerate", String(t.fps), "-i", png];
+        chain.push(`zoompan=z='1+0.14*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}`, "setsar=1", LOOK);
+        if (v.map.label && font) chain.push(`drawtext=textfile='${escPath(writeText(v.map.label.toUpperCase(), "map-label"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.045)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.014)}:x=w/2+${Math.round(H * 0.06)}:y=h/2-${Math.round(H * 0.1)}:alpha='min(1,max(0,(t-0.35)/0.4))'`);
+        mapped = true;
+      } catch (error) {
+        warnings.push(`${v.id}: the map could not be drawn (${error instanceof Error ? error.message : error}); a text card stands in.`);
+      }
+    }
+    if ((type !== "clip" || !input.length) && !mapped) {
       const paper = type === "card" && v.style === "paper";
       input = color(type === "black" ? "black" : paper ? "0xefe6d2" : "0x0b110e");
       if (type === "card") {

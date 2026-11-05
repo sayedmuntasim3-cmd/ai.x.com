@@ -292,6 +292,19 @@ export default function ZuponaAiLandingPage() {
               <p className="tile-title"><L en="A look per genre" bn="ধরন অনুযায়ী লুক" /></p><p className="tile-text"><L en="Cinematic 2.39:1 for stories, faded archive for history, clean for explainers." bn="গল্পে সিনেমাটিক ২.৩৯:১, ইতিহাসে পুরোনো আর্কাইভ লুক, ব্যাখ্যায় পরিষ্কার লুক।" /></p>
             </div>
             <div className="tile">
+              <div className="relative aspect-video overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_50%_45%,#11252a,#070f11)]">
+                <svg viewBox="0 0 320 180" className="kb absolute inset-0 h-full w-full">
+                  <path d="M40 30 L120 26 L150 60 L176 58 L196 96 L188 150 L150 176 L110 166 L96 120 L60 100 Z" fill="#26402f" stroke="#bef264" strokeWidth="2" />
+                  <path d="M196 96 L260 70 L300 90 L292 150 L232 168 L188 150 Z" fill="#1a2a23" stroke="#3b5a4a" strokeWidth="1.5" />
+                  <circle cx="150" cy="96" r="22" fill="none" stroke="#bef264" strokeOpacity="0.3" strokeWidth="2" />
+                  <circle cx="150" cy="96" r="12" fill="#bef264" fillOpacity="0.12" stroke="#bef264" strokeOpacity="0.5" strokeWidth="2" />
+                  <circle cx="150" cy="96" r="4.5" fill="#bef264" stroke="#fff" strokeWidth="1.5" />
+                </svg>
+                <span className="rise-loop absolute left-[52%] top-[30%] rounded bg-black/60 px-2 py-0.5 text-xs font-semibold tracking-wide">CAIRO, EGYPT</span>
+              </div>
+              <p className="tile-title"><L en="Animated maps, no map fees" bn="অ্যানিমেটেড ম্যাপ, কোনো ফি ছাড়া" /></p><p className="tile-text"><L en="The country lights up, a pin drops, the name appears; drawn from public-domain map data." bn="দেশটা আলোকিত হয়, পিন পড়ে, নাম ভেসে ওঠে; পাবলিক-ডোমেইন ম্যাপ ডেটা থেকে আঁকা।" /></p>
+            </div>
+            <div className="tile">
               <div className="relative aspect-video overflow-hidden rounded-xl bg-[#0b110e]">
                 <div className="absolute inset-0 flex items-end gap-1.5 p-4">{[38, 52, 30, 64, 46, 72, 58, 84].map((h, i) => <span key={i} className="bar flex-1 rounded-t bg-lime-300/80" style={{ height: `${h}%`, animationDelay: `${i * 0.12}s` }} />)}</div>
               </div>

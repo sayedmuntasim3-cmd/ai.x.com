@@ -140,3 +140,20 @@ test("the script's transitions become whips, slides, zooms and flashes; cuts and
   assert.deepEqual(t.video.map((v) => v.transition ?? null), [null, "whip", null], "a dissolve stays a dip, never a whip on top of it");
   assert.ok(t.video[2].fadeIn);
 });
+
+test("a map shot with coordinates becomes an animated map; without them it stays a card", async () => {
+  const { buildTimeline: build, mapPlace } = await import("../src/timeline.mjs");
+  assert.deepEqual(mapPlace("R1 FX-MAP Bengaluru (12.97, 77.59) pin drops"), { lat: 12.97, lon: 77.59, label: "Bengaluru" });
+  assert.deepEqual(mapPlace("R1 map \"Cairo\" 30.04°N 31.23°E"), { lat: 30.04, lon: 31.23, label: "Cairo" });
+  assert.deepEqual(mapPlace("R1 locator, Lima 12.05°S 77.04°W"), { lat: -12.05, lon: -77.04, label: "Lima" });
+  assert.equal(mapPlace("R1 FX-MAP the old silk road"), null);
+  assert.equal(mapPlace("(120, 400)"), null, "impossible coordinates are refused");
+  const md = [
+    "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 FX-MAP Bengaluru (12.97, 77.59) | LOOK: L",
+    "**SC0002** | 0:00:03-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 FX-MAP \"the old silk road\" | LOOK: L",
+  ].join("\n");
+  const t = build({ chapters: [{ id: "C1", markdown: md }] });
+  assert.deepEqual(t.video[0].map, { lat: 12.97, lon: 77.59, label: "Bengaluru" });
+  assert.equal(t.video[1].map, undefined);
+  assert.equal(t.video[1].type, "card");
+});
