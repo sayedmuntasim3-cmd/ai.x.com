@@ -4,6 +4,18 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
 
 ## 0. Start here
 
+**Latest (5 Nov 2026, end of the long session; the owner started a new session to save credits):**
+- Read `docs/VISION.md` (the owner's vision, condensed) instead of asking for it again.
+- Built and pushed today: audit and honest agent status; fail-fast and resume; exact costs; saving mode (Batch API, half price); free archives (Wikimedia Commons, NASA) with credits; animated photos (Ken Burns, parallax); 25 formats; new landing page (English and Bangla); transitions (whip, slide, zoom, flash); line-by-line kinetic type; animated maps and route lines; modern thumbnails; synthesised sound design under the edit (whoosh, impact, boom, riser, click, glitch). Tests: 108 engine + 36 platform, all passing.
+- **Next, in order:**
+  1. Edit Director agent: a Claude stage after QA that writes `edit-C1.json` per chapter (per scene: transition, punch-in times, shake times, extra sound hits), validated in code and merged by the timeline; add `edit-*` files to the studio list; update `ROLE_STATUS`.
+  2. Renderer: punch-in zoom at given times, camera shake on impacts, a glitch transition (rgbashift and noise; `transitionFor` already maps the word to nothing yet).
+  3. Owner's own pictures: `pictures/<film id>/SC0012-1.jpg` (or .png/.mp4) replaces that shot in the render (CLI flag and GitHub workflow step, like `voice/` and `music/`); licence report says "provided by the owner".
+  4. More legal sources: Openverse (CC images), Smithsonian, the Met, Art Institute of Chicago, Library of Congress (no known restrictions).
+  5. When the owner connects Cloudflare and the keys: a 2-5 minute test film in saving mode, then fix what breaks.
+- Work rules: small steps, `npm test` and `cd engine && npm run typecheck` before every push, commit and push after every step, branch `ccr-cb190ece-ukm6vg` only, replies to the owner in Bangla, short.
+
+
 - **Branch:** `ccr-cb190ece-ukm6vg` holds everything (it already merged `claude/studio-first-screen-y4tp15`). A new session first runs `git fetch origin && git merge origin/ccr-cb190ece-ukm6vg`. Never push to `main`.
 - **Done:**
   - USA Ramesh Babu film: C1–C6, QA (14 fixes), S6, S7 and the page `productions/ramesh-babu/ramesh-babu-usa.html`.
