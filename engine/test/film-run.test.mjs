@@ -118,6 +118,11 @@ function scriptedModel() {
             { scene: "SC0003", transition: "glitch", punchIns: ["0:00:21.0"] },
             { scene: "SC0004", punchIns: ["0:00:35.0"] }, { scene: "SC0005", punchIns: ["0:00:45.0"] }, { scene: "SC0006", punchIns: ["0:00:55.0"] },
           ] }) + "\n```");
+        case "viewer": {
+          assert.equal(r.system.length, 1, "the panel reads without the production manual");
+          assert.ok(!r.system[0].text.includes("MANUAL") && r.messages[0].content[0].text.includes("SAID: Marker1"), "it sees what is said and seen, not the plan");
+          return reply("```json\n" + JSON.stringify({ stayScore: 7, why: "the mill grabs you", leaves: [{ viewer: "the 19-year-old", scene: "SC0003", reason: "slow" }], kept: ["the bells"], fixes: [{ scene: "SC0003", find: "NARR: Marker3 the", replace: "NARR: Marker3 one", why: "sharper" }] }) + "\n```");
+        }
         case "edit:C2": return reply("```json\n" + JSON.stringify({ scenes: [{ scene: "SC0099", transition: "whip" }, { scene: "SC0008", shakes: ["0:01:15.0"] }] }) + "\n```");
         case "s6": return reply("## S6");
         case "s7": return reply("## S7\n**Final title: The Old Mill at Dawn**");
@@ -139,7 +144,7 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   const store = memoryStore();
   const state = await runFilm({ film: made.film, manual: "MANUAL", model, store });
   assert.equal(state.status, "done", JSON.stringify(state.gaps));
-  assert.deepEqual(model.calls, ["s01", "research", "s2", "s3", "s4", "s4", "s5:C1", "s5:C2", "repair:C2", "qa", "edit:C1", "edit:C2", "s6", "s7"]);
+  assert.deepEqual(model.calls, ["s01", "research", "s2", "s3", "s4", "s4", "s5:C1", "s5:C2", "repair:C2", "qa", "viewer", "edit:C1", "edit:C2", "s6", "s7"]);
   for (const f of ["s01.md", "research.json", "s2.md", "s3.md", "s3-chapters.json", "s4.md", "s5-C1.md", "s5-C2.md", "qa.json", "fix-log.json", "film-check.json", "s6.md", "s7.md", "run.json"]) assert.ok(store.m.has(f), f);
   assert.equal(store.m.get("s4.md"), "## S4\nnarrator\nsound bible\n", "a cut-off reply is continued after its last complete line");
   assert.ok(store.m.get("s5-C1.md").includes("NARR: Marker2 a"), "the QA fix is applied");
@@ -150,7 +155,9 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
 
   const again = await runFilm({ film: made.film, manual: "MANUAL", model, store });
   assert.equal(again.status, "done");
-  assert.equal(model.calls.length, 14, "a finished run makes no new model calls");
+  assert.equal(model.calls.length, 15, "a finished run makes no new model calls");
+  assert.ok(store.m.get("s5-C1.md").includes("NARR: Marker3 one"), "the viewer panel's fix is applied when the code checks still pass");
+  assert.equal(JSON.parse(store.m.get("viewer.json")).applied, 1);
   // The Edit Director's plans, checked in code: the glitch right after a whip is refused, an unknown scene is dropped.
   const e1 = JSON.parse(store.m.get("edit-C1.json"));
   assert.deepEqual(e1.scenes.map((/** @type {any} */ x) => [x.scene, x.transition ?? null, x.punchIns]), [["SC0001", null, [5]], ["SC0002", "whip", [14]], ["SC0003", null, [21]], ["SC0004", null, [35]], ["SC0005", null, [45]], ["SC0006", null, [55]]]);
@@ -171,10 +178,10 @@ test("a run stops at its budget and resumes where it stopped", async () => {
   const stopped = JSON.parse(store.m.get("run.json"));
   assert.equal(stopped.status, "stopped-budget");
   const spent = model.calls.length;
-  assert.ok(spent >= 1 && spent < 14);
+  assert.ok(spent >= 1 && spent < 15);
   const done = await runFilm({ film: made.film, manual: "M", model, store });
   assert.equal(done.status, "done");
-  assert.equal(model.calls.length, 14, "nothing already paid for is asked again");
+  assert.equal(model.calls.length, 15, "nothing already paid for is asked again");
 });
 
 test("the media step writes media-C1.json per chapter, never repeats a clip, and resumes without searching again", async () => {
@@ -410,4 +417,19 @@ test("the market desk: proven videos on the topic reach S1 and S7, and a title t
   const failing = await runFilm({ film: { ...made.film, id: "mkt2" }, manual: "M", model: scriptedModel(), store: memoryStore(), market: { find: async () => { throw new Error("quota"); } } });
   assert.equal(failing.status, "done", "a market search that fails never stops the film");
   assert.match(String(failing.market), /quota/);
+});
+
+test("the viewer panel's fix that breaks the word budget is not applied, and a low stay score is a gap", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "vw");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  const model = { ...base, call: async (/** @type {any} */ r) => (r.stage === "viewer"
+    ? { text: "```json\n" + JSON.stringify({ stayScore: 3, why: "nothing happens for a minute", leaves: [], kept: [], fixes: [{ scene: "SC0002", find: "NARR: Marker2 a river runs past the old mill while the town wakes slowly", replace: "NARR: Marker2.", why: "shorter" }] }) + "\n```", stopReason: "end_turn", usage: { input_tokens: 10, output_tokens: 10 } }
+    : base.call(r)) };
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "M", model, store });
+  const viewer = JSON.parse(store.m.get("viewer.json"));
+  assert.equal(viewer.applied, 0);
+  assert.match(String(viewer.reverted ?? ""), /broke a code check/);
+  assert.ok(state.gaps.some((/** @type {string} */ g) => g.startsWith("viewer panel: the opening scored 3/10")));
 });

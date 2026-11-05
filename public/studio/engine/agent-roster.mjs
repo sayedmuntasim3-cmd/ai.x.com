@@ -412,7 +412,7 @@ export const ROLE_STATUS = Object.freeze({
   "audience-cta": ["model", "S7 call to action"],
   "audience-platform-specs": ["code", "cuts.mjs: 9:16 Shorts and the 4:5 Facebook cut"],
   "audience-metadata": ["model", "S7 description, chapters and tags"],
-  "audience-panel-review": ["model", "the manual's silent expert panel before each stage"],
+  "audience-panel-review": ["model", "the manual's silent expert panel before each stage; after QA a separate viewer panel (five target viewers, no manual, no plan) cold-reads the first two minutes, says where it would leave, and its fixes are kept only if every code check passes"],
 
   "intake-transcriber": ["planned", "no speech-to-text yet"],
   "intake-language-detector": ["code", "studio: content-intel.mjs"],

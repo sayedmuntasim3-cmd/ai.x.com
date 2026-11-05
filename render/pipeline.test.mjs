@@ -41,6 +41,7 @@ function fakeModel() {
       if (stage === "s5:C2") return reply("# C2\n" + [7, 8, 9, 10, 11, 12].map(scene).join("\n"));
       if (stage === "qa") return reply("```json\n" + JSON.stringify({ mustFix: [], passed: ["all"], notChecked: [] }) + "\n```");
       if (stage === "edit:C1") return reply("```json\n" + JSON.stringify({ scenes: [{ scene: "SC0003", transition: "whip", punchIns: ["0:00:22.0"], hits: [{ at: "0:00:27.0", sound: "impact" }] }] }) + "\n```");
+      if (stage === "viewer") return reply("```json\n" + JSON.stringify({ stayScore: 8, why: "a clear stake", leaves: [], kept: ["the wheel"], fixes: [] }) + "\n```");
       if (stage === "edit:C2") return reply("```json\n" + JSON.stringify({ scenes: [] }) + "\n```");
       if (stage === "s7") return reply([
         "**Final title (A): The Last Day of the Old Mill**",

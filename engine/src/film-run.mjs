@@ -131,6 +131,27 @@ export function filmBrief(film) {
 export const SCENE_LINE_EXAMPLE =
   "**SC0001** | 0:00:00-0:00:08 | C1 | HOOK B1 | E | C01, C02 | NARR: Final, speakable narration, numbers spelled out for the voice. | W 20/20 | ANCHOR: \"key word\" -> what appears on screen 0:00:02.5 | SHOTS: (1) 0:00:00-0:00:04 R3 OBJ-01 description, no face; (2) 0:00:04-0:00:08 R1 kinetic card | EV: R1 1 / R3 1 | RUNG: R3/L2 -> R1/L4 | FX: FX-KINETIC, FX-SOURCECHIP | SRC: Pexels https://www.pexels.com/video/... · Q1 \"exact query\" · Q2 \"exact query\" | MOTION: 1.08x push | TRANS: hard cut on the beat | OST: on-screen text; source chip | SFX: SND-FX-01 | MUS: M01 | LOOK: LOOK-M";
 
+/** How much of the film the viewer panel reads: the opening, where most viewers decide. */
+export const VIEWER_SECONDS = 120;
+
+/** The viewer panel's own system prompt: no production manual, no plan, no rules; just the audience. */
+export const VIEWER_SYSTEM = "You are a panel of five real YouTube viewers in the US and the UK, scrolling on phones and TVs in the evening: a 28-year-old who watches business and success stories, a 41-year-old mother who watches true stories, a 55-year-old history fan, a sceptic who checks claims in the comments, and a 19-year-old who leaves after 10 seconds unless something grabs him. You have never seen how this film was made. You only react to what you would hear and see. Be blunt and specific; praise only what earns it.";
+
+/**
+ * What the viewer panel is shown: the film's opening as the audience meets it
+ * (what is said, what is on screen), nothing of the plan behind it.
+ * @param {Film} film @param {import("./scene-lines.mjs").SceneLine[]} scenes
+ */
+export function viewerInstruction(film, scenes) {
+  const lines = scenes.map((s) => `${s.sc} ${toClock(s.start)} | SAID: ${s.wordless ? "(nothing; picture and sound only)" : s.narration} | SEEN: ${(s.fields.SHOTS ?? "").replace(/\s+/g, " ").slice(0, 260)}${s.fields.OST ? ` | ON SCREEN: ${s.fields.OST.slice(0, 120)}` : ""}`);
+  return [
+    `This is the opening of a ${Math.round(film.durationSeconds / 60)}-minute documentary you just clicked on ("${film.topic}"). Read it as you would watch it.`,
+    lines.join("\n"),
+    "Answer as the panel. Where would each of you leave, and why? What is confusing, slow, vague, unbelievable or repeated? What made you stay? Then give the writer exact fixes for the worst moments only (at most 6): change the said words (keep about the same number of words so the timing holds, keep every fact as it is, never invent one), never the scene ids or times.",
+    "Output ONE fenced ```json block: {\"stayScore\": 0-10 (how many of you would still be watching at 2:00, times two), \"why\": \"one sentence\", \"leaves\": [{\"viewer\": \"the 19-year-old\", \"scene\": \"SC0003\", \"reason\": \"...\"}], \"kept\": [\"what worked\"], \"fixes\": [{\"scene\": \"SC0002\", \"find\": \"exact words copied from SAID\", \"replace\": \"new words\", \"why\": \"...\"}]}",
+  ].join("\n\n");
+}
+
 /** How S2 treats the source desk's marks (research facts carry check.status when code opened their pages). */
 export const CHECKED_FACTS = " Facts may carry check.status, set by code that opened their source pages: verified (a page shows the number), opened (a page opened; nothing numeric to look for), unconfirmed (the pages opened but none shows the number: never write it as FACT; give it as REPORTED or ESTIMATE with the source named, or leave it out) and unreachable (no page could be read: attribute it to its source). A number whose check.sites is 1 rests on one site: name that site when it is said.";
 
@@ -197,7 +218,7 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
   const minutes = durationSeconds / 60;
   const chapters = Math.max(1, Math.round(minutes / 7.5));
   const outPerChapter = Math.max(4000, (minutes / chapters) * 2000) * 1.5;
-  const fixedOut = 6 * 12000 * 1.5; // S0-S4, QA, S6, S7
+  const fixedOut = 6 * 12000 * 1.5 + 4000 * 1.5; // S0-S4, QA, S6, S7, and the viewer panel
   // Edit Director: one call per chapter, about 3k tokens out (with thinking) from a short scene sheet.
   const outputTokens = Math.round(chapters * outPerChapter * 1.2 + fixedOut + chapters * 3000 * 1.5); // 1.2: repairs
   const cachedIn = 30000 * (chapters * 2 + 8); // manual + brief + ledger + bibles, read from cache (S5 and the edit per chapter)
@@ -227,7 +248,7 @@ export function costOf(u, model) {
 }
 
 /** Effort per stage: the writing and checking stages think hardest. */
-export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "medium", s3: "high", s4: "medium", s5: "high", repair: "medium", qa: "high", edit: "medium", s6: "medium", s7: "medium" });
+export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "medium", s3: "high", s4: "medium", s5: "high", repair: "medium", qa: "high", viewer: "medium", edit: "medium", s6: "medium", s7: "medium" });
 
 /**
  * Run (or resume) a film. Returns the final run state.
@@ -241,12 +262,15 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * sources (optional, { fetch }) adds the source desk after research: every
  * cited page is opened in code, facts whose pages are all gone are dropped,
  * and each fact is marked verified, opened, unconfirmed or unreachable.
+ * viewers (default true) adds the viewer panel after QA: a cold read of the
+ * first two minutes in its own context, whose fixes are kept only when every
+ * code check still passes; a low stay score is a gap.
  * edit (default true) adds the Edit Director after QA: one call per chapter
  * that writes edit-C1.json ... (transitions, punch-ins, shakes, sound hits),
  * checked in code; edit: false leaves the edit to the script alone.
  * channel (optional) holds the fingerprints of the channel's earlier films;
  * the finished film is compared with them (originality.json) and added.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -266,14 +290,14 @@ export async function runFilm(o) {
 
   /**
    * One model call, with continuation when the reply hits max_tokens.
-   * @param {string} stage @param {Block[]} content @param {number} maxTokens @param {{ webSearch?: { maxUses: number }, effort?: string }} [extra]
+   * @param {string} stage @param {Block[]} content @param {number} maxTokens @param {{ webSearch?: { maxUses: number }, effort?: string, system?: Block[] }} [extra]
    */
   async function ask(stage, content, maxTokens, extra = {}) {
     /** @type {ModelRequest["messages"]} */
     const messages = [{ role: "user", content }];
     let text = "";
     for (let part = 0; part < 4; part += 1) {
-      const reply = await model.call({ stage, system, messages, maxTokens, effort: extra.effort ?? STAGE_EFFORT[/** @type {keyof typeof STAGE_EFFORT} */ (stage.split(":")[0])] ?? "medium", webSearch: extra.webSearch });
+      const reply = await model.call({ stage, system: extra.system ?? system, messages, maxTokens, effort: extra.effort ?? STAGE_EFFORT[/** @type {keyof typeof STAGE_EFFORT} */ (stage.split(":")[0])] ?? "medium", webSearch: extra.webSearch });
       record(stage, reply);
       if (reply.stopReason === "refusal") throw new Error(`The model declined stage ${stage}.`);
       if (reply.stopReason !== "max_tokens") return text + reply.text;
@@ -523,6 +547,43 @@ export async function runFilm(o) {
       await store.put("fix-log.json", JSON.stringify(fixLog, null, 1));
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };
     });
+
+    // The viewer panel: a cold read of the first two minutes by people who never saw the rules or the
+    // plan, as the audience meets it; their fixes are applied only when every code check still passes.
+    if (o.viewers !== false) {
+      await stage("viewer", async () => {
+        const first = plan.chapters[0];
+        const key = `s5-${first.id}.md`;
+        const markdown = await read(key);
+        const opening = parseSceneLines(markdown).filter((s) => s.start < VIEWER_SECONDS);
+        const reply = await ask("viewer", [{ text: viewerInstruction(film, opening) }], 12000, { system: [{ text: VIEWER_SYSTEM }] });
+        const panel = safeJson(reply);
+        if (!panel || typeof panel !== "object") {
+          state.gaps.push("viewer panel: the reply was not valid JSON; the opening was not test-read.");
+          return { ok: false };
+        }
+        const spec = chapterSpec(first, film.versionId);
+        const fixes = (Array.isArray(panel.fixes) ? panel.fixes : []).filter((/** @type {any} */ f) => f && typeof f.find === "string" && typeof f.replace === "string");
+        let applied = 0;
+        if (fixes.length) {
+          const before = checkChapter(markdown, spec);
+          const { text, log: done } = applyFixes(markdown, fixes);
+          const after = checkChapter(text, spec);
+          const hookBefore = hookFindings(parseSceneLines(markdown)).length;
+          const hookAfter = hookFindings(parseSceneLines(text)).length;
+          // A fix that breaks the clock, the word budget or the hook is not applied.
+          if (after.errors.length <= before.errors.length && hookAfter <= hookBefore) {
+            await store.put(`s5-${first.id}.viewer-draft.md`, markdown);
+            await store.put(key, text);
+            applied = done.filter((d) => d.status === "applied").length;
+          } else panel.reverted = "the fixes broke a code check and were not applied";
+        }
+        const stay = Number(panel.stayScore);
+        if (Number.isFinite(stay) && stay < 6) state.gaps.push(`viewer panel: the opening scored ${stay}/10 for staying to watch (${String(panel.why ?? "").slice(0, 160)}).`);
+        await store.put("viewer.json", JSON.stringify({ ...panel, applied }, null, 1));
+        return { stayScore: Number.isFinite(stay) ? stay : null, fixes: fixes.length, applied };
+      });
+    }
 
     // The Edit Director: the edit on top of the script, per chapter, checked in code.
     if (o.edit !== false) {
