@@ -111,9 +111,12 @@ function scriptedModel() {
         case "qa": return reply("```json\n" + JSON.stringify({ mustFix: [{ lens: "facts", chapter: "C1", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }], passed: ["p"], notChecked: [] }) + "\n```");
         case "edit:C1":
           assert.ok(r.messages[0].content[0].text.includes("SC0002 0:00:10.0-0:00:20.0"), "the director sees the scene sheet");
+          assert.ok(r.messages[0].content[0].text.includes("LONG HOLDS") && r.messages[0].content[0].text.includes("SC0001-1 0:00:00.0-0:00:10.0 (10 s)"), "and the holds code measured");
           return reply("```json\n" + JSON.stringify({ scenes: [
+            { scene: "SC0001", punchIns: ["0:00:05.0"] },
             { scene: "SC0002", transition: "whip", punchIns: ["0:00:14.0"], shakes: [], hits: [{ at: "0:00:14.0", sound: "impact" }], why: "the turn" },
             { scene: "SC0003", transition: "glitch", punchIns: ["0:00:21.0"] },
+            { scene: "SC0004", punchIns: ["0:00:35.0"] }, { scene: "SC0005", punchIns: ["0:00:45.0"] }, { scene: "SC0006", punchIns: ["0:00:55.0"] },
           ] }) + "\n```");
         case "edit:C2": return reply("```json\n" + JSON.stringify({ scenes: [{ scene: "SC0099", transition: "whip" }, { scene: "SC0008", shakes: ["0:01:15.0"] }] }) + "\n```");
         case "s6": return reply("## S6");
@@ -150,12 +153,13 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   assert.equal(model.calls.length, 14, "a finished run makes no new model calls");
   // The Edit Director's plans, checked in code: the glitch right after a whip is refused, an unknown scene is dropped.
   const e1 = JSON.parse(store.m.get("edit-C1.json"));
-  assert.deepEqual(e1.scenes.map((/** @type {any} */ x) => [x.scene, x.transition ?? null, x.punchIns]), [["SC0002", "whip", [14]], ["SC0003", null, [21]]]);
+  assert.deepEqual(e1.scenes.map((/** @type {any} */ x) => [x.scene, x.transition ?? null, x.punchIns]), [["SC0001", null, [5]], ["SC0002", "whip", [14]], ["SC0003", null, [21]], ["SC0004", null, [35]], ["SC0005", null, [45]], ["SC0006", null, [55]]]);
+  assert.deepEqual(e1.holds, { found: 6, uncovered: [] }, "code found the 10-second holds of the first minute; the director covered each");
   assert.ok(e1.problems.some((/** @type {string} */ p) => p.startsWith("SC0003") && p.includes("right after another named transition")));
   const e2 = JSON.parse(store.m.get("edit-C2.json"));
   assert.deepEqual(e2.scenes.map((/** @type {any} */ x) => [x.scene, x.shakes]), [["SC0008", [75]]]);
   assert.ok(e2.problems.some((/** @type {string} */ p) => p.startsWith("SC0099")));
-  assert.deepEqual(state.stages["edit:C1"].result, { scenes: 2, transitions: 1, photos: 0, punchIns: 2, shakes: 0, hits: 1, dropped: 1 });
+  assert.deepEqual(state.stages["edit:C1"].result, { scenes: 6, transitions: 1, photos: 0, punchIns: 6, shakes: 0, hits: 1, dropped: 1, longHolds: 6, uncovered: 0 });
 });
 
 test("a run stops at its budget and resumes where it stopped", async () => {

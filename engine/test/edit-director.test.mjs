@@ -99,3 +99,20 @@ test("the director may show a scene's photos as prints or push toward one part; 
   assert.ok(plan.problems.some((p) => p.startsWith("SC0004")), "a leak over the script's dissolve is refused");
   assert.ok(editInstruction("C1", "", "History epic (archive look)").includes("This film: History epic"), "the director knows the kind of film");
 });
+
+test("code measures long holds: over 6 s in the first minute, over 12 s after; wordless scenes and black are left alone", async () => {
+  const { longHolds, uncoveredHolds } = await import("../src/edit-director.mjs");
+  const video = [
+    { id: "SC0001-1", scene: "SC0001", start: 0, end: 8, type: "clip" },
+    { id: "SC0002-1", scene: "SC0002", start: 8, end: 13, type: "clip" },
+    { id: "SC0003-1", scene: "SC0003", start: 13, end: 25, type: "card" },
+    { id: "SC0004-1", scene: "SC0004", start: 70, end: 81, type: "clip" },
+    { id: "SC0005-1", scene: "SC0005", start: 81, end: 99, type: "clip" },
+    { id: "SC0006-1", scene: "SC0006", start: 99, end: 120, type: "black" },
+  ];
+  const holds = longHolds(video, new Set(["SC0001", "SC0002", "SC0004", "SC0005", "SC0006"]));
+  assert.deepEqual(holds.map((h) => [h.id, h.seconds]), [["SC0001-1", 8], ["SC0005-1", 18]], "SC0003 is wordless, SC0004 is under 12 s after the first minute, SC0006 is black");
+  const plan = { chapter: "C1", by: /** @type {const} */ ("edit-director"), problems: [], scenes: [{ scene: "SC0001", punchIns: [4], shakes: [], hits: [] }, { scene: "SC0005", punchIns: [], shakes: [], hits: [], photo: { focus: /** @type {const} */ ("left") } }] };
+  assert.deepEqual(uncoveredHolds(holds, plan), []);
+  assert.deepEqual(uncoveredHolds(holds, { ...plan, scenes: [] }).map((h) => h.id), ["SC0001-1", "SC0005-1"]);
+});

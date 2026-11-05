@@ -58,7 +58,7 @@ export function applyOwnPictures(timeline, folder) {
     const own = folder.shots[v.id];
     if (!own) return v;
     applied.push(v.id);
-    const { split: _split, counter: _counter, map: _map, speed: _speed, ...rest } = v;
+    const { split: _split, counter: _counter, map: _map, speed: _speed, chart: _chart, highlight: _highlight, ...rest } = v;
     // The file's content is part of the shot, so a replaced picture under the same name is rendered again.
     const fileHash = createHash("sha256").update(readFileSync(own.file)).digest("hex").slice(0, 12);
     return { ...rest, type: "clip", url: own.file, sourcePageUrl: null, licence: OWNER_LICENCE, motion: own.kind === "image" ? "push" : "none", text: "", sourceIn: 0, still: own.kind === "image", fileHash };

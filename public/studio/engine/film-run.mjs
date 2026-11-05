@@ -14,7 +14,8 @@
  * - step(name, fn)                                       (Cloudflare Workflows step.do, or fn() in tests)
  * so a run survives restarts: a finished stage is never paid for twice.
  */
-import { editInstruction, editSheet, editStats, validateEditPlan } from "./edit-director.mjs";
+import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
+import { buildTimeline } from "./timeline.mjs";
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
@@ -478,12 +479,17 @@ export async function runFilm(o) {
           const markdown = await read(`s5-${c.id}.md`);
           const format = film.formatId ? getFormat(film.formatId) : null;
           const style = format ? `${format.name} (${lookFor(film.formatId)} look)` : "a general documentary";
-          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style) }], 16000);
+          // Code measures where one picture holds too long; the director is told, and what it leaves uncovered is a gap.
+          const laid = buildTimeline({ chapters: [{ id: c.id, markdown }], autoSound: false });
+          const holds = longHolds(laid.video, new Set(laid.narration.map((n) => n.scene)));
+          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style, holds) }], 16000);
           const parsed = safeJson(reply);
           const edit = validateEditPlan(parsed, markdown, c.id);
           if (parsed === null) state.gaps.push(`${c.id} edit: the Edit Director's reply was not valid JSON; this chapter's edit follows the script alone.`);
-          await store.put(`edit-${c.id}.json`, JSON.stringify(edit, null, 1));
-          return editStats(edit);
+          const left = uncoveredHolds(holds, edit);
+          if (left.length) state.gaps.push(`${c.id} edit: ${left.length} shot${left.length > 1 ? "s hold" : " holds"} one picture too long with no move (${left.slice(0, 8).map((h) => `${h.id} ${h.seconds} s`).join(", ")}${left.length > 8 ? " ..." : ""}).`);
+          await store.put(`edit-${c.id}.json`, JSON.stringify({ ...edit, holds: { found: holds.length, uncovered: left.map((h) => h.id) } }, null, 1));
+          return { ...editStats(edit), longHolds: holds.length, uncovered: left.length };
         });
       }
     }

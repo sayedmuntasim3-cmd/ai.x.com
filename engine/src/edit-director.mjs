@@ -70,8 +70,9 @@ export const EDIT_CRAFT = [
 /**
  * The instruction for one chapter's Edit Director call.
  * @param {string} chapterId @param {string} sheet @param {string} [style] the film's format and look, so the edit fits the kind of film
+ * @param {ReturnType<typeof longHolds>} [holds] shots code found holding too long
  */
-export function editInstruction(chapterId, sheet, style = "") {
+export function editInstruction(chapterId, sheet, style = "", holds = []) {
   return [
     `You are the Edit Director for chapter ${chapterId}: the editor of a documentary channel whose films reach tens of millions of viewers in the US and Europe.${style ? ` This film: ${style}.` : ""} The script below is final and checked; do not change words, shots or times. Decide the edit on top of it, scene by scene, where it serves the story:`,
     EDIT_CRAFT,
@@ -82,8 +83,38 @@ export function editInstruction(chapterId, sheet, style = "") {
     `- hits: extra sound hits ${Object.keys(EDIT_SOUNDS).map((k) => `"${k}"`).join(", ")} at the moment they land (a riser ends at its time); at most ${EDIT_LIMITS.hitsPerScene} per scene, ${EDIT_LIMITS.hitGap} s apart. The edit already adds a whoosh into each whip, slide, zoom or leak, a boom under a flash, a riser into each chapter and an impact on counters, so do not repeat those.`,
     `Times are film-clock "h:mm:ss.s", inside the scene, not in its first or last ${EDIT_LIMITS.edgeSeconds} s. Time a word by its place in the narration (the narrator reads at an even pace across the scene). A wordless scene with no reason to move stays untouched. Restraint wins: an edit that never rests tires the viewer.`,
     "Output ONE fenced ```json block and nothing after it: {\"scenes\": [{\"scene\": \"SC0001\", \"transition\": \"whip\", \"punchIns\": [\"0:00:03.2\"], \"shakes\": [], \"photo\": {\"frame\": \"print\", \"focus\": \"left\"}, \"hits\": [{\"at\": \"0:00:03.2\", \"sound\": \"impact\"}], \"why\": \"a short reason\"}]}. List only scenes you change.",
+    holds.length ? `LONG HOLDS (code measured these shots: one picture stays on screen longer than viewers stay with it). Give each at least one punch-in inside it, on its strongest word, or a photo focus for its scene:\n${holds.map((h) => `${h.id} ${clock(h.start)}-${clock(h.end)} (${h.seconds} s)`).join("\n")}` : "",
     `<CHAPTER_${chapterId}>\n${sheet}\n</CHAPTER_${chapterId}>`,
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
+}
+
+/** How long one picture may stay on screen before the viewer drifts: in the film's first minute, and after it. */
+export const HOLD_LIMITS = Object.freeze({ hookSeconds: 60, hook: 6, rest: 12 });
+
+/**
+ * Shots that hold one picture longer than viewers stay with it (code's
+ * retention check): over 6 s in the film's first minute, over 12 s after.
+ * Wordless scenes are left alone (a held silence is a choice), and so is black.
+ * @param {{ id: string, scene: string, start: number, end: number, type: string }[]} video the chapter's timeline segments
+ * @param {Set<string>} narrated scenes that have narration
+ * @returns {{ id: string, scene: string, start: number, end: number, seconds: number }[]}
+ */
+export function longHolds(video, narrated) {
+  return video.filter((v) => v.type !== "black" && narrated.has(v.scene) && v.end - v.start > (v.start < HOLD_LIMITS.hookSeconds ? HOLD_LIMITS.hook : HOLD_LIMITS.rest) + 0.05)
+    .map((v) => ({ id: v.id, scene: v.scene, start: v.start, end: v.end, seconds: Math.round((v.end - v.start) * 10) / 10 }));
+}
+
+/**
+ * The long holds the director's plan leaves without a move (no punch-in
+ * inside the shot and no photo focus on its scene).
+ * @param {ReturnType<typeof longHolds>} holds @param {EditPlan} plan
+ */
+export function uncoveredHolds(holds, plan) {
+  const by = new Map(plan.scenes.map((s) => [s.scene, s]));
+  return holds.filter((h) => {
+    const e = by.get(h.scene);
+    return !(e && (e.photo?.focus || e.punchIns.some((t) => t >= h.start && t < h.end)));
+  });
 }
 
 /**
