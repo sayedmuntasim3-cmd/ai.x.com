@@ -262,7 +262,7 @@ export function mapRoute(text) {
 
 /**
  * The transition a scene's TRANS field asks for into its first shot, when it
- * is not a cut or a dip: a whip pan, a slide, a zoom through, or a white flash.
+ * is not a cut or a dip: a whip pan, a slide, a zoom through, a white flash or a glitch.
  * @param {string} trans
  * @returns {Transition | null}
  */
@@ -272,6 +272,7 @@ export function transitionFor(trans) {
   if (/\bzoom[- ]?(through|transition|cut|in transition)\b|\bpunch[- ]?in transition\b/.test(t)) return "zoom";
   if (/\b(slide|push) (transition|left|right|across)\b|\bslide\b/.test(t)) return "slide";
   if (/\b(white )?flash\b|\bflash[- ]?cut\b/.test(t)) return "flash";
+  if (/\bglitch\b/.test(t)) return "glitch";
   return null;
 }
 

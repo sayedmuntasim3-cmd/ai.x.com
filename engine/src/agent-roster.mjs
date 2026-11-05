@@ -329,7 +329,7 @@ export const ROLE_STATUS = Object.freeze({
   "cinematography-visual-director": ["model", "S5 shots: evidence or illustration rung per shot"],
   "cinematography-composition": ["planned", "picks are not judged for composition yet"],
   "cinematography-lens-language": ["model", "S4 look: lens kit"],
-  "cinematography-camera-motion": ["code", "renderer: push-ins and slow motion from the MOTION field"],
+  "cinematography-camera-motion": ["code", "renderer: push-ins and slow motion from the MOTION field; the Edit Director's punch-ins and camera shakes"],
   "cinematography-lighting": ["planned", "no lighting continuity check yet"],
   "cinematography-environment": ["model", "S4 locations"],
   "cinematography-archive-language": ["model", "S5 rungs; renderer archive look"],
@@ -345,7 +345,7 @@ export const ROLE_STATUS = Object.freeze({
   "animation-2d-animation": ["planned", "not built yet"],
   "animation-3d-visualization": ["planned", "not built yet"],
   "animation-parallax": ["code", "renderer: 2.5D parallax on portrait and square archive photos"],
-  "animation-transition-logic": ["code", "renderer: whip pans, slides, zoom-throughs, flashes, dips to black and chapter dips from the TRANS field"],
+  "animation-transition-logic": ["code", "renderer: whip pans, slides, zoom-throughs, flashes, glitches (torn colour and noise), dips to black and chapter dips from the TRANS field and the Edit Director"],
   "animation-fx-qc": ["planned", "not built yet"],
 
   "footage-asset-strategist": ["model", "S5: search queries per shot"],

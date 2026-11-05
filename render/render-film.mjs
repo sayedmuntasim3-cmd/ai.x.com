@@ -174,6 +174,53 @@ async function downloadClip(url, dir) {
  */
 
 /**
+ * The Edit Director's moves on one shot as one zoompan filter: each punch-in
+ * pushes the frame 12% in over a tenth of a second and holds to the end of the
+ * shot (two add up); a shake is 0.4 s of decaying jitter with a little zoom,
+ * so the frame's edge never shows. "" when the shot has neither.
+ * @param {{ frames: number, punchIns?: number[], shakes?: number[] }} v @param {number} width @param {number} height @param {number} fps
+ */
+export function editMotion(v, width, height, fps) {
+  const { punches, shakes } = editFrames(v, fps);
+  if (!punches.length && !shakes.length) return "";
+  const ramp = Math.max(1, Math.round(fps * 0.1));
+  const decay = Math.max(2, Math.round(fps * 0.4));
+  const punch = punches.map((p) => `clip((on-${p})/${ramp},0,1)`).join("+") || "0";
+  const shake = shakes.map((s) => `clip(1-(on-${s})/${decay},0,1)*gte(on,${s})`).join("+") || "0";
+  return `zoompan=z='1+0.12*(${punch})+0.05*(${shake})':x='iw/2-(iw/zoom/2)+iw*0.012*(${shake})*sin(on*1.9)':y='ih/2-(ih/zoom/2)+ih*0.012*(${shake})*cos(on*2.3)':d=1:s=${width}x${height}:fps=${fps}`;
+}
+
+/** The frames of a shot's punch-ins and shakes that fall inside it. @param {{ frames: number, punchIns?: number[], shakes?: number[] }} v @param {number} fps */
+function editFrames(v, fps) {
+  const at = (/** @type {number[] | undefined} */ list) => (list ?? []).map((s) => Math.round(s * fps)).filter((f) => f >= 0 && f < v.frames);
+  return { punches: at(v.punchIns), shakes: at(v.shakes) };
+}
+/** @param {{ frames: number, punchIns?: number[], shakes?: number[] }} v @param {number} fps */
+function editMotionCount(v, fps) {
+  const f = editFrames(v, fps);
+  return { punchIns: f.punches.length, shakes: f.shakes.length };
+}
+
+/**
+ * A glitch transition drawn in the shot itself: three short bursts of torn
+ * colour channels (rgbashift) under digital noise, over its first 0.3 s.
+ * @param {number} seconds the shot's length @param {number} height
+ */
+export function glitchIn(seconds, height) {
+  const d = Math.min(0.3, seconds / 3);
+  const s = Math.max(2, Math.round(height * 0.012));
+  const a = (d / 3).toFixed(3);
+  const b = ((2 * d) / 3).toFixed(3);
+  const e = d.toFixed(3);
+  return [
+    `rgbashift=rh=-${s}:bh=${s}:enable='lt(t,${a})'`,
+    `rgbashift=rh=${s}:gv=${Math.ceil(s / 2)}:bh=-${s}:enable='between(t,${a},${b})'`,
+    `rgbashift=rh=-${2 * s}:bv=${s}:enable='between(t,${b},${e})'`,
+    `noise=alls=48:allf=t:enable='lt(t,${e})'`,
+  ];
+}
+
+/**
  * Render the timeline. Returns what was rendered and every warning.
  * @param {RenderOptions} o
  */
@@ -233,7 +280,9 @@ export async function renderFilm(o) {
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
-    const key = hash({ v: 8, map: v.map ?? null, transition: v.transition === "flash" ? "flash" : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
+    const moves = v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {};
+    const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -394,6 +443,9 @@ export async function renderFilm(o) {
         } else if (v.text && font) chain.push(text(wrap(v.text, 26), "card", cardStyle));
       }
     }
+    // The Edit Director's punch-ins and camera shakes move the picture (titles, chips and bars stay put).
+    const motion = type === "black" ? "" : editMotion(v, t.width, t.height, t.fps);
+    if (motion) chain.push(motion);
     // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.
     if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:${rise(v.kinetic, "h*0.72")}`));
     if (BARS) chain.push(BARS);
@@ -412,6 +464,8 @@ export async function renderFilm(o) {
     if (v.fadeIn) chain.push(`fade=t=in:st=0:d=${v.fadeIn.toFixed(3)}`);
     // A white flash into the scene: the first fifth of a second comes up from white.
     if (v.transition === "flash" && !v.fadeIn) chain.push(`fade=t=in:st=0:d=${Math.min(0.2, seconds / 4).toFixed(3)}:color=white`);
+    // A glitch into the scene: colour channels torn apart and digital noise for its first few frames.
+    if (v.transition === "glitch" && !v.fadeIn) chain.push(...glitchIn(seconds, t.height));
     if (v.fadeOut) chain.push(`fade=t=out:st=${Math.max(0, seconds - v.fadeOut).toFixed(3)}:d=${v.fadeOut.toFixed(3)}`);
     const vf = chain.length ? chain.join(",") : "null";
     const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), complex ? "-filter_complex" : "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
@@ -645,7 +699,9 @@ export async function renderFilm(o) {
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
-  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, master, licences, warnings };
+  // What the Edit Director's plan put on screen (punch-ins and shakes drawn, glitches into scenes).
+  const edit = { punchIns: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).punchIns), 0), shakes: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).shakes), 0), glitches: t.video.filter((v) => v.transition === "glitch" && !v.fadeIn).length };
+  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, master, licences, warnings };
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;

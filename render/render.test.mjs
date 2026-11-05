@@ -278,6 +278,36 @@ test("a whip pan moves from the last frame of the shot before; the film keeps it
   }
 });
 
+test("the Edit Director's moves are drawn: a punch-in holds, a shake jitters and settles, a glitch tears the colour", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-moves-"));
+  try {
+    const md = [
+      "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"PUNCH\" | LOOK: L",
+      "**SC0002** | 0:00:03-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"GLITCH\" | TRANS: glitch | LOOK: L",
+    ].join("\n");
+    const edit = { chapter: "C1", by: /** @type {const} */ ("edit-director"), problems: [], scenes: [{ scene: "SC0001", punchIns: [1], shakes: [2], hits: [] }] };
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md, edit }], width: 320, height: 180, fps: 10 });
+    assert.equal(timeline.video[1].transition, "glitch", "the script's word becomes a glitch");
+    const out = join(dir, "t.mp4");
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    assert.deepEqual(report.stats.edit, { punchIns: 1, shakes: 1, glitches: 1 });
+    assert.ok(Math.abs((await mediaDuration(out)) - 6) < 0.15, "the moves never shift the clock");
+    const frame = (/** @type {number} */ s, fmt = "gray") => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", fmt, "-"]).stdout;
+    const diff = (/** @type {Buffer} */ a, /** @type {Buffer} */ b) => { let n = 0; for (let i = 0; i < a.length; i += 1) n += Math.abs(a[i] - b[i]); return n / a.length; };
+    // The card's word is bright on dark: punched in, more of the frame is lit.
+    const lit = (/** @type {Buffer} */ f) => f.filter((b) => b > 128).length;
+    assert.ok(lit(frame(1.5)) > lit(frame(0.5)) * 1.15, `the punch-in enlarges the picture (${lit(frame(0.5))} -> ${lit(frame(1.5))} lit pixels)`);
+    assert.ok(lit(frame(2.9)) > lit(frame(0.5)) * 1.15, "and holds to the end of the shot");
+    assert.ok(diff(frame(2.1), frame(1.9)) > 1, "the shake moves the frame");
+    assert.ok(diff(frame(2.8), frame(2.7)) < 0.5, "and settles");
+    // The glitch: colour channels pulled apart for the first frames of the shot, then the clean card.
+    const tear = (/** @type {Buffer} */ f) => { let n = 0; for (let i = 0; i < f.length; i += 3) n += Math.abs(f[i] - f[i + 2]); return n / (f.length / 3); };
+    assert.ok(tear(frame(3.05, "rgb24")) > tear(frame(4.5, "rgb24")) + 2, `the glitch tears the colour (${tear(frame(3.05, "rgb24")).toFixed(1)} vs ${tear(frame(4.5, "rgb24")).toFixed(1)})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a thumbnail can come from an archive photograph (one frame, nothing to seek into)", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
   const { renderThumbnails } = await import("./thumbnails.mjs");
   const dir = mkdtempSync(join(tmpdir(), "zupona-thumb-"));
