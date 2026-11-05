@@ -339,3 +339,21 @@ test("a route map draws its line from the first place to the second over time", 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the synthesised sound design is heard under the edit", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-autosfx-"));
+  try {
+    const md = [
+      "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"ONE\" | LOOK: L",
+      "**SC0002** | 0:00:03-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"TWO\" | TRANS: whip pan | LOOK: L",
+    ].join("\n");
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 160, height: 90, fps: 10 });
+    const out = join(dir, "s.mp4");
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    const level = (/** @type {number} */ from, /** @type {number} */ to) => Number(/mean_volume: (-?[\d.]+) dB/.exec(spawnSync("ffmpeg", ["-v", "info", "-ss", String(from), "-t", String(to - from), "-i", out, "-af", "volumedetect", "-f", "null", "-"], { encoding: "utf8" }).stderr)?.[1] ?? -99);
+    assert.ok(level(2.7, 3.3) > level(0.5, 1.5) + 15, `the whoosh into the whip is heard (${level(2.7, 3.3)} vs ${level(0.5, 1.5)} dB)`);
+    assert.ok(Math.abs((await mediaDuration(out)) - 6) < 0.15);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

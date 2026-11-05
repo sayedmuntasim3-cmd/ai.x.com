@@ -164,3 +164,15 @@ test("a map shot that travels between two places becomes a route", async () => {
   assert.equal(mapRoute("R1 FX-MAP Cairo (30.04, 31.23)"), null, "one place is not a route");
   assert.equal(mapPlaces("R1 FX-MAP Lima 12.05°S 77.04°W and Quito 0.18°S 78.47°W").length, 2);
 });
+
+test("the edit's sound design follows the edit: whoosh into whips, boom under flashes, impact on counters, riser into chapters, never crowded", async () => {
+  const { buildTimeline: build } = await import("../src/timeline.mjs");
+  const L = (/** @type {number} */ n, /** @type {number} */ a, /** @type {number} */ b, /** @type {string} */ rest) => `**SC000${n}** | 0:00:${String(a).padStart(2, "0")}-0:00:${String(b).padStart(2, "0")} | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | ${rest} | LOOK: L`;
+  const c1 = [L(1, 0, 4, "SHOTS: (1) R1 card \"ONE\""), L(2, 4, 8, "SHOTS: (1) R1 card \"TWO\" | TRANS: whip pan"), L(3, 8, 9, "SHOTS: (1) R1 counter card \"400 CARS\" | FX: FX-COUNTER")].join("\n");
+  const c2 = L(4, 9, 14, "SHOTS: (1) R1 card \"FOUR\" | TRANS: white flash").replace("| C1 |", "| C2 |");
+  const t = build({ chapters: [{ id: "C1", markdown: c1, title: "One" }, { id: "C2", markdown: c2, title: "Two" }] });
+  const auto = t.sfx.filter((e) => e.token.startsWith("AUTO-")).map((e) => [e.token, e.start, e.scene]);
+  assert.deepEqual(auto, [["AUTO-WHOOSH", 3.8, "SC0001"], ["AUTO-IMPACT", 8.05, "SC0003"]], "the riser at 7.4 s and the boom at 9 s are dropped: each would land within 1.5 s of another sound");
+  const quiet = build({ chapters: [{ id: "C1", markdown: c1 }], autoSound: false });
+  assert.equal(quiet.sfx.filter((e) => e.token.startsWith("AUTO-")).length, 0, "it can be switched off");
+});

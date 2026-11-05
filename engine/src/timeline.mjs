@@ -273,6 +273,41 @@ export function transitionFor(trans) {
   return null;
 }
 
+/**
+ * The sound design an editor lays under the edit, from the edit itself:
+ * a whoosh into a whip, slide or zoom; a boom under a white flash; a glitch
+ * sound on a glitch; an impact when a number counts up or a key line lands;
+ * a riser into each new chapter; a soft click on the first archive photo of
+ * a run; a whoosh as a map opens. Never two within 1.5 seconds, so the edit
+ * breathes. Tokens AUTO-* are synthesised by the renderer (render/sfx-synth.mjs).
+ * @param {VideoSegment[]} video
+ * @returns {SoundEvent[]}
+ */
+export function autoSounds(video) {
+  /** @type {SoundEvent[]} */
+  const out = [];
+  let last = -Infinity;
+  const add = (/** @type {string} */ token, /** @type {number} */ start, /** @type {string} */ scene, /** @type {number} */ length) => {
+    const at = Math.max(0, start);
+    if (at - last < 1.5) return;
+    last = at;
+    out.push({ token, kind: "hit", scene, start: Math.round(at * 1000) / 1000, end: Math.round((at + length) * 1000) / 1000 });
+  };
+  video.forEach((v, i) => {
+    const prev = video[i - 1];
+    // A sound that starts before its shot belongs to the shot before, so it sits in that shot's span.
+    const before = prev?.scene ?? v.scene;
+    if (v.chapterTitle && i > 0) add("AUTO-RISER", v.start - 1.6, before, 1.6);
+    if (v.transition === "whip" || v.transition === "slide" || v.transition === "zoom") add("AUTO-WHOOSH", v.start - 0.2, before, 0.55);
+    else if (v.transition === "flash") add("AUTO-BOOM", v.start, v.scene, 2.4);
+    else if (v.transition === "glitch") add("AUTO-GLITCH", v.start, v.scene, 0.4);
+    else if (v.map && !(prev?.map)) add("AUTO-WHOOSH", v.start - 0.15, before, 0.55);
+    if (v.counter || (v.kinetic && v.type === "card")) add("AUTO-IMPACT", v.start + 0.05, v.scene, 1.1);
+    else if (v.still && !prev?.still) add("AUTO-CLICK", v.start + 0.02, v.scene, 0.18);
+  });
+  return out;
+}
+
 /** Seconds of the dip through black at a chapter break, and at a written dissolve or fade. */
 export const CHAPTER_DIP = 0.4;
 export const SCENE_DIP = 0.25;
@@ -295,7 +330,7 @@ export function slowMotion(motion) {
 }
 
 /**
- * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook }} o
+ * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook, autoSound?: boolean }} o
  * @returns {Timeline}
  */
 export function buildTimeline(o) {
@@ -437,6 +472,8 @@ export function buildTimeline(o) {
     }
   }
   const frames = video.reduce((n, v) => n + v.frames, 0);
+  // The edit's own sound design (synthesised by the renderer): whooshes, impacts, risers, booms.
+  if (o.autoSound !== false) sfx.push(...autoSounds(video));
   return {
     width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, look: o.look ?? "documentary", notes,
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },

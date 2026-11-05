@@ -14,6 +14,10 @@
  *   options: --voice <SC0001.mp3 ...> --music <M01.mp3 ...> --sfx <SND-FX-01.mp3 ...> --width 1920 --height 1080 --fps 30 --work .render --font /path/font.ttf
  */
 import { mapSvg, routeSvgs } from "./maps.mjs";
+import { synthSounds } from "./sfx-synth.mjs";
+
+/** Levels of the synthesised edit sounds in the effects mix. */
+const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -531,8 +535,10 @@ export async function renderFilm(o) {
   // 4. Sound effects: per scene, its ambience looped low under the whole scene and its one-shots at their moments.
   /** @type {string | null} */
   let sfxFile = null;
-  const sounds = (t.sfx ?? []).filter((e) => o.sfx?.[e.token]);
-  const missingSfx = new Set((t.sfx ?? []).filter((e) => !o.sfx?.[e.token]).map((e) => e.token));
+  // The edit's own sound design is synthesised here (free, nobody's copyright); a file the owner gives wins.
+  const sfxFiles = (t.sfx ?? []).some((e) => e.token.startsWith("AUTO-")) ? { ...(await synthSounds(join(dirs.audio, "synth"), ffmpeg)), ...(o.sfx ?? {}) } : { ...(o.sfx ?? {}) };
+  const sounds = (t.sfx ?? []).filter((e) => sfxFiles[e.token]);
+  const missingSfx = new Set((t.sfx ?? []).filter((e) => !sfxFiles[e.token]).map((e) => e.token));
   if (missingSfx.size && sounds.length) warnings.push(`Sound effects without a file: ${[...missingSfx].sort().join(", ")}.`);
   if (sounds.length) {
     // One span per scene, from its earliest sound to the scene's end; one-shots sit at their offset inside it.
@@ -549,11 +555,14 @@ export async function renderFilm(o) {
     const pieces = [];
     let at = 0;
     for (const span of spans) {
+      // Nothing may ring past the end of the film (a boom under the last shot is cut at the last frame).
+      const end = Math.min(span.end, t.durationSeconds);
       const start = Math.max(span.start, at);
+      if (start >= end) continue;
       if (start > at + 1e-6) pieces.push(await audioPiece(null, Math.round(start * SAMPLE_RATE) - Math.round(at * SAMPLE_RATE)));
-      const samples = Math.round(span.end * SAMPLE_RATE) - Math.round(start * SAMPLE_RATE);
+      const samples = Math.round(end * SAMPLE_RATE) - Math.round(start * SAMPLE_RATE);
       if (samples > 0) pieces.push(await scenePiece(span.events, start, samples));
-      at = Math.max(at, span.end);
+      at = Math.max(at, end);
     }
     const tail = Math.round(t.durationSeconds * SAMPLE_RATE) - Math.round(at * SAMPLE_RATE);
     if (tail > 0) pieces.push(await audioPiece(null, tail));
@@ -569,7 +578,7 @@ export async function renderFilm(o) {
    * @param {typeof sounds} events @param {number} start @param {number} samples
    */
   async function scenePiece(events, start, samples) {
-    const key = hash({ sfx: events.map((e) => [e.token, resolve(String(o.sfx?.[e.token])), e.kind, Math.round((e.start - start) * 1000)]), samples });
+    const key = hash({ sfx: events.map((e) => [e.token, resolve(String(sfxFiles[e.token])), e.kind, Math.round((e.start - start) * 1000)]), samples });
     const out = join(dirs.audio, `s-${key}.wav`);
     if (existsSync(out)) return out;
     /** @type {string[]} */
@@ -577,9 +586,11 @@ export async function renderFilm(o) {
     /** @type {string[]} */
     const chains = [];
     events.forEach((e, i) => {
-      const file = /** @type {string} */ (o.sfx?.[e.token]);
+      const file = /** @type {string} */ (sfxFiles[e.token]);
+      // Synthesised edit sounds sit a little lower than the script's own effects, so they support rather than shout.
+      const gain = AUTO_GAIN[/** @type {keyof typeof AUTO_GAIN} */ (e.token)] ?? 0.45;
       if (e.kind === "bed") { inputs.push("-stream_loop", "-1", "-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},pan=mono|c0=c0,volume=0.12[s${i}]`); }
-      else { const ms = Math.max(0, Math.round((e.start - start) * 1000)); inputs.push("-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},pan=mono|c0=c0,volume=0.45,adelay=${ms}:all=1[s${i}]`); }
+      else { const ms = Math.max(0, Math.round((e.start - start) * 1000)); inputs.push("-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},pan=mono|c0=c0,volume=${gain},adelay=${ms}:all=1[s${i}]`); }
     });
     const graph = `${chains.join(";")};${events.map((_, i) => `[s${i}]`).join("")}amix=inputs=${events.length}:normalize=0:duration=longest,apad,atrim=end_sample=${samples}[out]`;
     await run(ffmpeg, ["-v", "error", "-y", ...inputs, "-filter_complex", graph, "-map", "[out]", "-ac", "1", "-c:a", "pcm_s16le", out + ".part.wav"]);
