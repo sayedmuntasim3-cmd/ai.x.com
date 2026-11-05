@@ -1,3 +1,371 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ==========================================================================
+   Zupona AI brand colors. Each value is "R G B" so Tailwind can add opacity
+   (bg-volt/10). Change a value here, run `npm run build`, and the whole site
+   follows. See BRAND.md for when to use each color.
+   ========================================================================== */
+:root {
+  --night: 7 7 11;        /* Night        #07070B  page background            */
+  --ink: 13 13 20;        /* Ink          #0D0D14  panels, alternate sections */
+  --surface: 20 20 30;    /* Surface      #14141E  cards                      */
+  --raised: 30 30 44;     /* Raised       #1E1E2C  chips, inputs              */
+  --cloud: 245 245 247;   /* Cloud        #F5F5F7  headings, main text        */
+  --mist: 163 163 184;    /* Mist         #A3A3B8  body text, labels          */
+  --volt: 200 255 61;     /* Volt         #C8FF3D  buttons, key highlights    */
+  --aqua: 92 242 224;     /* Aqua         #5CF2E0  second accent              */
+  --ultra: 139 108 255;   /* Ultraviolet  #8B6CFF  glows and depth            */
+  --flare: 255 107 74;    /* Flare        #FF6B4A  tiny warm accents          */
+  color-scheme: dark;
+}
+
+@property --angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: rgb(var(--night));
+    color: rgb(var(--cloud));
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgb(var(--volt));
+    color: rgb(var(--night));
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--volt));
+    outline-offset: 3px;
+  }
+  textarea:focus-visible,
+  input:focus-visible {
+    outline: none;
+  }
+  textarea,
+  input {
+    caret-color: rgb(var(--volt));
+  }
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  [id] {
+    scroll-margin-top: 96px;
+  }
+}
+
+@layer components {
+  .text-aurora {
+    background-image: linear-gradient(100deg, rgb(var(--volt)) 5%, rgb(var(--aqua)) 50%, rgb(var(--ultra)) 95%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-aurora {
+    background-image: linear-gradient(100deg, rgb(var(--volt)), rgb(var(--aqua)) 50%, rgb(var(--ultra)));
+  }
+
+  .btn-volt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    background-color: rgb(var(--volt));
+    color: rgb(var(--night));
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 0 0 1px rgb(var(--volt) / 0.6), 0 10px 32px -12px rgb(var(--volt) / 0.7),
+      inset 0 1px 0 rgb(255 255 255 / 0.55);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+  .btn-volt:hover {
+    background-color: rgb(216 255 120);
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px rgb(var(--volt)), 0 16px 40px -12px rgb(var(--volt) / 0.85), inset 0 1px 0 rgb(255 255 255 / 0.6);
+  }
+  .btn-volt:active {
+    transform: translateY(0);
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    background-color: rgb(255 255 255 / 0.04);
+    color: rgb(var(--cloud));
+    font-weight: 500;
+    white-space: nowrap;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .btn-ghost:hover {
+    border-color: rgb(255 255 255 / 0.25);
+    background-color: rgb(255 255 255 / 0.08);
+  }
+
+  .card {
+    border-radius: 1.5rem;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background-image: linear-gradient(180deg, rgb(var(--surface) / 0.9), rgb(var(--surface) / 0.55));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  }
+  .panel {
+    border-radius: 1rem;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background-color: rgb(var(--night) / 0.72);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background-color: rgb(255 255 255 / 0.03);
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    color: rgb(var(--mist));
+    white-space: nowrap;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgb(var(--volt));
+  }
+  .eyebrow::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background-color: currentColor;
+    box-shadow: 0 0 12px currentColor;
+  }
+
+  /* The glowing, slowly rotating border around the prompt boxes. */
+  .prompt-shell {
+    position: relative;
+    isolation: isolate;
+    border-radius: 1.75rem;
+    padding: 1px;
+    background-image: conic-gradient(
+      from var(--angle),
+      rgb(255 255 255 / 0.1) 0deg,
+      rgb(var(--volt)) 40deg,
+      rgb(var(--aqua)) 85deg,
+      rgb(var(--ultra)) 130deg,
+      rgb(255 255 255 / 0.1) 175deg,
+      rgb(255 255 255 / 0.1) 360deg
+    );
+    animation: angle 8s linear infinite;
+  }
+  .prompt-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    filter: blur(22px);
+    opacity: 0.4;
+    transition: opacity 0.3s ease;
+  }
+  .prompt-shell:focus-within::before {
+    opacity: 0.85;
+  }
+  .prompt-inner {
+    border-radius: calc(1.75rem - 1px);
+    background-color: rgb(var(--surface) / 0.94);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+  .prompt-pill,
+  .prompt-pill > .prompt-inner {
+    border-radius: 9999px;
+  }
+}
+
+@layer utilities {
+  .bg-grid {
+    background-image: linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+    background-size: 72px 72px;
+    background-position: center top;
+    -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 0%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 60% 55% at 50% 0%, #000 20%, transparent 75%);
+  }
+  .noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.05;
+  }
+  .fade-x {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.5), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 2.4s ease-in-out infinite;
+  }
+
+  .hero-in {
+    animation: rise 0.9s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+    animation-delay: var(--d, 0s);
+  }
+  .animate-float {
+    animation: float 7s ease-in-out infinite;
+  }
+  .animate-float-late {
+    animation: float 7s ease-in-out -3.5s infinite;
+  }
+  .animate-drift {
+    animation: drift 16s ease-in-out infinite;
+  }
+  .animate-drift-late {
+    animation: drift 21s ease-in-out -8s infinite;
+  }
+  .animate-marquee {
+    animation: marquee 40s linear infinite;
+  }
+  .animate-caret {
+    animation: blink 1.05s steps(1) infinite;
+  }
+  .wave-bar {
+    transform-origin: center;
+    animation: wave 1.3s ease-in-out infinite;
+  }
+}
+
+/* Gentle reveal-on-scroll and the studio "tilt to flat" effect. Uses CSS
+   scroll-driven animations; browsers without them simply show everything. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 24%;
+    }
+    .tilt-in {
+      transform-origin: 50% 0%;
+      animation: untilt linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 42%;
+    }
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes untilt {
+  from {
+    transform: perspective(1800px) rotateX(18deg) scale(0.94);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(30px, 40px, 0) scale(1.1);
+  }
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes shimmer {
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes angle {
+  to {
+    --angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
