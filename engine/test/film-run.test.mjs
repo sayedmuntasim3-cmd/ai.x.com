@@ -390,3 +390,24 @@ test("the source desk runs after research: a cited page that is gone strikes its
   assert.equal(state.stages.sources.status, "done");
   assert.ok(model.calls.indexOf("s2") > model.calls.indexOf("research"));
 });
+
+test("the market desk: proven videos on the topic reach S1 and S7, and a title too close to one of them is a gap", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "mkt");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  /** @type {Record<string, string>} */
+  const prompts = {};
+  const model = { ...base, call: async (/** @type {any} */ r) => { prompts[r.stage] = r.messages[0].content.map((/** @type {any} */ b) => b.text).join("\n"); return base.call(r); } };
+  const store = memoryStore();
+  const picks = [{ title: "The Old Mill at Dawn: What Happened", channelTitle: "Other", views: 2400000, outlier: 31.5, durationSeconds: 1500 }, { title: "Inside a 300-year-old mill", channelTitle: "B", views: 900000, outlier: 8, durationSeconds: 900 }];
+  const state = await runFilm({ film: made.film, manual: "M", model, store, market: { find: async () => picks } });
+  assert.match(prompts.s01, /PROVEN_DEMAND[\s\S]*"The Old Mill at Dawn: What Happened" \(Other\): 2,400,000 views, 31.5x/);
+  assert.match(prompts.s01, /never reuse their wording/);
+  assert.match(prompts.s7, /PROVEN_DEMAND/);
+  assert.ok(state.gaps.some((/** @type {string} */ g) => g.includes("too close to an existing video")), "'The Old Mill at Dawn' copies a proven title");
+  const { titleTooClose } = await import("../src/film-run.mjs");
+  assert.equal(titleTooClose("The Barber Who Owns 400 Cars", "How a Barber Bought a Rolls-Royce"), false);
+  const failing = await runFilm({ film: { ...made.film, id: "mkt2" }, manual: "M", model: scriptedModel(), store: memoryStore(), market: { find: async () => { throw new Error("quota"); } } });
+  assert.equal(failing.status, "done", "a market search that fails never stops the film");
+  assert.match(String(failing.market), /quota/);
+});

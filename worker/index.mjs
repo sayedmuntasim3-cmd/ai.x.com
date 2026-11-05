@@ -108,6 +108,15 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
       // The source desk opens every page the research cites.
       sources: { fetch: (url, init) => fetch(url, init) },
+      // The market desk: proven videos on this topic (YouTube Data API, about 102 quota units, cached a day).
+      market: env.YOUTUBE_API_KEY ? {
+        find: async (/** @type {string} */ topic) => {
+          const cache = { get: async (/** @type {string} */ k) => { const o = await env.FILMS.get(k); return o ? o.text() : null; }, put: async (/** @type {string} */ k, /** @type {string} */ t) => { await env.FILMS.put(k, t); } };
+          const r = await radarSearch({ apiKey: env.YOUTUBE_API_KEY, query: topic.slice(0, 200), months: 12, cache });
+          if (!r.ok) throw new Error(r.error);
+          return r.picks;
+        },
+      } : undefined,
       channel: {
         // One channel per deployment for now; a per-client channel key comes with client accounts.
         load: async () => { const obj = await env.FILMS.get("channel/fingerprints.json"); return obj ? JSON.parse(await obj.text()) : []; },

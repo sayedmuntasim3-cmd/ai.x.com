@@ -404,8 +404,8 @@ export const ROLE_STATUS = Object.freeze({
   "quality-release-gate": ["code", "a film is done only with no GAP; every GAP is listed"],
 
   "audience-retention": ["model", "S3 retention map and the retention rule"],
-  "audience-audience-fit": ["model", "S1 angle and audience"],
-  "audience-title": ["model", "S1 titles and S7; code flags an invented story whose title claims truth"],
+  "audience-audience-fit": ["model", "S1 angle and audience, against the videos that already won on the topic (market.json)"],
+  "audience-title": ["model", "S1 titles and S7, given the topic's proven YouTube outliers (market stage, with YOUTUBE_API_KEY); code flags an invented story whose title claims truth and a title too close to an existing video"],
   "audience-thumbnail": ["code", "S1/S7 briefs; thumbnails.mjs makes three for Test & Compare"],
   "audience-first-minute": ["model", "S3 and S5 hook"],
   "audience-midpoint": ["model", "S3 midpoint turn"],

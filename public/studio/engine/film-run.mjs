@@ -246,7 +246,7 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * checked in code; edit: false leaves the edit to the script alone.
  * channel (optional) holds the fingerprints of the channel's earlier films;
  * the finished film is compared with them (originality.json) and added.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -332,8 +332,29 @@ export async function runFilm(o) {
 
   await save();
   try {
+    // The market desk: what already works on this topic on YouTube (titles that beat their own channels).
+    if (o.market) {
+      const market = o.market;
+      await stage("market", async () => {
+        /** @type {any[]} */
+        let picks = [];
+        try { picks = await market.find(film.topic); } catch (error) { state.market = `skipped: ${error instanceof Error ? error.message.slice(0, 200) : error}`; }
+        await store.put("market.json", JSON.stringify({ topic: film.topic, picks: picks.slice(0, 12) }, null, 1));
+        return { picks: Math.min(12, picks.length) };
+      });
+    }
+    let marketTitles = /** @type {string[]} */ ([]);
+    const proven = () => {
+      const data = safeParse(marketText);
+      const picks = Array.isArray(data?.picks) ? data.picks : [];
+      marketTitles = picks.map((/** @type {any} */ p) => String(p.title ?? "")).filter(Boolean);
+      return picks.length ? ctx("PROVEN_DEMAND", picks.map((/** @type {any} */ p) => `"${p.title}" (${p.channelTitle}): ${Number(p.views).toLocaleString("en-US")} views, ${p.outlier}x its channel's average, ${Math.round(Number(p.durationSeconds) / 60)} min`).join("\n")) : "";
+    };
+    const marketText = await read("market.json");
+
     await stage("s01", async () => {
-      const text = await ask("s01", [{ text: "Write S0 (section 4: intake, media math, risk scan) and S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it." }], 24000);
+      const demand = proven();
+      const text = await ask("s01", [...(demand ? [{ text: demand }] : []), { text: "Write S0 (section 4: intake, media math, risk scan) and S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it."  + (demand ? " PROVEN_DEMAND lists real videos on this topic that beat their own channels: study why they won (the promise, the stake, the specific detail) and beat them with a better angle; never reuse their wording or structure." : "") }], 24000);
       await store.put("s01.md", text);
       return { chars: text.length };
     });
@@ -565,12 +586,16 @@ export async function runFilm(o) {
       // Credits for the archive pictures the film uses, built from their licence records, never from memory.
       const credits = pictureCredits((await Promise.all(plan.chapters.map((c) => read(`media-${c.id}.json`)))).filter(Boolean).map((t) => JSON.parse(t)));
       let text = await ask("s7", [
-        { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) + (credits ? "\n" + ctx("PICTURE_CREDITS", credits) + "\nThe description's credits block includes every PICTURE_CREDITS line exactly as written (the CC BY licences require it)." : "") },
+        { text: (proven() ? proven() + "\nPROVEN_DEMAND shows titles that won on this topic: learn their promise, never their wording.\n" : "") + ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) + (credits ? "\n" + ctx("PICTURE_CREDITS", credits) + "\nThe description's credits block includes every PICTURE_CREDITS line exactly as written (the CC BY licences require it)." : "") },
         { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, written on one line as **Final title: ...**, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") + "\n\n" + PACKAGING_RULES },
       ], 16000);
       if (credits && !credits.split("\n").every((line) => text.includes(line))) text += `\n\n### Picture credits (required by the licences)\n\n${credits}\n`;
       const title = (/\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(text)?.[1] ?? "").trim();
       state.gaps.push(...titleProblems(title).map((p) => `S7: ${p}`));
+      // Never an existing video's title: the closest proven title on this topic must stay clearly different.
+      proven();
+      const close = marketTitles.find((m) => titleTooClose(title, m));
+      if (title && close) state.gaps.push(`S7: the title "${title}" is too close to an existing video, "${close}"; write a title of your own.`);
       if (isStoryFilm(film)) {
         const note = storyNote(film);
         if (!text.includes(note)) text += `\n\n### Description note (required for an invented story)\n\n${note}\n`;
@@ -696,6 +721,27 @@ export function storyNote(film) {
 
 /** Thrown when a run stops at its budget; the run can be resumed with a higher one. */
 export class BudgetReached extends Error {}
+
+const TITLE_STOP = new Set(["the", "a", "an", "of", "and", "to", "in", "on", "for", "how", "why", "what", "who", "this", "that", "is", "was", "his", "her", "their", "from", "with", "by", "at"]);
+
+/**
+ * Two titles too alike to call ours: most of the words of the shorter one
+ * are in the other (case, punctuation and small words ignored).
+ * @param {string} a @param {string} b
+ */
+export function titleTooClose(a, b) {
+  const words = (/** @type {string} */ t) => new Set(t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 1 && !TITLE_STOP.has(w)));
+  const x = words(a);
+  const y = words(b);
+  if (x.size < 2 || y.size < 2) return false;
+  const shared = [...x].filter((w) => y.has(w)).length;
+  return shared / Math.min(x.size, y.size) >= 0.75;
+}
+
+/** @param {string} text */
+function safeParse(text) {
+  try { return JSON.parse(text); } catch { return null; }
+}
 
 /** @param {string} text */
 function safeJson(text) {
