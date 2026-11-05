@@ -24,17 +24,26 @@ import { getVersion } from "./versions.mjs";
 /** Versions the run can produce today. Arabic and Bangla follow once English works end to end. */
 export const RUN_VERSIONS = Object.freeze(["en-US"]);
 
-/** US dollars per million tokens. Cache writes use the 1-hour TTL (2x input). */
+/**
+ * US dollars per million tokens. Cache writes use the 1-hour TTL (2x input).
+ * The older Opus models are here because a declined request is re-run on one
+ * of them server-side (fallbacks), and that call is billed at its own price.
+ */
 export const PRICES = Object.freeze({
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 8 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 4 },
+  "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 10 },
+  "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 10 },
 });
+
+/** US dollars per web search (server tool). */
+export const WEB_SEARCH_USD = 0.01;
 
 /**
  * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string, formatId?: string | null }} Film
  * @typedef {{ text: string, cache?: boolean, image?: string }} Block  image: an https image URL; text is ignored then
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
- * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number }} Usage
+ * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number }} Usage
  * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string }} ModelReply
  * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply> }} Model
  * @typedef {{ get: (key: string) => Promise<string | null>, put: (key: string, text: string) => Promise<void> }} Store
@@ -192,13 +201,14 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
 }
 
 /**
+ * What a call cost. A model with no listed price is charged at the highest
+ * listed price, so the budget is never under-counted.
  * @param {Usage} u
  * @param {string} model
  */
 export function costOf(u, model) {
-  const p = PRICES[/** @type {keyof typeof PRICES} */ (model)];
-  if (!p) return 0;
-  return ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6;
+  const p = PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? Object.values(PRICES).reduce((a, b) => (b.output > a.output ? b : a));
+  return ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6 + (u.web_search_requests ?? 0) * WEB_SEARCH_USD;
 }
 
 /** Effort per stage: the writing and checking stages think hardest. */
@@ -227,6 +237,10 @@ export async function runFilm(o) {
 
   /** @type {any} */
   const state = JSON.parse((await store.get("run.json")) ?? "null") ?? { film, model: model.name, stages: {}, usage: {}, costUsd: 0, gaps: [], status: "running" };
+  // A failed or budget-stopped run that is started again resumes: finished stages are kept, the rest runs.
+  if (state.status !== "running") { state.resumes = (state.resumes ?? 0) + 1; state.status = "running"; }
+  delete state.error;
+  delete state.lastError;
   const save = () => store.put("run.json", JSON.stringify(state, null, 1));
 
   /**
@@ -258,7 +272,8 @@ export async function runFilm(o) {
     const u = reply.usage ?? {};
     const s = (state.usage[stage] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 });
     s.calls += 1;
-    for (const k of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"]) s[k] += /** @type {any} */ (u)[k] ?? 0;
+    for (const k of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "web_search_requests"]) if (/** @type {any} */ (u)[k] || s[k] !== undefined) s[k] = (s[k] ?? 0) + (/** @type {any} */ (u)[k] ?? 0);
+    if (reply.model && reply.model !== model.name) s.servedBy = reply.model;
     state.costUsd = round2(state.costUsd + costOf(u, reply.model ?? model.name));
   }
 
@@ -274,9 +289,16 @@ export async function runFilm(o) {
     }
     log(`${id}: start`);
     const result = await step(id, async () => {
-      const r = await fn();
-      return r;
+      try {
+        return await fn();
+      } catch (error) {
+        // Shown in the studio while the step is retried, so a wrong key or an outage is visible at once.
+        state.lastError = { stage: id, message: error instanceof Error ? error.message.slice(0, 500) : String(error), at: new Date().toISOString() };
+        await save().catch(() => {});
+        throw error;
+      }
     });
+    delete state.lastError;
     state.stages[id] = { status: "done", result };
     await save();
     log(`${id}: done`);
@@ -475,13 +497,14 @@ export async function runFilm(o) {
       const chapterTimes = plan.chapters.map((c) => `${c.start} ${c.title}`).join("\n");
       let text = await ask("s7", [
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) },
-        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") },
+        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, written on one line as **Final title: ...**, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") + "\n\n" + PACKAGING_RULES },
       ], 16000);
+      const title = (/\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(text)?.[1] ?? "").trim();
+      state.gaps.push(...titleProblems(title).map((p) => `S7: ${p}`));
       if (isStoryFilm(film)) {
         const note = storyNote(film);
         if (!text.includes(note)) text += `\n\n### Description note (required for an invented story)\n\n${note}\n`;
-        const title = /\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(text)?.[1] ?? "";
-        if (/\b(true|real)[- ]life\b|\btrue story\b|\breal story\b|\bbased on (a )?true\b|\breally happened\b/i.test(title)) state.gaps.push(`S7: the title "${title.trim()}" claims the invented story is true; change it before upload.`);
+        if (/\b(true|real)[- ]life\b|\btrue story\b|\breal story\b|\bbased on (a )?true\b|\breally happened\b/i.test(title)) state.gaps.push(`S7: the title "${title}" claims the invented story is true; change it before upload.`);
       }
       await store.put("s7.md", text);
       return { chars: text.length };
@@ -505,7 +528,7 @@ export async function runFilm(o) {
     state.status = state.gaps.length ? "done-with-gaps" : "done";
   } catch (error) {
     if (!(error instanceof BudgetReached)) state.status = "failed";
-    state.error = error instanceof Error ? error.message : String(error);
+    state.error = (error instanceof Error ? error.message : String(error)).replace(/^NonRetryableError:\s*/, "");
     await save();
     throw error;
   }
@@ -532,6 +555,40 @@ export function createFootageJudge(ask) {
     if (!verdict || typeof verdict !== "object" || Array.isArray(verdict)) throw new Error("The footage verdict was not a JSON object.");
     return verdict;
   };
+}
+
+/**
+ * The packaging desk's rules (from the Viral SEO & Thumbnails squad brief,
+ * prompts/4), given to S7 because packaging decides whether anyone clicks.
+ */
+export const PACKAGING_RULES = [
+  "PACKAGING RULES (the packaging desk; they win over style):",
+  "- Title: 3 to 8 words, at most 70 characters, the famous entity or the stake early, a concrete number or stake from the ledger, at most one all-caps word, no emoji; it promises exactly what the film pays off in its first minute and by the end. Never an existing video's wording.",
+  "- Never call a named living person or an existing company a scam, fraud, criminal, thief, cheat, liar, killer or evil in the title, thumbnail, Shorts or narration, with or without a question mark, unless a court or regulator found it; describe the documented record instead.",
+  "- Thumbnails (three, for YouTube's Test & Compare, which judges watch time): one dominant subject, one high-contrast cue, 0 to 3 words that add to the title and never repeat it, readable at 168x94 px; only imagery the film contains; no editorial-only images, logos, trade dress, fake news layouts or realistic AI depictions of real people.",
+  "- Description: two hook lines, a summary, chapters (first at 00:00, at least three, each at least 10 s), sources by domain and title. Money films add 'Educational, not investment advice'; health films add 'Not medical advice'.",
+  "- Before you finish, ask: would a stranger scrolling on a phone understand the promise in under a second, and could anyone call it misleading? If so, change it.",
+].join("\n");
+
+const DEFAMATORY = /\b(scam(?:mer)?s?|fraud(?:ster)?s?|criminals?|thie(?:f|ves)|cheats?|liars?|killers?|evil|crooks?|con ?(?:man|men|artist))\b/i;
+
+/**
+ * Code checks of the final title (the parts that can be measured).
+ * @param {string} title
+ * @returns {string[]} problems, empty when fine
+ */
+export function titleProblems(title) {
+  if (!title) return ["no line '**Final title: ...**' was found; the title cannot be checked."];
+  /** @type {string[]} */
+  const out = [];
+  if (title.length > 70) out.push(`the title is ${title.length} characters; YouTube cuts titles at about 70 on most screens.`);
+  const words = title.split(/\s+/).filter(Boolean).length;
+  if (words > 12) out.push(`the title has ${words} words; packaging works best at 3 to 8.`);
+  const caps = title.split(/\s+/).filter((w) => /^[A-Z]{3,}[!?.,:]*$/.test(w)).length;
+  if (caps > 1) out.push(`the title has ${caps} all-caps words; use at most one.`);
+  const hit = DEFAMATORY.exec(title);
+  if (hit) out.push(`the title says "${hit[1]}": allowed only about a court or regulator finding; check the named-subject rule before upload.`);
+  return out;
 }
 
 /** The one-line description note of an invented story, in the film's language. @param {Film} film */

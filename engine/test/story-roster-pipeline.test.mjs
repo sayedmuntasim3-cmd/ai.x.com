@@ -113,3 +113,23 @@ test("a documentary plan researches every claim, and every gate has a written ru
   for (const gate of plan.gates) assert.ok(gate.rule && gate.rule === GATES[gate.id]);
   assert.throws(() => planRun({ contentType: "documentary", versions: ["fr"] }), /Unknown version/);
 });
+
+test("every agent's real status is recorded: code, a Claude stage, or not built yet; nothing counts as working by its name", async () => {
+  const { AGENTS, ROLE_STATUS, rosterStatus } = await import("../src/agent-roster.mjs");
+  for (const a of AGENTS) {
+    const s = ROLE_STATUS[a.id];
+    assert.ok(s, `${a.id} has a status`);
+    assert.ok(["code", "model", "planned"].includes(s[0]), `${a.id}: ${s[0]}`);
+    assert.ok(s[1].length > 8, `${a.id} says where (or why not)`);
+  }
+  assert.equal(Object.keys(ROLE_STATUS).length, AGENTS.length, "no status for a role that does not exist");
+  const all = rosterStatus();
+  assert.equal(all.code + all.model + all.planned, all.total);
+  assert.ok(AGENTS.filter((a) => a.squadId === "quran").every((a) => ROLE_STATUS[a.id][0] === "planned"), "Quran films are not made yet, so no Quran role is counted as working");
+  assert.ok(["arabic", "bangla"].every((l) => ROLE_STATUS[`versions-${l}-writer`][0] === "planned"), "only English runs today");
+  const { planRun } = await import("../src/pipeline.mjs");
+  const plan = planRun({ contentType: "documentary" });
+  assert.equal(plan.working.total, plan.agentsUsed);
+  assert.equal(plan.stageWorking.length, plan.stages.length);
+  assert.ok(plan.working.planned > 0, "the plan admits what is not built");
+});

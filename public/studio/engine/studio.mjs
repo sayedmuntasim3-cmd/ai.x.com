@@ -367,9 +367,10 @@ export function planIdea({ text, mode = "auto", minutes = null }) {
     reHooks,
     versions,
     run: {
-      stages: run.stages.map((s) => ({ id: s.id, title: s.title, agents: s.agents.length, perVersion: s.perVersion, gates: s.gates })),
+      stages: run.stages.map((s, i) => ({ id: s.id, title: s.title, agents: s.agents.length, perVersion: s.perVersion, gates: s.gates, working: run.stageWorking[i] })),
       gates: run.gates,
       agentsUsed: run.agentsUsed,
+      working: { total: run.working.total, code: run.working.code, model: run.working.model, planned: run.working.planned },
       humanApprovalSteps: run.humanApprovalSteps,
       publishing: run.publishing,
     },

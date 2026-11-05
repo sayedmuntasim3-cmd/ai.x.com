@@ -56,6 +56,35 @@ export function run(bin, args) {
   });
 }
 
+/**
+ * Measure a finished master instead of assuming it: integrated loudness and
+ * true peak (EBU R128) and stretches of black picture of 1.5 s or more
+ * (deliberate dips are shorter; a card with text is never "black").
+ * @param {string} file @param {string} [ffmpeg]
+ * @returns {Promise<{ integratedLufs: number | null, truePeakDbtp: number | null, loudnessRangeLu: number | null, black: { start: number, end: number, duration: number }[] }>}
+ */
+export function measureMaster(file, ffmpeg = "ffmpeg") {
+  return new Promise((ok, fail) => {
+    const p = spawn(ffmpeg, ["-nostats", "-hide_banner", "-i", file, "-filter_complex", "[0:a]ebur128=peak=true:framelog=quiet[a];[0:v]scale=160:-2,blackdetect=d=1.5:pix_th=0.05:pic_th=0.999[v]", "-map", "[v]", "-map", "[a]", "-f", "null", "-"], { stdio: ["ignore", "ignore", "pipe"] });
+    /** @type {string[]} */
+    const kept = [];
+    let rest = "";
+    p.stderr.on("data", (d) => {
+      const lines = (rest + d).split("\n");
+      rest = lines.pop() ?? "";
+      for (const l of lines) if (/black_start|^\s+(I|Peak|LRA):/.test(l)) kept.push(l);
+    });
+    p.on("error", fail);
+    p.on("close", (code) => {
+      if (rest && /black_start|^\s+(I|Peak|LRA):/.test(rest)) kept.push(rest);
+      if (code !== 0) { fail(new Error(`${ffmpeg} exited ${code} while measuring the master`)); return; }
+      const last = (/** @type {RegExp} */ re) => { const hits = kept.map((l) => re.exec(l)).filter(Boolean); const v = hits.length ? Number(/** @type {RegExpExecArray} */ (hits[hits.length - 1])[1]) : NaN; return Number.isFinite(v) ? v : null; };
+      const black = kept.map((l) => /black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/.exec(l)).filter(Boolean).map((m) => ({ start: Number(/** @type {RegExpExecArray} */ (m)[1]), end: Number(/** @type {RegExpExecArray} */ (m)[2]), duration: Number(/** @type {RegExpExecArray} */ (m)[3]) }));
+      ok({ integratedLufs: last(/^\s+I:\s+(-?[\d.]+) LUFS/), truePeakDbtp: last(/^\s+Peak:\s+(-?[\d.]+) dBFS/), loudnessRangeLu: last(/^\s+LRA:\s+(-?[\d.]+) LU/), black });
+    });
+  });
+}
+
 /** @param {string} file @param {string} [ffprobe] */
 export async function mediaDuration(file, ffprobe = "ffprobe") {
   const out = await run(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file]);
@@ -455,10 +484,23 @@ export async function renderFilm(o) {
     }
   }
   renameSync(o.outFile + ".part.mp4", o.outFile);
+  // 6. Check the master itself: the loudness target and black picture are measured, not assumed.
+  /** @type {Awaited<ReturnType<typeof measureMaster>> | null} */
+  let master = null;
+  try { master = await measureMaster(o.outFile, ffmpeg); } catch (error) { warnings.push(`The master could not be measured: ${error instanceof Error ? error.message : error}`); }
+  if (master) {
+    const normalised = anySound && t.durationSeconds >= 3;
+    if (normalised && master.integratedLufs !== null && Math.abs(master.integratedLufs + 14) > 1) warnings.push(`Master loudness is ${master.integratedLufs} LUFS; the target is -14 LUFS within 1 LU.`);
+    if (master.truePeakDbtp !== null && master.truePeakDbtp > -1) warnings.push(`Master true peak is ${master.truePeakDbtp} dBTP; the limit is -1 dBTP.`);
+    // Black the script asks for (a black segment) is intended; any other black stretch is a defect to look at.
+    const scripted = t.video.filter((v) => v.type === "black");
+    const covered = (/** @type {{ start: number, end: number, duration: number }} */ b) => scripted.reduce((sum, v) => sum + Math.max(0, Math.min(v.end, b.end) - Math.max(v.start, b.start)), 0) >= b.duration - 0.5;
+    for (const b of master.black) if (!covered(b)) warnings.push(`Black picture for ${b.duration.toFixed(1)} s from ${b.start.toFixed(1)} s that the script does not ask for.`);
+  }
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
-  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, licences, warnings };
+  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, master, licences, warnings };
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;

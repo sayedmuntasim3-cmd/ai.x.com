@@ -11,6 +11,8 @@ The owner asked: where are the problems, what must improve, what is not done, an
 
 The first real runs will break things: prompts, parsing, timeouts and cost. Until that happens, every quality claim is a plan, not a result.
 
+**Update, 5 November 2026 (audit):** the whole film run has now run inside the real Cloudflare runtime (Worker, Workflow, R2) against a fake Claude server, and the studio was driven in a browser; the failures it exposed (silent retries on a wrong key, no way to resume, uncounted costs) are fixed. Of the roster's 151 jobs, 57 run in code, 47 in Claude stages and 47 are not built yet (`ROLE_STATUS` in `engine/src/agent-roster.mjs`). Real API calls still wait for the owner's keys.
+
 ## 2. Problems in what exists
 
 | Area | Problem | Effect |

@@ -6,7 +6,7 @@
  * (the shot is dropped, the reference withheld, the music muted) instead of
  * waiting for a person. Publishing is never automatic: the owner publishes.
  */
-import { getAgent } from "./agent-roster.mjs";
+import { getAgent, rosterStatus } from "./agent-roster.mjs";
 import { VERSION_IDS, getVersion } from "./versions.mjs";
 import { musicPlanFor } from "./voice-plan.mjs";
 
@@ -151,6 +151,13 @@ export function planRun({ contentType, islamic, needsAiVisuals = false, source =
     gates: [...new Set(stages.flatMap((s) => s.gates))].map((id) => ({ id, rule: GATES[/** @type {keyof typeof GATES} */ (id)] })),
     music,
     agentsUsed: resolved.size,
+    // How many of those roles really work today (code, Claude stage, or not built yet).
+    working: rosterStatus([...resolved]),
+    stageWorking: stages.map((s) => {
+      const ids = s.agents.flatMap((id) => (id.includes("{lang}") ? versions.map((v) => id.replace("{lang}", v === "ar" ? "arabic" : v === "en-US" ? "english" : "bangla")) : [id]));
+      const st = rosterStatus(ids);
+      return { id: s.id, total: st.total, code: st.code, model: st.model, planned: st.planned };
+    }),
     humanApprovalSteps: 0,
     failurePolicy: FAILURE_POLICY,
     publishing: "Never automatic: the finished versions are delivered and the owner publishes them.",

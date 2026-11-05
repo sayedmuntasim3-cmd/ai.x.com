@@ -291,3 +291,196 @@ export function getSquad(id) {
 export function getAgent(id) {
   return AGENTS.find((agent) => agent.id === id) ?? null;
 }
+
+/**
+ * Where each role's job is actually done today, so nothing is shown as
+ * working only because its name exists (audit of 5 Nov 2026).
+ * - "code": a module does the job and checks it the same way every time;
+ * - "model": a film-run stage (Claude) is told to do the job, and code checks
+ *   what it can of the result;
+ * - "planned": nothing does it yet.
+ * A role is not a separate program: the film run is about a dozen model
+ * stages plus code checks, and each role below names the part that does its job.
+ * @type {Readonly<Record<string, readonly ["code" | "model" | "planned", string]>>}
+ */
+export const ROLE_STATUS = Object.freeze({
+  "research-primary-source": ["model", "research stage: web search; code drops every fact without a source URL"],
+  "research-fact-ledger": ["model", "S2 claim ledger"],
+  "research-date-check": ["model", "S2 ledger and the QA facts pass"],
+  "research-statistics": ["model", "S2 ledger: values, units and conversions"],
+  "research-peer-review": ["planned", "no search of academic literature yet"],
+  "research-counterevidence": ["model", "research stage records conflicts between sources"],
+  "research-geography": ["planned", "places are not verified separately yet"],
+  "research-people-orgs": ["model", "research stage (people not to confuse) and the named-subject rules"],
+  "research-source-diversity": ["planned", "no check that sources are independent yet"],
+  "research-freshness": ["planned", "no re-check of facts that change over time yet"],
+
+  "story-transcript-integrity": ["planned", "films start from a topic; a supplied transcript is not taken yet"],
+  "story-chapter-arc": ["model", "S3; code checks that the chapters tile the film"],
+  "story-opening-hook": ["model", "S3 and S5 (30-second hook rule)"],
+  "story-open-loops": ["code", "S3 loop ledger; code checks every opened loop is paid"],
+  "story-exposition": ["planned", "no separate clarity pass yet"],
+  "story-narration": ["model", "S5; code checks words per scene and banned phrases"],
+  "story-continuity": ["model", "S4 continuity rules and the QA passes"],
+  "story-emotional-arc": ["model", "S3 emotion curve and the 'written to be felt' rule"],
+  "story-ending": ["model", "S3 and S5 (payoff, last image and line)"],
+  "story-script-coverage": ["code", "scene-lines.mjs: words against seconds for every scene"],
+
+  "cinematography-visual-director": ["model", "S5 shots: evidence or illustration rung per shot"],
+  "cinematography-composition": ["planned", "picks are not judged for composition yet"],
+  "cinematography-lens-language": ["model", "S4 look: lens kit"],
+  "cinematography-camera-motion": ["code", "renderer: push-ins and slow motion from the MOTION field"],
+  "cinematography-lighting": ["planned", "no lighting continuity check yet"],
+  "cinematography-environment": ["model", "S4 locations"],
+  "cinematography-archive-language": ["model", "S5 rungs; renderer archive look"],
+  "cinematography-visual-metaphor": ["planned", "not built yet"],
+  "cinematography-shot-variety": ["code", "media step: no clip twice within 10 minutes"],
+  "cinematography-accessibility": ["planned", "no contrast or flashing check yet"],
+
+  "animation-motion-director": ["model", "S4 motion-graphics style"],
+  "animation-map-motion": ["planned", "maps render as text cards; a map provider key is needed"],
+  "animation-data-graphics": ["code", "renderer: counter cards only; no charts yet"],
+  "animation-kinetic-type": ["code", "renderer: FX-KINETIC kinetic type"],
+  "animation-diagram-builder": ["planned", "not built yet"],
+  "animation-2d-animation": ["planned", "not built yet"],
+  "animation-3d-visualization": ["planned", "not built yet"],
+  "animation-parallax": ["planned", "not built yet"],
+  "animation-transition-logic": ["code", "renderer: fades, dips to black, chapter dips"],
+  "animation-fx-qc": ["planned", "not built yet"],
+
+  "footage-asset-strategist": ["model", "S5: search queries per shot"],
+  "footage-exact-match": ["model", "footage desk: Claude looks at the thumbnails of each shot's candidates"],
+  "footage-provider-coverage": ["code", "media step: Pexels and Pixabay searched per shot"],
+  "footage-metadata": ["code", "media step: source page, creator and licence kept per clip"],
+  "footage-license": ["code", "media step: only Pexels and Pixabay licences are kept"],
+  "footage-attribution": ["code", "renderer licence report; S7 credits block"],
+  "footage-duplicate-assets": ["code", "media step: no clip twice within 10 minutes"],
+  "footage-scene-fit": ["model", "footage desk"],
+  "footage-release-risk": ["model", "footage desk rejects faces, brands, plates and watermarks where the shot avoids them"],
+  "footage-rights-gate": ["code", "nothing without a licence record is rendered"],
+
+  "editing-runtime": ["code", "scene-lines.mjs clock and the frame-exact timeline"],
+  "editing-pace": ["model", "S3 retention map; code checks words per scene"],
+  "editing-coverage": ["code", "media step lists every shot with no fitting clip as a GAP"],
+  "editing-cut-logic": ["model", "S5 transitions"],
+  "editing-timeline-integrity": ["code", "timeline.mjs: frame-exact edit list"],
+  "editing-continuity-match": ["planned", "not built yet"],
+  "editing-b-roll-balance": ["planned", "not built yet"],
+  "editing-chapter-transitions": ["code", "renderer: chapter dips and chapter titles"],
+  "editing-intro-outro": ["planned", "not built yet"],
+  "editing-edit-qc": ["code", "renderer checks the finished master for black stretches"],
+
+  "audio-voice-sync": ["code", "captions on the voice's word timings; voice placed per scene"],
+  "audio-noise": ["code", "studio voice check: noise floor and SNR"],
+  "audio-dialogue-level": ["code", "renderer mix: voice over music and effects"],
+  "audio-ducking": ["code", "renderer: music ducks under the voice"],
+  "audio-sound-effects": ["code", "sound-kit.mjs: CC0 effects from Freesound per scene"],
+  "audio-music-arc": ["code", "S3 music arc and S4 cues; music-kit.mjs composes one track per cue"],
+  "audio-loudness": ["code", "renderer: loudness normalised to -14 LUFS and measured on the master"],
+  "audio-silence": ["model", "rule: silence before the moving scene of each chapter"],
+  "audio-pronunciation": ["model", "S4 lexicon is written; it is not yet sent to the voice"],
+  "audio-audio-qc": ["code", "renderer measures the master's loudness and true peak"],
+
+  "color-color-match": ["code", "renderer: one master grade per look"],
+  "color-exposure": ["planned", "not built yet"],
+  "color-white-balance": ["planned", "not built yet"],
+  "color-skin-tone": ["planned", "not built yet"],
+  "color-look-dev": ["code", "S4 look; renderer looks: documentary, cinematic, archive"],
+  "color-archive-grade": ["code", "renderer archive look"],
+  "color-artifact-check": ["planned", "not built yet"],
+  "color-subtitle-style": ["code", "renderer captions; word-highlight captions in Shorts"],
+  "color-encode": ["code", "renderer: H.264 with a bitrate cap"],
+  "color-final-master": ["code", "renderer: MP4 master, SRT and licence report"],
+
+  "quality-hallucination": ["model", "QA facts pass against the S2 ledger"],
+  "quality-defamation": ["model", "named-subject rules and the QA rights pass"],
+  "quality-sensitive-context": ["model", "sensitive-subject rules and the QA passes"],
+  "quality-artifact-qc": ["planned", "not built yet"],
+  "quality-subtitle-text": ["code", "captions are made from the narration itself"],
+  "quality-timeline-qc": ["code", "scene-lines.mjs checks the whole film"],
+  "quality-license-qc": ["code", "licence record per clip; renderer licence report"],
+  "quality-claim-language": ["model", "QA facts pass; code bans listed phrases"],
+  "quality-accessibility-qc": ["planned", "not built yet"],
+  "quality-release-gate": ["code", "a film is done only with no GAP; every GAP is listed"],
+
+  "audience-retention": ["model", "S3 retention map and the retention rule"],
+  "audience-audience-fit": ["model", "S1 angle and audience"],
+  "audience-title": ["model", "S1 titles and S7; code flags an invented story whose title claims truth"],
+  "audience-thumbnail": ["code", "S1/S7 briefs; thumbnails.mjs makes three for Test & Compare"],
+  "audience-first-minute": ["model", "S3 and S5 hook"],
+  "audience-midpoint": ["model", "S3 midpoint turn"],
+  "audience-cta": ["model", "S7 call to action"],
+  "audience-platform-specs": ["code", "cuts.mjs: 9:16 Shorts and the 4:5 Facebook cut"],
+  "audience-metadata": ["model", "S7 description, chapters and tags"],
+  "audience-panel-review": ["model", "the manual's silent expert panel before each stage"],
+
+  "intake-transcriber": ["planned", "no speech-to-text yet"],
+  "intake-language-detector": ["code", "studio: content-intel.mjs"],
+  "intake-recitation-identifier": ["planned", "matching code exists; no Quran text is loaded"],
+  "intake-content-classifier": ["code", "studio: content-intel.mjs"],
+  "intake-intent-interpreter": ["code", "studio: spelling fixes and mode"],
+  "intake-fact-fiction-judge": ["code", "studio: true story or invented story"],
+  "intake-rights-intake": ["planned", "not built yet"],
+  "intake-version-planner": ["code", "studio plan (only the English version can be made today)"],
+  "intake-duration-planner": ["code", "studio plan and the cost estimate"],
+  "intake-brief-writer": ["code", "film-run.mjs: the production brief"],
+
+  "voice-recording-analyst": ["code", "studio voice check (loudness, peak, SNR, clipping)"],
+  "voice-voice-guardian": ["code", "the owner's takes are used exactly as recorded"],
+  "voice-repair-engineer": ["planned", "no noise repair yet"],
+  "voice-tone-dynamics": ["planned", "not built yet"],
+  "voice-loudness-engineer": ["code", "gain to target in the studio; loudness in the renderer"],
+  "voice-elevenlabs-operator": ["code", "voice.mjs: one take per scene with word timings"],
+  "voice-pronunciation": ["planned", "the S4 lexicon is not sent to the voice yet"],
+  "voice-pacing-editor": ["code", "words per scene; a capped speed-up when a take runs long"],
+  "voice-music-supervisor": ["code", "music-kit.mjs and the mix"],
+  "voice-mix-engineer": ["code", "renderer mix"],
+
+  "quran-ayah-aligner": ["planned", "Quran films are not made yet"],
+  "quran-text-guardian": ["planned", "Quran films are not made yet"],
+  "quran-reference-checker": ["planned", "Quran films are not made yet"],
+  "quran-translation-curator": ["planned", "Quran films are not made yet"],
+  "quran-meaning-researcher": ["planned", "Quran films are not made yet"],
+  "quran-visual-matcher": ["planned", "Quran films are not made yet"],
+  "quran-visual-adab-guard": ["planned", "Quran films are not made yet"],
+  "quran-recitation-editor": ["planned", "Quran films are not made yet"],
+  "quran-arabic-typographer": ["planned", "Quran films are not made yet"],
+  "quran-islamic-reviewer": ["planned", "Quran films are not made yet"],
+
+  "screenplay-premise-architect": ["model", "S1 and the S2 story bible (story mode)"],
+  "screenplay-era-researcher": ["model", "research stage: real-world details of the time and place"],
+  "screenplay-character-designer": ["model", "S2 story bible and the S4 LOOK line per character"],
+  "screenplay-plot-architect": ["model", "S3 story architecture: plot, turns and chapters"],
+  "screenplay-hook-doctor": ["model", "S3 and S5 hook"],
+  "screenplay-money-path-auditor": ["model", "S2 money path"],
+  "screenplay-scene-writer": ["model", "S5 scene lines, every scene in order"],
+  "screenplay-narration-writer": ["code", "S5; code flags machine-sounding or preachy writing"],
+  "screenplay-realism-auditor": ["model", "S2 realism ledger from the research"],
+  "screenplay-ai-scene-director": ["code", "ai-scenes.mjs: one cast, a real person is never made"],
+  "screenplay-fiction-label-guard": ["code", "the description note is added in code; a title claiming truth is flagged"],
+
+  "versions-arabic-writer": ["planned", "only the English version can be made today"],
+  "versions-english-writer": ["model", "S5 in English (USA)"],
+  "versions-bangla-writer": ["planned", "only the English version can be made today"],
+  "versions-arabic-reviewer": ["planned", "only the English version can be made today"],
+  "versions-english-reviewer": ["model", "QA language pass"],
+  "versions-bangla-reviewer": ["planned", "only the English version can be made today"],
+  "versions-numerals-typography": ["planned", "only the English version can be made today"],
+  "versions-separation-guard": ["code", "scene-lines.mjs: narration language check"],
+  "versions-subtitle-builder": ["code", "SRT from the narration and the voice timings"],
+  "versions-packaging-localizer": ["planned", "only the English version can be made today"],
+});
+
+/**
+ * How many roles really work today, overall and per squad.
+ * @param {readonly string[]} [ids] limit to these roles (for example a run plan's)
+ */
+export function rosterStatus(ids) {
+  const pick = ids ? AGENTS.filter((a) => ids.includes(a.id)) : AGENTS;
+  const count = (/** @type {readonly Agent[]} */ list) => {
+    const c = { total: list.length, code: 0, model: 0, planned: 0 };
+    for (const a of list) c[ROLE_STATUS[a.id]?.[0] ?? "planned"] += 1;
+    return c;
+  };
+  return { ...count(pick), squads: SQUADS.map((s) => ({ id: s.id, name: s.name, ...count(pick.filter((a) => a.squadId === s.id)) })).filter((s) => s.total > 0) };
+}

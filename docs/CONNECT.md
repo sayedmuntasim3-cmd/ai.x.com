@@ -26,6 +26,10 @@ The studio shows an estimate before you start (Claude Opus 5.5): about **$4–9 
 
 Optional: change `MODEL` or `BUDGET_USD` in `wrangler.jsonc` (`vars`). `GET /api/health` shows what is connected, without showing any secret.
 
+Optional: to see every Claude call (time, tokens, errors) in Cloudflare's dashboard, create an AI Gateway and set the var `ANTHROPIC_BASE_URL` to `https://gateway.ai.cloudflare.com/v1/<account id>/<gateway name>/anthropic`. The API key still goes to Anthropic.
+
+**If a film stops.** A wrong or revoked API key, or a request the API refuses, stops the film at once with the reason on the film's card in the studio (it is no longer retried for minutes). Outages and overload are retried automatically, and while that happens the card shows the last error. Fix the cause, then press **Resume where it stopped** on the card (or `POST /api/films/<id>/resume`): finished stages are kept and not paid for again. A film stopped by its budget resumes the same way, optionally with a higher budget for that film only.
+
 ## Media step (optional, free)
 
 After QA the run searches free stock footage for every S5 stock shot, with the scene's own queries, and writes `media-C1.json` ... per chapter: one pick per shot with its licence record (licence, source page, creator), up to three alternates, and the search trace. Only Pexels License and Pixabay Content License items are kept, and no clip is used twice within 10 minutes of film time. Shots with no free clip are listed as GAPs.

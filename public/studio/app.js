@@ -73,6 +73,8 @@ const T = {
     descNote: "ডেসক্রিপশনের এক লাইন (স্ক্রিনে কোনো লেবেল নয়):",
     runTitle: "স্বয়ংক্রিয় রান",
     agentsUsed: (n) => `${n} জন এজেন্ট`,
+    working: (w) => `${w.total}টি কাজের মধ্যে আজ সত্যিই চলে ${w.code + w.model}টি: ${w.code}টি কোডে (প্রতিবার একইভাবে যাচাই), ${w.model}টি Claude-এর ধাপে; ${w.planned}টি এখনও তৈরি হয়নি। এখন শুধু English (USA) ভার্সনের ফিল্ম বানানো যায়।`,
+    stageWorking: (w) => `${w.code + w.model}/${w.total} চালু`,
     approvals: "রানের ভেতরে human approval: ০টি। শেষে আপনি নিজে পাবলিশ করবেন।",
     perVersion: "প্রতি ভার্সনে",
     gates: "স্বয়ংক্রিয় চেক",
@@ -214,6 +216,8 @@ const T = {
     descNote: "Description line (no label on screen):",
     runTitle: "Automatic run",
     agentsUsed: (n) => `${n} agents`,
+    working: (w) => `Of ${w.total} jobs, ${w.code + w.model} really run today: ${w.code} in code (checked the same way every time), ${w.model} in Claude's stages; ${w.planned} are not built yet. Only the English (USA) version can be made today.`,
+    stageWorking: (w) => `${w.code + w.model}/${w.total} working`,
     approvals: "Human approval steps inside the run: 0. You publish at the end.",
     perVersion: "per version",
     gates: "Automatic checks",
@@ -429,7 +433,8 @@ function renderIdea() {
   const run = h("div", { class: "panel" },
     h("h3", null, `${L.runTitle} · ${L.agentsUsed(p.run.agentsUsed)}`),
     h("p", { class: "small" }, L.approvals),
-    h("ol", { class: "stages", lang: "en" }, p.run.stages.map((s) => h("li", null, h("span", null, s.title), h("span", { class: "muted small" }, `${s.agents}${s.perVersion ? " · " + L.perVersion : ""}`)))),
+    p.run.working ? h("p", { class: "small" }, L.working(p.run.working)) : null,
+    h("ol", { class: "stages", lang: "en" }, p.run.stages.map((s) => h("li", null, h("span", null, s.title), h("span", { class: "muted small" }, `${s.working ? L.stageWorking(s.working) : s.agents}${s.perVersion ? " · " + L.perVersion : ""}`)))),
     h("details", null, h("summary", null, `${L.gates} (${p.run.gates.length})`), h("ul", { lang: "en" }, p.run.gates.map((g) => h("li", null, h("b", null, g.id), ": ", g.rule)))),
   );
 

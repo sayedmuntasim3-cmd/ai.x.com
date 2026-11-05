@@ -66,6 +66,12 @@ const T = {
     remakeGo: "দৃশ্যটা আবার বানাও",
     remakeDone: "হয়ে গেছে। খরচ",
     remakeFailed: "হয়নি:",
+    lastError: "শেষ চেষ্টায় সমস্যা (আবার চেষ্টা হচ্ছে)",
+    failedWhy: "থেমে গেছে, কারণ",
+    resume: "যেখানে থেমেছে সেখান থেকে চালাও",
+    resumeHint: "শেষ হওয়া ধাপগুলোর টাকা আবার লাগবে না।",
+    resumeBudget: "এই ফিল্মের নতুন বাজেট (ডলার, খালি রাখলে আগেরটা)",
+    resumed: "আবার চালু হয়েছে।",
     footage: "ফুটেজ",
     gaps: "বাকি কাজ (GAP)",
     stages: { s01: "S0–S1 টাইটেল ও প্ল্যান", research: "ওয়েব রিসার্চ", s2: "S2 তথ্যের খাতা", s3: "S3 গল্পের কাঠামো", s4: "S4 বাইবেল", qa: "QA ও সংশোধন", s6: "S6 রিপোর্ট", s7: "S7 পাবলিশিং প্যাক" },
@@ -112,6 +118,12 @@ const T = {
     remakeGo: "Re-make the scene",
     remakeDone: "Done. Cost",
     remakeFailed: "Not done:",
+    lastError: "Last attempt failed (retrying)",
+    failedWhy: "Stopped because",
+    resume: "Resume where it stopped",
+    resumeHint: "Finished stages are not paid for again.",
+    resumeBudget: "New budget for this film (USD, empty keeps the old one)",
+    resumed: "Resumed.",
     footage: "Footage",
     gaps: "Open items (GAPs)",
     stages: { s01: "S0–S1 titles and plan", research: "Web research", s2: "S2 claim ledger", s3: "S3 story architecture", s4: "S4 bibles", qa: "QA and fixes", s6: "S6 report", s7: "S7 publishing pack" },
@@ -205,6 +217,9 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   const h = (/** @type {string} */ tag, /** @type {string} */ text) => { const e = document.createElement(tag); e.textContent = text; return e; };
   out.append(h("h3", `${run.film?.topic ?? ""} · ${l.status}: ${run.status ?? "queued"}`));
   out.append(h("p", `${l.spent}: $${run.costUsd ?? 0}`));
+  if (run.status === "running" && run.lastError) out.append(h("p", `⚠ ${l.lastError} (${run.lastError.stage}): ${run.lastError.message}`));
+  if ((run.status === "failed" || run.status === "stopped-budget") && run.error) out.append(h("p", `✗ ${l.failedWhy}: ${run.error}`));
+  if (run.status === "failed" || run.status === "stopped-budget") out.append(resumeForm(id));
   const list = document.createElement("ul");
   for (const [stage, info] of Object.entries(run.stages ?? {})) {
     const label = stage.startsWith("s5:") ? `S5 ${stage.slice(3)}` : stage.startsWith("media:") ? `${l.footage} ${stage.slice(6)}` : l.stages[stage] ?? stage;
@@ -218,7 +233,10 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
     out.append(g);
   }
   const stages = Object.keys(run.stages ?? {});
-  const files = ["s01.md", "research.json", "s2.md", "s3.md", "s4.md", ...stages.filter((s) => s.startsWith("s5:")).map((s) => `s5-${s.slice(3)}.md`), "qa.json", ...stages.filter((s) => s.startsWith("media:")).map((s) => `media-${s.slice(6)}.json`), "s6.md", "s7.md"];
+  // Only files whose stage has finished exist; the rest would be dead links.
+  /** @type {Record<string, string[]>} */
+  const made = { s01: ["s01.md"], research: ["research.json"], s2: ["s2.md"], s3: ["s3.md"], s4: ["s4.md"], qa: ["qa.json", "fix-log.json"], s6: ["film-check.json", "s6.md"], s7: ["s7.md"], originality: ["originality.json"] };
+  const files = stages.flatMap((s) => (s.startsWith("s5:") ? [`s5-${s.slice(3)}.md`] : s.startsWith("media:") ? [`media-${s.slice(6)}.json`] : made[s] ?? []));
   const page = document.createElement("a");
   page.href = `/api/films/${id}/page`;
   page.textContent = l.page;
@@ -323,6 +341,48 @@ async function showFilms() {
   } catch (error) {
     say(`${l.remakeFailed} ${error instanceof Error ? error.message : error}`);
   }
+}
+
+/** Resume a failed or budget-stopped film from its last finished stage. @param {string} id */
+function resumeForm(id) {
+  const l = L();
+  const wrap = document.createElement("p");
+  const budget = document.createElement("input");
+  budget.type = "number";
+  budget.min = "1";
+  budget.max = "500";
+  budget.inputMode = "decimal";
+  budget.placeholder = "60";
+  const label = document.createElement("label");
+  label.append(l.resumeBudget, budget);
+  const go = document.createElement("button");
+  go.type = "button";
+  go.className = "go";
+  go.textContent = l.resume;
+  const result = document.createElement("span");
+  result.setAttribute("aria-live", "polite");
+  go.addEventListener("click", async () => {
+    const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+    if (!token) { result.textContent = ` ${l.remakeFailed} ${l.token}`; return; }
+    go.disabled = true;
+    result.textContent = " …";
+    try {
+      const body = budget.value ? { budgetUsd: Number(budget.value) } : {};
+      const res = await fetch(`/api/films/${id}/resume`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      const r = await res.json().catch(() => ({ error: l.notConnected }));
+      result.textContent = r.ok ? ` ${l.resumed}` : ` ${l.remakeFailed} ${r.error ?? res.status}`;
+      if (r.ok) setTimeout(() => poll(id), 3000);
+    } catch (error) {
+      result.textContent = ` ${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
+    } finally {
+      go.disabled = false;
+    }
+  });
+  const hint = document.createElement("span");
+  hint.className = "muted small";
+  hint.textContent = ` ${l.resumeHint}`;
+  wrap.append(label, go, result, hint);
+  return wrap;
 }
 
 /** Start the GitHub render of a finished film. @param {string} id */

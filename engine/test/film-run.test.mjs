@@ -110,7 +110,7 @@ function scriptedModel() {
         }
         case "qa": return reply("```json\n" + JSON.stringify({ mustFix: [{ lens: "facts", chapter: "C1", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }], passed: ["p"], notChecked: [] }) + "\n```");
         case "s6": return reply("## S6");
-        case "s7": return reply("## S7");
+        case "s7": return reply("## S7\n**Final title: The Old Mill at Dawn**");
         default: throw new Error("unexpected stage " + r.stage);
       }
     },
@@ -295,4 +295,35 @@ test("an invented story gets its description note in code, and a title that clai
   assert.ok(s7.trimEnd().endsWith("Dramatized story. Characters and events are created for this film."), "the note is added when the model forgot it");
   assert.ok(state.gaps.some((/** @type {string} */ g) => g.startsWith('S7: the title "The True Story of the Old Mill" claims')));
   assert.ok(state.gaps.some((/** @type {string} */ g) => / writing \(/.test(g)), "machine-sounding or flat writing is flagged in story mode");
+});
+
+test("a failed film resumes where it stopped: finished stages are not paid twice and the error is visible meanwhile", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f-resume");
+  assert.ok(made.ok);
+  const store = memoryStore();
+  const broken = scriptedModel();
+  const failing = { ...broken, call: async (/** @type {any} */ r) => { if (r.stage === "s2") throw Object.assign(new Error("401 invalid x-api-key"), { status: 401 }); return broken.call(r); } };
+  await assert.rejects(runFilm({ film: made.film, manual: "MANUAL", model: failing, store }), /401/);
+  const failed = JSON.parse(store.m.get("run.json"));
+  assert.equal(failed.status, "failed");
+  assert.match(failed.error, /401/);
+  assert.equal(failed.lastError.stage, "s2", "the studio shows which stage failed and why");
+  const model = scriptedModel();
+  const state = await runFilm({ film: made.film, manual: "MANUAL", model, store });
+  assert.equal(state.status, "done");
+  assert.equal(state.resumes, 1);
+  assert.equal(state.lastError, undefined);
+  assert.equal(state.error, undefined);
+  assert.ok(!model.calls.includes("s01") && !model.calls.includes("research"), "S0-S1 and research were already paid for");
+  assert.equal(model.calls[0], "s2");
+});
+
+test("the final title is checked in code: length, all-caps, and words that would defame a named subject", async () => {
+  const { titleProblems, PACKAGING_RULES } = await import("../src/film-run.mjs");
+  assert.deepEqual(titleProblems("He Bought a Rolls-Royce With $50"), []);
+  assert.match(titleProblems("")[0], /no line/);
+  assert.ok(titleProblems("x ".repeat(40).trim()).some((p) => /characters/.test(p)));
+  assert.ok(titleProblems("The SHOCKING TRUTH About Money").some((p) => /all-caps/.test(p)));
+  assert.ok(titleProblems("Is Acme Corp a Scam?").some((p) => /court or regulator/.test(p)), "a question mark is no defence");
+  assert.match(PACKAGING_RULES, /Test & Compare/);
 });

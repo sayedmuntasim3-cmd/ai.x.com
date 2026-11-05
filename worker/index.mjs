@@ -15,6 +15,7 @@
  *   GET  /api/films/:id/script       the narration script for recording it yourself (one line per scene file)
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/render       start the GitHub render (MP4, Shorts, thumbnails)   (Bearer STUDIO_TOKEN)
+ *   POST /api/films/:id/resume       { budgetUsd? } -> continue a failed or budget-stopped film; finished stages are kept   (Bearer STUDIO_TOKEN)
  *
  * Needs (set by the owner when Cloudflare is connected):
  *   secrets ANTHROPIC_API_KEY, STUDIO_TOKEN; R2 bucket FILMS; Workflow FILM_RUN.
@@ -26,12 +27,13 @@
  *   Optional YOUTUBE_API_KEY secret: the topic radar (/api/ideas), cached a day in R2.
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
+import { NonRetryableError } from "cloudflare:workflows";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../engine/src/film-page.mjs";
 import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
-import { anthropicModel } from "./anthropic.mjs";
+import { anthropicModel, permanentError } from "./anthropic.mjs";
 import { dispatchRender } from "./github.mjs";
 import { listFilms } from "./films.mjs";
 import { radarSearch } from "./youtube.mjs";
@@ -57,6 +59,20 @@ function r2Store(bucket, id) {
   };
 }
 
+/**
+ * The status of a film's current Workflow instance (the first run, or its latest resume).
+ * @param {any} env @param {string} id
+ * @returns {Promise<any>}
+ */
+async function currentInstance(env, id) {
+  try {
+    const record = JSON.parse((await r2Store(env.FILMS, id).get("workflow.json")) ?? "null");
+    return await (await env.FILM_RUN.get(record?.instanceId ?? id)).status();
+  } catch {
+    return null;
+  }
+}
+
 /** @param {unknown} body @param {number} [status] */
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": TYPES.json, "cache-control": "no-store" } });
@@ -75,8 +91,9 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
   async run(event, step) {
     const /** @type {any} */ env = this.env;
     const film = event.payload.film;
-    const model = anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5" });
-    const budget = Number(env.BUDGET_USD);
+    const model = anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined });
+    // A resume may raise the budget for this film; otherwise the deployment's BUDGET_USD applies.
+    const budget = Number(event.payload.budgetUsd ?? env.BUDGET_USD);
     await runFilm({
       film,
       manual: MANUAL,
@@ -91,7 +108,14 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       },
       log: (line) => console.log(`[${film.id}] ${line}`),
       // A long chapter (64k output tokens, up to four continued parts) can take well over 30 minutes; a timeout would pay for it twice.
-      step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, fn),
+      step: (name, fn) => step.do(name, { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, async () => {
+        try {
+          return await fn();
+        } catch (error) {
+          const permanent = permanentError(error);
+          throw permanent ? new NonRetryableError(permanent) : error;
+        }
+      }),
     });
     // The finished film goes straight to the renderer when GitHub is connected.
     if (env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL) {
@@ -155,7 +179,7 @@ export default {
         const body = /** @type {any} */ (await request.json().catch(() => null));
         const result = await remakeScene({
           store: r2Store(env.FILMS, remake[1]),
-          model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5" }),
+          model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined }),
           manual: MANUAL,
           scene: remake[2],
           instruction: typeof body?.instruction === "string" ? body.instruction : "",
@@ -171,6 +195,27 @@ export default {
         const result = await dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: render[1], site: url.origin });
         if (env.FILMS && result.ok) await r2Store(env.FILMS, render[1]).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
         return json(result, result.ok ? 202 : 502);
+      }
+      const resume = /^\/api\/films\/([0-9a-f-]{36})\/resume$/.exec(url.pathname);
+      if (resume && request.method === "POST") {
+        if (!env.ANTHROPIC_API_KEY || !env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (Claude API key, R2 bucket or Workflow missing)." }, 503);
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const store = r2Store(env.FILMS, resume[1]);
+        const saved = JSON.parse((await store.get("film.json")) ?? "null");
+        if (!saved) return json({ error: "Not found." }, 404);
+        const run = JSON.parse((await store.get("run.json")) ?? "null");
+        if (run?.status === "done" || run?.status === "done-with-gaps") return json({ error: "This film is finished; nothing to resume." }, 409);
+        const current = await currentInstance(env, resume[1]);
+        if (current && ["queued", "running", "waiting", "paused", "waitingForPause"].includes(current.status)) return json({ error: "This film is still running." }, 409);
+        const body = /** @type {any} */ (await request.json().catch(() => ({})));
+        const asked = Number(body?.budgetUsd);
+        const budgetUsd = Number.isFinite(asked) && asked >= 1 && asked <= 500 ? asked : undefined;
+        const { createdAt: _created, ...film } = saved;
+        const instanceId = `${resume[1]}-r${(run?.resumes ?? 0) + 1}-${Date.now().toString(36)}`;
+        await env.FILM_RUN.create({ id: instanceId, params: { film, ...(budgetUsd ? { budgetUsd } : {}) } });
+        await store.put("workflow.json", JSON.stringify({ instanceId, at: new Date().toISOString() }, null, 1));
+        return json({ ok: true, instanceId, budgetUsd: budgetUsd ?? null }, 202);
       }
       const page = /^\/api\/films\/([0-9a-f-]{36})\/(page|script)$/.exec(url.pathname);
       if (page && request.method === "GET") {
@@ -194,10 +239,7 @@ export default {
         }
         const run = (await store.get("run.json")) ?? (await store.get("film.json"));
         if (run === null) return json({ error: "Not found." }, 404);
-        /** @type {unknown} */
-        let workflow = null;
-        try { workflow = await (await env.FILM_RUN.get(m[1])).status(); } catch { workflow = null; }
-        return json({ run: JSON.parse(run), workflow });
+        return json({ run: JSON.parse(run), workflow: await currentInstance(env, m[1]) });
       }
       return json({ error: "Not found." }, 404);
     } catch (error) {

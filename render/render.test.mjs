@@ -58,6 +58,11 @@ test("a film renders to MP4 with picture, voice in its slots, captions and a rep
     assert.deepEqual(timeline.sfx.map((e) => [e.token, e.kind, e.start]), [["SND-AMB-01", "bed", 8], ["SND-FX-05", "hit", 8], ["SND-FX-99", "hit", 8]]);
     assert.match(readFileSync(join(dir, "out", "film.srt"), "utf8"), /^1\n00:00:00,000 --> 00:00:04,000\nThe mill opens at dawn\.\n/);
     assert.ok(existsSync(join(dir, "out", "film.report.json")));
+    assert.ok(report.master && report.master.integratedLufs !== null && report.master.truePeakDbtp !== null, "the master's loudness is measured, not assumed");
+    assert.ok(Math.abs(/** @type {number} */ (report.master.integratedLufs) + 14) <= 1, `the master is -14 LUFS within 1 LU (${report.master.integratedLufs})`);
+    assert.ok(/** @type {number} */ (report.master.truePeakDbtp) <= -1, `true peak at or below -1 dBTP (${report.master.truePeakDbtp})`);
+    assert.equal(report.master.black.length, 1, "the scripted black is measured");
+    assert.ok(!report.warnings.some((w) => w.startsWith("Black picture")), "scripted black is not a defect");
 
     const again = await renderFilm(options);
     assert.equal(again.stats.segmentsRendered, 0, "a second render reuses every segment");
