@@ -478,7 +478,7 @@ export async function runFilm(o) {
           const markdown = await read(`s5-${c.id}.md`);
           const format = film.formatId ? getFormat(film.formatId) : null;
           const style = format ? `${format.name} (${lookFor(film.formatId)} look)` : "a general documentary";
-          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style) }], 8000);
+          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style) }], 16000);
           const parsed = safeJson(reply);
           const edit = validateEditPlan(parsed, markdown, c.id);
           if (parsed === null) state.gaps.push(`${c.id} edit: the Edit Director's reply was not valid JSON; this chapter's edit follows the script alone.`);

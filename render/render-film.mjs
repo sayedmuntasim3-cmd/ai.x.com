@@ -521,8 +521,12 @@ export async function renderFilm(o) {
           const left = W * 0.16;
           const slot = (W * 0.68) / bars.length;
           const bw = Math.round(slot * 0.56);
-          const base = Math.round(H * 0.8);
-          const room = Math.round(H * 0.44);
+          // Inside the frame's safe area: under the cinematic bars, with room for a punch-in.
+          const titleLines = v.text ? wrap(v.text, 34).split("\n").length : 0;
+          const titleY = Math.round(Math.max(H * 0.12, bar + H * 0.05));
+          const titleBottom = titleY + Math.round(titleLines * H * 0.07);
+          const base = Math.round(Math.min(H * 0.8, H - bar - H * 0.15));
+          const room = Math.round(Math.max(H * 0.18, Math.min(H * 0.44, base - titleBottom - H * 0.1)));
           const grow = Math.min(0.9, (v.frames / t.fps) * 0.3);
           const stagger = Math.min(0.15, (v.frames / t.fps) * 0.05);
           const steps = Math.max(2, Math.round(grow * t.fps));
@@ -545,7 +549,7 @@ export async function renderFilm(o) {
             labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.label, `bar-label-${k}`))}':fontfile='${face}':fontcolor=${muted}:fontsize=${Math.round(H * 0.035)}:x=${Math.round(cx)}-text_w/2:y=${base + Math.round(H * 0.025)}:alpha='min(1,t/0.35)'`);
             labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.text, `bar-value-${k}`))}':fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.042)}:x=${Math.round(cx)}-text_w/2:y=${base - full - Math.round(H * 0.065)}:alpha='min(1,max(0,(t-${(from + grow * 0.8).toFixed(3)})/0.25))'`);
           });
-          if (v.text) chain.push(text(wrap(v.text, 34), "chart-title", `fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.055)}:x=(w-text_w)/2:${rise(v.kinetic, "h*0.12")}`));
+          if (v.text) chain.push(text(wrap(v.text, 34), "chart-title", `fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.055)}:x=(w-text_w)/2:${rise(v.kinetic, String(titleY))}`));
           chain.push(commands(cmds), ...boxes, `drawbox=x=${Math.round(left)}:y=${base}:w=${Math.round(W * 0.68)}:h=${Math.max(2, Math.round(H * 0.004))}:color=${muted}:t=fill`, ...labels);
         } else if (v.text && font && v.highlight) {
           // A highlighter sweeps the key words on a document (a marker band behind them); on a dark card an underline draws itself.

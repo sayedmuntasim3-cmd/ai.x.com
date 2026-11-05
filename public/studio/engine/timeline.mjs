@@ -490,8 +490,10 @@ export function buildTimeline(o) {
           const place = route ? { ...route.from, to: route.to } : isMap ? mapPlace(shot.text) : null;
           // A chart only from numbers the shot itself writes; a highlighter only on words the card shows.
           const chart = !black && !panels && !place && /FX-CHART/i.test(`${fx} ${shot.text}`) ? chartData(shot.text) : null;
-          const marked = !black && !panels && !place && !chart ? highlightFor(shot.text, ost, fx, words) : "";
-          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: chart ? chart.title || words : words, counter: !panels && !place && !chart && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}), ...(chart ? { chart } : {}), ...(marked ? { highlight: marked } : {}) });
+          const counter = !black && !panels && !place && !chart && /COUNTER/i.test(fx) && /\d/.test(words);
+          // A counter has its own landing (the number runs, then an impact); a highlighter would stop it running.
+          const marked = !black && !panels && !place && !chart && !counter ? highlightFor(shot.text, ost, fx, words) : "";
+          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: chart ? chart.title || words : words, counter, ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}), ...(chart ? { chart } : {}), ...(marked ? { highlight: marked } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
           const shotSeconds = frames / fps;
