@@ -23,8 +23,11 @@ export const REPEAT_WINDOW_SECONDS = 600;
  */
 export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0", "PDM-1.0", "PUBLIC-DOMAIN", "US-GOV-PD", "CC-BY"]);
 
-/** Archives searched without a key: real, historical and scientific pictures, free for commercial use. */
-export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa"]);
+/**
+ * Archives: real, historical, scientific and museum pictures, free for
+ * commercial use. All but the Smithsonian are searched without a key.
+ */
+export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa", "loc", "smithsonian", "met", "artic", "openverse"]);
 
 /**
  * The item-level rights check of an archive result. Commons returns the file
@@ -35,7 +38,10 @@ export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa"]);
  */
 export async function verifyArchiveItem(c) {
   if (c.source === "wikimedia") return !c.restrictions;
-  if (c.source === "nasa") return c.rights.allowed;
+  // NASA: third-party credits refused by classifyLicense. The Library of Congress, the Met, the
+  // Art Institute and the Smithsonian: each provider keeps only items whose own record says
+  // "no known restrictions", public domain or CC0. Openverse: CC0, PDM and CC BY only, as the source states them.
+  if (["nasa", "loc", "smithsonian", "met", "artic", "openverse"].includes(c.source)) return c.rights.allowed && !c.restrictions;
   return false;
 }
 
@@ -438,16 +444,201 @@ export function nasaProvider(o = {}) {
   };
 }
 
+/** Fetch JSON, or null on any failure (a detail request that fails drops one item, never the search). @param {FetchLike} get @param {string} url @param {RequestInit} init */
+async function jsonOrNull(get, url, init) {
+  try { const r = await get(url, init); return r.ok ? /** @type {any} */ (await r.json()) : null; } catch { return null; }
+}
+/** @param {unknown} v */
+const str = (v) => (Array.isArray(v) ? v.map(String).join(" ") : typeof v === "string" ? v : "");
+
 /**
- * The providers a run can use: the free archives (no key) and whichever
- * stock keys are set.
- * @param {{ pexelsKey?: string, pixabayKey?: string, fetch?: FetchLike, archives?: boolean }} keys
+ * Library of Congress (loc.gov photos): American history in photographs,
+ * prints and documents. No key. Only items whose own record says "No known
+ * restrictions on publication" are kept; the item record is read for each
+ * of the first few results (the search result does not carry it).
+ * @param {{ fetch?: FetchLike, perPage?: number, details?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function locProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  return {
+    id: "loc", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 20, windowSeconds: 10 },
+    async search(query, kind, signal) {
+      if (kind !== "image") return [];
+      const res = await get(`https://www.loc.gov/photos/?${new URLSearchParams({ q: query.slice(0, 200), fo: "json", c: String(o.perPage ?? 20), fa: "online-format:image" })}`, { headers: { "user-agent": COMMONS_UA }, signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      const hits = (Array.isArray(data?.results) ? data.results : []).filter((/** @type {any} */ r) => typeof r?.id === "string" && Array.isArray(r.image_url) && r.image_url.length).slice(0, o.details ?? 6);
+      const items = await Promise.all(hits.map((/** @type {any} */ r) => jsonOrNull(get, `${r.id.replace(/^http:/, "https:").replace(/\/?$/, "/")}?fo=json`, { headers: { "user-agent": COMMONS_UA }, signal })));
+      return hits.flatMap((/** @type {any} */ r, /** @type {number} */ i) => {
+        const item = items[i]?.item;
+        const advisory = str(item?.rights_advisory).trim();
+        if (!/^no known restrictions on publication/i.test(advisory)) return [];
+        // Renditions carry their size in the hash (…_150px.jpg#h=150&w=118); the largest is the picture, one near 320 px the preview.
+        const sized = r.image_url.map((/** @type {string} */ u) => ({ url: u.split("#")[0], w: Number(/[#&]w=(\d+)/.exec(u)?.[1] ?? 0), h: Number(/[#&]h=(\d+)/.exec(u)?.[1] ?? 0) })).filter((/** @type {any} */ x) => /^https?:\/\//.test(x.url));
+        if (!sized.length) return [];
+        const big = sized.reduce((/** @type {any} */ a, /** @type {any} */ b) => (b.w > a.w ? b : a));
+        const preview = sized.filter((/** @type {any} */ x) => x.w >= 300).sort((/** @type {any} */ a, /** @type {any} */ b) => a.w - b.w)[0] ?? big;
+        const page = String(r.url ?? r.id).replace(/^http:/, "https:");
+        return [{
+          id: `loc:${r.id.replace(/^https?:\/\/www\.loc\.gov\//, "").replace(/\/$/, "")}`, source: "loc", mediaType: "image", title: plain(r.title) || query,
+          previewUrl: preview.url.replace(/^http:/, "https:"), mediaUrl: big.url.replace(/^http:/, "https:"), sourcePageUrl: page,
+          creator: str(item?.contributor_names ?? r.contributor).slice(0, 120) || null,
+          license: `Library of Congress: ${advisory.slice(0, 160)}`, licenseUrl: "https://www.loc.gov/legal/understanding-copyright/",
+          attributionRequired: false, durationSeconds: null, width: big.w || null, height: big.h || null,
+        }];
+      });
+    },
+  };
+}
+
+/**
+ * Smithsonian Open Access: museum objects, history, science and nature,
+ * CC0 only. Needs a free api.data.gov key (SMITHSONIAN_API_KEY).
+ * @param {{ apiKey: string, fetch?: FetchLike, perPage?: number }} o
+ * @returns {MediaProvider}
+ */
+export function smithsonianProvider(o) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  return {
+    id: "smithsonian", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 30, windowSeconds: 60 },
+    async search(query, kind, signal) {
+      if (kind !== "image") return [];
+      const q = `${query.slice(0, 200)} AND online_media_type:"Images" AND media_usage:"CC0"`;
+      const res = await get(`https://api.si.edu/openaccess/api/v1.0/search?${new URLSearchParams({ q, rows: String(o.perPage ?? 20), api_key: o.apiKey })}`, { signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      return (Array.isArray(data?.response?.rows) ? data.response.rows : []).flatMap((/** @type {any} */ row) => {
+        const d = row?.content?.descriptiveNonRepeating ?? {};
+        // Every picture of the record states its own usage; only CC0 ones are taken.
+        const m = (d.online_media?.media ?? []).find((/** @type {any} */ x) => x?.type === "Images" && String(x?.usage?.access ?? "").toUpperCase() === "CC0" && typeof x.content === "string");
+        if (!m) return [];
+        const hi = (m.resources ?? []).find((/** @type {any} */ r) => /high-resolution jpeg/i.test(String(r?.label)) && typeof r.url === "string")?.url;
+        const ids = (/** @type {string} */ u, /** @type {number} */ max) => (/deliveryService/.test(u) ? `${u}${u.includes("?") ? "&" : "?"}max=${max}` : u);
+        return [{
+          id: `smithsonian:${row.id ?? d.record_ID ?? m.idsId}`, source: "smithsonian", mediaType: "image", title: plain(d.title?.content ?? row.title) || query,
+          previewUrl: m.thumbnail ?? ids(m.content, 320), mediaUrl: hi ?? ids(m.content, 1920), sourcePageUrl: d.record_link ?? d.guid ?? "https://www.si.edu/openaccess",
+          creator: plain(row?.content?.freetext?.name?.[0]?.content) || plain(d.data_source) || null,
+          license: "CC0 (Smithsonian Open Access)", licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+          attributionRequired: false, durationSeconds: null, width: null, height: null,
+        }];
+      });
+    },
+  };
+}
+
+/**
+ * The Metropolitan Museum of Art (Open Access): public-domain objects, CC0.
+ * No key. The search returns ids only, so the first few objects are read.
+ * @param {{ fetch?: FetchLike, details?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function metProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  const base = "https://collectionapi.metmuseum.org/public/collection/v1";
+  return {
+    id: "met", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 1 },
+    async search(query, kind, signal) {
+      if (kind !== "image") return [];
+      const res = await get(`${base}/search?${new URLSearchParams({ hasImages: "true", q: query.slice(0, 200) })}`, { signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      const ids = (Array.isArray(data?.objectIDs) ? data.objectIDs : []).slice(0, o.details ?? 6);
+      const objects = await Promise.all(ids.map((/** @type {number} */ id) => jsonOrNull(get, `${base}/objects/${id}`, { signal })));
+      return objects.flatMap((/** @type {any} */ x) => {
+        if (!x || x.isPublicDomain !== true || typeof x.primaryImage !== "string" || !x.primaryImage) return [];
+        return [{
+          id: `met:${x.objectID}`, source: "met", mediaType: "image", title: [plain(x.title), plain(x.objectDate)].filter(Boolean).join(", ") || query,
+          previewUrl: x.primaryImageSmall || null, mediaUrl: x.primaryImage, sourcePageUrl: x.objectURL || `https://www.metmuseum.org/art/collection/search/${x.objectID}`,
+          creator: plain(x.artistDisplayName) || null, license: "CC0 (The Met Open Access, public-domain object)", licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+          attributionRequired: false, durationSeconds: null, width: null, height: null,
+        }];
+      });
+    },
+  };
+}
+
+/**
+ * The Art Institute of Chicago: public-domain artworks, images released as
+ * CC0, served through IIIF. No key.
+ * @param {{ fetch?: FetchLike, perPage?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function articProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  return {
+    id: "artic", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 60 },
+    async search(query, kind, signal) {
+      if (kind !== "image") return [];
+      const params = new URLSearchParams({ q: query.slice(0, 200), "query[term][is_public_domain]": "true", limit: String(o.perPage ?? 20), fields: "id,title,image_id,artist_title,date_display,is_public_domain,thumbnail" });
+      const res = await get(`https://api.artic.edu/api/v1/artworks/search?${params}`, { headers: { "AIC-User-Agent": COMMONS_UA }, signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      const iiif = typeof data?.config?.iiif_url === "string" ? data.config.iiif_url : "https://www.artic.edu/iiif/2";
+      return (Array.isArray(data?.data) ? data.data : []).flatMap((/** @type {any} */ a) => {
+        if (a?.is_public_domain !== true || !a.image_id) return [];
+        return [{
+          id: `artic:${a.id}`, source: "artic", mediaType: "image", title: [plain(a.title), plain(a.date_display)].filter(Boolean).join(", ") || query,
+          previewUrl: `${iiif}/${a.image_id}/full/400,/0/default.jpg`, mediaUrl: `${iiif}/${a.image_id}/full/1686,/0/default.jpg`, sourcePageUrl: `https://www.artic.edu/artworks/${a.id}`,
+          creator: plain(a.artist_title) || null, license: "CC0 (Art Institute of Chicago, public-domain artwork)", licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+          attributionRequired: false, durationSeconds: null, width: null, height: null,
+        }];
+      });
+    },
+  };
+}
+
+/** Openverse also indexes these; they are searched directly, with their own rights metadata. */
+const OPENVERSE_SKIP = new Set(["wikimedia", "nasa", "smithsonian", "met", "artic"]);
+
+/**
+ * Openverse: openly licensed images from many collections (Flickr, museums,
+ * libraries), CC0, Public Domain Mark and CC BY only (never share-alike,
+ * non-commercial or no-derivatives). No key; anonymous use is rate-limited,
+ * so a busy Openverse is skipped. The licence is as the source states it.
+ * @param {{ fetch?: FetchLike, perPage?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function openverseProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  return {
+    id: "openverse", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 20, windowSeconds: 60 },
+    async search(query, kind, signal) {
+      if (kind !== "image") return [];
+      const params = new URLSearchParams({ q: query.slice(0, 200), license: "cc0,pdm,by", page_size: String(o.perPage ?? 20), mature: "false" });
+      const res = await get(`https://api.openverse.org/v1/images/?${params}`, { headers: { "user-agent": COMMONS_UA }, signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      return (Array.isArray(data?.results) ? data.results : []).flatMap((/** @type {any} */ r) => {
+        if (!r?.id || typeof r.url !== "string" || r.mature === true || OPENVERSE_SKIP.has(String(r.source))) return [];
+        if (r.filetype && !/^(jpe?g|png|webp)$/i.test(String(r.filetype))) return [];
+        const lic = String(r.license ?? "").toLowerCase();
+        const license = lic === "cc0" ? "CC0 1.0" : lic === "pdm" ? "Public Domain Mark 1.0" : lic === "by" ? `CC BY ${r.license_version ?? ""}`.trim() : null;
+        if (!license) return [];
+        return [{
+          id: `openverse:${r.id}`, source: "openverse", mediaType: "image", title: plain(r.title) || query,
+          previewUrl: typeof r.thumbnail === "string" ? r.thumbnail : null, mediaUrl: r.url, sourcePageUrl: r.foreign_landing_url ?? `https://openverse.org/image/${r.id}`,
+          creator: plain(r.creator) || null, license, licenseUrl: r.license_url ?? null, attributionRequired: lic === "by",
+          durationSeconds: null, width: Number(r.width) || null, height: Number(r.height) || null,
+        }];
+      });
+    },
+  };
+}
+
+/**
+ * The providers a run can use: the free archives (no key; the Smithsonian
+ * with its free key) and whichever stock keys are set.
+ * @param {{ pexelsKey?: string, pixabayKey?: string, smithsonianKey?: string, fetch?: FetchLike, archives?: boolean }} keys
  * @returns {MediaProvider[]}
  */
 export function mediaProviders(keys) {
   /** @type {MediaProvider[]} */
   const out = [];
-  if (keys.archives !== false) out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }));
+  if (keys.archives !== false) {
+    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }));
+    if (keys.smithsonianKey) out.push(smithsonianProvider({ apiKey: keys.smithsonianKey, fetch: keys.fetch }));
+  }
   if (keys.pexelsKey) out.push(pexelsProvider({ apiKey: keys.pexelsKey, fetch: keys.fetch }));
   if (keys.pixabayKey) out.push(pixabayProvider({ apiKey: keys.pixabayKey, fetch: keys.fetch }));
   return out;

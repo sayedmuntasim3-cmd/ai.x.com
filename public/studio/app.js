@@ -83,7 +83,7 @@ const T = {
     copy: "কপি",
     copied: "কপি হয়েছে",
     rules: {
-      "legal-footage-only": "ফুটেজ শুধু বৈধ ফ্রি সোর্স (stock সাইট, Commons, NASA) বা ক্রিয়েটরের লিখিত অনুমতিতে। Facebook, X, YouTube, TikTok থেকে কোনো ডাউনলোড নয়।",
+      "legal-footage-only": "ফুটেজ শুধু বৈধ ফ্রি সোর্স (stock সাইট, Commons, NASA, Library of Congress, Smithsonian, Met, Art Institute, Openverse) বা ক্রিয়েটরের লিখিত অনুমতিতে। Facebook, X, YouTube, TikTok থেকে কোনো ডাউনলোড নয়।",
       "versions-native": "আরবি (ইসলামিক দৃষ্টিভঙ্গি), ইংরেজি (USA), বাংলা: তিনটিই আলাদা করে নিজ ভাষায় লেখা।",
       "no-approval-step": "রানের ভেতরে কোনো human approval নেই; আপনি নিজে পাবলিশ করবেন।",
       "no-label-on-screen": "স্ক্রিনে \"fictional story\" লেবেল নেই; শুধু ডেসক্রিপশনে এক লাইনের নোট।",
@@ -226,7 +226,7 @@ const T = {
     copy: "Copy",
     copied: "Copied",
     rules: {
-      "legal-footage-only": "Footage only from legal free sources (stock sites, Commons, NASA) or with the creator's written permission. Nothing downloaded from Facebook, X, YouTube or TikTok.",
+      "legal-footage-only": "Footage only from legal free sources (stock sites, Commons, NASA, Library of Congress, Smithsonian, the Met, Art Institute, Openverse) or with the creator's written permission. Nothing downloaded from Facebook, X, YouTube or TikTok.",
       "versions-native": "Arabic (Islamic outlook), English (USA) and Bangla, each written natively.",
       "no-approval-step": "No human approval step inside the run; you publish.",
       "no-label-on-screen": "No \"fictional story\" label on screen; a one-line note in the description only.",

@@ -109,7 +109,7 @@ export function filmBrief(film) {
     story
       ? `1. STORY MODE: the story is invented. Never name, depict or imply a real private person, and never attach an invented act to any real person, company or town; invented characters get names no famous real person has. Real-world details (prices, wages, laws, distances, jobs, era) come from the research file and the S2 realism ledger and must be exact. Never call the story true, real or "based on a true story" in narration, title, thumbnail or description. Nothing is written on the video to say it is invented; S7 ends the description with this exact line: "${note}"`
       : "1. Facts only from the research file and the S2 ledger. Where sources conflict, never pick silently: say \"reports differ\" or use wording every source supports. Quotes are paraphrased with attribution (\"he told X in 2014 that ...\"), never presented as verbatim. Unknown means unknown.",
-    "2. Pictures only from sources the media step licenses item by item. Real archive pictures come first for evidence: R2 public-domain, CC0 and CC BY photographs, documents and video from Wikimedia Commons and NASA, showing the actual people, places, objects and events; write those shots as R2 with an exact, searchable description (who or what, where, when: 'Apollo 11 launch, Kennedy Space Center, July 1969'), and the photo is animated in the edit. Never a share-alike, non-commercial or restricted file. Then footage from free stock: Pexels, Pixabay, Videvo (free licence, commercial use, never Editorial Use Only or Premium), Coverr (downloaded by hand) and Mixkit (Free Licence), plus graphics the editor builds (R1: OpenStreetMap maps credited \"© OpenStreetMap contributors\", kinetic type, counters, timelines, document-style cards rebuilt from public facts). Music and SFX only from Pixabay and Mixkit. Never social media, agency, archive or screenshot material.",
+    "2. Pictures only from sources the media step licenses item by item. Real archive pictures come first for evidence: R2 public-domain, CC0 and CC BY photographs, documents, paintings and video from Wikimedia Commons, NASA, the Library of Congress, the Smithsonian, the Met, the Art Institute of Chicago and Openverse, showing the actual people, places, objects and events; write those shots as R2 with an exact, searchable description (who or what, where, when: 'Apollo 11 launch, Kennedy Space Center, July 1969'), and the photo is animated in the edit. Never a share-alike, non-commercial or restricted file. Then footage from free stock: Pexels, Pixabay, Videvo (free licence, commercial use, never Editorial Use Only or Premium), Coverr (downloaded by hand) and Mixkit (Free Licence), plus graphics the editor builds (R1: OpenStreetMap maps credited \"© OpenStreetMap contributors\", kinetic type, counters, timelines, document-style cards rebuilt from public facts). Music and SFX only from Pixabay and Mixkit. Never social media, agency, archive or screenshot material.",
     film.allowAi && story
       ? "3. AI SCENES (R9) carry the story's people: one consistent cast from the S4 bible. Every shot of a character is an R9 shot that names its token (CHR-01) and describes, in one concrete sentence, the action, the place, the light and the camera. Places and objects may still come from stock (R3). Never a real person's likeness, a child as the focus, a real brand, gore or nudity. The film is disclosed in YouTube Studio's altered-or-synthetic setting; nothing is written on the video."
       : film.allowAi ? "3. AI imagery only where the engine allows it, never a real person's likeness, disclosed in YouTube Studio's altered-or-synthetic setting; nothing written on the video." : "3. No AI imagery or AI audio (AI cap = 0 s).",
@@ -623,10 +623,11 @@ export function titleProblems(title) {
 }
 
 /** @type {Record<string, string>} */
-const ARCHIVE_NAMES = { wikimedia: "Wikimedia Commons", nasa: "NASA" };
+const ARCHIVE_NAMES = { wikimedia: "Wikimedia Commons", nasa: "NASA", loc: "the Library of Congress", smithsonian: "Smithsonian Open Access", met: "The Metropolitan Museum of Art", artic: "the Art Institute of Chicago", openverse: "Openverse" };
 
 /**
- * The credit lines for every archive picture a film uses (Commons, NASA),
+ * The credit lines for every archive picture a film uses (Commons, NASA, the
+ * Library of Congress, the Smithsonian, the Met, the Art Institute, Openverse),
  * one per item, from its licence record. CC BY items must be credited; public
  * domain items are credited too, as good practice. Stock (Pexels, Pixabay)
  * needs no credit.
@@ -641,7 +642,8 @@ export function pictureCredits(chapters) {
       if (!p || !ARCHIVE_NAMES[p.source] || lines.has(p.id)) continue;
       const what = p.title ? `"${String(p.title).slice(0, 120)}"` : "Picture";
       const who = p.licence?.creator || p.creator;
-      const licence = p.licence?.licenseId === "CC-BY" ? `CC BY${p.licence?.licenseUrl ? ` (${p.licence.licenseUrl})` : ""}` : p.source === "nasa" ? "courtesy of NASA" : "public domain";
+      const id = p.licence?.licenseId;
+      const licence = id === "CC-BY" ? `CC BY${p.licence?.licenseUrl ? ` (${p.licence.licenseUrl})` : ""}` : p.source === "nasa" ? "courtesy of NASA" : p.source === "loc" ? "no known restrictions on publication" : id === "CC0-1.0" ? "CC0" : "public domain";
       lines.set(p.id, `${what}${who ? ` by ${String(who).slice(0, 80)}` : ""}, ${licence}, via ${ARCHIVE_NAMES[p.source]}: ${p.sourcePageUrl}`);
     }
   }

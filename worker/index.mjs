@@ -25,6 +25,7 @@
  *   Optional GITHUB_TOKEN secret + GITHUB_REPO and SITE_URL vars: a finished
  *   film starts the "Render a film" GitHub workflow by itself (render.json).
  *   Optional YOUTUBE_API_KEY secret: the topic radar (/api/ideas), cached a day in R2.
+ *   Optional SMITHSONIAN_API_KEY secret (api.data.gov): Smithsonian Open Access (CC0) in the media step.
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
@@ -102,7 +103,7 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       model,
       store: r2Store(env.FILMS, film.id),
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
-      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY }) },
+      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
       channel: {
         // One channel per deployment for now; a per-client channel key comes with client accounts.
         load: async () => { const obj = await env.FILMS.get("channel/fingerprints.json"); return obj ? JSON.parse(await obj.text()) : []; },
@@ -135,7 +136,7 @@ export default {
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
       if (url.pathname === "/api/health") {
-        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), model: env.MODEL || "claude-opus-5-5" });
+        return json({ claude: Boolean(env.ANTHROPIC_API_KEY), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: env.MODEL || "claude-opus-5-5" });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
@@ -186,7 +187,7 @@ export default {
           manual: MANUAL,
           scene: remake[2],
           instruction: typeof body?.instruction === "string" ? body.instruction : "",
-          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY }),
+          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }),
         });
         return json(result, result.ok ? 200 : 422);
       }

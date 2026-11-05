@@ -48,7 +48,7 @@ test("Pexels and Pixabay results map to licensed candidates; keys go only where 
   const pb = await pixabayProvider({ apiKey: "PB", fetch: f }).search("old mill", "video", signal);
   assert.equal(pb[0].source, "pixabay");
   assert.ok(calls[1].url.includes("key=PB") && !calls[0].url.includes("PB"));
-  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "pixabay"], "the free archives need no key");
+  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "loc", "met", "artic", "openverse", "pixabay"], "the free archives need no key");
   assert.deepEqual(mediaProviders({ archives: false }), []);
 });
 
@@ -164,4 +164,98 @@ test("an evidence shot (R2) takes a real archive photo first; a stock shot still
   assert.equal(evidence.pick?.licence.licenseId, "PUBLIC-DOMAIN");
   assert.equal(stockShot.pick?.id, "pexels:video:5");
   assert.equal(stockShot.pick?.kind, "video");
+});
+
+// Fixtures shaped like each archive's real API (the build sandbox cannot reach them; the first real run must confirm).
+const LOC_SEARCH = { results: [
+  { id: "http://www.loc.gov/item/2017659512/", title: "Brooklyn Bridge, New York, 1883", url: "https://www.loc.gov/item/2017659512/", image_url: ["https://tile.loc.gov/storage-services/service/pnp/cph/3c10000/3c10200/3c10272_150px.jpg#h=150&w=200", "https://tile.loc.gov/storage-services/service/pnp/cph/3c10000/3c10200/3c10272r.jpg#h=480&w=640", "https://tile.loc.gov/storage-services/service/pnp/cph/3c10000/3c10200/3c10272v.jpg#h=1536&w=2048"] },
+  { id: "http://www.loc.gov/item/2016800001/", title: "A studio portrait", url: "https://www.loc.gov/item/2016800001/", image_url: ["https://tile.loc.gov/x_150px.jpg#h=150&w=110"] },
+  { id: "http://www.loc.gov/item/no-pictures/", title: "Text only" },
+] };
+const LOC_ITEMS = {
+  "https://www.loc.gov/item/2017659512/?fo=json": { item: { rights_advisory: ["No known restrictions on publication."], contributor_names: ["Currier & Ives."] } },
+  "https://www.loc.gov/item/2016800001/?fo=json": { item: { rights_advisory: ["Rights status not evaluated. For general information see ..."] } },
+};
+const MET_SEARCH = { total: 3, objectIDs: [436535, 11417, 999] };
+const MET_OBJECTS = {
+  436535: { objectID: 436535, isPublicDomain: true, primaryImage: "https://images.metmuseum.org/CRDImages/ep/original/DT1502.jpg", primaryImageSmall: "https://images.metmuseum.org/CRDImages/ep/web-large/DT1502.jpg", title: "Wheat Field with Cypresses", objectDate: "1889", artistDisplayName: "Vincent van Gogh", objectURL: "https://www.metmuseum.org/art/collection/search/436535" },
+  11417: { objectID: 11417, isPublicDomain: false, primaryImage: "", title: "A later painting" },
+};
+const ARTIC = { config: { iiif_url: "https://www.artic.edu/iiif/2" }, data: [
+  { id: 27992, title: "A Sunday on La Grande Jatte — 1884", image_id: "2d484387-2509-5e8e-2c43-22f9981972eb", artist_title: "Georges Seurat", date_display: "1884–86", is_public_domain: true },
+  { id: 100, title: "Modern work", image_id: "abc", is_public_domain: false },
+] };
+const OPENVERSE = { results: [
+  { id: "f1", title: "Harbour at dawn", url: "https://live.staticflickr.com/1/harbour_b.jpg", thumbnail: "https://api.openverse.org/v1/images/f1/thumb/", foreign_landing_url: "https://www.flickr.com/photos/ann/1", creator: "Ann", license: "by", license_version: "2.0", license_url: "https://creativecommons.org/licenses/by/2.0/", source: "flickr", filetype: "jpg", width: 2048, height: 1365, mature: false },
+  { id: "f2", title: "Share-alike harbour", url: "https://x/2.jpg", license: "by-sa", license_version: "2.0", source: "flickr" },
+  { id: "f3", title: "Commons copy", url: "https://x/3.jpg", license: "cc0", source: "wikimedia" },
+  { id: "f4", title: "Old map", url: "https://x/4.png", license: "pdm", license_version: "1.0", license_url: "https://creativecommons.org/publicdomain/mark/1.0/", source: "flickr", filetype: "png", width: 3000, height: 2000 },
+  { id: "f5", title: "An animation", url: "https://x/5.gif", license: "cc0", source: "flickr", filetype: "gif" },
+] };
+const SMITHSONIAN = { response: { rows: [
+  { id: "edanmdm-nasm_A19610048000", title: "Wright Flyer", content: { descriptiveNonRepeating: { title: { content: "1903 Wright Flyer" }, record_link: "https://airandspace.si.edu/collection/id/nasm_A19610048000", data_source: "National Air and Space Museum", online_media: { media: [{ type: "Images", content: "https://ids.si.edu/ids/deliveryService?id=NASM-A19610048000-NASM2018-02858", thumbnail: "https://ids.si.edu/ids/deliveryService?id=NASM-A19610048000-NASM2018-02858&max=150", usage: { access: "CC0" } }] } }, freetext: { name: [{ label: "Manufacturer", content: "Wright Brothers" }] } } },
+  { id: "edanmdm-restricted", title: "Restricted", content: { descriptiveNonRepeating: { online_media: { media: [{ type: "Images", content: "https://ids.si.edu/ids/deliveryService?id=R", usage: { access: "Usage conditions apply" } }] } } } },
+] } };
+
+/** A fetch that answers like the five newer archives. @param {string} url */
+async function archiveFetch(url) {
+  if (url.startsWith("https://www.loc.gov/photos/")) return Response.json(LOC_SEARCH);
+  if (url.startsWith("https://www.loc.gov/item/")) { const body = /** @type {any} */ (LOC_ITEMS)[url]; return body ? Response.json(body) : new Response("no", { status: 404 }); }
+  if (url.includes("metmuseum.org/public/collection/v1/search")) return Response.json(MET_SEARCH);
+  const met = /\/objects\/(\d+)$/.exec(url);
+  if (met) { const body = /** @type {any} */ (MET_OBJECTS)[met[1]]; return body ? Response.json(body) : new Response("gone", { status: 404 }); }
+  if (url.startsWith("https://api.artic.edu/")) return Response.json(ARTIC);
+  if (url.startsWith("https://api.openverse.org/")) return Response.json(OPENVERSE);
+  if (url.startsWith("https://api.si.edu/")) return Response.json(SMITHSONIAN);
+  return Response.json({});
+}
+
+test("more legal sources: the Library of Congress, the Met, the Art Institute, Openverse and the Smithsonian keep only free items", async () => {
+  const { locProvider, metProvider, articProvider, openverseProvider, smithsonianProvider, verifyArchiveItem } = await import("../src/film-media.mjs");
+  const { classifyLicense } = await import("../src/documentary-media-fetch.mjs");
+  const f = /** @type {any} */ (archiveFetch);
+  const sig = AbortSignal.timeout(1000);
+  const verdict = async (/** @type {any} */ c) => { const rights = classifyLicense(c); return rights.allowed && (await verifyArchiveItem({ ...c, layer: 1, rights })) ? rights.licenseId : "refused"; };
+
+  const loc = await locProvider({ fetch: f }).search("brooklyn bridge", "image", sig);
+  assert.deepEqual(loc.map((c) => c.id), ["loc:item/2017659512"], "an item whose rights are not evaluated is dropped");
+  assert.equal(loc[0].mediaUrl, "https://tile.loc.gov/storage-services/service/pnp/cph/3c10000/3c10200/3c10272v.jpg", "the largest rendition");
+  assert.equal(loc[0].previewUrl, "https://tile.loc.gov/storage-services/service/pnp/cph/3c10000/3c10200/3c10272r.jpg", "a preview near 320 px for the footage desk");
+  assert.equal(loc[0].width, 2048);
+  assert.equal(await verdict(loc[0]), "PUBLIC-DOMAIN");
+
+  const met = await metProvider({ fetch: f }).search("wheat field", "image", sig);
+  assert.deepEqual(met.map((c) => c.id), ["met:436535"], "not public domain or gone: refused");
+  assert.equal(met[0].creator, "Vincent van Gogh");
+  assert.equal(await verdict(met[0]), "CC0-1.0");
+
+  const artic = await articProvider({ fetch: f }).search("grande jatte", "image", sig);
+  assert.deepEqual(artic.map((c) => c.id), ["artic:27992"]);
+  assert.equal(artic[0].mediaUrl, "https://www.artic.edu/iiif/2/2d484387-2509-5e8e-2c43-22f9981972eb/full/1686,/0/default.jpg");
+  assert.equal(await verdict(artic[0]), "CC0-1.0");
+
+  const ov = await openverseProvider({ fetch: f }).search("harbour", "image", sig);
+  assert.deepEqual(ov.map((c) => c.id), ["openverse:f1", "openverse:f4"], "share-alike, a Commons copy and a GIF are left out");
+  assert.deepEqual(await Promise.all(ov.map(verdict)), ["CC-BY", "PDM-1.0"]);
+  assert.equal(ov[0].attributionRequired, true);
+
+  const si = await smithsonianProvider({ apiKey: "K", fetch: f }).search("wright flyer", "image", sig);
+  assert.deepEqual(si.map((c) => c.id), ["smithsonian:edanmdm-nasm_A19610048000"], "only CC0 pictures");
+  assert.equal(si[0].mediaUrl, "https://ids.si.edu/ids/deliveryService?id=NASM-A19610048000-NASM2018-02858&max=1920");
+  assert.equal(await verdict(si[0]), "CC0-1.0");
+  for (const p of [locProvider({ fetch: f }), metProvider({ fetch: f }), articProvider({ fetch: f }), openverseProvider({ fetch: f })]) assert.deepEqual(await p.search("x", "video", sig), [], `${p.id} has no video`);
+
+  // The run's provider list: every keyless archive, the Smithsonian only with its key.
+  const ids = (/** @type {any} */ k) => mediaProviders({ fetch: f, ...k }).map((p) => p.id);
+  assert.deepEqual(ids({}), ["wikimedia", "nasa", "loc", "met", "artic", "openverse"]);
+  assert.ok(ids({ smithsonianKey: "K" }).includes("smithsonian"));
+});
+
+test("an evidence shot can be filled from a museum, and the description credits it", async () => {
+  const md = "**SC0001** | 0:00:00-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R2 Wheat Field with Cypresses, Van Gogh, 1889 | SRC: Met · Q1 \"wheat field cypresses\" | LOOK: L";
+  const media = await chapterMedia({ chapter: "C1", markdown: md, providers: mediaProviders({ fetch: /** @type {any} */ (async (/** @type {string} */ url) => (url.includes("wikimedia") || url.includes("nasa") || url.includes("loc.gov") || url.includes("artic") || url.includes("openverse") ? Response.json({}) : archiveFetch(url))) }), sleep: async () => {} });
+  assert.equal(media.shots[0].pick?.id, "met:436535");
+  assert.equal(media.shots[0].pick?.licence.licenseId, "CC0-1.0");
+  const { pictureCredits } = await import("../src/film-run.mjs");
+  assert.equal(pictureCredits([media]), "\"Wheat Field with Cypresses, 1889\" by Vincent van Gogh, CC0, via The Metropolitan Museum of Art: https://www.metmuseum.org/art/collection/search/436535");
 });
