@@ -12,7 +12,8 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition }} VideoSegment
+ * @typedef {"whip" | "slide" | "zoom" | "flash"} Transition
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
  *   style: "paper" for FX-PAPER cards (document look); kinetic: text moves in (FX-KINETIC);
@@ -211,6 +212,21 @@ export function sceneSounds(field, scene, shotStarts) {
   return out;
 }
 
+/**
+ * The transition a scene's TRANS field asks for into its first shot, when it
+ * is not a cut or a dip: a whip pan, a slide, a zoom through, or a white flash.
+ * @param {string} trans
+ * @returns {Transition | null}
+ */
+export function transitionFor(trans) {
+  const t = String(trans ?? "").toLowerCase();
+  if (/\b(whip|swish)\b/.test(t)) return "whip";
+  if (/\bzoom[- ]?(through|transition|cut|in transition)\b|\bpunch[- ]?in transition\b/.test(t)) return "zoom";
+  if (/\b(slide|push) (transition|left|right|across)\b|\bslide\b/.test(t)) return "slide";
+  if (/\b(white )?flash\b|\bflash[- ]?cut\b/.test(t)) return "flash";
+  return null;
+}
+
 /** Seconds of the dip through black at a chapter break, and at a written dissolve or fade. */
 export const CHAPTER_DIP = 0.4;
 export const SCENE_DIP = 0.25;
@@ -316,6 +332,9 @@ export function buildTimeline(o) {
           if (previous && previous.type !== "black") previous.fadeOut = Math.min(dip, previous.frames / fps / 3);
           base.fadeIn = Math.min(dip, frames / fps / 3);
         }
+        // A whip, slide, zoom or flash into the scene (never on top of a dip).
+        const into = lead && !dip ? transitionFor(s.fields.TRANS ?? "") : null;
+        if (into && video.length) base.transition = into;
         if (lead && chapterStart && chapter.title) base.chapterTitle = `${chapter.id.replace(/^C/, "Chapter ")} · ${chapter.title}`;
         if (lead) chapterStart = false;
         if (rung === "R1") {

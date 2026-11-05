@@ -182,7 +182,7 @@ export async function renderFilm(o) {
   const font = o.fontFile ?? FONT_CANDIDATES.find((f) => existsSync(f));
   /** @type {string[]} */
   const warnings = [...t.notes];
-  const stats = { segmentsRendered: 0, segmentsCached: 0, audioRendered: 0, clipsFailed: 0 };
+  const stats = { segmentsRendered: 0, segmentsCached: 0, audioRendered: 0, clipsFailed: 0, transitions: 0 };
   const fetchClip = o.fetchClip ?? ((url) => downloadClip(url, dirs.clips));
   const limit = o.concurrency ?? Math.max(1, cpus().length - 1);
   // Quality-led encoding with a ceiling: about 6 Mbit/s at 1080p30 (scaled by frame size and rate),
@@ -228,7 +228,7 @@ export async function renderFilm(o) {
   const segments = new Array(t.video.length);
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
-    const key = hash({ v: 8, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 8, transition: v.transition === "flash" ? "flash" : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -358,6 +358,8 @@ export async function renderFilm(o) {
     // Dips through black at chapter breaks and written dissolves: the shot fades out, the next fades in.
     const seconds = v.frames / t.fps;
     if (v.fadeIn) chain.push(`fade=t=in:st=0:d=${v.fadeIn.toFixed(3)}`);
+    // A white flash into the scene: the first fifth of a second comes up from white.
+    if (v.transition === "flash" && !v.fadeIn) chain.push(`fade=t=in:st=0:d=${Math.min(0.2, seconds / 4).toFixed(3)}:color=white`);
     if (v.fadeOut) chain.push(`fade=t=out:st=${Math.max(0, seconds - v.fadeOut).toFixed(3)}:d=${v.fadeOut.toFixed(3)}`);
     const vf = chain.length ? chain.join(",") : "null";
     const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), complex ? "-filter_complex" : "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
@@ -367,6 +369,25 @@ export async function renderFilm(o) {
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
   });
+  // 1b. Transitions that need the shot before: a whip, a slide or a zoom from its last frame into this shot.
+  // The shot keeps its length (the move happens over its first frames), so the film's clock never shifts.
+  const XFADE = { whip: ["slideleft", 0.25], slide: ["smoothleft", 0.4], zoom: ["zoomin", 0.35] };
+  for (let i = 1; i < t.video.length; i += 1) {
+    const v = t.video[i];
+    const kind = v.transition && v.transition !== "flash" ? XFADE[v.transition] : null;
+    if (!kind || t.video[i - 1].type === "black") continue;
+    const [name, wanted] = kind;
+    const duration = Math.min(Number(wanted), v.frames / t.fps / 3);
+    const out = segments[i].replace(/\.mp4$/, `-${v.transition}-${hash({ from: segments[i - 1], d: duration })}.mp4`);
+    if (!existsSync(out)) {
+      const last = out.replace(/\.mp4$/, "-from.png");
+      await run(ffmpeg, ["-v", "error", "-y", "-sseof", "-0.12", "-i", segments[i - 1], "-frames:v", "1", "-update", "1", last]);
+      await run(ffmpeg, ["-v", "error", "-y", "-loop", "1", "-framerate", String(t.fps), "-t", duration.toFixed(3), "-i", last, "-i", segments[i], "-filter_complex", `[0]fps=${t.fps},format=yuv420p,setsar=1,settb=AVTB[a];[1]fps=${t.fps},format=yuv420p,setsar=1,settb=AVTB[b];[a][b]xfade=transition=${name}:duration=${duration.toFixed(3)}:offset=0${v.transition === "whip" ? `,gblur=sigma=18:sigmaV=0.01:enable='lt(t,${duration.toFixed(3)})'` : ""}[v]`, "-map", "[v]", "-frames:v", String(v.frames), "-threads", "2", ...enc, out + ".part.mp4"]);
+      renameSync(out + ".part.mp4", out);
+      stats.transitions += 1;
+    }
+    segments[i] = out;
+  }
   const videoList = join(o.workDir, "video.txt");
   writeFileSync(videoList, segments.map((s) => `file '${resolve(s).replace(/'/g, "'\\''")}'`).join("\n") + "\n");
   const videoFile = join(o.workDir, "video.mp4");

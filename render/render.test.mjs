@@ -256,3 +256,24 @@ test("kinetic type rises in line by line; a landscape photo keeps the Ken Burns 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a whip pan moves from the last frame of the shot before; the film keeps its exact length", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-whip-"));
+  try {
+    const md = [
+      "**SC0001** | 0:00:00-0:00:02 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"BEFORE\" | LOOK: L",
+      "**SC0002** | 0:00:02-0:00:04 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"AFTER\" | TRANS: whip pan | LOOK: L",
+      "**SC0003** | 0:00:04-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"FLASH\" | TRANS: white flash | LOOK: L",
+    ].join("\n");
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+    const out = join(dir, "t.mp4");
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    assert.equal(report.stats.transitions, 1);
+    assert.ok(Math.abs((await mediaDuration(out)) - 6) < 0.15, "a transition never shifts the clock");
+    const mean = (/** @type {number} */ s) => { const f = spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout; let n = 0; for (const b of f) n += b; return n / f.length; };
+    assert.ok(mean(4.02) > 120, `the flash starts white (${mean(4.02).toFixed(0)})`);
+    assert.ok(mean(5) < 60, "and settles into the card");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

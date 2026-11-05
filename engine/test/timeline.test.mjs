@@ -121,3 +121,22 @@ test("v3 delivery tags in a take's timings never become caption words", async ()
   const words = wordsFromAlignment({ characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.05), character_end_times_seconds: chars.map((_, i) => i * 0.05 + 0.05) });
   assert.deepEqual(words.map((w) => w.text), ["He", "kept", "it."]);
 });
+
+test("the script's transitions become whips, slides, zooms and flashes; cuts and dips stay what they are", async () => {
+  const { transitionFor } = await import("../src/timeline.mjs");
+  assert.equal(transitionFor("whip pan left on the beat"), "whip");
+  assert.equal(transitionFor("zoom-through transition into the map"), "zoom");
+  assert.equal(transitionFor("slide left"), "slide");
+  assert.equal(transitionFor("white flash"), "flash");
+  assert.equal(transitionFor("hard cut on the beat"), null);
+  assert.equal(transitionFor("match cut from the comb teeth"), null);
+  const md = [
+    "**SC0001** | 0:00:00-0:00:03 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"ONE\" | TRANS: hard cut | LOOK: L",
+    "**SC0002** | 0:00:03-0:00:06 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"TWO\" | TRANS: whip pan | LOOK: L",
+    "**SC0003** | 0:00:06-0:00:09 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card \"THREE\" | TRANS: dissolve | LOOK: L",
+  ].join("\n");
+  const { buildTimeline: build } = await import("../src/timeline.mjs");
+  const t = build({ chapters: [{ id: "C1", markdown: md }] });
+  assert.deepEqual(t.video.map((v) => v.transition ?? null), [null, "whip", null], "a dissolve stays a dip, never a whip on top of it");
+  assert.ok(t.video[2].fadeIn);
+});
