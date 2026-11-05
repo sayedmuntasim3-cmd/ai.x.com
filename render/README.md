@@ -47,10 +47,12 @@ It runs only when the film allows AI (`allowAi`, on by default for invented stor
 
 ```sh
 # From the run's files on the deployed site:
-node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --sfx sfx/ --ai ai/ --out film.mp4
+node render/render-film.mjs --api https://ai.zupona.com --id <film id> --voice voice/ --music music/ --sfx sfx/ --ai ai/ --pictures pictures/<film id>/ --out film.mp4
 # From a folder of run files (s3-chapters.json, s5-C1.md ..., media-C1.json ...):
 node render/render-film.mjs --run productions/ramesh-babu/USA --out usa.mp4 --width 1280 --height 720
 ```
+
+`--pictures <folder>` puts the owner's own pictures into their shots: `SC0012-1.jpg` (`.png`, `.webp`, `.mp4`, `.mov` …; `SC0012.jpg` is the scene's first shot) replaces shot 1 of SC0012 (photos move like archive stills, clips play from their start); the licence report says "provided by the owner" (`render/own-pictures.mjs`). Shot ids are shown on the film page.
 
 What it makes:
 

@@ -271,9 +271,9 @@ const tile = (value, label, tone = "") => `<div class="tile${tone ? " " + tone :
 
 /**
  * One shot's footage: the pick with its licence, or why there is none.
- * @param {string} text @param {ShotMedia | undefined} row @param {boolean} searched
+ * @param {string} text @param {ShotMedia | undefined} row @param {boolean} searched @param {string} [id] the shot's id (SC0012-1), the name an owner's own picture is saved under
  */
-function shotHtml(text, row, searched) {
+function shotHtml(text, row, searched, id = "") {
   const rung = /^(?:\d+:\d{2}:\d{2}(?:\.\d+)?\s*[-–]\s*\d+:\d{2}:\d{2}(?:\.\d+)?\s*)?(R\d)\b/.exec(text)?.[1] ?? null;
   let media = "";
   if (rung === "R1") media = chip("", "graphic, built in the edit");
@@ -300,7 +300,7 @@ function shotHtml(text, row, searched) {
   } else if (searched) {
     media = chip("", "not searched");
   }
-  return `<li class="shot"><div class="shot-text">${inline(text)}</div>${media ? `<div class="shot-media">${media}</div>` : ""}</li>`;
+  return `<li class="shot"><div class="shot-text">${id ? `<code class="small">${esc(id)}</code> ` : ""}${inline(text)}</div>${media ? `<div class="shot-media">${media}</div>` : ""}</li>`;
 }
 
 /**
@@ -319,7 +319,7 @@ function chapterHtml(text, media) {
     const [s] = parseSceneLines(line);
     if (!s) { buffer.push(line); continue; }
     flush();
-    const shots = shotParts(s.fields.SHOTS ?? "").map((t, k) => shotHtml(t, byShot.get(`${s.sc}#${k + 1}`), Boolean(media))).join("");
+    const shots = shotParts(s.fields.SHOTS ?? "").map((t, k) => shotHtml(t, byShot.get(`${s.sc}#${k + 1}`), Boolean(media), `${s.sc}-${k + 1}`)).join("");
     const meta = [
       `<span class="sc">${esc(s.sc)}</span>`,
       `<span>${esc(toClock(s.start))}–${esc(toClock(s.end))}</span>`,
@@ -437,7 +437,7 @@ export function renderFilmPage(d) {
   ${d.run.error ? `<p class="small">Stopped: ${esc(d.run.error)}</p>` : ""}
   ${d.render ? `<p class="small">Video render: ${d.render.ok && safeUrl(d.render.actionsUrl) ? `started on GitHub${d.render.at ? ` (${esc(String(d.render.at).slice(0, 16).replace("T", " "))} UTC)` : ""}, ${link(/** @type {string} */ (safeUrl(d.render.actionsUrl)), "follow it and download the MP4, Shorts and thumbnails")}` : `not started: ${esc(d.render.error ?? "unknown error")}`}</p>` : ""}
 </header>
-<section id="script"><div class="section-head"><h2>Script and shots</h2><p class="small">Narration as the voice will read it, then each shot with the clip found for it.</p></div>${chaptersHtml || `<p class="small">No chapter written yet.</p>`}</section>
+<section id="script"><div class="section-head"><h2>Script and shots</h2><p class="small">Narration as the voice will read it, then each shot with the clip found for it. To put a picture you choose into a shot, commit it as <code>pictures/&lt;film id&gt;/SC0012-1.jpg</code> (.png, .webp or .mp4 too), named after the shot; it replaces that shot in the render. Its rights are your decision and responsibility.</p></div>${chaptersHtml || `<p class="small">No chapter written yet.</p>`}</section>
 <section id="sources"><div class="section-head"><h2>Sources</h2><p class="small">The research file every chapter was written from. Conflicting sources are shown, never resolved silently.</p></div>${sourcesHtml(d)}</section>
 ${creditsHtml(d)}
 <section id="qa"><div class="section-head"><h2>QA report</h2></div>${doc("s6", "S6 whole-film QA", true) || `<p class="small">Not written yet.</p>`}</section>

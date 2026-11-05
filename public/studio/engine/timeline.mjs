@@ -13,9 +13,10 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch"} Transition
- *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera
+ *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera;
+ *   fileHash: the content hash of a local file the owner provided, so a replaced picture is rendered again
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
  *   style: "paper" for FX-PAPER cards (document look); kinetic: text moves in (FX-KINETIC);

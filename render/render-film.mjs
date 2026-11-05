@@ -281,7 +281,7 @@ export async function renderFilm(o) {
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
-    const moves = v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {};
+    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}) };
     const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
@@ -768,7 +768,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--ai <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--ai <folder>] [--pictures <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -793,6 +793,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const { applyAiScenes } = await import("./ai-scenes.mjs");
     aiShots = applyAiScenes(timeline, args.ai);
     if (aiShots) console.log(`AI scenes: ${aiShots}`);
+  }
+  // The owner's own pictures (pictures/<film id>/SC0012-1.jpg ...) replace their shots, after AI scenes.
+  if (args.pictures) {
+    const { applyOwnPictures, ownPictureFolder } = await import("./own-pictures.mjs");
+    const own = applyOwnPictures(timeline, ownPictureFolder(args.pictures));
+    if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
   }
   const workDir = args.work ?? ".render";
   const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });

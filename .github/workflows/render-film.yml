@@ -16,6 +16,8 @@ name: Render a film
 # Music: composed per cue with ElevenLabs Music when ELEVENLABS_API_KEY is set (repository variable MUSIC_AUTO=off
 #   turns it off); tracks committed as music/<film id>/M01.mp3 ... always win.
 # Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
+# Optional own pictures: pictures/<film id>/SC0012-1.jpg (.png, .webp, .mp4 ...) replaces that shot (shot ids are on the
+#   film page); the licence report says "provided by the owner": the choice and its rights are yours.
 
 on:
   workflow_dispatch:
@@ -118,7 +120,7 @@ jobs:
           fi
       - name: Render
         run: |
-          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" --ai "ai/$FILM_ID" \
+          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" --ai "ai/$FILM_ID" --pictures "pictures/$FILM_ID" \
             --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out "out/$FILM_ID.mp4"
       - name: Summary
         if: always()
