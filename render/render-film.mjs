@@ -960,7 +960,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
   // The owner's own pictures (pictures/<film id>/SC0012-1.jpg ...) replace their shots, after AI scenes.
   if (args.pictures) {
-    const { applyOwnPictures, ownPictureFolder } = await import("./own-pictures.mjs");
+    const { applyOwnPictures, downloadPictureLinks, ownPictureFolder } = await import("./own-pictures.mjs");
+    const { parseLinksFile } = await import("../engine/src/picture-links.mjs");
+    // Links the owner pasted in the studio (pictures.json) and in a committed links.txt; the committed file wins on a clash.
+    const pasted = JSON.parse((await loadRunText(from, "pictures.json")) ?? "{}");
+    const listed = existsSync(join(args.pictures, "links.txt")) ? parseLinksFile(readFileSync(join(args.pictures, "links.txt"), "utf8")) : { links: {}, bad: [] };
+    for (const b of listed.bad) console.warn(`links.txt: not understood: ${b}`);
+    const links = { ...pasted, ...listed.links };
+    if (Object.keys(links).length) {
+      const got = await downloadPictureLinks(links, args.pictures);
+      console.log(`picture links: ${got.saved.length} downloaded, ${got.kept.length} already here, ${got.skipped.length} replaced by committed files`);
+      for (const f of got.failed) timeline.notes.push(`pictures: the link for ${f.shot} could not be used (${f.why}); the shot keeps its own picture.`);
+    }
     const own = applyOwnPictures(timeline, ownPictureFolder(args.pictures));
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
   }

@@ -65,3 +65,52 @@ test("an owner's photo and clip replace their shots; the report says provided by
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the owner's picture links: one per shot, checked, removable; links.txt lines are read", async () => {
+  const { updatePictureLinks, parseLinksFile, shotId } = await import("../engine/src/picture-links.mjs");
+  assert.equal(shotId("sc0012"), "SC0012-1");
+  assert.equal(shotId("SC0012-3"), "SC0012-3");
+  assert.equal(shotId("scene 12"), null);
+  const a = updatePictureLinks({}, { shot: "SC0012", url: "https://example.org/a.jpg" }, "t");
+  assert.ok(a.ok && a.links["SC0012-1"].url === "https://example.org/a.jpg");
+  assert.equal(updatePictureLinks({}, { shot: "SC0012-1", url: "file:///etc/passwd" }).ok, false, "only web links");
+  assert.equal(updatePictureLinks({}, { shot: "SC0012-1", url: "https://u:p@example.org/a.jpg" }).ok, false, "no passwords in links");
+  const removed = updatePictureLinks(a.ok ? a.links : {}, { shot: "SC0012-1", url: "" });
+  assert.ok(removed.ok && removed.removed && !removed.links["SC0012-1"]);
+  const parsed = parseLinksFile("# my picks\nSC0001-1 https://example.org/1.jpg\n\nSC0002 https://example.org/2.mp4\nnonsense line\n");
+  assert.deepEqual(Object.keys(parsed.links), ["SC0001-1", "SC0002-1"]);
+  assert.deepEqual(parsed.bad, ["nonsense line"]);
+});
+
+test("linked pictures are downloaded once per link, named after the shot; a page link or a failure is reported, never fatal", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-links-"));
+  try {
+    const { downloadPictureLinks } = await import("./own-pictures.mjs");
+    const png = Buffer.alloc(2000, 7);
+    /** @type {string[]} */
+    const asked = [];
+    const f = /** @type {any} */ (async (/** @type {string} */ url) => {
+      asked.push(url);
+      if (url.endsWith("/photo")) return new Response(png, { headers: { "content-type": "image/png" } });
+      if (url.endsWith(".mp4")) return new Response(png, { headers: { "content-type": "application/octet-stream" } });
+      if (url.endsWith("/page")) return new Response("<html></html>", { headers: { "content-type": "text/html" } });
+      return new Response("no", { status: 403 });
+    });
+    const links = { "SC0001-1": { url: "https://a.example/photo", at: "t" }, "SC0002-1": { url: "https://a.example/clip.mp4", at: "t" }, "SC0003-1": { url: "https://a.example/page", at: "t" }, "SC0004-1": { url: "https://a.example/blocked.jpg", at: "t" } };
+    const first = await downloadPictureLinks(links, dir, { fetch: f });
+    assert.deepEqual(first.saved, ["SC0001-1", "SC0002-1"]);
+    assert.deepEqual(first.failed.map((x) => x.shot), ["SC0003-1", "SC0004-1"]);
+    assert.match(first.failed[0].why, /link the file itself/);
+    assert.deepEqual(Object.keys(ownPictureFolder(dir).shots), ["SC0001-1", "SC0002-1"], "named after their shots, the record file is not a picture");
+    asked.length = 0;
+    const again = await downloadPictureLinks({ "SC0001-1": links["SC0001-1"] }, dir, { fetch: f });
+    assert.deepEqual(again.kept, ["SC0001-1"]);
+    assert.deepEqual(asked, [], "a link already downloaded is not fetched again");
+    assert.deepEqual(Object.keys(ownPictureFolder(dir).shots), ["SC0001-1"], "a removed link takes its file with it");
+    writeFileSync(join(dir, "SC0005.jpg"), png);
+    const own = await downloadPictureLinks({ "SC0005-1": { url: "https://a.example/photo", at: "t" } }, dir, { fetch: f });
+    assert.deepEqual(own.skipped, ["SC0005-1"], "a file the owner committed wins over a link");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

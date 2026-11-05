@@ -49,6 +49,13 @@ const T = {
     remakeGo: "দৃশ্যটা আবার বানাও",
     remakeDone: "হয়ে গেছে। খরচ",
     remakeFailed: "হয়নি:",
+    picture: "একটা শটে নিজের ছবি",
+    pictureHint: "ফিল্ম পেজে প্রতিটা শটের আইডি আছে (যেমন SC0012-1)। আপনার বাছাই করা ছবি বা ক্লিপের সরাসরি লিংক দিন; রেন্ডারের সময় সেটা নামিয়ে ওই শটে বসানো হবে। লিংক খালি রাখলে আগেরটা মুছে যাবে। ছবির অধিকার আপনার দায়িত্ব।",
+    pictureShot: "শটের আইডি (যেমন SC0012-1)",
+    pictureUrl: "ছবি বা ক্লিপের লিংক",
+    pictureGo: "সেভ করো",
+    pictureDone: "সেভ হয়েছে। পরের রেন্ডারে এই শটে বসবে। মোট লিংক:",
+    pictureRemoved: "লিংক মুছে গেছে।",
     lastError: "শেষ চেষ্টায় সমস্যা (আবার চেষ্টা হচ্ছে)",
     failedWhy: "থেমে গেছে, কারণ",
     resume: "যেখানে থেমেছে সেখান থেকে চালাও",
@@ -104,6 +111,13 @@ const T = {
     remakeGo: "Re-make the scene",
     remakeDone: "Done. Cost",
     remakeFailed: "Not done:",
+    picture: "Your own picture for a shot",
+    pictureHint: "Every shot has an id on the film page (e.g. SC0012-1). Paste the direct link of a picture or clip you chose; the render downloads it and puts it in that shot. An empty link removes the earlier one. Its rights are your responsibility.",
+    pictureShot: "Shot id (e.g. SC0012-1)",
+    pictureUrl: "Link to the picture or clip",
+    pictureGo: "Save",
+    pictureDone: "Saved. The next render puts it in this shot. Links:",
+    pictureRemoved: "Link removed.",
     lastError: "Last attempt failed (retrying)",
     failedWhy: "Stopped because",
     resume: "Resume where it stopped",
@@ -232,7 +246,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
   page.rel = "noopener";
   page.className = "go";
   out.append(page);
-  if (run.status === "done" || run.status === "done-with-gaps") out.append(renderButton(id), remakeForm(id));
+  if (run.status === "done" || run.status === "done-with-gaps") out.append(renderButton(id), remakeForm(id), pictureForm(id));
   out.append(h("h4", l.files));
   const p = document.createElement("p");
   for (const f of files) {
@@ -451,6 +465,54 @@ function remakeForm(id) {
       const res = await fetch(`/api/films/${id}/scenes/${scene.value.trim().toUpperCase()}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ instruction: what.value.trim() }) });
       const r = await res.json().catch(() => ({ error: l.notConnected }));
       result.textContent = r.ok ? `${l.remakeDone} $${r.costUsd}. ${r.after}` : `${l.remakeFailed} ${r.error ?? res.status}`;
+    } catch (error) {
+      result.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
+    } finally {
+      go.disabled = false;
+    }
+  });
+  return form;
+}
+
+/**
+ * The owner's own picture for one shot: a link he chose, downloaded by the render.
+ * @param {string} id
+ */
+function pictureForm(id) {
+  const l = L();
+  const form = document.createElement("form");
+  form.className = "card";
+  form.noValidate = true;
+  const title = document.createElement("h4");
+  title.textContent = l.picture;
+  const hint = document.createElement("p");
+  hint.className = "small";
+  hint.textContent = l.pictureHint;
+  const field = (/** @type {string} */ label, /** @type {HTMLInputElement} */ input) => { const w = document.createElement("label"); w.append(label, input); return w; };
+  const shot = document.createElement("input");
+  shot.placeholder = "SC0012-1";
+  shot.autocomplete = "off";
+  const link = document.createElement("input");
+  link.type = "url";
+  link.placeholder = "https://";
+  link.maxLength = 2000;
+  const go = document.createElement("button");
+  go.type = "submit";
+  go.className = "go";
+  go.textContent = l.pictureGo;
+  const result = document.createElement("p");
+  result.setAttribute("aria-live", "polite");
+  form.append(title, hint, field(l.pictureShot, shot), field(l.pictureUrl, link), go, result);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
+    if (!/^sc\d{4,5}(-\d{1,2})?$/i.test(shot.value.trim()) || !token) { result.textContent = `${l.remakeFailed} ${l.pictureShot} / ${l.token}`; return; }
+    go.disabled = true;
+    result.textContent = "…";
+    try {
+      const res = await fetch(`/api/films/${id}/pictures`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ shot: shot.value.trim(), url: link.value.trim() }) });
+      const r = await res.json().catch(() => ({ error: l.notConnected }));
+      result.textContent = r.ok ? (r.removed ? l.pictureRemoved : `${l.pictureDone} ${r.count}`) : `${l.remakeFailed} ${r.error ?? res.status}`;
     } catch (error) {
       result.textContent = `${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
     } finally {

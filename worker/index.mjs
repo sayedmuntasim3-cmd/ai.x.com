@@ -14,6 +14,7 @@
  *   GET  /api/films/:id/page         the readable page: script, shots with clips and licences, sources, cost
  *   GET  /api/films/:id/script       the narration script for recording it yourself (one line per scene file)
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
+ *   POST /api/films/:id/pictures     { shot: "SC0012-1", url } -> the owner's own picture for a shot (empty url removes it); the render downloads it   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/render       start the GitHub render (MP4, Shorts, thumbnails)   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/resume       { budgetUsd? } -> continue a failed or budget-stopped film; finished stages are kept   (Bearer STUDIO_TOKEN)
  *
@@ -30,6 +31,7 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import { mediaProviders } from "../engine/src/film-media.mjs";
+import { updatePictureLinks } from "../engine/src/picture-links.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../engine/src/film-page.mjs";
 import { remakeScene } from "../engine/src/scene-remake.mjs";
@@ -190,6 +192,19 @@ export default {
           providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }),
         });
         return json(result, result.ok ? 200 : 422);
+      }
+      const pictures = /^\/api\/films\/([0-9a-f-]{36})\/pictures$/.exec(url.pathname);
+      if (pictures && request.method === "POST") {
+        if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const store = r2Store(env.FILMS, pictures[1]);
+        if ((await store.get("film.json")) === null && (await store.get("run.json")) === null) return json({ error: "Not found." }, 404);
+        const body = /** @type {any} */ (await request.json().catch(() => null));
+        const result = updatePictureLinks(JSON.parse((await store.get("pictures.json")) ?? "{}"), { shot: body?.shot, url: body?.url });
+        if (!result.ok) return json({ error: result.error }, 400);
+        await store.put("pictures.json", JSON.stringify(result.links, null, 1));
+        return json({ ok: true, shot: result.shot, removed: result.removed, count: Object.keys(result.links).length });
       }
       const render = /^\/api\/films\/([0-9a-f-]{36})\/render$/.exec(url.pathname);
       if (render && request.method === "POST") {
