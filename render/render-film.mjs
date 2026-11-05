@@ -13,7 +13,7 @@
  *   node render/render-film.mjs --api https://ai.zupona.com --id <film id> --out film.mp4
  *   options: --voice <SC0001.mp3 ...> --music <M01.mp3 ...> --sfx <SND-FX-01.mp3 ...> --width 1920 --height 1080 --fps 30 --work .render --font /path/font.ttf
  */
-import { mapSvg } from "./maps.mjs";
+import { mapSvg, routeSvgs } from "./maps.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -306,7 +306,36 @@ export async function renderFilm(o) {
     }
     const H = t.height;
     let mapped = false;
-    if (type === "card" && v.map) {
+    if (type === "card" && v.map?.to) {
+      try {
+        // A route: the line draws itself from the first place to the second, then the second name appears.
+        const W = t.width;
+        const key = hash({ route: v.map, w: W, h: H, v: 1 });
+        const basePng = join(dirs.cards, `${key}-base.png`);
+        const linePng = join(dirs.cards, `${key}-line.png`);
+        const r = routeSvgs({ from: v.map, to: v.map.to, width: W, height: H });
+        if (!existsSync(basePng) || !existsSync(linePng)) {
+          writeFileSync(basePng.replace(/\.png$/, ".svg"), r.base);
+          writeFileSync(linePng.replace(/\.png$/, ".svg"), r.line);
+          await run(ffmpeg, ["-v", "error", "-y", "-i", basePng.replace(/\.png$/, ".svg"), "-frames:v", "1", basePng]);
+          await run(ffmpeg, ["-v", "error", "-y", "-i", linePng.replace(/\.png$/, ".svg"), "-frames:v", "1", "-pix_fmt", "rgba", linePng]);
+        }
+        const [ax, ay] = r.a.map((n) => Math.round(n));
+        const [bx, by] = r.b.map((n) => Math.round(n));
+        const dx = bx - ax;
+        const dy = by - ay;
+        const len2 = Math.max(1, dx * dx + dy * dy);
+        const draw = Math.max(0.8, Math.min(2.4, (v.frames / t.fps) * 0.6)).toFixed(2);
+        input = ["-loop", "1", "-framerate", String(t.fps), "-i", basePng, "-loop", "1", "-framerate", String(t.fps), "-i", linePng];
+        complex = true;
+        chain.push(`[1]format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*lte(((X-${ax})*${dx}+(Y-${ay})*${dy})/${len2},T/${draw})'[rl];[0]format=rgba[rb];[rb][rl]overlay=format=auto,format=yuv420p`, "setsar=1", LOOK);
+        const label = (/** @type {string} */ words, /** @type {number} */ x, /** @type {number} */ y, /** @type {string} */ from, /** @type {string} */ name) => (words && font ? `drawtext=textfile='${escPath(writeText(words.toUpperCase(), name))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.04)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.012)}:x=${Math.min(W - Math.round(W * 0.25), x + Math.round(H * 0.04))}:y=${Math.max(Math.round(H * 0.04), y - Math.round(H * 0.09))}:alpha='min(1,max(0,(t-${from})/0.4))'` : "");
+        chain.push(...[label(v.map.label, ax, ay, "0.15", "route-from"), label(v.map.to.label, bx, by, draw, "route-to")].filter(Boolean));
+        mapped = true;
+      } catch (error) {
+        warnings.push(`${v.id}: the route map could not be drawn (${error instanceof Error ? error.message : error}); a text card stands in.`);
+      }
+    } else if (type === "card" && v.map) {
       try {
         // An animated map: the place's country lit, a pin at the centre, a slow push-in and the place's name.
         const png = join(dirs.cards, `${hash({ map: v.map, w: t.width, h: t.height, v: 1 })}.png`);

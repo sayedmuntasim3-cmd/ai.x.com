@@ -12,7 +12,7 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, map?: { lat: number, lon: number, label: string } }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash"} Transition
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
@@ -219,19 +219,43 @@ export function sceneSounds(field, scene, shotStarts) {
  * @returns {{ lat: number, lon: number, label: string } | null}
  */
 export function mapPlace(text) {
+  return mapPlaces(text)[0] ?? null;
+}
+
+/**
+ * Every place written in a map shot, in order, each with the words before it
+ * as its name: "FX-MAP route Mumbai (19.07, 72.88) to London (51.51, -0.13)".
+ * @param {string} text
+ * @returns {{ lat: number, lon: number, label: string }[]}
+ */
+export function mapPlaces(text) {
   const t = String(text ?? "");
-  const deg = /(\d{1,2}(?:\.\d+)?)\s*°?\s*([NS])[,;\s]+(\d{1,3}(?:\.\d+)?)\s*°?\s*([EW])/i.exec(t);
-  const pair = /\(\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*\)/.exec(t);
-  const words = /\blat(?:itude)?\s*(-?\d{1,2}(?:\.\d+)?)[,;\s]+lon(?:gitude)?\s*(-?\d{1,3}(?:\.\d+)?)/i.exec(t);
-  let lat = NaN;
-  let lon = NaN;
-  let at = -1;
-  if (deg) { lat = Number(deg[1]) * (/s/i.test(deg[2]) ? -1 : 1); lon = Number(deg[3]) * (/w/i.test(deg[4]) ? -1 : 1); at = deg.index; } else if (pair) { lat = Number(pair[1]); lon = Number(pair[2]); at = pair.index; } else if (words) { lat = Number(words[1]); lon = Number(words[2]); at = words.index; }
-  if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return null;
-  const quoted = /["“]([^"”]{2,60})["”]/.exec(t)?.[1];
-  const before = t.slice(0, at).replace(/^R\d\s+/, "").replace(/\bFX-MAP\b|\bmap\b|\bpin\b|\blocator\b|\bon\b|[-:–]/gi, " ").replace(/\b(?:LOC|OBJ|CHR)-\d+\b/g, " ").replace(/\s+/g, " ").replace(/^[,\s]+|[,\s]+$/g, "");
-  const label = (quoted ?? before.split(/\s+/).slice(-4).join(" ")).replace(/^[,\s]+|[,\s]+$/g, "");
-  return { lat, lon, label: label.slice(0, 40) };
+  const re = /(\d{1,2}(?:\.\d+)?)\s*°?\s*([NS])[,;\s]+(\d{1,3}(?:\.\d+)?)\s*°?\s*([EW])|\(\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*\)|\blat(?:itude)?\s*(-?\d{1,2}(?:\.\d+)?)[,;\s]+lon(?:gitude)?\s*(-?\d{1,3}(?:\.\d+)?)/gi;
+  /** @type {{ lat: number, lon: number, label: string }[]} */
+  const out = [];
+  let last = 0;
+  const quotes = [...t.matchAll(/["“]([^"”]{2,60})["”]/g)].map((m) => m[1]);
+  for (const m of t.matchAll(re)) {
+    const lat = m[1] !== undefined ? Number(m[1]) * (/s/i.test(m[2]) ? -1 : 1) : m[5] !== undefined ? Number(m[5]) : Number(m[7]);
+    const lon = m[1] !== undefined ? Number(m[3]) * (/w/i.test(m[4]) ? -1 : 1) : m[5] !== undefined ? Number(m[6]) : Number(m[8]);
+    const before = t.slice(last, m.index).replace(/^R\d\s+/, "").replace(/\bFX-MAP\b|\bmap\b|\bpin\b|\blocator\b|\broute\b|\bjourney\b|\bfrom\b|\bto\b|\bon\b|->|→|[-:–]/gi, " ").replace(/\b(?:LOC|OBJ|CHR)-\d+\b/g, " ").replace(/["“”]/g, " ").replace(/\s+/g, " ").replace(/^[,\s]+|[,\s]+$/g, "");
+    last = (m.index ?? 0) + m[0].length;
+    if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) continue;
+    const label = (quotes[out.length] && out.length === 0 && !before ? quotes[0] : before.split(/\s+/).slice(-4).join(" ") || quotes[out.length] || "").replace(/^[,\s]+|[,\s]+$/g, "");
+    out.push({ lat, lon, label: label.slice(0, 40) });
+  }
+  return out;
+}
+
+/**
+ * A route between the first two places of a map shot, when the shot says it
+ * travels (route, to, a flight, a voyage, an arrow).
+ * @param {string} text
+ */
+export function mapRoute(text) {
+  const places = mapPlaces(text);
+  if (places.length < 2 || !/\broute\b|\bto\b|->|→|\bjourney\b|\bflight\b|\bvoyage\b|\bpath\b|\bline\b/i.test(String(text))) return null;
+  return { from: places[0], to: places[1] };
 }
 
 /**
@@ -369,7 +393,9 @@ export function buildTimeline(o) {
             words = marked ?? quotes(shot.text).find((q) => !q.includes(" / ") && !panels.some((p) => q.includes(p) || p.includes(q))) ?? "";
           }
           // A map shot with the place's coordinates becomes an animated map; without them it stays a card.
-          const place = !black && !panels && /FX-MAP|\bmap\b|\blocator\b/i.test(`${fx} ${shot.text}`) ? mapPlace(shot.text) : null;
+          const isMap = !black && !panels && /FX-MAP|\bmap\b|\blocator\b/i.test(`${fx} ${shot.text}`);
+          const route = isMap ? mapRoute(shot.text) : null;
+          const place = route ? { ...route.from, to: route.to } : isMap ? mapPlace(shot.text) : null;
           video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: words, counter: !panels && !place && /COUNTER/i.test(fx) && /\d/.test(words), ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;

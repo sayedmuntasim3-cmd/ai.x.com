@@ -157,3 +157,10 @@ test("a map shot with coordinates becomes an animated map; without them it stays
   assert.equal(t.video[1].map, undefined);
   assert.equal(t.video[1].type, "card");
 });
+
+test("a map shot that travels between two places becomes a route", async () => {
+  const { mapRoute, mapPlaces } = await import("../src/timeline.mjs");
+  assert.deepEqual(mapRoute("R1 FX-MAP route Mumbai (19.07, 72.88) to London (51.51, -0.13)"), { from: { lat: 19.07, lon: 72.88, label: "Mumbai" }, to: { lat: 51.51, lon: -0.13, label: "London" } });
+  assert.equal(mapRoute("R1 FX-MAP Cairo (30.04, 31.23)"), null, "one place is not a route");
+  assert.equal(mapPlaces("R1 FX-MAP Lima 12.05°S 77.04°W and Quito 0.18°S 78.47°W").length, 2);
+});

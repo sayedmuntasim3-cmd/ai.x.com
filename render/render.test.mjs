@@ -320,3 +320,20 @@ test("maps: Natural Earth shapes decode, a place finds its country, and a map sh
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a route map draws its line from the first place to the second over time", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-route-"));
+  try {
+    const md = "**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 FX-MAP route Mumbai (19.07, 72.88) to London (51.51, -0.13) | LOOK: L";
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+    assert.deepEqual(timeline.video[0].map?.to, { lat: 51.51, lon: -0.13, label: "London" });
+    const out = join(dir, "route.mp4");
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    assert.ok(!report.warnings.some((w) => /could not be drawn/.test(w)), report.warnings.join("\n"));
+    assert.ok(Math.abs((await mediaDuration(out)) - 4) < 0.15);
+    const lit = (/** @type {number} */ s) => { const f = spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout; let n = 0; for (let k = 0; k < f.length; k += 3) if (f[k + 1] > 180 && f[k] > 150) n += 1; return n; };
+    assert.ok(lit(3.6) > lit(0.15) + 40, `the line is longer later (${lit(0.15)} -> ${lit(3.6)})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
