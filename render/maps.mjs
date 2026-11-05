@@ -74,6 +74,24 @@ export function countryAt(lon, lat) {
 }
 
 /**
+ * The country of a place, allowing for coastal cities that fall just offshore
+ * at 1:50m (New York, Mumbai): the nearest country within about 0.6 degrees.
+ * @param {number} lon @param {number} lat
+ */
+export function countryNear(lon, lat) {
+  const exact = countryAt(lon, lat);
+  if (exact) return exact;
+  for (const r of [0.2, 0.4, 0.6]) {
+    for (let k = 0; k < 8; k += 1) {
+      const a = (k * Math.PI) / 4;
+      const c = countryAt(lon + r * Math.cos(a), lat + r * Math.sin(a));
+      if (c) return c;
+    }
+  }
+  return null;
+}
+
+/**
  * An SVG map centred on a place.
  * @param {{ lat: number, lon: number, width: number, height: number, spanDeg?: number }} o
  */
@@ -86,7 +104,7 @@ export function mapSvg(o) {
   const px = (/** @type {number[]} */ [lon, lat]) => `${((lon - o.lon) * cos * k + o.width / 2).toFixed(1)},${((lat0 - lat) * k + o.height / 2).toFixed(1)}`;
   const view = [o.lon - span / 2 - 5, lat0 - vSpan / 2 - 5, o.lon + span / 2 + 5, lat0 + vSpan / 2 + 5];
   const near = (/** @type {Country} */ c) => !(c.bbox[2] < view[0] || c.bbox[0] > view[2] || c.bbox[3] < view[1] || c.bbox[1] > view[3]);
-  const home = countryAt(o.lon, o.lat);
+  const home = countryNear(o.lon, o.lat);
   const path = (/** @type {Country} */ c) => c.rings.map((r) => `M${r.map(px).join("L")}Z`).join("");
   const stroke = Math.max(1, o.width / 1400);
   const lines = [];
@@ -121,7 +139,7 @@ export function routeSvgs(o) {
   const pt = (/** @type {number[]} */ q) => xy(q).map((n) => n.toFixed(1)).join(",");
   const view = [lon0 - span / 2 - 5, lat0 - vSpan / 2 - 5, lon0 + span / 2 + 5, lat0 + vSpan / 2 + 5];
   const near = (/** @type {Country} */ c) => !(c.bbox[2] < view[0] || c.bbox[0] > view[2] || c.bbox[3] < view[1] || c.bbox[1] > view[3]);
-  const lit = [countryAt(o.from.lon, o.from.lat), countryAt(o.to.lon, o.to.lat)].filter((c) => c !== null);
+  const lit = [countryNear(o.from.lon, o.from.lat), countryNear(o.to.lon, o.to.lat)].filter((c) => c !== null);
   const path = (/** @type {Country} */ c) => c.rings.map((r) => `M${r.map(pt).join("L")}Z`).join("");
   const stroke = Math.max(1, o.width / 1400);
   const a = xy([o.from.lon, o.from.lat]);

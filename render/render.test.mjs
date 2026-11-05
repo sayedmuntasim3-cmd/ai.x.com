@@ -303,6 +303,8 @@ test("maps: Natural Earth shapes decode, a place finds its country, and a map sh
   assert.equal(countryAt(31.23, 30.04)?.name, "Egypt");
   assert.equal(countryAt(-98, 39)?.name, "United States of America");
   assert.equal(countryAt(-30, 0), null, "the open Atlantic is no country");
+  const { countryNear } = await import("./maps.mjs");
+  assert.equal(countryNear(-74.0, 40.71)?.name, "United States of America", "a coastal city just offshore at 1:50m still lights its country");
   const svg = mapSvg({ lat: 12.97, lon: 77.59, width: 640, height: 360 });
   assert.match(svg, /stroke="#bef264"/, "the place's country is lit");
   const dir = mkdtempSync(join(tmpdir(), "zupona-map-"));
