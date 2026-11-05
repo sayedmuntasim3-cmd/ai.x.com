@@ -344,8 +344,8 @@ export const ROLE_STATUS = Object.freeze({
   "animation-diagram-builder": ["planned", "not built yet"],
   "animation-2d-animation": ["planned", "not built yet"],
   "animation-3d-visualization": ["planned", "not built yet"],
-  "animation-parallax": ["code", "renderer: 2.5D parallax on portrait and square archive photos"],
-  "animation-transition-logic": ["code", "renderer: whip pans, slides, zoom-throughs, flashes, glitches (torn colour and noise), dips to black and chapter dips from the TRANS field and the Edit Director"],
+  "animation-parallax": ["code", "renderer: 2.5D parallax on portrait and square archive photos; prints in a white border with a shadow and focus zooms toward one part, chosen by the Edit Director"],
+  "animation-transition-logic": ["code", "renderer: whip pans, slides, zoom-throughs, flashes, glitches (torn colour and noise), light leaks, dips to black and chapter dips from the TRANS field and the Edit Director"],
   "animation-fx-qc": ["planned", "not built yet"],
 
   "footage-asset-strategist": ["model", "S5: search queries per shot"],

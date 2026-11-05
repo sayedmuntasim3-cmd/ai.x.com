@@ -15,7 +15,10 @@ import { shotParts } from "./film-media.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /** Transitions the director may choose; "cut" removes the one the script wrote. */
-export const EDIT_TRANSITIONS = Object.freeze(["cut", "whip", "slide", "zoom", "flash", "glitch"]);
+export const EDIT_TRANSITIONS = Object.freeze(["cut", "whip", "slide", "zoom", "flash", "glitch", "leak"]);
+
+/** How an archive photo may be shown: as a print, and pushed toward one part of it. */
+export const EDIT_FOCUS = Object.freeze(["left", "right", "top", "bottom", "center"]);
 
 /** Sound hits the director may add, and the synthesised token each one plays (render/sfx-synth.mjs). */
 export const EDIT_SOUNDS = Object.freeze({ impact: "AUTO-IMPACT", whoosh: "AUTO-WHOOSH", boom: "AUTO-BOOM", riser: "AUTO-RISER", click: "AUTO-CLICK", glitch: "AUTO-GLITCH" });
@@ -29,9 +32,10 @@ export const EDIT_LIMITS = Object.freeze({
 });
 
 /**
- * @typedef {"cut" | "whip" | "slide" | "zoom" | "flash" | "glitch"} EditTransition
+ * @typedef {"cut" | "whip" | "slide" | "zoom" | "flash" | "glitch" | "leak"} EditTransition
+ * @typedef {"left" | "right" | "top" | "bottom" | "center"} EditFocus
  * @typedef {keyof typeof EDIT_SOUNDS} EditSound
- * @typedef {{ scene: string, transition?: EditTransition, punchIns: number[], shakes: number[], hits: { at: number, sound: EditSound }[], why?: string }} SceneEdit
+ * @typedef {{ scene: string, transition?: EditTransition, punchIns: number[], shakes: number[], hits: { at: number, sound: EditSound }[], photo?: { frame?: "print", focus?: EditFocus }, why?: string }} SceneEdit
  *   times are film-clock seconds (the same clock as the scene lines)
  * @typedef {{ chapter: string, by: "edit-director", scenes: SceneEdit[], problems: string[] }} EditPlan
  */
@@ -51,18 +55,33 @@ export function editSheet(markdown) {
 }
 
 /**
- * The instruction for one chapter's Edit Director call.
- * @param {string} chapterId @param {string} sheet
+ * How the best-performing documentary editors for US and European audiences
+ * cut (retention editing): the craft the director applies, per kind of film.
  */
-export function editInstruction(chapterId, sheet) {
+export const EDIT_CRAFT = [
+  "CRAFT (what top documentary editors with tens of millions of views do):",
+  "- The picture changes at least every 3 to 6 seconds in the first minute and every 6 to 10 seconds after; a still or a card never sits unmoved. Where the script holds one shot longer, a punch-in or a focus zoom is the change.",
+  "- Every number, name, date and claim lands on screen as it is spoken: punch in on it, hit it with an impact, or let the card's highlighter sweep it.",
+  "- Rhythm: build, then release. Before a reveal, hold back (no hits, a slow focus zoom, a riser ending on the reveal); on the reveal, one strong move (flash, glitch, shake or a punch-in with an impact). Never two big moves within a few seconds.",
+  "- Emotional scenes stay clean: no glitch, no shake, no whooshes; a slow focus zoom on a face or an object, a light leak at most.",
+  "- Style per kind of film: money and business (punch-ins on figures, whips between eras, impacts on totals); history and archive (print frames for old photos, focus zooms on the detail that matters, slides, flashes for jumps in time); mystery, crime and conspiracy (slow focus zooms, glitch on a lie or a twist, risers into reveals, rare shakes); motivation and success (light leaks into warm moments, punch-ins on the turning words, a riser into the comeback); science and space (zooms into detail, clean slides, few hits).",
+].join("\n");
+
+/**
+ * The instruction for one chapter's Edit Director call.
+ * @param {string} chapterId @param {string} sheet @param {string} [style] the film's format and look, so the edit fits the kind of film
+ */
+export function editInstruction(chapterId, sheet, style = "") {
   return [
-    `You are the Edit Director for chapter ${chapterId}. The script below is final and checked; do not change words, shots or times. Decide the edit a top YouTube documentary editor would cut on top of it, scene by scene, where it serves the story:`,
-    `- transition into the scene: "whip" (energy, a jump forward), "slide" (a calm move between related scenes), "zoom" (into a detail or a place), "flash" (a reveal or a jump in time), "glitch" (a twist, a lie exposed, a system breaking, a time jump in a modern story), or "cut" to replace a named transition the script wrote with a plain cut. Leave it out to keep the script's. Never two named transitions in a row; most scenes stay hard cuts on the beat.`,
+    `You are the Edit Director for chapter ${chapterId}: the editor of a documentary channel whose films reach tens of millions of viewers in the US and Europe.${style ? ` This film: ${style}.` : ""} The script below is final and checked; do not change words, shots or times. Decide the edit on top of it, scene by scene, where it serves the story:`,
+    EDIT_CRAFT,
+    `- transition into the scene: "whip" (energy, a jump forward), "slide" (a calm move between related scenes), "zoom" (into a detail or a place), "flash" (a reveal or a jump in time), "glitch" (a twist, a lie exposed, a system breaking, a time jump in a modern story), "leak" (a warm light leak into a hopeful or nostalgic moment), or "cut" to replace a named transition the script wrote with a plain cut. Leave it out to keep the script's. Never two named transitions in a row; most scenes stay hard cuts on the beat.`,
     `- punchIns: moments the picture punches in (a quick 1.0 to 1.15 scale) on a key word, a number or a reveal; at most ${EDIT_LIMITS.punchPerScene} per scene, ${EDIT_LIMITS.punchGap} s apart, about one per ${EDIT_LIMITS.punchPerSeconds} s of chapter at most.`,
     `- shakes: a short camera shake on an impact (a crash, a slam, a verdict, a shocking number); rare, at most one per ${EDIT_LIMITS.shakePerSeconds} s of chapter.`,
-    `- hits: extra sound hits ${Object.keys(EDIT_SOUNDS).map((k) => `"${k}"`).join(", ")} at the moment they land (a riser ends at its time); at most ${EDIT_LIMITS.hitsPerScene} per scene, ${EDIT_LIMITS.hitGap} s apart. The edit already adds a whoosh into each whip, slide or zoom, a boom under a flash, a riser into each chapter and an impact on counters, so do not repeat those.`,
+    `- photo (for scenes with archive photographs, R2): {"frame": "print"} shows the photo as a print in a white border with a shadow (old photos, family pictures, evidence); {"focus": "left" | "right" | "top" | "bottom" | "center"} pushes in toward the part of the picture that matters. Either or both.`,
+    `- hits: extra sound hits ${Object.keys(EDIT_SOUNDS).map((k) => `"${k}"`).join(", ")} at the moment they land (a riser ends at its time); at most ${EDIT_LIMITS.hitsPerScene} per scene, ${EDIT_LIMITS.hitGap} s apart. The edit already adds a whoosh into each whip, slide, zoom or leak, a boom under a flash, a riser into each chapter and an impact on counters, so do not repeat those.`,
     `Times are film-clock "h:mm:ss.s", inside the scene, not in its first or last ${EDIT_LIMITS.edgeSeconds} s. Time a word by its place in the narration (the narrator reads at an even pace across the scene). A wordless scene with no reason to move stays untouched. Restraint wins: an edit that never rests tires the viewer.`,
-    "Output ONE fenced ```json block and nothing after it: {\"scenes\": [{\"scene\": \"SC0001\", \"transition\": \"whip\", \"punchIns\": [\"0:00:03.2\"], \"shakes\": [], \"hits\": [{\"at\": \"0:00:03.2\", \"sound\": \"impact\"}], \"why\": \"a short reason\"}]}. List only scenes you change.",
+    "Output ONE fenced ```json block and nothing after it: {\"scenes\": [{\"scene\": \"SC0001\", \"transition\": \"whip\", \"punchIns\": [\"0:00:03.2\"], \"shakes\": [], \"photo\": {\"frame\": \"print\", \"focus\": \"left\"}, \"hits\": [{\"at\": \"0:00:03.2\", \"sound\": \"impact\"}], \"why\": \"a short reason\"}]}. List only scenes you change.",
     `<CHAPTER_${chapterId}>\n${sheet}\n</CHAPTER_${chapterId}>`,
   ].join("\n\n");
 }
@@ -146,8 +165,18 @@ export function validateEditPlan(raw, markdown, chapterId) {
       edit.hits.push({ at, sound: /** @type {EditSound} */ (sound) });
     }
     edit.hits.sort((a, b) => a.at - b.at);
+    if (e.photo && typeof e.photo === "object") {
+      /** @type {{ frame?: "print", focus?: EditFocus }} */
+      const photo = {};
+      if (e.photo.frame === "print") photo.frame = "print";
+      else if (e.photo.frame !== undefined && e.photo.frame !== null && e.photo.frame !== "plain") problems.push(`${id}: unknown photo frame "${e.photo.frame}"; ignored.`);
+      const focus = String(e.photo.focus ?? "").toLowerCase();
+      if (EDIT_FOCUS.includes(focus)) photo.focus = /** @type {EditFocus} */ (focus);
+      else if (focus) problems.push(`${id}: unknown photo focus "${focus}"; ignored.`);
+      if (photo.frame || photo.focus) edit.photo = photo;
+    }
     if (typeof e.why === "string" && e.why.trim()) edit.why = e.why.trim().slice(0, 160);
-    if (edit.transition || edit.punchIns.length || edit.shakes.length || edit.hits.length) out.set(id, edit);
+    if (edit.transition || edit.punchIns.length || edit.shakes.length || edit.hits.length || edit.photo) out.set(id, edit);
   }
   return { chapter: chapterId, by: "edit-director", scenes: [...out.values()], problems };
 }
@@ -161,7 +190,7 @@ export function validateEditPlan(raw, markdown, chapterId) {
 function scriptTransition(trans) {
   const t = trans.toLowerCase();
   if (/\b(cross[- ]?)?dissolve\b|\bdip\b|\bfade (to|from|in|out)\b/.test(t)) return "dip";
-  if (/\b(whip|swish)\b|\bzoom[- ]?(through|transition|cut|in transition)\b|\bslide\b|\b(slide|push) (transition|left|right|across)\b|\bflash\b|\bglitch\b/.test(t)) return "named";
+  if (/\b(whip|swish)\b|\bzoom[- ]?(through|transition|cut|in transition)\b|\bslide\b|\b(slide|push) (transition|left|right|across)\b|\bflash\b|\bglitch\b|\blight[- ]?leak\b|\bfilm burn\b/.test(t)) return "named";
   return null;
 }
 
@@ -170,6 +199,7 @@ export function editStats(plan) {
   return {
     scenes: plan.scenes.length,
     transitions: plan.scenes.filter((s) => s.transition && s.transition !== "cut").length,
+    photos: plan.scenes.filter((s) => s.photo).length,
     punchIns: plan.scenes.reduce((n, s) => n + s.punchIns.length, 0),
     shakes: plan.scenes.reduce((n, s) => n + s.shakes.length, 0),
     hits: plan.scenes.reduce((n, s) => n + s.hits.length, 0),

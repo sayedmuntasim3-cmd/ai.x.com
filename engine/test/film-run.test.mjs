@@ -155,7 +155,7 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   const e2 = JSON.parse(store.m.get("edit-C2.json"));
   assert.deepEqual(e2.scenes.map((/** @type {any} */ x) => [x.scene, x.shakes]), [["SC0008", [75]]]);
   assert.ok(e2.problems.some((/** @type {string} */ p) => p.startsWith("SC0099")));
-  assert.deepEqual(state.stages["edit:C1"].result, { scenes: 2, transitions: 1, punchIns: 2, shakes: 0, hits: 1, dropped: 1 });
+  assert.deepEqual(state.stages["edit:C1"].result, { scenes: 2, transitions: 1, photos: 0, punchIns: 2, shakes: 0, hits: 1, dropped: 1 });
 });
 
 test("a run stops at its budget and resumes where it stopped", async () => {

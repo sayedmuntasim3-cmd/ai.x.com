@@ -13,10 +13,11 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
- * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch"} Transition
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch" | "leak"} Transition
  *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera;
  *   highlight: words on a card swept by a highlighter (paper) or an underline (FX-HIGHLIGHT); chart: an animated bar chart (FX-CHART);
+ *   frame / focus: how a still photo is shown (as a print; pushed toward one part), chosen by the Edit Director;
  *   fileHash: the content hash of a local file the owner provided, so a replaced picture is rendered again
  *   text: a card's own words; title: on-screen text laid over the scene's first clip; chip: the source chip shown with the scene's first shot;
  *   counter: the card's number counts up (FX-COUNTER) before it settles on the text as written;
@@ -312,6 +313,7 @@ export function transitionFor(trans) {
   if (/\b(slide|push) (transition|left|right|across)\b|\bslide\b/.test(t)) return "slide";
   if (/\b(white )?flash\b|\bflash[- ]?cut\b/.test(t)) return "flash";
   if (/\bglitch\b/.test(t)) return "glitch";
+  if (/\blight[- ]?leak\b|\bfilm burn\b/.test(t)) return "leak";
   return null;
 }
 
@@ -341,7 +343,7 @@ export function autoSounds(video, placed = []) {
     // A sound that starts before its shot belongs to the shot before, so it sits in that shot's span.
     const before = prev?.scene ?? v.scene;
     if (v.chapterTitle && i > 0) add("AUTO-RISER", v.start - 1.6, before, 1.6);
-    if (v.transition === "whip" || v.transition === "slide" || v.transition === "zoom") add("AUTO-WHOOSH", v.start - 0.2, before, 0.55);
+    if (v.transition === "whip" || v.transition === "slide" || v.transition === "zoom" || v.transition === "leak") add("AUTO-WHOOSH", v.start - 0.2, before, 0.55);
     else if (v.transition === "flash") add("AUTO-BOOM", v.start, v.scene, 2.4);
     else if (v.transition === "glitch") add("AUTO-GLITCH", v.start, v.scene, 0.4);
     else if ((v.map && !(prev?.map)) || v.chart) add("AUTO-WHOOSH", v.start - 0.15, before, 0.55);
@@ -513,6 +515,8 @@ export function buildTimeline(o) {
           (v[key] ??= []).push(round3(t - v.start));
           return true;
         };
+        // How the scene's photos are shown (the renderer uses it on stills, the owner's pictures included).
+        if (edit.photo) for (const v of laid) { if (edit.photo.frame) v.frame = edit.photo.frame; if (edit.photo.focus) v.focus = edit.photo.focus; }
         for (const t of edit.punchIns ?? []) place(t, "punchIns");
         for (const t of edit.shakes ?? []) if (place(t, "shakes")) shakeTimes.push(t);
         for (const h of edit.hits ?? []) {

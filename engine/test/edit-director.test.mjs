@@ -87,3 +87,15 @@ test("the edit's sounds keep the breathing room: an automatic sound near a direc
   const near = t.sfx.filter((e) => e.kind === "hit" && Math.abs(e.start - 10.5) < 1.5);
   assert.deepEqual(near.map((e) => e.token), ["AUTO-IMPACT"], "the whip's whoosh gives way to the director's impact");
 });
+
+test("the director may show a scene's photos as prints or push toward one part; unknown words are dropped", () => {
+  const plan = validateEditPlan({ scenes: [
+    { scene: "SC0003", photo: { frame: "print", focus: "left" } },
+    { scene: "SC0005", photo: { frame: "polaroid", focus: "middle" } },
+    { scene: "SC0004", transition: "leak" },
+  ] }, CHAPTER, "C1");
+  assert.deepEqual(plan.scenes.map((s) => [s.scene, s.photo ?? null]), [["SC0003", { frame: "print", focus: "left" }]]);
+  assert.ok(plan.problems.some((p) => p.includes("polaroid")) && plan.problems.some((p) => p.includes("middle")));
+  assert.ok(plan.problems.some((p) => p.startsWith("SC0004")), "a leak over the script's dissolve is refused");
+  assert.ok(editInstruction("C1", "", "History epic (archive look)").includes("This film: History epic"), "the director knows the kind of film");
+});

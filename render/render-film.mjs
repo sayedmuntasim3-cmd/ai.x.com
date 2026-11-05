@@ -222,6 +222,38 @@ function editMotionCount(v, fps) {
   return { punchIns: f.punches.length, shakes: f.shakes.length };
 }
 
+/** Where a focus zoom heads, as a share of the free width and height. */
+const FOCUS = { left: [0, 0.5], right: [1, 0.5], top: [0.5, 0], bottom: [0.5, 1], center: [0.5, 0.5] };
+
+/**
+ * How a still photo moves: a focus zoom pushes 16% toward the part the Edit
+ * Director names (the face, the document's line, the crowd on the left); a
+ * print drifts in gently; otherwise push, pull and pan take turns.
+ * @param {string | undefined} focus @param {boolean} print @param {number} i @param {number} n frames
+ */
+export function stillMove(focus, print, i, n) {
+  const f = focus ? FOCUS[/** @type {keyof typeof FOCUS} */ (focus)] : null;
+  if (f) return `zoompan=z='1+${print ? 0.1 : 0.16}*on/${n}':x='(iw-iw/zoom)*${f[0]}':y='(ih-ih/zoom)*${f[1]}'`;
+  if (print) return `zoompan=z='1.02+0.05*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
+  const moves = [
+    `zoompan=z='1+0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
+    `zoompan=z='1.09-0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
+    `zoompan=z='1.08':x='(iw-iw/zoom)*on/${n}':y='ih/2-(ih/zoom/2)'`,
+  ];
+  return moves[i % moves.length];
+}
+
+/**
+ * A light leak into the scene: a warm glow sweeps across the frame and fades,
+ * over its first 0.7 s (added light, like film exposed at the edge).
+ * @param {number} seconds the shot's length
+ */
+export function lightLeak(seconds) {
+  const d = Math.min(0.7, seconds / 3).toFixed(3);
+  const glow = `exp(-(pow(X-W*(-0.3+1.6*T/${d}),2)+pow((Y-H*0.38)*1.3,2))/pow(W*0.38,2))*190*sin(PI*min(T,${d})/${d})`;
+  return ["format=gbrp", `geq=r='min(255,r(X,Y)+${glow})':g='min(255,g(X,Y)+0.62*${glow})':b='min(255,b(X,Y)+0.22*${glow})':enable='lt(t,${d})'`, "format=yuv420p"];
+}
+
 /**
  * A glitch transition drawn in the shot itself: three short bursts of torn
  * colour channels (rgbashift) under digital noise, over its first 0.3 s.
@@ -329,8 +361,8 @@ export async function renderFilm(o) {
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
-    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}) };
-    const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}) };
+    const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -351,7 +383,7 @@ export async function renderFilm(o) {
         const H = t.height;
         const [pw, ph] = (await run(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", src])).trim().split(",").map(Number);
         const plateKey = hash({ still: v.url, w: W, h: H });
-        if (pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
+        if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
           // A portrait or square photograph: 2.5D parallax. The sharp picture grows and drifts one way,
           // its blurred copy behind it the other way, so the photo seems to float in depth.
           const bg = join(dirs.cards, `${plateKey}-bg.png`);
@@ -372,19 +404,22 @@ export async function renderFilm(o) {
         } else {
           // A landscape photograph: framed over a blurred copy of itself, then moved slowly
           // (push in, pull out or pan, in turn) so it lives on screen like footage.
-          const plate = join(dirs.cards, `${plateKey}.png`);
+          const print = v.frame === "print";
+          const plate = join(dirs.cards, `${plateKey}${print ? "-print" : ""}.png`);
           if (!existsSync(plate)) {
             const W2 = W * 2;
             const H2 = H * 2;
-            await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `split=2[bg][fg];[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=-0.07:saturation=0.8[bgb];[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`, plate]);
+            const bg = `[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=${print ? "-0.18:saturation=0.55" : "-0.07:saturation=0.8"}[bgb]`;
+            // A print: the photo in a white border, turned a degree or two, casting a soft shadow on its own blur.
+            const angle = (i % 2 ? 1 : -1) * 0.03;
+            const border = Math.round(H2 * 0.016);
+            const fg = print
+              ? `[fg]scale=w='min(${Math.round(W2 * 0.8)},iw*${Math.round(H2 * 0.72)}/ih)':h=-2,pad=iw+${2 * border}:ih+${2 * border}:${border}:${border}:color=0xf4f1ea,format=rgba,rotate=${angle}:c=none:ow=rotw(${angle}):oh=roth(${angle}),split=2[p1][p2];[p2]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.55,boxblur=${Math.round(H2 * 0.012)}:2[sh];[bgb][sh]overlay=(W-w)/2+${Math.round(H2 * 0.012)}:(H-h)/2+${Math.round(H2 * 0.018)}[b2];[b2][p1]overlay=(W-w)/2:(H-h)/2,setsar=1`
+              : `[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+            await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-filter_complex", `[0]split=2[bg][fg];${bg};${fg}`, plate]);
           }
           input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
-          const moves = [
-            `zoompan=z='1+0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
-            `zoompan=z='1.09-0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
-            `zoompan=z='1.08':x='(iw-iw/zoom)*on/${n}':y='ih/2-(ih/zoom/2)'`,
-          ];
-          chain.push(`${moves[i % moves.length]}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
+          chain.push(`${stillMove(v.focus, print, i, n)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
         }
       } catch (error) {
         stats.clipsFailed += 1;
@@ -594,6 +629,7 @@ export async function renderFilm(o) {
     if (v.transition === "flash" && !v.fadeIn) chain.push(`fade=t=in:st=0:d=${Math.min(0.2, seconds / 4).toFixed(3)}:color=white`);
     // A glitch into the scene: colour channels torn apart and digital noise for its first few frames.
     if (v.transition === "glitch" && !v.fadeIn) chain.push(...glitchIn(seconds, t.height));
+    if (v.transition === "leak" && !v.fadeIn) chain.push(...lightLeak(seconds));
     if (v.fadeOut) chain.push(`fade=t=out:st=${Math.max(0, seconds - v.fadeOut).toFixed(3)}:d=${v.fadeOut.toFixed(3)}`);
     const vf = chain.length ? chain.join(",") : "null";
     const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), complex ? "-filter_complex" : "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);

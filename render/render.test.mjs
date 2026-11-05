@@ -336,6 +336,29 @@ test("motion graphics: a bar chart grows from the shot's own numbers, a highligh
   }
 });
 
+test("archive photos as the Edit Director asks: a print in a white border, a focus zoom, a light leak", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-photo-"));
+  try {
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0x2050c0:s=600x400", "-frames:v", "1", join(dir, "p.png")]);
+    const md = [1, 2, 3].map((n) => `**SC000${n}** | 0:00:0${(n - 1) * 2}-0:00:0${n * 2} | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R2 photo | ${n === 3 ? "TRANS: light leak | " : ""}LOOK: L`).join("\n");
+    const media = /** @type {any} */ ({ shots: [1, 2, 3].map((n) => ({ scene: `SC000${n}`, shot: 1, pick: { mediaUrl: join(dir, "p.png"), kind: "image", sourcePageUrl: null, licence: { name: "PD" } } })) });
+    const edit = { chapter: "C1", by: /** @type {const} */ ("edit-director"), problems: [], scenes: [{ scene: "SC0001", punchIns: [], shakes: [], hits: [], photo: { frame: /** @type {const} */ ("print") } }, { scene: "SC0002", punchIns: [], shakes: [], hits: [], photo: { focus: /** @type {const} */ ("left") } }] };
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md, media, edit }], width: 320, height: 180, fps: 10 });
+    assert.deepEqual(timeline.video.map((v) => [v.frame ?? null, v.focus ?? null, v.transition ?? null]), [["print", null, null], [null, "left", null], [null, null, "leak"]]);
+    const out = join(dir, "t.mp4");
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    const frame = (/** @type {number} */ s) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout;
+    const near = (/** @type {Buffer} */ f, /** @type {(r: number, g: number, b: number) => boolean} */ ok) => { let n = 0; for (let i = 0; i < f.length; i += 3) if (ok(f[i], f[i + 1], f[i + 2])) n += 1; return n; };
+    const white = (/** @type {number} */ r, /** @type {number} */ g, /** @type {number} */ b) => r > 200 && g > 200 && b > 190;
+    assert.ok(near(frame(1), white) > 200, `the print has its white border (${near(frame(1), white)} white pixels)`);
+    assert.equal(near(frame(3), white), 0, "a plain photo has none");
+    const warm = (/** @type {Buffer} */ f) => { let n = 0; for (let i = 0; i < f.length; i += 3) n += f[i] - f[i + 2]; return n / (f.length / 3); };
+    assert.ok(warm(frame(4.15)) > warm(frame(5.5)) + 15, `the light leak warms the frame, then passes (${warm(frame(4.15)).toFixed(0)} vs ${warm(frame(5.5)).toFixed(0)})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a thumbnail can come from an archive photograph (one frame, nothing to seek into)", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
   const { renderThumbnails } = await import("./thumbnails.mjs");
   const dir = mkdtempSync(join(tmpdir(), "zupona-thumb-"));
