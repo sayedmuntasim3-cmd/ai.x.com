@@ -4,6 +4,8 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
 
 ## 0. Start here
 
+**Latest (6 Nov 2026):** read the owner's master list at the end of `docs/VISION.md` first and keep every item in view (US documentaries, one signature voice, Quran films, the free self-run brain, no like/subscribe asks, website, Bangla later, repo privacy). The ElevenLabs account is on a 10,000-credit quota with 186 left, so the signature-voice design waits for credits or a paid plan.
+
 **Latest (5 Nov 2026, end of the long session; the owner started a new session to save credits):**
 - Read `docs/VISION.md` (the owner's vision, condensed) instead of asking for it again.
 - Built and pushed today: audit and honest agent status; fail-fast and resume; exact costs; saving mode (Batch API, half price); free archives (Wikimedia Commons, NASA) with credits; animated photos (Ken Burns, parallax); 25 formats; new landing page (English and Bangla); transitions (whip, slide, zoom, flash); line-by-line kinetic type; animated maps and route lines; modern thumbnails; synthesised sound design under the edit (whoosh, impact, boom, riser, click, glitch). Tests: 108 engine + 36 platform, all passing.

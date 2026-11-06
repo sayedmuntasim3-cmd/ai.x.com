@@ -33,6 +33,17 @@ test("a shifted timecode, a missing field and a banned phrase are caught with th
   assert.ok(codes.includes("banned-phrase:SC0102"), codes.join());
 });
 
+test("narration never asks the viewer to like, subscribe or comment", () => {
+  const c = usaChapters[2];
+  const asks = c.markdown.replace(/(\*\*SC0102\*\*[^\n]*?NARR: )/, "$1Like and subscribe, and let me know in the comments. ");
+  const banned = checkChapter(asks, c.spec).errors.filter((e) => e.code === "banned-phrase" && e.scene === "SC0102").map((e) => e.detail);
+  assert.ok(banned.some((d) => d.includes("like and subscribe")), banned.join());
+  assert.ok(banned.some((d) => d.includes("let me know in the comments")), banned.join());
+  // A story about a company's subscribers is not an ask.
+  const story = c.markdown.replace(/(\*\*SC0102\*\*[^\n]*?NARR: )/, "$1The service had two million subscribers. ");
+  assert.ok(!checkChapter(story, c.spec).errors.some((e) => e.code === "banned-phrase" && e.scene === "SC0102"));
+});
+
 test("placeholders count as one spoken number; fixes apply only when unique", () => {
   assert.equal(countWords("About [C12 low] to [C12 high] cents."), 5);
   assert.equal(countWords("(wordless)"), 0);

@@ -16,6 +16,9 @@ export const BANNED_EN = Object.freeze([
   "in today's video", "let's dive in", "buckle up", "you won't believe", "little did they know",
   "ever wondered", "shocking truth", "mind-blowing", "the answer will shock you", "stay till the end",
   "smash that like button", "amazing", "unbelievable", "secrets",
+  // The owner's rule (6 Nov 2026): a film never asks to be liked, subscribed to or commented on. It earns it.
+  "like and subscribe", "hit subscribe", "don't forget to subscribe", "subscribe to the channel", "subscribe to our channel",
+  "subscribe for more", "hit the bell", "ring the bell", "comment below", "let me know in the comments",
 ]);
 
 /** Openings that lose a viewer in the first seconds (they announce instead of showing). */
