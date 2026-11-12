@@ -220,63 +220,209 @@ export function truePeak(channels) {
  * @returns {RecordingAnalysis}
  */
 export function analyzeRecording(channels, sampleRate) {
-  const loudness = measureLoudness(channels, sampleRate);
-  const length = channels[0].length;
+  validate(channels, sampleRate);
+  const analyzer = createRecordingAnalyzer(sampleRate, channels.length);
+  analyzer.push(channels);
+  return analyzer.finish();
+}
+
+/**
+ * The same measurement, fed piece by piece, so an hour of audio is measured
+ * in constant memory (a phone reads the file in slices instead of holding
+ * all of it). Every sum is kept per channel in sample order and combined in
+ * channel order, so any way of cutting the audio into pieces gives exactly
+ * the result of one piece. Memory grows only with the 100 ms hop energies
+ * and 50 ms frame levels (about 2 MB for an hour).
+ * True peak: the original skips stretches more than 8 dB under the final
+ * sample peak; here the running peak is used, which only rises, so every
+ * stretch skipped is one the original skips too, and the result is the same.
+ * @param {number} sampleRate
+ * @param {number} channelCount
+ * @param {{ dualMono?: boolean }} [options]
+ */
+export function createRecordingAnalyzer(sampleRate, channelCount, options = {}) {
+  if (!(channelCount >= 1)) throw new Error("At least one audio channel is needed.");
+  if (!(sampleRate >= 8000 && sampleRate <= 384000)) throw new Error("The sample rate must be between 8 and 384 kHz.");
+  const monoBoost = channelCount === 1 && (options.dualMono ?? true) ? 2 : 1;
+  const hop = Math.round(sampleRate * 0.1);
   const frame = Math.max(1, Math.round(sampleRate * 0.05));
+  const { shelf, highpass } = kWeighting(sampleRate);
+  const half = TAPS / 2;
   /** @type {number[]} */
-  const frameDb = [];
-  let dcSum = 0;
+  const hopEnergy = [];
+  const ch = Array.from({ length: channelCount }, () => ({
+    s1: 0, s2: 0, h1: 0, h2: 0, hopSum: 0, hops: 0,
+    frameSum: 0, frames: /** @type {number[]} */ ([]),
+    dc: 0, run: 0,
+    tail: new Float32Array(0), next: 0,
+  }));
+  let length = 0;
+  let peak = 0;
+  let tp = 0;
   let clippedSamples = 0;
   let clippedRuns = 0;
-  for (const channel of channels) {
-    let run = 0;
-    for (let n = 0; n < length; n += 1) {
-      const v = channel[n];
-      dcSum += v;
-      if (Math.abs(v) >= 0.999) {
-        clippedSamples += 1;
-        run += 1;
-        if (run === 3) clippedRuns += 1;
-      } else {
-        run = 0;
+
+  /**
+   * True-peak interpolation for positions whose 12 taps are all known.
+   * @param {(typeof ch)[number]} c @param {Float32Array} buf samples from global index g0 @param {number} g0 @param {number} last the last position to do @param {number} n total length (bounds)
+   */
+  const interpolate = (c, buf, g0, last, n) => {
+    const threshold = peak * Math.pow(10, -8 / 20);
+    for (let i = c.next; i <= last; i += 1) {
+      const a = buf[i - g0];
+      const b = buf[i + 1 - g0];
+      if (Math.abs(a) < threshold && Math.abs(b) < threshold) continue;
+      for (const taps of INTERPOLATOR) {
+        let y = 0;
+        for (let k = 0; k < TAPS; k += 1) {
+          const at = i + k - half + 1;
+          if (at >= 0 && at < n && at - g0 >= 0) y += taps[k] * buf[at - g0];
+        }
+        const v = Math.abs(y);
+        if (v > tp) tp = v;
       }
     }
-  }
-  for (let start = 0; start + frame <= length; start += frame) {
-    let sum = 0;
-    for (const channel of channels) for (let n = start; n < start + frame; n += 1) sum += channel[n] * channel[n];
-    const rms = Math.sqrt(sum / (frame * channels.length));
-    frameDb.push(rms > 0 ? 20 * Math.log10(rms) : -120);
-  }
-  const sorted = [...frameDb].sort((a, b) => a - b);
-  /** @param {number} q */
-  const percentile = (q) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : null);
-  const noiseFloorDb = percentile(0.1);
-  const speechLevelDb = percentile(0.9);
-  const snrDb = noiseFloorDb === null || speechLevelDb === null ? null : round2(speechLevelDb - noiseFloorDb);
-  const silenceShare = noiseFloorDb === null ? 0 : round2(frameDb.filter((db) => db < noiseFloorDb + 6).length / frameDb.length);
-  const dcOffset = Math.round((dcSum / (length * channels.length || 1)) * 1e5) / 1e5;
+    c.next = Math.max(c.next, last + 1);
+  };
 
-  /** @type {string[]} */
-  const problems = [];
-  if (loudness.durationSeconds < 1) problems.push("The recording is shorter than one second.");
-  if (clippedRuns > 0) problems.push(`The recording clips in ${clippedRuns} place${clippedRuns === 1 ? "" : "s"}: record again a little further from the microphone or with lower input gain.`);
-  if (snrDb !== null && snrDb < 20) problems.push("Background noise is close to the voice level (under 20 dB apart): record in a quieter room if you can.");
-  if (loudness.integrated !== null && loudness.integrated < -40) problems.push("The recording is very quiet; raising it will also raise its noise.");
-  if (Math.abs(dcOffset) > 0.01) problems.push("The recording has a DC offset; it will be removed.");
-  if (sampleRate < 32000) problems.push("The sample rate is below 32 kHz, so the voice will sound dull; record at 44.1 or 48 kHz if possible.");
   return {
-    ...loudness,
-    sampleRate,
-    channels: channels.length,
-    noiseFloorDb: noiseFloorDb === null ? null : round2(noiseFloorDb),
-    speechLevelDb: speechLevelDb === null ? null : round2(speechLevelDb),
-    snrDb,
-    silenceShare,
-    clippedSamples,
-    clippedRuns,
-    dcOffset,
-    problems,
+    /** @param {Channel[]} channels one piece; every channel the same length */
+    push(channels) {
+      if (channels.length !== channelCount) throw new Error(`Expected ${channelCount} channels, got ${channels.length}.`);
+      const n = channels[0].length;
+      if (channels.some((x) => x.length !== n)) throw new Error("All channels must have the same length.");
+      if (!n) return;
+      for (const x of channels) for (let i = 0; i < n; i += 1) { const v = Math.abs(x[i]); if (v > peak) peak = v; }
+      if (peak > tp) tp = peak;
+      channels.forEach((x, ci) => {
+        const c = ch[ci];
+        const w = monoBoost;
+        let { s1, s2, h1, h2, hopSum, frameSum, dc, run } = c;
+        for (let i = 0; i < n; i += 1) {
+          const v = x[i];
+          // K-weighting: two cascaded biquads in transposed direct form II, in double precision.
+          const y1 = shelf.b[0] * v + s1;
+          s1 = shelf.b[1] * v - shelf.a[1] * y1 + s2;
+          s2 = shelf.b[2] * v - shelf.a[2] * y1;
+          const y2 = highpass.b[0] * y1 + h1;
+          h1 = highpass.b[1] * y1 - highpass.a[1] * y2 + h2;
+          h2 = highpass.b[2] * y1 - highpass.a[2] * y2;
+          hopSum += y2 * y2;
+          const at = length + i + 1;
+          if (at % hop === 0) {
+            const h = at / hop - 1;
+            hopEnergy[h] = (hopEnergy[h] ?? 0) + w * hopSum;
+            hopSum = 0;
+            c.hops += 1;
+          }
+          frameSum += v * v;
+          if (at % frame === 0) { c.frames.push(frameSum); frameSum = 0; }
+          dc += v;
+          if (Math.abs(v) >= 0.999) {
+            clippedSamples += 1;
+            run += 1;
+            if (run === 3) clippedRuns += 1;
+          } else run = 0;
+        }
+        Object.assign(c, { s1, s2, h1, h2, hopSum, frameSum, dc, run });
+        // True peak needs six samples after each position; keep eleven for the next piece.
+        const buf = new Float32Array(c.tail.length + n);
+        buf.set(c.tail, 0);
+        for (let i = 0; i < n; i += 1) buf[c.tail.length + i] = x[i];
+        const g0 = length - c.tail.length;
+        interpolate(c, buf, g0, length + n - 7, Infinity);
+        const keep = Math.min(buf.length, TAPS - 1);
+        c.tail = buf.slice(buf.length - keep);
+      });
+      length += n;
+    },
+    /** @returns {RecordingAnalysis} */
+    finish() {
+      if (!length) throw new Error("No audio was given.");
+      for (const c of ch) interpolate(c, c.tail, length - c.tail.length, length - 2, length);
+      const hops = Math.floor(length / hop);
+      /** @param {number} start @param {number} count */
+      const meanSquare = (start, count) => {
+        let sum = 0;
+        for (let h = start; h < start + count; h += 1) sum += hopEnergy[h] ?? 0;
+        return sum / (count * hop);
+      };
+      /** @param {number} z */
+      const lufs = (z) => -0.691 + 10 * Math.log10(z);
+      /** @type {number[]} */
+      const blocks = [];
+      for (let j = 0; j + 4 <= hops; j += 1) blocks.push(meanSquare(j, 4));
+      let shortTermMax = null;
+      for (let j = 0; j + 30 <= hops; j += 1) {
+        const value = lufs(meanSquare(j, 30));
+        if (shortTermMax === null || value > shortTermMax) shortTermMax = value;
+      }
+      const aboveAbsolute = blocks.filter((z) => z > 0 && lufs(z) > -70);
+      let integrated = null;
+      let gatedShare = 0;
+      if (aboveAbsolute.length) {
+        const relativeGate = lufs(aboveAbsolute.reduce((a, b) => a + b, 0) / aboveAbsolute.length) - 10;
+        const kept = aboveAbsolute.filter((z) => lufs(z) > relativeGate);
+        integrated = round2(lufs(kept.reduce((a, b) => a + b, 0) / kept.length));
+        gatedShare = round2(kept.length / blocks.length);
+      }
+      let loudestBlock = 0;
+      for (const z of blocks) if (z > loudestBlock) loudestBlock = z;
+
+      const frames = Math.floor(length / frame);
+      /** @type {number[]} */
+      const frameDb = [];
+      for (let f = 0; f < frames; f += 1) {
+        let sum = 0;
+        for (const c of ch) sum += c.frames[f];
+        const rms = Math.sqrt(sum / (frame * channelCount));
+        frameDb.push(rms > 0 ? 20 * Math.log10(rms) : -120);
+      }
+      const sorted = [...frameDb].sort((a, b) => a - b);
+      /** @param {number} q */
+      const percentile = (q) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : null);
+      const noiseFloorDb = percentile(0.1);
+      const speechLevelDb = percentile(0.9);
+      const snrDb = noiseFloorDb === null || speechLevelDb === null ? null : round2(speechLevelDb - noiseFloorDb);
+      const silenceShare = noiseFloorDb === null ? 0 : round2(frameDb.filter((db) => db < noiseFloorDb + 6).length / frameDb.length);
+      let dcSum = 0;
+      for (const c of ch) dcSum += c.dc;
+      const dcOffset = Math.round((dcSum / (length * channelCount || 1)) * 1e5) / 1e5;
+
+      /** @type {LoudnessResult} */
+      const loudness = {
+        integrated,
+        momentaryMax: loudestBlock > 0 ? round2(lufs(loudestBlock)) : null,
+        shortTermMax: shortTermMax === null || shortTermMax === -Infinity ? null : round2(shortTermMax),
+        samplePeakDb: round2(toDb(peak)),
+        truePeakDb: round2(toDb(tp)),
+        durationSeconds: round2(length / sampleRate),
+        gatedShare,
+      };
+      /** @type {string[]} */
+      const problems = [];
+      if (loudness.durationSeconds < 1) problems.push("The recording is shorter than one second.");
+      if (clippedRuns > 0) problems.push(`The recording clips in ${clippedRuns} place${clippedRuns === 1 ? "" : "s"}: record again a little further from the microphone or with lower input gain.`);
+      if (snrDb !== null && snrDb < 20) problems.push("Background noise is close to the voice level (under 20 dB apart): record in a quieter room if you can.");
+      if (loudness.integrated !== null && loudness.integrated < -40) problems.push("The recording is very quiet; raising it will also raise its noise.");
+      if (Math.abs(dcOffset) > 0.01) problems.push("The recording has a DC offset; it will be removed.");
+      if (sampleRate < 32000) problems.push("The sample rate is below 32 kHz, so the voice will sound dull; record at 44.1 or 48 kHz if possible.");
+      return {
+        ...loudness,
+        sampleRate,
+        channels: channelCount,
+        noiseFloorDb: noiseFloorDb === null ? null : round2(noiseFloorDb),
+        speechLevelDb: speechLevelDb === null ? null : round2(speechLevelDb),
+        snrDb,
+        silenceShare,
+        clippedSamples,
+        clippedRuns,
+        dcOffset,
+        problems,
+      };
+    },
+    /** Seconds measured so far. */
+    get seconds() { return length / sampleRate; },
   };
 }
 

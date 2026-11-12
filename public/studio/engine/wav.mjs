@@ -20,30 +20,37 @@ export function isWav(buffer) {
 }
 
 /**
- * @param {ArrayBuffer} buffer
- * @param {{ maxChannels?: number }} [options] channels beyond maxChannels are left out
- * @returns {DecodedWav}
+ * @typedef {{ code: number, channelCount: number, sampleRate: number, bits: number, frameBytes: number, dataStart: number, dataSize: number | null, isFloat: boolean }} WavLayout
  */
-export function decodeWav(buffer, options = {}) {
-  if (!isWav(buffer)) throw new Error("This is not a WAV file.");
-  const v = new DataView(buffer);
+
+/**
+ * Where a WAV file's samples are and how they are stored, from its first
+ * bytes only (64 KB is plenty), so a long recording can be read in slices.
+ * dataSize is null when the header gives none (some recorders write 0 while
+ * recording); then the samples run to the end of the file.
+ * @param {ArrayBuffer} head the start of the file
+ * @returns {WavLayout}
+ */
+export function wavLayout(head) {
+  if (!isWav(head)) throw new Error("This is not a WAV file.");
+  const v = new DataView(head);
   let offset = 12;
   /** @type {{ code: number, channelCount: number, sampleRate: number, bits: number, blockAlign: number } | null} */
   let fmt = null;
-  /** @type {{ start: number, size: number } | null} */
+  /** @type {{ start: number, size: number | null } | null} */
   let data = null;
   while (offset + 8 <= v.byteLength) {
     const id = tag(v, offset);
     const size = v.getUint32(offset + 4, true);
     const body = offset + 8;
     if (id === "fmt ") {
+      if (body + 16 > v.byteLength) break;
       let code = v.getUint16(body, true);
       // WAVE_FORMAT_EXTENSIBLE keeps the real format code in its sub-format GUID.
-      if (code === 0xfffe && size >= 26) code = v.getUint16(body + 24, true);
+      if (code === 0xfffe && size >= 26 && body + 26 <= v.byteLength) code = v.getUint16(body + 24, true);
       fmt = { code, channelCount: v.getUint16(body + 2, true), sampleRate: v.getUint32(body + 4, true), blockAlign: v.getUint16(body + 12, true), bits: v.getUint16(body + 14, true) };
     } else if (id === "data") {
-      // Some recorders write 0 or a too-large size while recording; use what is there.
-      data = { start: body, size: Math.min(size || v.byteLength - body, v.byteLength - body) };
+      data = { start: body, size: size || null };
       break;
     }
     offset = body + size + (size % 2);
@@ -55,14 +62,25 @@ export function decodeWav(buffer, options = {}) {
   if (!(code === 1 || isFloat)) throw new Error("This WAV uses a compressed format (code " + code + "); export it as PCM WAV, or upload MP3, M4A or the original file.");
   if (isFloat ? !(bits === 32 || bits === 64) : !(bits === 8 || bits === 16 || bits === 24 || bits === 32)) throw new Error("Unsupported WAV bit depth: " + bits + ".");
   if (!(channelCount >= 1)) throw new Error("The WAV file has no channels.");
-  const bytes = bits / 8;
-  const frameBytes = fmt.blockAlign || bytes * channelCount;
-  const frames = Math.floor(data.size / frameBytes);
-  const keep = Math.min(channelCount, Math.max(1, options.maxChannels ?? channelCount));
+  return { code, channelCount, sampleRate, bits, frameBytes: fmt.blockAlign || (bits / 8) * channelCount, dataStart: data.start, dataSize: data.size, isFloat };
+}
+
+/**
+ * Float samples from whole frames of sample data (a slice of the data
+ * block that starts on a frame boundary; a partial frame at the end is left out).
+ * @param {ArrayBuffer} bytes @param {WavLayout} layout @param {number} [maxChannels]
+ * @returns {Float32Array[]}
+ */
+export function decodeWavFrames(bytes, layout, maxChannels = layout.channelCount) {
+  const v = new DataView(bytes);
+  const { bits, isFloat, frameBytes } = layout;
+  const size = bits / 8;
+  const frames = Math.floor(v.byteLength / frameBytes);
+  const keep = Math.min(layout.channelCount, Math.max(1, maxChannels));
   const channels = Array.from({ length: keep }, () => new Float32Array(frames));
   for (let c = 0; c < keep; c += 1) {
     const out = channels[c];
-    let p = data.start + c * bytes;
+    let p = c * size;
     for (let n = 0; n < frames; n += 1, p += frameBytes) {
       if (isFloat) out[n] = bits === 32 ? v.getFloat32(p, true) : v.getFloat64(p, true);
       else if (bits === 16) out[n] = v.getInt16(p, true) / 32768;
@@ -73,7 +91,44 @@ export function decodeWav(buffer, options = {}) {
       else out[n] = (v.getUint8(p) - 128) / 128;
     }
   }
-  return { sampleRate, bitsPerSample: bits, format: isFloat ? "float" : "pcm", channels };
+  return channels;
+}
+
+/**
+ * @param {ArrayBuffer} buffer
+ * @param {{ maxChannels?: number }} [options] channels beyond maxChannels are left out
+ * @returns {DecodedWav}
+ */
+export function decodeWav(buffer, options = {}) {
+  const layout = wavLayout(buffer);
+  const available = buffer.byteLength - layout.dataStart;
+  // Some recorders write 0 or a too-large size while recording; use what is there.
+  const size = Math.min(layout.dataSize ?? available, available);
+  const channels = decodeWavFrames(buffer.slice(layout.dataStart, layout.dataStart + size), layout, options.maxChannels);
+  return { sampleRate: layout.sampleRate, bitsPerSample: layout.bits, format: layout.isFloat ? "float" : "pcm", channels };
+}
+
+/**
+ * Measure a WAV file slice by slice, in constant memory: the header from the
+ * first 64 KB, then sliceBytes of samples at a time, each slice decoded and
+ * fed to the streaming analyzer. read(start, end) returns those bytes of the
+ * file (Blob.slice(start, end).arrayBuffer() in a browser).
+ * @param {{ size: number, read: (start: number, end: number) => Promise<ArrayBuffer>, analyzer: (sampleRate: number, channels: number) => { push(c: Float32Array[]): void, finish(): any }, maxChannels?: number, sliceBytes?: number, onProgress?: (done: number, total: number) => void }} o
+ */
+export async function measureWavFile(o) {
+  const layout = wavLayout(await o.read(0, Math.min(o.size, 65536)));
+  const end = Math.min(o.size, layout.dataStart + (layout.dataSize ?? o.size));
+  const keep = Math.min(layout.channelCount, Math.max(1, o.maxChannels ?? layout.channelCount));
+  const analyzer = o.analyzer(layout.sampleRate, keep);
+  // Slices hold whole frames, so no sample is split between two slices.
+  const slice = Math.max(layout.frameBytes, Math.floor((o.sliceBytes ?? 4 * 1024 * 1024) / layout.frameBytes) * layout.frameBytes);
+  for (let at = layout.dataStart; at < end; at += slice) {
+    const stop = Math.min(end, at + slice);
+    const channels = decodeWavFrames(await o.read(at, stop), layout, keep);
+    if (channels[0].length) analyzer.push(channels);
+    o.onProgress?.(stop - layout.dataStart, end - layout.dataStart);
+  }
+  return { analysis: analyzer.finish(), layout };
 }
 
 /**

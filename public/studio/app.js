@@ -1,9 +1,9 @@
 // Zupona AI Studio, first screen. Everything runs in the browser with the
 // engine modules in ./engine/ (an exact copy of /engine/src): no server, no
 // API keys, nothing uploaded anywhere.
-import { analyzeRecording } from "./engine/loudness.mjs";
+import { createRecordingAnalyzer } from "./engine/loudness.mjs";
 import { planIdea, planRecording } from "./engine/studio.mjs";
-import { isWav, decodeWav } from "./engine/wav.mjs";
+import { isWav, measureWavFile } from "./engine/wav.mjs";
 
 const T = {
   bn: {
@@ -31,7 +31,11 @@ const T = {
     ctQuran: "কুরআন তিলাওয়াত",
     footer: "এই পাতা শুধু প্ল্যান বানায় ও রেকর্ডিং মাপে। স্ক্রিপ্ট লেখা, ট্রান্সক্রিপশন আর রেন্ডার Cloudflare যুক্ত হলে চালু হবে।",
     emptyIdea: "আগে একটা আইডিয়া বা বিষয় লিখুন।",
-    tooBig: "ফাইলটা খুব বড় (৩০০ MB-এর বেশি)। ছোট অংশ দিন।",
+    tooBig: "ফাইলটা খুব বড় (৪ GB-এর বেশি)। ছোট অংশ দিন।",
+    tooBigDevice: (need, have) => need ? `এই ফাইল খুলতে প্রায় ${need} MB মেমরি লাগবে, আর এই ডিভাইসে ব্রাউজার নিরাপদে প্রায় ${have} MB ব্যবহার করতে পারে। ফোন যাতে ক্র্যাশ না করে, তাই এটি এখানে মাপা হলো না। WAV বা MP3 হিসেবে export করে দিন (সেগুলো অল্প অল্প করে মাপা যায়), অথবা কম্পিউটারে খুলুন।` : `এই ফাইলের দৈর্ঘ্য জানা যাচ্ছে না, তাই এটি এই ডিভাইসে নিরাপদে খোলা যাবে কিনা বলা যাচ্ছে না। WAV বা MP3 হিসেবে export করে দিন, অথবা কম্পিউটারে খুলুন।`,
+    measuringPct: (p) => `লাউডনেস আর নয়েজ মাপা হচ্ছে… ${p}%`,
+    decodingPart: (i, n) => `অডিও খোলা হচ্ছে… অংশ ${i}/${n}`,
+    approximate: "ফাইলটি অংশে অংশে খোলা হয়েছে, তাই মানগুলো আনুমানিক",
     decodeFail: "এই ফাইলটা পড়া গেল না। WAV বা MP3 হিসেবে export করে আবার দিন।",
     reading: "ফাইল পড়া হচ্ছে…",
     decoding: "অডিও খোলা হচ্ছে…",
@@ -174,7 +178,11 @@ const T = {
     ctQuran: "Quran recitation",
     footer: "This page plans films and measures recordings. Script writing, transcription and rendering switch on once Cloudflare is connected.",
     emptyIdea: "Type an idea or a topic first.",
-    tooBig: "The file is too large (over 300 MB). Use a shorter part.",
+    tooBig: "The file is too large (over 4 GB). Use a shorter part.",
+    tooBigDevice: (need, have) => need ? `Opening this file needs about ${need} MB of memory, and the browser on this device can safely use about ${have} MB. It was not measured here, so the phone does not crash. Export it as WAV or MP3 (those are measured a piece at a time), or open it on a computer.` : `This file's length cannot be read, so it is not safe to open on this device. Export it as WAV or MP3, or open it on a computer.`,
+    measuringPct: (p) => `Measuring loudness and noise… ${p}%`,
+    decodingPart: (i, n) => `Opening the audio… part ${i} of ${n}`,
+    approximate: "the file was opened in parts, so the values are approximate",
     decodeFail: "This file could not be read. Export it as WAV or MP3 and try again.",
     reading: "Reading the file…",
     decoding: "Opening the audio…",
@@ -460,31 +468,120 @@ function downloadJson(data, name) {
 
 // ---------- Voice ----------
 
+// The voice check runs in constant memory, so a phone never holds a whole
+// recording: a WAV is read by the worker slice by slice; another format is
+// decoded by the browser only when it fits this device's memory budget (an
+// MP3 that does not fit is decoded in parts and marked approximate), and
+// anything else that does not fit is refused with the reason, never a crash.
+
+/** Memory this page may use for decoded audio, from what the device reports (Chrome) or a careful guess. */
+export function memoryBudgetMb(nav = navigator) {
+  const gb = typeof nav.deviceMemory === "number" ? nav.deviceMemory : null;
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent || "");
+  const total = gb !== null ? gb * 1024 : mobile ? 2048 : 4096;
+  return Math.max(120, Math.min(800, Math.round(total * 0.15)));
+}
+
 let worker = null;
-function measureInWorker(message, transfer) {
+/** The audio worker, or null where workers cannot start (the page then measures by itself, still slice by slice). */
+function audioWorker() {
   try {
     worker = worker || new Worker(new URL("./audio-worker.js", import.meta.url), { type: "module" });
+    return worker;
   } catch {
     return null;
   }
+}
+
+/** Send the worker its work and wait for the result; progress goes to onProgress. */
+function workerJob(w, start, onProgress) {
   return new Promise((resolve, reject) => {
-    worker.onmessage = (e) => (e.data.error ? reject(new Error(e.data.error)) : resolve(e.data));
-    worker.onerror = (e) => { e.preventDefault(); worker = null; reject(new Error("worker")); };
-    worker.postMessage(message, transfer);
+    w.onmessage = (e) => {
+      const d = e.data;
+      if (typeof d.progress === "number") { onProgress?.(d.progress); return; }
+      if (d.error) reject(new Error(d.error));
+      else resolve(d);
+    };
+    w.onerror = (e) => { e.preventDefault(); worker = null; reject(new Error("worker")); };
+    start(w);
   });
 }
 
-async function decodeInBrowser(buffer) {
+/** The recording's length from the player's metadata (no decoding), or null. */
+function mediaSeconds(player) {
+  return new Promise((resolve) => {
+    const known = () => (Number.isFinite(player.duration) && player.duration > 0 ? player.duration : null);
+    if (known()) return resolve(known());
+    const done = () => resolve(known());
+    player.addEventListener("loadedmetadata", done, { once: true });
+    player.addEventListener("error", () => resolve(null), { once: true });
+    setTimeout(done, 4000);
+  });
+}
+
+/** True when the bytes start like an MP3 (an ID3 tag or a frame sync), which can be decoded in parts. */
+function looksLikeMp3(head, file) {
+  const b = new Uint8Array(head);
+  return (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0) || /mpeg|mp3/i.test(file.type) || /\.mp3$/i.test(file.name);
+}
+
+/**
+ * One decoder for a whole file: an offline context opens no audio device and
+ * is reused for every part (a new AudioContext per part piles up memory).
+ */
+function audioDecoder() {
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (Offline) {
+    const ctx = new Offline(1, 1, 48000);
+    return { decode: (bytes) => new Promise((resolve, reject) => ctx.decodeAudioData(bytes, resolve, reject)), close: () => {} };
+  }
   const Ctx = window.AudioContext || window.webkitAudioContext;
   const ctx = new Ctx();
-  try {
-    const audio = await new Promise((resolve, reject) => ctx.decodeAudioData(buffer, resolve, reject));
-    const channels = [];
-    for (let c = 0; c < Math.min(2, audio.numberOfChannels); c += 1) channels.push(audio.getChannelData(c).slice());
-    return { channels, sampleRate: audio.sampleRate };
-  } finally {
-    if (ctx.close) ctx.close().catch(() => {});
+  return { decode: (bytes) => new Promise((resolve, reject) => ctx.decodeAudioData(bytes, resolve, reject)), close: () => { if (ctx.close) ctx.close().catch(() => {}); } };
+}
+
+/** Let the browser run its garbage collector between parts. */
+const breathe = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** A decoded buffer to the analyzer in 10-second pieces, so no second full copy is ever made. */
+async function sendDecoded(audio, push) {
+  const channels = Math.min(2, audio.numberOfChannels);
+  const step = audio.sampleRate * 10;
+  for (let at = 0; at < audio.length; at += step) {
+    const piece = [];
+    for (let c = 0; c < channels; c += 1) piece.push(audio.getChannelData(c).slice(at, Math.min(audio.length, at + step)));
+    await push(piece);
   }
+}
+
+/**
+ * Pieces to the worker with backpressure: decoding is faster than measuring,
+ * so without waiting, every decoded piece would queue up in the worker at once.
+ * At most two pieces are in flight.
+ */
+function pcmStream(w) {
+  let inFlight = 0;
+  let wake = null;
+  let failed = null;
+  w.onmessage = (e) => {
+    if (e.data.ack) inFlight -= 1;
+    else if (e.data.error) failed = new Error(e.data.error);
+    if (wake) { const r = wake; wake = null; r(); }
+  };
+  w.onerror = (e) => { e.preventDefault(); worker = null; failed = new Error("worker"); if (wake) { const r = wake; wake = null; r(); } };
+  return {
+    start: (sampleRate, channels) => w.postMessage({ kind: "pcm-start", sampleRate, channels }),
+    async send(piece) {
+      while (inFlight >= 2 && !failed) await new Promise((r) => { wake = r; });
+      if (failed) throw failed;
+      inFlight += 1;
+      w.postMessage({ kind: "pcm-chunk", channels: piece }, piece.map((c) => c.buffer));
+    },
+    async drain() {
+      while (inFlight > 0 && !failed) await new Promise((r) => { wake = r; });
+      if (failed) throw failed;
+    },
+  };
 }
 
 async function handleFile(file) {
@@ -492,52 +589,81 @@ async function handleFile(file) {
   const error = $("#voice-error");
   error.hidden = true;
   state.analysis = null;
+  state.approximate = false;
   $("#voice-out").replaceChildren();
   $("#file-name").textContent = file.name;
   const player = $("#player");
   if (player.src) URL.revokeObjectURL(player.src);
   player.src = URL.createObjectURL(file);
   player.hidden = false;
-  if (file.size > 300 * 1024 * 1024) {
-    error.textContent = t("tooBig");
-    error.hidden = false;
-    return;
-  }
+  const fail = (message) => { status.textContent = ""; error.textContent = message; error.hidden = false; };
   try {
     status.textContent = t("reading");
-    const buffer = await file.arrayBuffer();
+    const head = await file.slice(0, 65536).arrayBuffer();
+    const w = audioWorker();
+    const progress = (p) => { status.textContent = t("measuringPct")(Math.round(p * 100)); };
     let result = null;
-    if (isWav(buffer)) {
+    if (isWav(head)) {
+      if (file.size > 4 * 1024 ** 3) return fail(t("tooBig"));
       status.textContent = t("measuring");
-      const copy = buffer.slice(0);
-      result = await measureInWorker({ kind: "wav", buffer: copy }, [copy])?.catch(() => null);
+      if (w) result = await workerJob(w, (x) => x.postMessage({ kind: "wav-file", file }), progress).catch(() => null);
       if (!result) {
-        try {
-          const d = decodeWav(buffer, { maxChannels: 2 });
-          result = { analysis: analyzeRecording(d.channels, d.sampleRate), nativeRate: true, bits: d.bitsPerSample };
-        } catch { result = null; }
+        // No worker: the page measures it the same way, slice by slice.
+        const m = await measureWavFile({ size: file.size, read: (a, b) => file.slice(a, b).arrayBuffer(), analyzer: (r, c) => createRecordingAnalyzer(r, c), maxChannels: 2, onProgress: (d, n) => progress(d / n) });
+        result = { analysis: m.analysis, nativeRate: true, bits: m.layout.bits };
       }
-    }
-    if (!result) {
-      status.textContent = t("decoding");
-      const d = await decodeInBrowser(buffer);
+    } else {
+      const budget = memoryBudgetMb();
+      const seconds = await mediaSeconds(player);
+      // A decoded second is 48,000 samples a channel, 4 bytes each. Measured in Chromium (12 Nov 2026), decoding a
+      // whole file costs about three times that at its peak (the decoder's own buffers), so the estimate is tripled.
+      const neededMb = seconds ? 3 * Math.ceil((seconds * 48000 * 2 * 4) / 1048576) + Math.ceil(file.size / 1048576) : null;
+      const fits = neededMb !== null && neededMb <= budget;
+      const mp3 = looksLikeMp3(head, file);
+      if (!fits && !mp3) return fail(t("tooBigDevice")(neededMb, budget));
+      // About a minute of MP3 a part: each decodes to some 25 MB, and only one part is held at a time.
+      const PART = 1048576;
+      const parts = fits ? [file] : Array.from({ length: Math.ceil(file.size / PART) }, (_, i) => file.slice(i * PART, (i + 1) * PART));
+      let analyzer = null;
+      let started = false;
+      let currentRate = 0;
+      const stream = w ? pcmStream(w) : null;
+      const push = async (piece) => {
+        if (!started) {
+          started = true;
+          if (stream) stream.start(currentRate, piece.length);
+          else analyzer = createRecordingAnalyzer(currentRate, piece.length);
+        }
+        if (stream) await stream.send(piece);
+        else analyzer.push(piece);
+      };
+      const decoder = audioDecoder();
+      try {
+        for (const [i, part] of parts.entries()) {
+          status.textContent = parts.length > 1 ? t("decodingPart")(i + 1, parts.length) : t("decoding");
+          const audio = await decoder.decode(await part.arrayBuffer());
+          currentRate = audio.sampleRate;
+          await sendDecoded(audio, push);
+          if (parts.length > 1) await breathe();
+        }
+      } finally {
+        decoder.close();
+      }
+      if (!started) throw new Error("no audio");
+      if (stream) await stream.drain();
       status.textContent = t("measuring");
-      const sent = d.channels.map((c) => c.slice());
-      result = await measureInWorker({ kind: "pcm", channels: sent, sampleRate: d.sampleRate }, sent.map((c) => c.buffer))?.catch(() => null);
-      if (!result) result = { analysis: analyzeRecording(d.channels, d.sampleRate) };
-      result.nativeRate = false;
-      result.bits = null;
+      const approximate = parts.length > 1;
+      result = w ? await workerJob(w, (x) => x.postMessage({ kind: "pcm-end", approximate }), progress) : { analysis: analyzer.finish(), nativeRate: false, bits: null, approximate };
     }
     state.analysis = result.analysis;
     state.nativeRate = result.nativeRate;
     state.bits = result.bits;
-    status.textContent = `${t("measured")} ✓`;
+    state.approximate = Boolean(result.approximate);
+    status.textContent = `${t("measured")} ✓${state.approximate ? ` · ${t("approximate")}` : ""}`;
     renderVoice();
     $("#voice-out").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
-    status.textContent = "";
-    error.textContent = t("decodeFail");
-    error.hidden = false;
+    fail(t("decodeFail"));
     console.error(e);
   }
 }
