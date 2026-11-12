@@ -112,7 +112,7 @@ test("the request cap stops a run before the call that would pass it, counts acr
   assert.equal(log.length, 1);
   assert.equal(log[0].stage, "s01");
   assert.equal(log[0].requests, 1);
-  assert.equal(log[0].manualIncluded, true, "the log says the production manual was sent");
+  assert.equal(log[0].fullManualIncluded, true, "the log says the production manual was sent");
   assert.match(log[0].sentSha256, /^[0-9a-f]{64}$/);
   assert.match(log[0].replySha256, /^[0-9a-f]{64}$/);
   // Resuming with the same cap makes no call: the count is kept in the folder.
@@ -160,4 +160,23 @@ test("Gemini is capped at 40 requests by default, retries count, and Google's re
   await assert.rejects(f("https://generativelanguage.googleapis.com/a"), /request cap of 2 is reached/);
   assert.equal(ledger.requests, 2);
   assert.match(String(ledger.halt()), /request cap of 2/);
+});
+
+test("--manual sends the Phase 0 context instead of the production manual, and a resume cannot switch context", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-ctx-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  /** @type {string[]} */
+  const systems = [];
+  const free = { name: "local-test", price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: async (/** @type {any} */ req) => { systems.push(req.system.map((/** @type {any} */ b) => b.text).join("\n")); return { text: "ANGLE: x", stopReason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } }; } };
+  const out = join(dir, "a");
+  const ctx = new URL("../prompts/phase0-context.txt", import.meta.url).pathname;
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "1", "--manual", ctx], {}, { model: free, log: () => {} }), /request cap of 1/);
+  assert.equal(systems.length, 1);
+  assert.ok(systems[0].includes("SCRIPT CONTEXT (Phase 0 experiment"));
+  assert.ok(!systems[0].includes("ai.zupona.com"), "the full manual was not sent");
+  const entry = JSON.parse(readFileSync(join(out, "calls.jsonl"), "utf8").trim());
+  assert.equal(entry.fullManualIncluded, false);
+  assert.equal(entry.contextSha256, JSON.parse(readFileSync(join(out, "context.json"), "utf8")).sha256);
+  await assert.rejects(main(["--out", out, "--max-calls", "5"], {}, { model: free, log: () => {} }), /started with the context .*phase0-context\.txt.*give the same --manual/);
+  assert.equal(systems.length, 1, "nothing was sent on the refused resume");
 });
