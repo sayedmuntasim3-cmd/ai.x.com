@@ -1,6 +1,9 @@
 # Boss Script Engine: master development plan
 
-Version 1, 12 Nov 2026. Branch `ccr-2867bb13-8ohb4z`. **Planning only: no
+Version 2, 12 Nov 2026 (version 1 the same day; version 2 adds the owner's
+decisions: Gemini free tier for the baseline only, restricted research
+access, the evaluation structure, dynamic token budgets, four gate statuses,
+and the baseline experiment protocol, section 21 and Appendix C). Branch `ccr-2867bb13-8ohb4z`. **Planning only: no
 application code was changed for this document.** Built on the two audits
 (`docs/BOSS_SCRIPT_ENGINE_AUDIT.md`, `docs/SCRIPT_ENGINE_AUDIT.md`) and
 checked again against the code (Appendix A lists every finding and how it was
@@ -25,7 +28,9 @@ Ground rules this plan keeps:
 3. en-US is the default production language and the US YouTube audience the
    default audience. Arabic is a separate profile. Bangla stays an optional
    profile, not the default.
-4. A gate that did not run is a failed gate, never a pass.
+4. Every gate reports PASS, FAIL, BLOCKED or NOT APPLICABLE. An applicable
+   gate that did not run is BLOCKED and blocks approval; NOT APPLICABLE needs
+   a recorded justification (section 14).
 5. Nothing is presented as fact without a checked source, and the engine
    says what it could not check.
 
@@ -271,7 +276,7 @@ version, claims and sources.
 
 Reuse `reviewRun` structure (gates with findings and evidence) and
 `releaseDecision`. Modify: every gate declares `mandatory`, `critical`,
-metric, threshold; a gate whose inputs are missing returns `not-run`, which
+metric, threshold; a gate whose inputs are missing reports BLOCKED, which
 blocks. Full gate list in section 14.
 
 ## 6. Research architecture
@@ -512,8 +517,9 @@ Design:
    1.0/min for history and science, 0.6/min for human interest, tuned in
    Phase 0). A runtime the research cannot support is reported, with a
    recommended runtime, instead of padding.
-3. **Context packs** (section 16) keep each chapter call around 15–30k tokens
-   whatever the film length.
+3. **Context packs** (section 16) keep each chapter call small whatever the
+   film length; the size of each pack is computed for the model that will
+   run it (section 16.1), never assumed.
 4. **Narrative memory** (S9) carries continuity: names, terms, revealed
    facts, open loops, promises, emotional level.
 5. **Cross-chapter checks** in code: no fact revealed twice as new; names and
@@ -579,10 +585,38 @@ improve or the span is escalated.
 
 ## 14. Quality gates and release criteria
 
-All gates are mandatory. A gate that cannot run (missing input, failed
-critic) is **not-run** and blocks. "Critical" = any finding blocks release
-unless the owner records an override with a reason (existing `ownerOverride`);
+All gates are mandatory. "Critical" = any finding blocks release unless the
+owner records an override with a reason (existing `ownerOverride`);
 overrides are shown on the film.
+
+**Gate status (every gate reports exactly one):**
+
+| Status | Meaning | Effect on approval |
+|---|---|---|
+| PASS | the gate ran on complete inputs and every threshold was met | allows |
+| FAIL | the gate ran and a threshold was missed or a critical finding exists | blocks |
+| BLOCKED | the gate applies but could not run: missing or invalid input, a failed dependency, no eligible brain or tool, quota exhausted, critic reply invalid | blocks |
+| NOT APPLICABLE | the gate does not apply to this film | allows only with a justification that matches the allow-list below; anything else is treated as BLOCKED |
+
+NOT APPLICABLE allow-list (code checks the justification against it):
+
+| Gate | Allowed condition |
+|---|---|
+| G15 F2/F3 labelling part | the film's mode is F0 or F1 (the quotation part still applies) |
+| G11 hook-and-loop parts | sleep-story profile (replaced by the calm-continuity check) |
+| L2 Arabic checks | language profile is not Arabic |
+| visual, rights, packaging, master (production gates) | a script-only run (no media, render or publishing stage in the graph) |
+
+Approval requires: 100% of gates reported; every gate PASS or justified
+NOT APPLICABLE; 0 FAIL; 0 BLOCKED; 0 unresolved critical findings.
+
+Mapping of today's gates (pass / revise / block) for the baseline report:
+`pass` → PASS; `revise` or `block` from an executed check → FAIL; findings
+that mean the check had nothing to read (`research.unchecked`,
+`claims.noLedger`, `story.notRead`, `story.noScript`, `visual.none`) →
+BLOCKED; production gates in the script-only baseline → NOT APPLICABLE
+with the justification above. The mapping is applied by hand in the
+baseline report, because changing the code is not authorised yet.
 
 | Gate | Metric and threshold (initial; tuned in Phase 0) | Critical |
 |---|---|---|
@@ -665,7 +699,8 @@ answer here); any real-model validation until the owner provides a brain
    chapter's outline beats, only the claims those beats need (with wording
    rules), the entity sheet for names in this chapter, the narrative memory
    so far (compact), the previous chapter's last scenes and the next
-   chapter's first beat. Target 15–30k tokens for any film length.
+   chapter's first beat. Its size is set by the dynamic token budget below,
+   not by a fixed number.
 3. **Retrieval is deterministic first:** by claim ids, entity ids and beat
    ids from the outline. Embedding search is optional later and only for
    research evidence.
@@ -673,9 +708,57 @@ answer here); any real-model validation until the owner provides a brain
    the dossier, so resume, reassignment and a different critic brain all see
    the same state.
 
-Accept: per-call input stays under 30k tokens for a 300-minute plan
-(computed by an updated `windowNeeds`); continuity gate G13 passes on the
-60-minute test.
+Accept: every request of a 300-minute plan fits the chosen model's measured
+limits by the budget below (planned in code before anything is sent); the
+size of a chapter pack does not grow with film length beyond the memory file;
+continuity gate G13 passes on the 60-minute test.
+
+### 16.1 Dynamic token budget (per model, per request)
+
+There is no universal safe size. For every request the planner computes:
+
+```
+W      = the model's input context limit (measured, see below)
+O_max  = the model's maximum output tokens (measured)
+R_out  = expected output for this task x 1.25, plus the thinking budget
+         when the model's reasoning tokens count against output; must be <= O_max
+M      = safety margin = max(2,000 tokens, 5% of W), widened to the
+         estimator's measured p95 error for this model
+input  = system modules + instructions + retrieved evidence + documentary
+         memory + chapter context (outline beats, claims, entities,
+         previous scenes)
+rule   : input + R_out + M <= W, and input + R_out <= the per-minute token
+         quota for rate-limited brains
+```
+
+- **Measured, not declared.** Limits come from the provider when it reports
+  them (Gemini `models.get` reports input and output token limits; a local
+  server reports its configured context), are stored in the brain's profile
+  (M2) with the date, and are re-read before each run. An `.env` value such
+  as `BRAIN_CONTEXT` is checked against the server, not trusted.
+- **Counted with the model's own tokenizer** where one is offered (Gemini
+  `countTokens`, the local server's tokenize endpoint, Claude token
+  counting). The current `chars / 3.2` estimate is a fallback, flagged in the
+  record when used.
+- **Calibrated after every call:** the reply's reported usage (input, output,
+  thinking) is compared with the estimate; the per-model p95 error sets M.
+- **Output reserved first.** A chapter whose expected output exceeds
+  `O_max` minus the thinking budget is split into scene groups at planning
+  time. The existing "continue after max_tokens" loop (up to 4 parts) remains
+  a fallback and every use of it is recorded as a budget miss.
+- **When it does not fit:** (1) drop optional context by priority (older
+  memory detail, then lower-priority evidence, then the previous chapter's
+  text beyond its last scenes), each drop recorded; (2) split the task;
+  (3) refuse with the numbers. Never truncate silently.
+- Accept (measured on the baseline and later runs): 0 requests rejected for
+  size; 0 unplanned `MAX_TOKENS` stops; estimator p95 error at most 10% after
+  calibration on each model.
+
+Current code, for the record: `windowNeeds` uses the 3.2-characters
+estimate; the Gemini adapter declares **no** context or output limit, so
+preflight's window check is skipped on Gemini; it caps output at 65,536
+tokens while S5 asks for 64,000, leaving no room for thinking tokens if the
+model counts them as output (to be measured in Phase 0).
 
 ## 17. Reliability, recovery, logging and security
 
@@ -693,7 +776,7 @@ Accept: per-call input stays under 30k tokens for a 300-minute plan
   `publicUrl` blocks private hosts (residual risk: a public name resolving
   to a private address on the owner's machine; add a resolved-address check
   in the local fetcher); no auto-publishing (existing rule).
-- **Honest status:** the studio shows not-run gates, critic level and
+- **Honest status:** the studio shows BLOCKED and NOT APPLICABLE gates (with justification), critic level and
   degraded capabilities, as preflight already does for missing tools.
 
 ## 18. Testing and evaluation strategy
@@ -705,7 +788,8 @@ Four separate layers. A passing lower layer proves nothing about a higher one.
 | T1 Automated unit and contract tests | schemas, code checks (C3, L1, S8 metrics, gates), executor, assigner | CI, every commit | the code does what it says |
 | T2 Mock-model pipeline tests | the full graph with scripted fake brains, including failures and bad JSON; **record/replay** of real outputs once they exist | CI | orchestration, recovery, gates wiring |
 | T3 Real-model tests | qualification suite (M2), seeded-defect recall, the topic runs below | owner's machine or a free-tier brain | what real brains actually produce |
-| T4 Human evaluation | blind rubric scoring and pairwise comparison by at least 2 readers (3 preferred), plus a gold fact sheet per topic | people | quality |
+| T4 Human evaluation | blind rubric scoring by Reader 1 (the owner) and Reader 2 (an independent reader of American English familiar with US documentary content), plus a gold fact sheet per topic | people | quality |
+| T5 AI evaluation | a separate AI critic scores with the same rubric; always labelled "AI evaluation (model id)" with its independence level; never presented as human or audience feedback, never averaged with human scores | a brain | a second technical opinion |
 
 ### Topic test plan
 
@@ -733,6 +817,56 @@ quality, hook strength, emotional development, suspense, pacing, transitions,
 American English, retention potential; plus the code metrics: gates, claims
 per minute, repetition, placeholders, revision rounds, critic level, tokens
 and time.
+
+### Evaluation structure and rubric
+
+- **Readers.** Reader 1: the project owner. Reader 2: an independent reader
+  who judges American English and knows US documentary-style content. If
+  Reader 2 is not available, Reader 2's scores are recorded as **pending**;
+  nothing is filled in on their behalf.
+- **AI critic** (T5): labelled AI evaluation. For the baseline the options
+  are (a) a different free Gemini model, which is the **same vendor** and is
+  labelled "not independent", or (b) this Claude Code session reading the
+  finished script as an outside critic, which is a different model family
+  (independence level 2) but uses the owner's Claude Code usage; the owner
+  chooses. The AI critic never sees the human scores, and humans never see
+  the AI scores before submitting.
+- **Blind and independent.** Each reader gets the script alone (no engine QA,
+  viewer-panel score, gate result or other reader's score), scores every
+  dimension with a quoted line as evidence, and submits before anything else
+  is shown. Scores are stored per reader and revealed together.
+- **Disagreement.** A gap of more than 1 point on a dimension is discussed
+  and both scores are kept; no averaging hides it.
+
+Rubric (1–5; anchors: **1** fails the job, **3** acceptable professional
+work with clear weaknesses, **5** excellent, nothing to fix):
+
+| Dimension | 1 | 3 | 5 |
+|---|---|---|---|
+| Research | thin, mostly one tertiary source | main facts covered, few primary sources | deep, primary sources for key claims, disputes shown |
+| Factual accuracy (with the gold sheet) | errors in key facts | minor errors or overstatements | no errors found |
+| Opening hook | generic or misleading | clear question, slow or soft | concrete, honest, compelling in 30 s |
+| Narrative structure | no shape | clear shape, some sag | every part earns its place |
+| Emotional development | flat or manipulative | some real stakes | earned, restrained, moving |
+| Suspense and curiosity | none, or fake cliffhangers | some real questions | real open questions paid at the right time |
+| Pacing | drags or rushes throughout | uneven | varied and controlled |
+| Transitions | abrupt | functional | each one pulls forward |
+| Repetition | repeats facts or phrases often | occasional | none |
+| American English | foreign-sounding or stiff | correct, plain | natural US narration |
+| Chapter coherence | chapters disconnected | logical | each chapter turns the story |
+| Retention potential (reader's judgement, not a prediction) | would leave early | would watch with lapses | would finish and recommend |
+| Ending | missing or unearned | resolves | pays the central question and promises |
+
+Minimum acceptable thresholds (for later releases; the baseline only
+measures): every dimension ≥3 from each human reader; research and factual
+accuracy ≥4; human mean ≥3.5. AI scores are reported beside them, never
+counted toward the threshold.
+
+Regression rules: recorded real-model outputs are replayed in CI (T2) so a
+code change cannot silently change a passing result; the seeded-defect set
+(V2) must keep its recall; on re-evaluation of the same topic a new engine
+version must not lower factual precision and must not lower any human
+dimension mean by more than 0.3 versus the previous version.
 
 **Baselines:** the current engine (`runFilm`, today's code) is run first on
 the same topics and the same brain. Every later phase must beat that baseline
@@ -774,8 +908,8 @@ parallel.
 
 | Phase | Work | Depends | Exit (measurable) |
 |---|---|---|---|
-| **0 Real baseline** (blocking) | owner provides a brain (Gemini free key as an environment secret, or a local 30B-class model with a ≥64k window and normal internet); brain qualification M2 (first version); run the **current** engine on the 3 topics at 10 minutes; human scoring; record/replay fixtures saved | owner decision | 3 baseline eval reports; known failure list; thresholds in section 14 tuned |
-| **1 Truth fixes in the current engine** | G7 placeholder and unresolved-marker gate; not-run = fail; `lintNarration` for all formats feeding gates; story gate critical with owner override; Gemini grounding URLs | 0 (can start in parallel) | Ramesh Babu production blocked until its 37 placeholders (10 in narration) are resolved; seeded tests pass; mock suite green |
+| **0 Real baseline** (blocking) | owner configures the Gemini free-tier key and the restricted research access (Appendix C); verify both; run the **current** engine, unchanged, on the 3 topics at 10 minutes (section 21); readers score; record/replay fixtures saved | owner approval of Appendix C | 3 baseline records (section 21.4) with Reader 1 scores and Reader 2 scores or "pending"; known failure list; thresholds in sections 14 and 16.1 tuned from measurements |
+| **1 Truth fixes in the current engine** | G7 placeholder and unresolved-marker gate; the four gate statuses (PASS, FAIL, BLOCKED, NOT APPLICABLE with allow-list); `lintNarration` for all formats feeding gates; story gate critical with owner override; Gemini grounding URLs | 0 (can start in parallel) | Ramesh Babu production blocked until its 37 placeholders (10 in narration) are resolved; seeded tests pass; mock suite green |
 | **2 Dossier + registry + executor** | D1 schemas; B2 registry with computed role status; B1 executor running the legacy graph unchanged | 1 | golden test: legacy run identical through the executor; studio role counts equal the registry |
 | **3 Research v2** | R1–R9, free providers, span verification, completion gate G1–G3 | 2 | on the 3 topics: 100% spans verified, 0 dead URLs, gold-sheet key-fact recall ≥80%, disputes recorded |
 | **4 Claim verification v2** | C1–C5, sentence tags, G4, G5, G8, G15 | 3 | seeded defects: 100% numbers/dates/placeholders, ≥90% overstatements |
@@ -788,14 +922,226 @@ parallel.
 | **11 Arabic profile** | L2 | 8 and an Arabic-qualified brain | native review ≥4/5 fluency; en-US goldens unchanged |
 | **12 Calibration with audience data** | S8 vs real retention | published films | correlation reported; thresholds updated |
 
-**First owner decisions needed (Phase 0):**
+**Owner decisions (recorded 12 Nov 2026):** Gemini free tier for the
+baseline experiments only (not a long-term dependency); restricted,
+read-only research access from the cloud environment; Reader 1 the owner,
+Reader 2 an independent US-English reader (pending until named), plus a
+separately labelled AI critic. **Still open:** approval to perform the setup
+in Appendix C, the choice of AI critic (section 18), and Reader 2's name.
 
-1. Which brain for the first real runs: Gemini free tier (key saved as an
-   environment secret, never in chat) or a local model (which computer: RAM,
-   GPU).
-2. Whether this cloud environment may reach research hosts (Wikipedia and the
-   providers in section 6), or the runs happen on the owner's machine.
-3. Who scores the human evaluation (at least two readers).
+## 21. Baseline experiment protocol (Phase 0, three 10-minute films)
+
+Purpose: measure what the **current, unchanged** engine produces with a real
+model. These are capability baselines, not proof of readiness for 30–60
+minute or multi-hour films. Nothing below has been run yet.
+
+### 21.1 Gemini for the baseline: what is known and what must be verified
+
+| Item | State | Source |
+|---|---|---|
+| Endpoint `generativelanguage.googleapis.com` reachable from this container | **verified** (answers) | curl, 12 Nov 2026 |
+| Key sent in the `x-goog-api-key` header | **verified in code** | `worker/gemini.mjs` |
+| Default model `gemini-2.5-flash`; output capped at 65,536; no context limit declared; `vision: false`, `webSearch: true` | **verified in code** | `worker/gemini.mjs` |
+| On 429 or 5xx the adapter retries 6 times with backoff up to 60 s, then the stage fails and the run can resume later | **verified in code** | `worker/gemini.mjs` |
+| Official pricing, rate-limit, model and terms pages | **not verified**: `ai.google.dev` gets no answer from this container | Appendix C adds it |
+| Search results (not the pages themselves) say: rate limits can change; Google Search grounding on the free tier for 2.5 Flash about 500 requests a day, shared with Flash-Lite; one forum user reported a free-tier model limit as low as 20 requests a day | **unverified**, reported only as search snippets and forum posts | [pricing](https://ai.google.dev/gemini-api/docs/pricing), [forum: Flash-Lite free tier](https://discuss.ai.google.dev/t/gemini-2-5-flash-lite-free-tier-search-grounding-quota-and-billing-clarification/188412), [forum: billing activation](https://discuss.ai.google.dev/t/clarification-on-gemini-api-free-tier-vs-paid-tier-after-billing-activation/96995) |
+
+**Model selection procedure** (done after Appendix C, before any film run):
+
+1. Read the official pricing, rate-limit, models, billing and terms pages
+   (with `ai.google.dev` allowed) and record, per candidate free model: free
+   tier yes/no, input limit, output limit, RPM, TPM, RPD, grounding quota,
+   thinking behaviour, any condition that creates a charge, data-use terms.
+2. Call `models.list` / `models.get` with the key (no generation, no
+   grounding) and record the limits the API itself reports.
+3. Choose the model by: free tier available; enough RPD for one run per day
+   (about 12–25 requests, below); output limit ≥ 32k; context ≥ 128k; Google
+   Search grounding on the free tier. Prefer the adapter's default
+   (`gemini-2.5-flash`) if it still qualifies, so the baseline tests today's
+   code; otherwise the closest free model, passed as `GEMINI_MODEL`.
+4. Record the choice and its reasons in the experiment record. Gemini stays
+   an optional adapter; nothing in the plan depends on it after Phase 0.
+
+**Charges.** The only safe rule without the official pages: the key belongs
+to a Google Cloud project **with no billing account linked**, so a request
+beyond the free limits is refused rather than billed. The engine's price
+table says $0 for Gemini, so its budget stop would not notice charges; it
+must not be relied on for this.
+
+**Data use.** Every request sends the 73 KB production manual (the owner's
+own work) and the research to Google. Free-tier terms may allow Google to use
+prompts and replies to improve its products, possibly with human review
+(to be confirmed on the terms page). The owner must accept that before the
+first run. No private or personal data is sent; the topics are public.
+
+### 21.2 Calls and quota per run (estimated from the code)
+
+| Stage | Requests | Grounded |
+|---|---|---|
+| s01 | 1 | 0 |
+| research | 1 (Gemini searches inside it) | 1 |
+| s2 | 1 | 0 |
+| s3 | 1, plus up to 2 repairs | 0 |
+| s4 | 1 | 0 |
+| s5 (10 min = 1 chapter) | 1, plus up to 2 repairs | 0 |
+| qa, viewer, s6, s7 | 4 | 0 |
+| edit | skipped with `--no-edit` (not part of the script) | 0 |
+| continuation after `MAX_TOKENS` | 0–3 per stage | 0 |
+| one Bossism revision round | 0–6 | 0–1 |
+
+Total about 12–25 requests and 1–2 grounded requests per run. If the chosen
+model's free RPD is low, one topic per day; a stopped run resumes the next
+day with finished stages kept (`--out` the same folder). Media is skipped
+(no stock keys), so the visual, rights and master gates are NOT APPLICABLE
+(script-only baseline).
+
+### 21.3 The three runs
+
+Same settings for all: `--minutes 10`, explicit format (no `auto`, for
+repeatability), `--no-edit`, default viewer panel, `--max-revisions 1`,
+version en-US. The notes give the same three-line positioning for each
+topic; every factual point in them is a **hypothesis the run must verify**,
+not an instruction to assert it.
+
+| Topic | Format | US-audience positioning (to be verified by the run) |
+|---|---|---|
+| The 1970 Bhola cyclone | `disaster-minute-by-minute` | why a US viewer should care: among the deadliest storms ever recorded; how the response fed into the 1971 war and the birth of Bangladesh; the 1971 Concert for Bangladesh in New York |
+| The discovery of CRISPR and the patent dispute | `big-question-science` | American institutions at the center (UC Berkeley vs the Broad Institute of MIT and Harvard), the US patent system, the first approved CRISPR therapy in the US; the dispute's current status must be checked live |
+| The 1977 Tenerife airport disaster | `disaster-minute-by-minute` | an American airline (Pan Am) among the two aircraft; how the accident changed cockpit teamwork training and radio phrasing used on US flights today |
+
+Command per topic (after Appendix C is done; the key value never appears):
+
+```
+BRAIN=gemini GEMINI_API_KEY=injected-by-proxy [GEMINI_MODEL=<chosen>] \
+  node local/run-film.mjs --topic "<topic>" --minutes 10 --format <id> \
+  --notes "<positioning>" --no-edit --max-revisions 1 --out films/baseline-<slug>
+```
+
+`films/` is ignored by git; only the written report is committed.
+
+### 21.4 What each experiment record contains
+
+File `docs/evals/2026-11-<dd>-baseline-<slug>.md`:
+
+1. Setup: commit hash, model id as returned by the API, settings, manual
+   SHA-256, date and time, environment and allowed hosts.
+2. Research sources: every URL in `research.json` with site, tier (by hand
+   for the baseline), and `sources-check.json` status (verified, opened,
+   unconfirmed, unreachable, dropped); unreachable split into "blocked by the
+   allowlist" and "site error" from the proxy result.
+3. Token usage per stage (from `run.json` usage) and total; budget misses
+   (continuations).
+4. Execution time per stage and total (log timestamps).
+5. Failures: errors, retries, 429s, repairs, invalid JSON, revision round.
+6. Factual verification: source-check summary; every narrated factual
+   sentence checked against the gold fact sheet (AI-drafted from primary
+   sources with citations, **marked AI-drafted** until the owner checks it);
+   placeholders left.
+7. Gate results in the four statuses (mapping in section 14), with evidence.
+8. Reader 1 scores; Reader 2 scores or **pending**; AI evaluation (labelled,
+   with model and independence level). Nothing filled in for anyone.
+9. What this baseline does **not** show (length, other genres, other models).
+
+### 21.5 Order of work after approval
+
+1. Owner approves Appendix C; the setup is done; access is verified (C.3).
+2. Model selection (21.1), recorded.
+3. One run, Tenerife first (best documented, cheapest research), then
+   Bhola, then CRISPR; each record written before the next run.
+4. Readers score; records completed; Phase 0 exit review with the owner.
+
+## Appendix C: owner setup for the baseline (nothing done yet)
+
+### C.1 Gemini key, stored so that it is never in the repository, the chat or the logs
+
+Steps for the owner, outside this session:
+
+1. In Google AI Studio, create an API key in a **new Google Cloud project
+   that has no billing account linked**.
+2. In the Google Cloud console for that project (APIs & Services →
+   Credentials → the key), restrict the key to the **Generative Language
+   API** only.
+3. Keep the key private. Do not paste it into chat, GitHub, an issue, a
+   commit, a `.env` in the repository or a screenshot.
+
+Steps in this session, each shown to the owner as an approval card (nothing
+is done before the owner approves):
+
+4. **A personal environment for this repository.** The session runs on the
+   owner's *Default* environment, which every repository uses; the research
+   access and the key belong to this project only. So I propose a new
+   personal environment named `ai.x.com` for `sayedmuntasim3-cmd/ai.x.com`,
+   with the hosts in C.2, package managers and MCP servers still allowed, and
+   this session moved onto it (network only). The Default stays unchanged.
+5. **The key as a network secret** on that environment: a secure form (not
+   chat) asks for the key for host `generativelanguage.googleapis.com`,
+   header `x-goog-api-key`, no prefix. The network proxy adds the header to
+   requests to that host; the key never enters this container, the files,
+   the logs or git. The run is given `GEMINI_API_KEY=injected-by-proxy` (a
+   placeholder, not a secret), which the proxy replaces.
+6. Verification (C.3), then stop and report.
+
+Alternative without my tools: the owner adds the same host, header and key
+under the environment's Network secrets in the environment settings.
+
+To revoke later: delete the network secret in the environment settings and
+delete the key in AI Studio.
+
+### C.2 Restricted research access (read-only, public hosts)
+
+Exact hosts (wildcards are not accepted; at most 20 per environment). The
+list favours primary, official, academic and institutional sources and is
+not Wikipedia-only:
+
+| Host | Why |
+|---|---|
+| `ai.google.dev` | official Gemini pricing, limits and terms (verification only) |
+| `en.wikipedia.org` | discovery and its cited references (tertiary; never enough alone) |
+| `www.wikidata.org` | entities and dates |
+| `api.openalex.org` | scholarly works metadata |
+| `api.crossref.org` | publication metadata (DOIs, dates) |
+| `www.ebi.ac.uk` | Europe PMC open-access papers (CRISPR) |
+| `eutils.ncbi.nlm.nih.gov` | PubMed search (CRISPR) |
+| `pmc.ncbi.nlm.nih.gov` | PubMed Central full texts (CRISPR) |
+| `www.nobelprize.org` | the 2020 Chemistry prize record (CRISPR) |
+| `www.uspto.gov` | patent board records (CRISPR dispute) |
+| `www.cafc.uscourts.gov` | Federal Circuit opinions (CRISPR dispute) |
+| `archive.org` | archived reports, newspapers and books |
+| `www.loc.gov` | Library of Congress collections |
+| `wmo.int` | World Meteorological Organization records (Bhola) |
+| `reliefweb.int` | humanitarian reports (Bhola) |
+| `www.britannica.com` | reputable reference (tertiary) |
+| `www.faa.gov` | FAA accident lessons and reports (Tenerife) |
+| `aviation-safety.net` | Flight Safety Foundation accident records (Tenerife) |
+| `skybrary.aero` | aviation safety reference (Tenerife) |
+
+`generativelanguage.googleapis.com` is allowed by saving the key (C.1).
+
+Rules that hold:
+
+- **Read-only use**: the engine only sends GET requests to these hosts
+  (search queries are GET parameters); nothing private is sent.
+- **No accounts**: no login, cookies or credentials for any research host.
+- **Downloaded content is data**: the engine extracts text from HTML, skips
+  PDFs and binaries (`source-check.mjs`), stores text as JSON in `films/`,
+  and never executes it; pages are treated as untrusted text.
+- **No paid APIs**: every host above is free to read; none needs a key.
+- **Known limit**: Gemini and Wikipedia will cite pages on other hosts. Those
+  stay blocked; source-check marks them unreachable (the fact is kept and
+  attributed, not verified), and the record counts them. If too many key
+  facts end up unverifiable, the owner may approve more exact hosts; I will
+  not widen access on my own.
+
+### C.3 Verification before claiming anything works
+
+1. Each allowed host answers (status recorded); a host not on the list
+   (for example `example.com`) is still refused, which proves the
+   restriction.
+2. `models.list` with the key succeeds without the key appearing in any file
+   or log (a search of the session's files for the key prefix `AIza` finds nothing).
+3. The official Gemini pages are read and section 21.1 is filled in.
+
+Only then the first run starts, after the owner's go-ahead.
 
 ---
 
@@ -822,6 +1168,12 @@ parallel.
 | **New:** S3 writes the whole plan in one call (32k output tokens) | this plan | yes | `stage("s3")` maxTokens |
 | **New:** genres exist as 25 presets but only shape one brief line | this plan | yes | `filmBrief` FORMAT line |
 | **New:** `docs/BRAIN.md` calls Claude "best tested so far", but no real run is recorded | this plan | yes | no eval output in the repository |
+| **New:** Gemini adapter declares no context or output limits; output capped at 65,536 | v2 | yes | `worker/gemini.mjs` `capabilities`, `generationConfig` |
+| **New:** Gemini priced at 0 in the run's price table, so the budget stop cannot detect charges if a project has billing | v2 | yes | `film-run.mjs` `PRICES["gemini-2.5-flash"]` |
+| **New:** Gemini runs use Gemini's own search (`canSearch` true), not the research desk; URLs come from the model's text | v2 | yes | `film-run.mjs` research stage; adapter reads no grounding metadata |
+| **New:** a page the network blocks counts as unreachable (kept, attributed), only 404/410 drop a fact | v2 | yes | `source-check.mjs` `gone` |
+| **New:** from this container all candidate research hosts and `ai.google.dev` get no answer; `generativelanguage.googleapis.com` answers | v2 | yes | curl, 12 Nov 2026 |
+| **New:** run outputs go to `films/`, which git ignores | v2 | yes | `.gitignore` |
 
 Where the two audits differ:
 
