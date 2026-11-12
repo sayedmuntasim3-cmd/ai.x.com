@@ -550,11 +550,13 @@ export function smithsonianProvider(o) {
 export function metProvider(o = {}) {
   const get = o.fetch ?? ((url, init) => fetch(url, init));
   const base = "https://collectionapi.metmuseum.org/public/collection/v1";
+  // The v1 search endpoint was retired on 2026-10-01 (410 Gone); v1.1 is Elastic-backed and paginated. Objects stay on v1.
+  const searchBase = "https://collectionapi.metmuseum.org/public/collection/v1.1";
   return {
     id: "met", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 1 },
     async search(query, kind, signal) {
       if (kind !== "image") return [];
-      const res = await get(`${base}/search?${new URLSearchParams({ hasImages: "true", q: query.slice(0, 200) })}`, { signal });
+      const res = await get(`${searchBase}/search?${new URLSearchParams({ hasImages: "true", q: query.slice(0, 200), limit: String(Math.max(o.details ?? 4, 1) * 2), offset: "0" })}`, { signal });
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       const ids = (Array.isArray(data?.objectIDs) ? data.objectIDs : []).slice(0, o.details ?? 4);

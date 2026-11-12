@@ -201,7 +201,7 @@ const SMITHSONIAN = { response: { rows: [
 async function archiveFetch(url) {
   if (url.startsWith("https://www.loc.gov/photos/")) return Response.json(LOC_SEARCH);
   if (url.startsWith("https://www.loc.gov/item/")) { const body = /** @type {any} */ (LOC_ITEMS)[url]; return body ? Response.json(body) : new Response("no", { status: 404 }); }
-  if (url.includes("metmuseum.org/public/collection/v1/search")) return Response.json(MET_SEARCH);
+  if (url.includes("metmuseum.org/public/collection/v1.1/search")) return Response.json(MET_SEARCH);
   const met = /\/objects\/(\d+)$/.exec(url);
   if (met) { const body = /** @type {any} */ (MET_OBJECTS)[met[1]]; return body ? Response.json(body) : new Response("gone", { status: 404 }); }
   if (url.startsWith("https://api.artic.edu/")) return Response.json(ARTIC);
