@@ -7,6 +7,7 @@ on:
       - "public/studio/**"
       - "worker/**"
       - "render/**"
+      - "local/**"
       - "package*.json"
       - ".github/workflows/engine-checks.yml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "public/studio/**"
       - "worker/**"
       - "render/**"
+      - "local/**"
       - "package*.json"
       - ".github/workflows/engine-checks.yml"
 

@@ -119,13 +119,14 @@ test("every agent's real status is recorded: code, a Claude stage, or not built 
   for (const a of AGENTS) {
     const s = ROLE_STATUS[a.id];
     assert.ok(s, `${a.id} has a status`);
-    assert.ok(["code", "model", "planned"].includes(s[0]), `${a.id}: ${s[0]}`);
+    assert.ok(["code", "model", "built", "planned"].includes(s[0]), `${a.id}: ${s[0]}`);
     assert.ok(s[1].length > 8, `${a.id} says where (or why not)`);
   }
   assert.equal(Object.keys(ROLE_STATUS).length, AGENTS.length, "no status for a role that does not exist");
   const all = rosterStatus();
-  assert.equal(all.code + all.model + all.planned, all.total);
-  assert.ok(AGENTS.filter((a) => a.squadId === "quran").every((a) => ROLE_STATUS[a.id][0] === "planned"), "Quran films are not made yet, so no Quran role is counted as working");
+  assert.equal(all.code + all.model + all.built + all.planned, all.total);
+  assert.ok(AGENTS.filter((a) => a.squadId === "quran").every((a) => ["built", "planned"].includes(ROLE_STATUS[a.id][0])), "Quran films are not made yet, so no Quran role is counted as working");
+  assert.ok(["intake-transcriber", "voice-repair-engineer"].every((id) => ROLE_STATUS[id][0] === "planned"), "no speech-to-text and no noise repair exist yet");
   assert.ok(["arabic", "bangla"].every((l) => ROLE_STATUS[`versions-${l}-writer`][0] === "planned"), "only English runs today");
   const { planRun } = await import("../src/pipeline.mjs");
   const plan = planRun({ contentType: "documentary" });

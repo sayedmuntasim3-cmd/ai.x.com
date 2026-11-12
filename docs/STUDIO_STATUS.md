@@ -5,6 +5,8 @@
 
 > **আগের `docs/PLATFORM_AUDIT.md` সম্পর্কে:** ওটা প্রথম মেসেজের "This is NOT an AI video generation website" কথার ভিত্তিতে লেখা হয়েছিল, তাই ভুল মাপকাঠিতে মাপা। মালিক নিশ্চিত করেছেন প্রোডাক্ট হলো **AI ডকুমেন্টারি স্টুডিও**। এখন এই ফাইলটাই আসল।
 
+> **Update, 12 Nov 2026 (later the same day):** the role counts in section 2 were re-checked against the code: 63 code, 46 model, 6 built but not wired, 36 planned. The free brain without paid APIs is now built (`docs/BRAIN.md`). The current verified state is `docs/ENGINEERING_STATE.md`.
+
 ---
 
 ## ১. মালিকের তিনটা সিস্টেম

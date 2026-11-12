@@ -1,15 +1,18 @@
-# ai.x.com
+# Zupona AI Studio
 
-Home of Zupona AI Studio, the AI documentary and story video platform.
+An AI documentary studio for YouTube: from an idea (or, soon, your own
+voiceover) to a researched script, a shot-by-shot production blueprint, and
+a rendered film with licensed footage.
 
-| Folder | What it holds |
-|---|---|
-| `public/` | The landing page, served by the `ai-x-com` Cloudflare Worker (`wrangler.jsonc`). Regenerate it from `page.tsx` with the scripts in `tools/`. |
-| `worker/` | The Cloudflare Worker: the film API and its durable Workflow, calling the Claude API. |
-| `engine/` | The studio's planning and media modules: three language versions, voice and loudness, Quran recitation recognition, story mode, the 151-role agent roster and the autonomous run plans. `cd engine && npm test`. |
-| `docs/SYSTEM_V5.md` | How the system works and why, with the research behind it. |
-| `docs/HANDOFF.md` | **Start here in a new session**: where everything is, the owner's decisions and the next steps. |
-| `productions/` | Films made with the engine prompts (Ramesh Babu, two versions), kept so no work is lost. |
-| `prompts/` | The master engine prompts the productions use. |
+- Live today on `main`: only the landing page for ai.zupona.com.
+- The studio (engine, Cloudflare Worker, renderer) is on the working branches
+  and is not deployed yet.
 
-The studio page is `public/studio/`; the film API is the Cloudflare Worker in `worker/` (`wrangler.jsonc`), which runs a topic through S0–S7 with `engine/src/film-run.mjs`. To connect it, follow `docs/CONNECT.md`.
+Start here:
+
+- `docs/ENGINEERING_STATE.md`: what is built, verified and missing, and what comes next.
+- `docs/BRAIN.md`: making films with your own free model, no paid API.
+- `docs/VISION.md`: the owner's goals (the master list at the top).
+- `docs/CONNECT.md`: connecting Cloudflare and the optional keys.
+
+Checks: `npm ci && npm test`, `cd engine && npm run typecheck`, `npm run check`.

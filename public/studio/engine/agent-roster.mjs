@@ -296,15 +296,21 @@ export function getAgent(id) {
  * Where each role's job is actually done today, so nothing is shown as
  * working only because its name exists (audit of 5 Nov 2026).
  * - "code": a module does the job and checks it the same way every time;
- * - "model": a film-run stage (Claude) is told to do the job, and code checks
- *   what it can of the result;
+ * - "model": a film-run stage (the connected brain: Claude, Gemini or the
+ *   owner's own model) is told to do the job, and code checks what it can of
+ *   the result;
+ * - "built": tested code does the job, but no film run calls it yet (it
+ *   waits to be wired in, for example voice mode or Quran films);
  * - "planned": nothing does it yet.
+ * Corrected 12 Nov 2026 against the code: entries that later commits had
+ * made untrue were fixed, and "built" was added so code that exists but is
+ * not reachable is not counted as working.
  * A role is not a separate program: the film run is about a dozen model
  * stages plus code checks, and each role below names the part that does its job.
- * @type {Readonly<Record<string, readonly ["code" | "model" | "planned", string]>>}
+ * @type {Readonly<Record<string, readonly ["code" | "model" | "built" | "planned", string]>>}
  */
 export const ROLE_STATUS = Object.freeze({
-  "research-primary-source": ["model", "research stage: web search; code drops every fact without a source URL, then opens every cited page (source-check.mjs) and drops facts whose pages are gone"],
+  "research-primary-source": ["model", "research stage: the brain's own web search (Claude, Gemini) or, for a brain that cannot search, the code research desk (research-desk.mjs: Wikipedia, the pages its articles cite and the owner's SearXNG; facts may cite only pages it opened); code drops every fact without a source URL, then opens every cited page (source-check.mjs) and drops facts whose pages are gone"],
   "research-fact-ledger": ["model", "S2 claim ledger"],
   "research-date-check": ["model", "S2 ledger and the QA facts pass"],
   "research-statistics": ["model", "S2 ledger: values, units and conversions"],
@@ -315,7 +321,7 @@ export const ROLE_STATUS = Object.freeze({
   "research-source-diversity": ["code", "source-check.mjs counts sites per fact and per film; numbers resting on one site are named in S2, under 4 sites is a gap"],
   "research-freshness": ["planned", "no re-check of facts that change over time yet"],
 
-  "story-transcript-integrity": ["planned", "films start from a topic; a supplied transcript is not taken yet"],
+  "story-transcript-integrity": ["built", "voice-scenes.mjs: checkVoiceChapter finds every changed, added or missing word against the recording's transcript and restoreVoiceFields puts the transcript's words and times back; no film run calls it yet (voice mode is not wired)"],
   "story-chapter-arc": ["model", "S3; code checks that the chapters tile the film"],
   "story-opening-hook": ["model", "S3 and S5 (30-second hook rule); code reads the hook (no announcing opener, one concrete number, name or place, a first sentence that lands) and what QA leaves wrong is a gap"],
   "story-open-loops": ["code", "S3 loop ledger; code checks every opened loop is paid"],
@@ -349,14 +355,14 @@ export const ROLE_STATUS = Object.freeze({
   "animation-fx-qc": ["planned", "not built yet"],
 
   "footage-asset-strategist": ["model", "S5: search queries per shot"],
-  "footage-exact-match": ["model", "footage desk: Claude looks at the thumbnails of each shot's candidates"],
-  "footage-provider-coverage": ["code", "media step: Pexels and Pixabay searched per shot"],
+  "footage-exact-match": ["model", "footage desk: the brain looks at the thumbnails of each shot's candidates; when the brain cannot see pictures the desk is skipped, the first search result is kept and it is listed as a gap"],
+  "footage-provider-coverage": ["code", "media step: Pexels, Pixabay and the archives (Wikimedia Commons, NASA, Library of Congress, Smithsonian, the Met, Art Institute of Chicago, Openverse) searched per shot; archive (R2) shots look there first"],
   "footage-metadata": ["code", "media step: source page, creator and licence kept per clip"],
-  "footage-license": ["code", "media step: only Pexels and Pixabay licences are kept"],
+  "footage-license": ["code", "media step: a clip is kept only when its item-level licence is Pexels, Pixabay, CC0, public domain, US-government public domain or CC BY (FREE_LICENCES); share-alike and non-commercial files are never kept"],
   "footage-attribution": ["code", "renderer licence report; S7 credits block"],
   "footage-duplicate-assets": ["code", "media step: no clip twice within 10 minutes"],
-  "footage-scene-fit": ["model", "footage desk"],
-  "footage-release-risk": ["model", "footage desk rejects faces, brands, plates and watermarks where the shot avoids them"],
+  "footage-scene-fit": ["model", "footage desk (only when the brain can see pictures)"],
+  "footage-release-risk": ["model", "footage desk rejects faces, brands, plates and watermarks where the shot avoids them (only when the brain can see pictures)"],
   "footage-rights-gate": ["code", "nothing without a licence record is rendered"],
 
   "editing-runtime": ["code", "scene-lines.mjs clock and the frame-exact timeline"],
@@ -378,7 +384,7 @@ export const ROLE_STATUS = Object.freeze({
   "audio-music-arc": ["code", "S3 music arc and S4 cues; music-kit.mjs composes one track per cue"],
   "audio-loudness": ["code", "renderer: loudness normalised to -14 LUFS and measured on the master"],
   "audio-silence": ["model", "rule: silence before the moving scene of each chapter"],
-  "audio-pronunciation": ["model", "S4 lexicon is written; it is not yet sent to the voice"],
+  "audio-pronunciation": ["code", "S4 writes the pronunciation lexicon; render/voice.mjs sends the names as it spells them to the voice and the captions keep them as written (ElevenLabs path)"],
   "audio-audio-qc": ["code", "renderer measures the master's loudness and true peak"],
 
   "color-color-match": ["code", "renderer: one master grade per look"],
@@ -416,7 +422,7 @@ export const ROLE_STATUS = Object.freeze({
 
   "intake-transcriber": ["planned", "no speech-to-text yet"],
   "intake-language-detector": ["code", "studio: content-intel.mjs"],
-  "intake-recitation-identifier": ["planned", "matching code exists; no Quran text is loaded"],
+  "intake-recitation-identifier": ["built", "quran.mjs: matchRecitation finds the surah, the ayat and each ayah's times in a transcript against the shipped Tanzil text; there is no speech-to-text yet, so no run calls it"],
   "intake-content-classifier": ["code", "studio: content-intel.mjs"],
   "intake-intent-interpreter": ["code", "studio: spelling fixes and mode"],
   "intake-fact-fiction-judge": ["code", "studio: true story or invented story"],
@@ -431,19 +437,19 @@ export const ROLE_STATUS = Object.freeze({
   "voice-tone-dynamics": ["planned", "not built yet"],
   "voice-loudness-engineer": ["code", "gain to target in the studio; loudness in the renderer"],
   "voice-elevenlabs-operator": ["code", "voice.mjs: one take per scene with word timings"],
-  "voice-pronunciation": ["planned", "the S4 lexicon is not sent to the voice yet"],
+  "voice-pronunciation": ["code", "render/voice.mjs applies S4's pronunciation lexicon to the text sent to the voice (ElevenLabs path)"],
   "voice-pacing-editor": ["code", "words per scene; a capped speed-up when a take runs long"],
   "voice-music-supervisor": ["code", "music-kit.mjs and the mix"],
   "voice-mix-engineer": ["code", "renderer mix"],
 
-  "quran-ayah-aligner": ["planned", "Quran films are not made yet"],
-  "quran-text-guardian": ["planned", "Quran films are not made yet"],
-  "quran-reference-checker": ["planned", "Quran films are not made yet"],
+  "quran-ayah-aligner": ["built", "quran.mjs matchRecitation and quran-film.mjs planQuranFilm: one scene per ayah from the transcript's word times; not wired to a run or a render yet"],
+  "quran-text-guardian": ["built", "quran-film.mjs: the on-screen text is Tanzil's, verbatim by surah:ayah, and checkQuranFilm refuses a plan with changed text; not wired yet"],
+  "quran-reference-checker": ["built", "quran.mjs: a passage found in several places lists every place and goes to review instead of being guessed; not wired yet"],
   "quran-translation-curator": ["planned", "Quran films are not made yet"],
   "quran-meaning-researcher": ["planned", "Quran films are not made yet"],
   "quran-visual-matcher": ["planned", "Quran films are not made yet"],
-  "quran-visual-adab-guard": ["planned", "Quran films are not made yet"],
-  "quran-recitation-editor": ["planned", "Quran films are not made yet"],
+  "quran-visual-adab-guard": ["planned", "quran-film.mjs lists the rules (no depiction, no faces), but no picture is chosen for a Quran film yet, so nothing checks one; the owner's questions on imagery are open (docs/STUDIO_STATUS.md section 6)"],
+  "quran-recitation-editor": ["built", "quran-film.mjs: cuts only in the quiet between ayat and checkQuranFilm refuses any cut inside an ayah or any sound under the recitation; not wired yet"],
   "quran-arabic-typographer": ["planned", "Quran films are not made yet"],
   "quran-islamic-reviewer": ["planned", "Quran films are not made yet"],
 
@@ -478,7 +484,7 @@ export const ROLE_STATUS = Object.freeze({
 export function rosterStatus(ids) {
   const pick = ids ? AGENTS.filter((a) => ids.includes(a.id)) : AGENTS;
   const count = (/** @type {readonly Agent[]} */ list) => {
-    const c = { total: list.length, code: 0, model: 0, planned: 0 };
+    const c = { total: list.length, code: 0, model: 0, built: 0, planned: 0 };
     for (const a of list) c[ROLE_STATUS[a.id]?.[0] ?? "planned"] += 1;
     return c;
   };

@@ -156,7 +156,7 @@ export function planRun({ contentType, islamic, needsAiVisuals = false, source =
     stageWorking: stages.map((s) => {
       const ids = s.agents.flatMap((id) => (id.includes("{lang}") ? versions.map((v) => id.replace("{lang}", v === "ar" ? "arabic" : v === "en-US" ? "english" : "bangla")) : [id]));
       const st = rosterStatus(ids);
-      return { id: s.id, total: st.total, code: st.code, model: st.model, planned: st.planned };
+      return { id: s.id, total: st.total, code: st.code, model: st.model, built: st.built, planned: st.planned };
     }),
     humanApprovalSteps: 0,
     failurePolicy: FAILURE_POLICY,

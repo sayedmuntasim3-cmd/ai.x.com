@@ -4,6 +4,8 @@ Read this file only (and `docs/CONNECT.md` when connecting Cloudflare). Do not r
 
 ## 0. Start here
 
+**Latest (12 Nov 2026): read `docs/ENGINEERING_STATE.md` first.** It is the verified state of the code against the owner's goals, what changed, and the next work in order. The free brain (no paid API) is now built: `docs/BRAIN.md`. Work continues on branch `ccr-2867bb13-8ohb4z`, which contains everything below.
+
 **Latest (6 Nov 2026):** read the owner's master list at the end of `docs/VISION.md` first and keep every item in view (US documentaries, one signature voice, Quran films, the free self-run brain, no like/subscribe asks, website, Bangla later, repo privacy). The ElevenLabs account is on a 10,000-credit quota with 186 left, so the signature-voice design waits for credits or a paid plan.
 
 **Latest (5 Nov 2026, end of the long session; the owner started a new session to save credits):**

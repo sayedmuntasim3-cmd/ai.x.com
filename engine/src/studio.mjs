@@ -370,7 +370,7 @@ export function planIdea({ text, mode = "auto", minutes = null }) {
       stages: run.stages.map((s, i) => ({ id: s.id, title: s.title, agents: s.agents.length, perVersion: s.perVersion, gates: s.gates, working: run.stageWorking[i] })),
       gates: run.gates,
       agentsUsed: run.agentsUsed,
-      working: { total: run.working.total, code: run.working.code, model: run.working.model, planned: run.working.planned },
+      working: { total: run.working.total, code: run.working.code, model: run.working.model, built: run.working.built, planned: run.working.planned },
       humanApprovalSteps: run.humanApprovalSteps,
       publishing: run.publishing,
     },
