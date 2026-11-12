@@ -1,5 +1,11 @@
 # Zupona: repository audit and documentary-platform strategy
 
+> **Superseded on 12 November 2026.** This audit measured the repository against a documentary *streaming* platform,
+> following the first brief's "This is NOT an AI video generation website". The owner has since confirmed that the product
+> is the AI documentary studio (idea system, voice system, Quran recitation films). The current status and plan are in
+> [`docs/STUDIO_STATUS.md`](STUDIO_STATUS.md). This file is kept for reference only (the security findings S1–S5 still apply).
+
+
 Audit date: 11 November 2026. Scope: every branch of `sayedmuntasim3-cmd/ai.x.com`.
 Status: **proposal, awaiting the owner's approval.** No application code was changed for this audit.
 
