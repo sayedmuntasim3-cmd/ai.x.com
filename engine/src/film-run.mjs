@@ -334,7 +334,7 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * budgetUsd is a hard cap: before every model call the worst case of that call
  * (its whole input at the full input price plus its whole output allowance)
  * is reserved, and a call that could cross the cap is never made.
- * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", researchStrict?: boolean, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -524,6 +524,12 @@ export async function runFilm(o) {
       const queries = listed.length ? listed : [film.topic];
       const { docs, trace } = await gatherCorpus({ queries, providers: o.research.providers, fetch: o.research.fetch, limits: { corpusChars: corpusBudget(model.capabilities?.contextTokens) } });
       await store.put("research-corpus.json", JSON.stringify({ queries, trace, docs }, null, 1));
+      // Phase 0 fairness rule: a corpus thinned by a failed source is never written from; the run stops and is redone.
+      const failed = trace.filter((t) => t.outcome.startsWith("failed") || t.outcome.startsWith("read failed"));
+      if (o.researchStrict && failed.length) {
+        const why = `Research incomplete: ${failed.length} research request${failed.length > 1 ? "s" : ""} failed (${[...new Set(failed.map((t) => `${t.provider}: ${t.outcome}`))].slice(0, 3).join("; ")}). Nothing was written from a partial corpus; run it again later.`;
+        throw Object.assign(new Error(why), { permanent: why });
+      }
       if (!docs.length) throw new Error(`The research desk opened no readable pages (searched: ${queries.join("; ").slice(0, 300)}).`);
       const text = await ask("research", [{ text: ctx("S0_S1", s01) }, { text: ctx("CORPUS", corpusText(docs)) }, { text: writeInstruction(story) }], 16000, { system: deskSystem });
       const bound = bindToCorpus(extractJson(text), docs);

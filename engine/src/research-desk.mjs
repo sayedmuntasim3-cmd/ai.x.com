@@ -121,17 +121,32 @@ export async function readPage(get, url, limits = /** @type {{ timeoutMs: number
  * Wikipedia: search and full plain-text articles through the public API
  * (no key; one request at a time, as Wikimedia asks of automated clients),
  * with the article's external references for the desk to open.
- * @param {{ fetch: FetchLike, language?: string }} o
+ * strict (Phase 0 fairness rule): the same bounded retry the other free
+ * sources have (2 retries on 429/5xx/network, Retry-After up to 10 s, else
+ * 1 s then 3 s). Off by default.
+ * @param {{ fetch: FetchLike, language?: string, strict?: boolean, sleep?: (ms: number) => Promise<void> }} o
  * @returns {ResearchProvider}
  */
 export function wikipediaProvider(o) {
+  const sleep = o.sleep ?? ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
   const lang = /^[a-z]{2,3}$/.test(o.language ?? "") ? /** @type {string} */ (o.language) : "en";
   const api = `https://${lang}.wikipedia.org/w/api.php`;
   /** @param {Record<string, string>} params */
   const call = async (params) => {
-    const res = await o.fetch(`${api}?${new URLSearchParams({ format: "json", formatversion: "2", ...params })}`, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(DESK_LIMITS.timeoutMs) });
-    if (!res.ok) throw new Error(`Wikipedia ${res.status}`);
-    return /** @type {any} */ (await res.json());
+    for (let attempt = 0; ; attempt += 1) {
+      /** @type {Response | null} */
+      let res = null;
+      try {
+        res = await o.fetch(`${api}?${new URLSearchParams({ format: "json", formatversion: "2", ...params })}`, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(DESK_LIMITS.timeoutMs) });
+      } catch (error) {
+        if (!o.strict || attempt >= 2) throw error;
+      }
+      if (res?.ok) return /** @type {any} */ (await res.json());
+      if (res && (!o.strict || attempt >= 2 || !(res.status === 429 || res.status >= 500))) throw new Error(`Wikipedia ${res.status}`);
+      const after = Number(res?.headers.get("retry-after"));
+      await res?.body?.cancel().catch(() => {});
+      await sleep(Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 10_000) : 1000 * 3 ** attempt);
+    }
   };
   return {
     id: "wikipedia",
@@ -182,11 +197,11 @@ export function searxngProvider(o) {
  * The research providers a run can use: Wikipedia always, SearXNG when the
  * owner gives its address, and the free research APIs the owner names
  * (`sources`, e.g. "crossref,europepmc,pubmed,archive,loc"; off by default).
- * @param {{ fetch: FetchLike, searxngUrl?: string, language?: string, sources?: string | string[] }} o
+ * @param {{ fetch: FetchLike, searxngUrl?: string, language?: string, sources?: string | string[], strict?: boolean }} o
  */
 export function researchProviders(o) {
   /** @type {ResearchProvider[]} */
-  const list = [wikipediaProvider({ fetch: o.fetch, language: o.language })];
+  const list = [wikipediaProvider({ fetch: o.fetch, language: o.language, strict: o.strict })];
   if (o.searxngUrl) list.push(searxngProvider({ fetch: o.fetch, url: o.searxngUrl, language: o.language }));
   if (o.sources) list.push(...sourceProviders(o.sources, { fetch: o.fetch, language: o.language }).providers);
   return list;
@@ -244,7 +259,8 @@ export async function gatherCorpus(o) {
   const order = interleave(hits, (h) => h.provider.id);
   for (const { hit, provider } of order) {
     if (docs.length >= limits.docs) break;
-    const read = provider.read ? await provider.read(hit).catch(() => null) : await readPage(o.fetch, hit.url, limits);
+    // A provider's own read that fails is written in the trace (a rate-limited source must be visible, not silent).
+    const read = provider.read ? await provider.read(hit).catch((/** @type {unknown} */ error) => { trace.push({ query: hit.url, provider: provider.id, outcome: `read failed: ${error instanceof Error ? error.message.slice(0, 120) : String(error)}`, hits: 0 }); return null; }) : await readPage(o.fetch, hit.url, limits);
     if (!read) continue;
     docs.push({ url: hit.url, title: read.title || hit.title, site: siteOf(hit.url), provider: provider.id, ...(hit.meta ? { meta: hit.meta } : {}), text: read.text });
     for (const ref of "references" in read ? /** @type {string[]} */ (read.references ?? []) : []) references.push({ url: ref.replace(/#.*$/, ""), from: hit.url });

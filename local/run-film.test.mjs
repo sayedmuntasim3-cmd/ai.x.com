@@ -224,3 +224,24 @@ test("a 429 for Google's daily free quota stops the run at once, with no retries
   assert.equal(entry.requests, 1);
   assert.match(entry.error, /daily free quota/);
 });
+
+test("fairness rule (RESEARCH_STRICT=1): a research source that stays rate limited stops arm B before anything is written from a partial corpus", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-strict-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  /** @type {string[]} */
+  const stages = [];
+  const free = { name: "local-test", capabilities: { webSearch: false }, price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: async (/** @type {any} */ req) => {
+    stages.push(req.stage);
+    return { text: req.stage === "research-plan" ? '```json\n{"queries": ["Tenerife airport disaster"]}\n```' : "ANGLE: x", stopReason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  let wiki = 0;
+  const web = /** @type {typeof fetch} */ (async (input) => {
+    if (new URL(String(input)).hostname === "en.wikipedia.org") { wiki += 1; return new Response("busy", { status: 429, headers: { "retry-after": "1" } }); }
+    return new Response("no", { status: 404 });
+  });
+  const out = join(dir, "b");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "10"], { RESEARCH_STRICT: "1" }, { model: free, fetch: web, log: () => {} }), /Research incomplete: 1 research request failed \(wikipedia: failed: Wikipedia 429\)/);
+  assert.deepEqual(stages, ["s01", "research-plan"], "the research writing call was never made");
+  assert.equal(wiki, 3, "one try and two retries");
+  assert.equal(JSON.parse(readFileSync(join(out, "context.json"), "utf8")).arm.researchStrict, "1");
+});

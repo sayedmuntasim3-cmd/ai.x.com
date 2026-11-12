@@ -93,3 +93,27 @@ test("helpers: public URLs only, readable text with case kept, the corpus fits t
   assert.ok(corpusBudget(131_072) > corpusBudget(32_768));
   assert.equal(corpusBudget(1_000_000), 150_000);
 });
+
+test("strict Wikipedia (fairness rule): 429 is retried twice with Retry-After capped at 10 s, then reported; default is one try", async () => {
+  /** @type {number[]} */
+  const slept = [];
+  let n = 0;
+  const busy = /** @type {typeof fetch} */ (async () => { n += 1; return n < 3 ? new Response("busy", { status: 429, headers: { "retry-after": "60" } }) : Response.json({ query: { search: [{ title: "Tenerife airport disaster", snippet: "x" }] } }); });
+  const strict = wikipediaProvider({ fetch: busy, strict: true, sleep: async (ms) => { slept.push(ms); } });
+  assert.equal((await strict.search("Tenerife", 1)).length, 1);
+  assert.deepEqual(slept, [10_000, 10_000]);
+  let m = 0;
+  const always = /** @type {typeof fetch} */ (async () => { m += 1; return new Response("busy", { status: 429 }); });
+  await assert.rejects(wikipediaProvider({ fetch: always, strict: true, sleep: async () => {} }).search("x", 1), /Wikipedia 429/);
+  assert.equal(m, 3, "one try and two retries, never more");
+  let d = 0;
+  await assert.rejects(wikipediaProvider({ fetch: /** @type {typeof fetch} */ (async () => { d += 1; return new Response("busy", { status: 429 }); }) }).search("x", 1), /Wikipedia 429/);
+  assert.equal(d, 1, "the default is unchanged: no retry");
+});
+
+test("a provider read that fails is written in the trace, not swallowed", async () => {
+  const provider = { id: "p", search: async () => [{ title: "A", url: "https://example.org/a" }], read: async () => { throw new Error("Wikipedia 429"); } };
+  const { docs, trace } = await gatherCorpus({ queries: ["q"], providers: [provider], fetch: /** @type {typeof fetch} */ (async () => new Response("")) });
+  assert.equal(docs.length, 0);
+  assert.deepEqual(trace.map((t) => t.outcome), ["ok", "read failed: Wikipedia 429"]);
+});

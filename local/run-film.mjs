@@ -202,8 +202,10 @@ export async function produceFilm(o) {
     sources: { fetch: pages },
     // Phase 0 arm A: RESEARCH_MODE=knowledge (no search, no research desk; model knowledge only).
     ...(env.RESEARCH_MODE === "knowledge" ? { researchMode: /** @type {const} */ ("knowledge") } : {}),
+    // Phase 0 fairness rule: RESEARCH_STRICT=1 (bounded Wikipedia retries; stop rather than write from a partial corpus).
+    ...(env.RESEARCH_STRICT === "1" ? { researchStrict: true } : {}),
     // The search providers' own APIs (Wikipedia, the owner's SearXNG, which may be on this network) use the plain fetch.
-    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES || undefined }), fetch: pages },
+    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES || undefined, strict: env.RESEARCH_STRICT === "1" }), fetch: pages },
     channel: o.channel,
     log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
     signal: o.signal,
@@ -272,7 +274,7 @@ export async function main(argv, env, deps = {}) {
   const usedSha = sha256(manual ?? fullManual);
   if (pinned && pinned.sha256 !== usedSha) throw new Error(`This film was started with the context ${pinned.file} (sha256 ${String(pinned.sha256).slice(0, 12)}); give the same --manual to resume it.`);
   // The experiment arm is pinned too: a resume cannot change the model, search, research mode or sources.
-  const arm = { model: env.GEMINI_MODEL ?? null, geminiSearch: env.GEMINI_SEARCH ?? null, researchMode: env.RESEARCH_MODE ?? null, researchSources: env.RESEARCH_SOURCES ?? null };
+  const arm = { model: env.GEMINI_MODEL ?? null, geminiSearch: env.GEMINI_SEARCH ?? null, researchMode: env.RESEARCH_MODE ?? null, researchSources: env.RESEARCH_SOURCES ?? null, researchStrict: env.RESEARCH_STRICT ?? null };
   if (pinned?.arm && JSON.stringify(pinned.arm) !== JSON.stringify(arm)) throw new Error(`This film was started with other settings (${JSON.stringify(pinned.arm)}); resume it with the same GEMINI_MODEL, GEMINI_SEARCH, RESEARCH_MODE and RESEARCH_SOURCES.`);
   if (!pinned && values.approve === undefined) await store.put("context.json", JSON.stringify({ file: values.manual ?? "prompts/1-zupona-master-engine-full.txt", sha256: usedSha, bytes: Buffer.byteLength(manual ?? fullManual), arm }, null, 1));
   const ledger = await callLedger(store, askedCap ?? (kind === "gemini" ? GEMINI_MAX_CALLS : undefined), fullManual, manual ?? fullManual);
