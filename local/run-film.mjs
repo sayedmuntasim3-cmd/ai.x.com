@@ -63,6 +63,57 @@ export function folderStore(dir) {
   };
 }
 
+/**
+ * One film from its first stage to Bossism's release decision, on whatever
+ * store holds it (a folder here, the studio's storage for a cloud job):
+ * preflight with this machine's brain, the supervised run, the review.
+ * @param {{ film: import("../engine/src/film-run.mjs").Film, store: import("../engine/src/film-run.mjs").Store,
+ *   brain: { kind: string, model: import("../engine/src/film-run.mjs").Model }, env: Record<string, string | undefined>,
+ *   fetch?: typeof fetch, signal?: AbortSignal, print: (line: string) => void, lang: "en" | "bn",
+ *   budgetUsd?: number, edit?: boolean, viewers?: boolean, maxRevisions?: number,
+ *   channel?: { load(): Promise<any[]>, save(list: any[]): Promise<void> } }} o
+ */
+export async function produceFilm(o) {
+  const { film, store, brain, env, print } = o;
+  const tell = (/** @type {{ code: string, params?: any }} */ m) => say(m, o.lang);
+  const caps = brain.model.capabilities ?? {};
+  const estimate = estimateRun(film.durationSeconds, brain.model.name, brain.model);
+  print(`Brain: ${brain.kind} ${brain.model.name}${caps.contextTokens ? `, window ${caps.contextTokens} tokens` : ""}${caps.vision === false ? ", cannot see pictures" : ""}${caps.webSearch === false ? ", research through the code desk" : ""}.`);
+  print(estimate.usdHigh === 0 ? `Cost: none (${estimate.chapters} chapter${estimate.chapters === 1 ? "" : "s"} on your own machine).` : `Estimated cost: $${estimate.usdLow}-$${estimate.usdHigh}.`);
+
+  // Bossism's preflight: refuse what cannot work before anything runs, and name every lowered quality.
+  const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY });
+  const manual = readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8");
+  const plan = preflight(productionGraph(understand({ film })), {
+    brain: { connected: true, kind: brain.kind, model: brain.model.name, seesPictures: caps.vision !== false, searchesWeb: caps.webSearch !== false, contextTokens: caps.contextTokens, maxOutputTokens: caps.maxOutputTokens },
+    researchDesk: true, mediaProviders: media.length, youtube: false, autoRender: false, minutes: film.durationSeconds / 60, manualChars: manual.length,
+  });
+  await store.put("preflight.json", JSON.stringify(plan, null, 1));
+  if (!plan.ok) throw Object.assign(new Error(plan.blockers.map((b) => tell(b)).join(" ")), { permanent: plan.blockers.map((b) => b.en).join(" ") });
+  for (const d of plan.degradations) print(`  NOTE ${tell(d)}`);
+
+  const get = o.fetch ?? fetch;
+  const web = (/** @type {string} */ url, /** @type {RequestInit | undefined} */ init) => get(url, init);
+  const options = {
+    film,
+    manual,
+    model: brain.model,
+    store,
+    budgetUsd: o.budgetUsd,
+    edit: o.edit ?? true,
+    viewers: o.viewers ?? true,
+    media: { providers: media },
+    sources: { fetch: web },
+    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined }), fetch: web },
+    channel: o.channel,
+    log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
+    signal: o.signal,
+  };
+  const max = Number.isFinite(o.maxRevisions) ? Math.max(0, Math.min(3, Number(o.maxRevisions))) : 1;
+  const { state, review } = await superviseFilm({ film, store, runOnce: () => runFilm(options), maxRevisions: max, log: options.log });
+  return { state, review, plan };
+}
+
 /** @param {string} topic */
 export function slug(topic) {
   return topic.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "film";
@@ -113,50 +164,17 @@ export async function main(argv, env, deps = {}) {
     await store.put("film.json", JSON.stringify({ ...film, createdAt: new Date().toISOString() }, null, 1));
   }
 
-  const caps = brain.model.capabilities ?? {};
-  const estimate = estimateRun(film.durationSeconds, brain.model.name, brain.model);
-  print(`Brain: ${brain.kind} ${brain.model.name}${caps.contextTokens ? `, window ${caps.contextTokens} tokens` : ""}${caps.vision === false ? ", cannot see pictures" : ""}${caps.webSearch === false ? ", research through the code desk" : ""}.`);
-  print(estimate.usdHigh === 0 ? `Cost: none (${estimate.chapters} chapter${estimate.chapters === 1 ? "" : "s"} on your own machine).` : `Estimated cost: $${estimate.usdLow}-$${estimate.usdHigh}.`);
-
-  // Bossism's preflight: refuse what cannot work before anything runs, and name every lowered quality.
-  const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY });
-  const manual = readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8");
-  const plan = preflight(productionGraph(understand({ film })), {
-    brain: { connected: true, kind: brain.kind, model: brain.model.name, seesPictures: caps.vision !== false, searchesWeb: caps.webSearch !== false, contextTokens: caps.contextTokens, maxOutputTokens: caps.maxOutputTokens },
-    researchDesk: true, mediaProviders: media.length, youtube: false, autoRender: false, minutes: film.durationSeconds / 60, manualChars: manual.length,
-  });
-  await store.put("preflight.json", JSON.stringify(plan, null, 1));
-  if (!plan.ok) throw new Error(plan.blockers.map((b) => tell(b)).join(" "));
-  for (const d of plan.degradations) print(`  NOTE ${tell(d)}`);
-
-  const get = deps.fetch ?? fetch;
-  const web = (/** @type {string} */ url, /** @type {RequestInit | undefined} */ init) => get(url, init);
-  const budget = Number(values.budget);
   const channelDir = join(dirname(out), "channel");
-  const options = {
-    film,
-    manual,
-    model: brain.model,
-    store,
+  const budget = Number(values.budget);
+  const { state, review } = await produceFilm({
+    film, store, brain, env, fetch: deps.fetch, signal: deps.signal, print, lang,
     budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
-    edit: !values["no-edit"],
-    viewers: !values["no-viewers"],
-    media: { providers: media },
-    sources: { fetch: web },
-    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined }), fetch: web },
+    edit: !values["no-edit"], viewers: !values["no-viewers"],
+    maxRevisions: Number(values["max-revisions"] ?? 1),
     channel: {
       load: async () => { const f = join(channelDir, "fingerprints.json"); return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : []; },
       save: async (list) => { mkdirSync(channelDir, { recursive: true }); writeFileSync(join(channelDir, "fingerprints.json"), JSON.stringify(list)); },
     },
-    log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
-    signal: deps.signal,
-  };
-  const maxRevisions = Number(values["max-revisions"] ?? 1);
-  const { state, review } = await superviseFilm({
-    film, store,
-    runOnce: () => runFilm(options),
-    maxRevisions: Number.isFinite(maxRevisions) ? Math.max(0, Math.min(3, maxRevisions)) : 1,
-    log: options.log,
   });
   print(`\n${state.status}${state.costUsd ? `, $${state.costUsd} spent` : ""}. Files in ${out}`);
   for (const gap of state.gaps) print(`  GAP ${gap}`);

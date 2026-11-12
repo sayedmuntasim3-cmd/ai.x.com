@@ -25,6 +25,9 @@ const T = {
     formatAuto: "বিষয় দেখে নিজে বেছে নাও",
     formatPlain: "সাধারণ ডকুমেন্টারি",
     saving: "সাশ্রয়ী মোড: Claude-এর খরচ অর্ধেক (Anthropic Batch), মান একই; তবে ধীরে, পুরো ফিল্মে কয়েক ঘণ্টা লাগতে পারে",
+    onWorker: "আমার নিজের কম্পিউটারে বানাও (তার নিজের ব্রেইন দিয়ে; কম্পিউটারে node local/jobs.mjs work --api চালু থাকতে হবে)",
+    renderHere: "আমার কম্পিউটারে রেন্ডার করো (কিছু প্রকাশ হবে না)",
+    queue: "কিউ",
     savingPrice: "সাশ্রয়ী মোডে",
     ai: "গল্পের চরিত্র AI দৃশ্যে দেখাও (একই চেহারা সব দৃশ্যে; আসল কোনো মানুষ নয়; YouTube Studio-তে ঘোষণা, স্ক্রিনে কিছু লেখা নয়)",
     token: "স্টুডিও টোকেন",
@@ -99,6 +102,9 @@ const T = {
     formatAuto: "Choose from the topic",
     formatPlain: "General documentary",
     saving: "Saving mode: half the Claude cost (Anthropic Batch API), same quality; slower, a full film can take a few hours",
+    onWorker: "Make it on my own computer (with its own brain; the computer runs node local/jobs.mjs work --api)",
+    renderHere: "Render on my computer (nothing is published)",
+    queue: "Queue",
     savingPrice: "in saving mode",
     ai: "Show the story's characters in AI scenes (the same look in every scene; never a real person; disclosed in YouTube Studio, nothing on screen)",
     token: "Studio token",
@@ -222,8 +228,9 @@ async function start(/** @type {SubmitEvent} */ ev) {
     const formatId = /** @type {HTMLSelectElement} */ ($("film-format")).value;
     const allowAi = /** @type {HTMLInputElement} */ ($("film-ai")).checked;
     const saving = /** @type {HTMLInputElement} */ ($("film-saving")).checked;
+    const runOn = /** @type {HTMLInputElement} */ ($("film-worker")).checked ? "worker" : undefined;
     const notes = idea && idea.topic === topic ? idea.note : undefined;
-    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes, saving }) });
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes, saving, runOn }) });
     const body = await res.json().catch(() => ({}));
     const isApi = (res.headers.get("content-type") ?? "").includes("json");
     if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }
@@ -319,6 +326,13 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run, /** @type {an
   }
   out.append(list);
   out.append(reviewPanel(extra.review ?? null, extra.degradations ?? []));
+  // The film's jobs on the owner's machines: what each is doing, in the page's language.
+  if (extra.jobs?.length) {
+    out.append(h("h4", l.queue));
+    const q = document.createElement("ul");
+    for (const j of extra.jobs) q.append(h("li", `${j.kind} · ${j.state}${j.progress ? ` · ${j.progress.stage} ${j.progress.done}/${j.progress.total}` : ""}${j.message ? ` · ${lang() === "bn" ? j.message.bn ?? "" : j.message.en ?? ""}` : ""}`));
+    out.append(q);
+  }
   if (run.gaps?.length) {
     out.append(h("h4", l.gaps));
     const g = document.createElement("ul");
@@ -514,7 +528,11 @@ function renderButton(id) {
         anyway.hidden = false;
         return;
       }
-      if (r.ok) {
+      if (r.ok && r.on === "worker") {
+        reason.hidden = true;
+        anyway.hidden = true;
+        result.textContent = ` ${l.queue}: ${r.job?.kind ?? "render"} · ${lang() === "bn" ? r.job?.message?.bn ?? "" : r.job?.message?.en ?? ""}`;
+      } else if (r.ok) {
         reason.hidden = true;
         anyway.hidden = true;
         const a = document.createElement("a");
@@ -535,7 +553,13 @@ function renderButton(id) {
   };
   go.addEventListener("click", () => send({}));
   anyway.addEventListener("click", () => send({ override: true, reason: reason.value.trim() }));
-  wrap.append(go, result, reason, anyway);
+  // Or on the owner's own computer: the film stays there, nothing is published.
+  const here = document.createElement("button");
+  here.type = "button";
+  here.className = "ghost";
+  here.textContent = l.renderHere;
+  here.addEventListener("click", () => send({ on: "worker" }));
+  wrap.append(go, here, result, reason, anyway);
   return wrap;
 }
 

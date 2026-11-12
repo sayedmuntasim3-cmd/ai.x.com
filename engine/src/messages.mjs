@@ -42,6 +42,7 @@ export const MESSAGES = Object.freeze({
   "plan.desk": { en: () => "The brain cannot search the web: research comes from the code research desk (Wikipedia and the pages it cites).", bn: () => "ব্রেইন ওয়েবে খুঁজতে পারে না: তথ্য আসবে কোডের রিসার্চ ডেস্ক থেকে (উইকিপিডিয়া ও সেখানে উদ্ধৃত পেজ)।" },
   "plan.noMarket": { en: () => "No YouTube key: titles are written without the videos that already won on this topic.", bn: () => "YouTube কী নেই: এই বিষয়ে আগে সফল ভিডিও না দেখেই টাইটেল লেখা হবে।" },
   "plan.noMedia": { en: () => "No footage source is connected: shots get no pictures.", bn: () => "কোনো ফুটেজ উৎস সংযুক্ত নেই: শটগুলোতে ছবি থাকবে না।" },
+  "plan.waitWorker": { en: () => "No machine with a brain is connected right now: the film waits in the queue until one is (node local/jobs.mjs work --api ...).", bn: () => "এই মুহূর্তে ব্রেইনসহ কোনো মেশিন সংযুক্ত নেই: একটি সংযুক্ত না হওয়া পর্যন্ত ফিল্মটি কিউতে অপেক্ষা করবে (node local/jobs.mjs work --api ...)।" },
   "plan.noAutoRender": { en: () => "GitHub is not connected: the film is not rendered automatically.", bn: () => "GitHub সংযুক্ত নেই: ফিল্ম নিজে থেকে রেন্ডার হবে না।" },
 
   // Bossism: gates

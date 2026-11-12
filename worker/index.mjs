@@ -20,6 +20,9 @@
  *   POST /api/films/:id/retention    { video } -> learn where viewers left the published film   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/render       start the GitHub render (MP4, Shorts, thumbnails)   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/resume       { budgetUsd? } -> continue a failed or budget-stopped film; finished stages are kept   (Bearer STUDIO_TOKEN)
+ *   POST /api/films { ..., runOn: "worker" }   the film is made by one of the owner's machines (its own brain) instead of the Workflow
+ *   POST /api/films/:id/render { on: "worker", resolution? }   a cleared film rendered on the owner's machine (nothing published)
+ *   /api/jobs..., /api/worker/...    the job queue for the owner's machines (worker/jobs-api.mjs)
  *
  * Needs (set by the owner when Cloudflare is connected):
  *   a brain (worker/brain.mjs, docs/BRAIN.md): the owner's own free model
@@ -46,6 +49,10 @@ import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { researchProviders } from "../engine/src/research-desk.mjs";
 import { cleared, ownerOverride, preflight, productionGraph, recordDecision, reviewRun, understand } from "../engine/src/bossism.mjs";
 import { superviseFilm } from "../engine/src/supervise.mjs";
+import { windowNeeds } from "../engine/src/bossism.mjs";
+import { renderNeed } from "../engine/src/device-profile.mjs";
+import { msg } from "../engine/src/messages.mjs";
+import { handleJobs, studioQueue, summary } from "./jobs-api.mjs";
 import { anthropicBatchModel, permanentError, savingModel } from "./anthropic.mjs";
 import { brainFromEnv, brainHealth } from "./brain.mjs";
 import { dispatchRender } from "./github.mjs";
@@ -227,6 +234,8 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
+      const jobs = await handleJobs(request, env, url);
+      if (jobs) return jobs;
       if (url.pathname === "/api/health") {
         const brain = brainHealth(env);
         return json({ brain, claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), localBrain: Boolean(env.BRAIN_URL), searxng: Boolean(env.SEARXNG_URL), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: brain.connected ? brain.model : null });
@@ -254,9 +263,6 @@ export default {
         return json({ films: await listFilms(env.FILMS) });
       }
       if (url.pathname === "/api/films" && request.method === "POST") {
-        const brain = brainFromEnv(env);
-        if (!brain.ok) return json({ error: brain.error }, 503);
-        if (!env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (R2 bucket or Workflow missing)." }, 503);
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your credits." }, 503);
         const auth = request.headers.get("authorization") ?? "";
         if (!sameToken(auth.replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
@@ -265,6 +271,23 @@ export default {
         const id = crypto.randomUUID();
         const made = newFilm(/** @type {any} */ (body), id);
         if (!made.ok) return json({ error: made.error }, 400);
+        if (/** @type {any} */ (body).runOn === "worker") {
+          // Made by one of the owner's own machines with its own brain: queued; the machine checks its brain itself.
+          if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
+          if (!env.WORKER_TOKEN) return json({ error: "Set the WORKER_TOKEN secret and start a worker on your computer first (docs/ARCHITECTURE.md)." }, 503);
+          const queue = studioQueue(env);
+          const health = await queue.health();
+          const plan = preflight(productionGraph(understand({ film: made.film })), { brain: { connected: true, kind: "worker" }, researchDesk: true, mediaProviders: 1, youtube: false, autoRender: false, minutes: made.film.durationSeconds / 60, manualChars: MANUAL.length });
+          const degradations = [...plan.degradations.filter((d) => d.code !== "plan.noMedia"), ...(health.workers.some((w) => w.alive && w.capabilities.includes("brain")) ? [] : [msg("plan.waitWorker")])];
+          const store = r2Store(env.FILMS, id);
+          await store.put("film.json", JSON.stringify({ ...made.film, createdAt: new Date().toISOString(), runOn: "worker" }, null, 1));
+          await store.put("preflight.json", JSON.stringify({ ...plan, degradations }, null, 1));
+          const job = await queue.enqueue({ kind: "film", filmId: id, title: made.film.topic, input: { filmId: id, maxRevisions: Number(env.MAX_REVISIONS ?? 1) }, requires: { capabilities: ["brain"], minContextTokens: windowNeeds(made.film.durationSeconds / 60, { manualChars: MANUAL.length }).perChapter }, timeoutMs: 24 * 3_600_000 });
+          return json({ id, film: made.film, runOn: "worker", job: summary(job), degradations }, 202);
+        }
+        const brain = brainFromEnv(env);
+        if (!brain.ok) return json({ error: brain.error }, 503);
+        if (!env.FILMS || !env.FILM_RUN) return json({ error: "The studio is not connected yet (R2 bucket or Workflow missing)." }, 503);
         // Bossism checks before anything is spent: a film that cannot be made is refused with its reasons.
         const plan = planFor(env, made.film);
         if (!plan.ok) return json({ error: plan.blockers.map((b) => b.en).join(" "), blockers: plan.blockers, degradations: plan.degradations }, 422);
@@ -338,8 +361,11 @@ export default {
       if (render && request.method === "POST") {
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
         if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
-        if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return json({ error: "Connect GitHub first: the GITHUB_TOKEN secret and the GITHUB_REPO var (docs/CONNECT.md)." }, 503);
         if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
+        const asked = /** @type {any} */ (await request.clone().json().catch(() => ({})));
+        const onWorker = asked?.on === "worker";
+        if (!onWorker && (!env.GITHUB_TOKEN || !env.GITHUB_REPO)) return json({ error: "Connect GitHub first: the GITHUB_TOKEN secret and the GITHUB_REPO var (docs/CONNECT.md), or render on your own computer ({ on: \"worker\" })." }, 503);
+        if (onWorker && !env.WORKER_TOKEN) return json({ error: "Set the WORKER_TOKEN secret and start a worker on your computer first." }, 503);
         // A film is rendered (and its release published) only when Bossism cleared it, or the owner approves it with a reason.
         const { store: filmStore, review } = await latestReview(env, render[1]);
         if (!review) return json({ error: "Not found." }, 404);
@@ -349,6 +375,12 @@ export default {
           if (body?.override !== true) return json({ error: review.release.message.en, message: review.release.message, blockedBy: review.release.blockedBy, gates: review.gates.map((/** @type {any} */ g) => ({ id: g.id, verdict: g.verdict, findings: g.findings.map((/** @type {any} */ f) => f.message) })), override: "To release anyway, send { override: true, reason } with your reason." }, 409);
           const approved = await ownerOverride(filmStore, review, body.reason);
           if (!approved.ok) return json({ error: approved.error }, 400);
+        }
+        if (onWorker) {
+          const resolution = /^\d{3,4}x\d{3,4}$/.test(String(asked.resolution ?? "")) ? String(asked.resolution) : "1920x1080";
+          const job = await studioQueue(env).enqueue({ kind: "render", filmId: render[1], title: `render ${resolution}`, input: { filmId: render[1], resolution }, requires: { capabilities: ["ffmpeg", renderNeed(resolution)] }, timeoutMs: 8 * 3_600_000 });
+          await filmStore.put("render.json", JSON.stringify({ ok: true, on: "worker", job: job.id, at: new Date().toISOString() }, null, 1));
+          return json({ ok: true, on: "worker", job: summary(job) }, 202);
         }
         const result = await dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: render[1], site: url.origin });
         if (env.FILMS && result.ok) await r2Store(env.FILMS, render[1]).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
@@ -406,6 +438,8 @@ export default {
           workflow: await currentInstance(env, m[1]),
           review: review ? { at: review.at, release: review.release, gates: review.gates.map((/** @type {any} */ g) => ({ id: g.id, verdict: g.verdict, critical: g.critical, findings: g.findings.map((/** @type {any} */ f) => ({ severity: f.severity, message: f.message })) })) } : null,
           degradations: plan?.degradations ?? [],
+          // The film's jobs on the owner's machines, with their last message in both languages.
+          jobs: (await studioQueue(env).list({ filmId: m[1] }).catch(() => [])).map(summary),
         });
       }
       return json({ error: "Not found." }, 404);

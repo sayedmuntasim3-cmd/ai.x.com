@@ -14,7 +14,7 @@
 /** @typedef {import("./jobs.mjs").WorkerProfile} WorkerProfile */
 /**
  * @typedef {{
- *   job: Job, signal: AbortSignal,
+ *   job: Job, signal: AbortSignal, lease: string,
  *   checkpoint: (data: any, stage?: string) => Promise<void>,
  *   progress: (stage: string, done: number, total: number) => void,
  *   log: (line: string) => void,
@@ -66,6 +66,8 @@ export async function runClaimed(queue, claimed, handler, o = {}) {
     const result = await handler(job, {
       job,
       signal: stop.signal,
+      // The lease proves this worker holds the job (the studio's film files are open only to it).
+      lease: token,
       checkpoint: async (data, stage) => {
         const r = await queue.checkpoint(job.id, token, data, stage);
         if (!r.ok) { halt(r.reason); throw new Error(`The job was ${r.reason}.`); }

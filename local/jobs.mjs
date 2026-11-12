@@ -10,6 +10,7 @@
  *   node local/jobs.mjs add render --run films/<slug> [--resolution 1920x1080]
  *   node local/jobs.mjs add selftest [--steps 20] [--step-ms 500]    (checks a worker end to end)
  *   node local/jobs.mjs work [--name "Home PC"] [--kinds film,render,selftest] [--concurrency N]
+ *   node local/jobs.mjs work --api https://ai.zupona.com      (take jobs from the cloud studio; needs WORKER_TOKEN)
  *   node local/jobs.mjs status | health [--lang bn]
  *   node local/jobs.mjs cancel <id> | retry <id>
  *   common: --queue <folder> (default films/queue)
@@ -18,7 +19,7 @@
  * each machine uses its own brain.
  */
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -29,8 +30,10 @@ import { createQueue } from "../engine/src/jobs.mjs";
 import { say } from "../engine/src/messages.mjs";
 import { main as releaseGate } from "../render/release-gate.mjs";
 import { probeDevice } from "./device.mjs";
+import { brainFromEnv } from "../worker/brain.mjs";
 import { folderJobStore } from "./folder-store.mjs";
-import { main as runFilmMain, slug } from "./run-film.mjs";
+import { remoteQueue } from "./remote-queue.mjs";
+import { main as runFilmMain, produceFilm, slug } from "./run-film.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -39,10 +42,27 @@ const pause = (ms, signal) => new Promise((r) => { const t = setTimeout(r, ms); 
 
 /**
  * What each kind of job does on this machine.
+ * A cloud job (input.filmId) works on the studio's copy of the film through
+ * `remote`; a local one (input.out, input.run) on a folder.
  * @param {Record<string, string | undefined>} env @param {(line: string) => void} print
+ * @param {ReturnType<typeof remoteQueue> | null} [remote]
  * @returns {Record<string, import("../engine/src/job-runner.mjs").Handler>}
  */
-export function handlers(env, print) {
+export function handlers(env, print, remote = null) {
+  /** A film's run files from the studio into a local folder, for the renderer. @param {import("../engine/src/jobs.mjs").Job} job @param {string} lease */
+  const fetchFilm = async (job, lease) => {
+    if (!remote) throw new PermanentError("This job belongs to the cloud studio; run the worker with --api.");
+    const store = remote.filmStore(String(job.input.filmId), job.id, lease);
+    const dir = resolve("films", String(job.input.filmId));
+    for (const name of await store.list()) {
+      if (name.startsWith("batches/")) continue;
+      const text = await store.get(name);
+      if (text === null) continue;
+      mkdirSync(dirname(join(dir, name)), { recursive: true });
+      writeFileSync(join(dir, name), text);
+    }
+    return dir;
+  };
   return {
     // Counts to `steps`, saving a checkpoint after each: a reclaimed self-test continues where the last worker stopped.
     async selftest(job, ctx) {
@@ -58,22 +78,32 @@ export function handlers(env, print) {
     },
     // The whole supervised film run (local/run-film.mjs); its stages in the film folder are the checkpoints.
     async film(job, ctx) {
+      const log = (/** @type {string} */ line) => {
+        print(`[${job.id.slice(0, 8)}] ${line}`);
+        const m = /\] (\S+): done$/.exec(line);
+        if (m) ctx.checkpoint({ stage: m[1] }, m[1]).catch(() => {});
+      };
+      if (job.input.filmId) {
+        // A film started from the studio (phone or browser), made here with this machine's brain, saved in the studio.
+        if (!remote) throw new PermanentError("This job belongs to the cloud studio; run the worker with --api.");
+        const store = remote.filmStore(String(job.input.filmId), job.id, ctx.lease);
+        const film = JSON.parse((await store.get("film.json")) ?? "null");
+        if (!film) throw new PermanentError("The film's files are not in the studio.");
+        const brain = brainFromEnv(env);
+        if (!brain.ok) throw new PermanentError(brain.error);
+        const { state, review } = await produceFilm({ film, store, brain, env, signal: ctx.signal, print: log, lang: "en", channel: remote.channel(job.id, ctx.lease), maxRevisions: Number(job.input.maxRevisions ?? 1) });
+        return { status: state.status, gaps: state.gaps.length, release: review.release.allowed, blockedBy: review.release.blockedBy };
+      }
       const out = String(job.input.out);
       const args = ["--out", out];
       if (!existsSync(join(out, "film.json"))) args.push("--topic", String(job.input.topic), "--minutes", String(job.input.minutes ?? 10), ...(job.input.format ? ["--format", String(job.input.format)] : []), ...(job.input.notes ? ["--notes", String(job.input.notes)] : []));
-      const state = await runFilmMain(args, env, {
-        signal: ctx.signal,
-        log: (line) => {
-          print(`[${job.id.slice(0, 8)}] ${line}`);
-          const m = /\] (\S+): done$/.exec(line);
-          if (m) ctx.checkpoint({ stage: m[1] }, m[1]).catch(() => {});
-        },
-      });
+      const state = await runFilmMain(args, env, { signal: ctx.signal, log });
       return { status: state?.status ?? null, gaps: state?.gaps?.length ?? 0, out };
     },
     // Render a cleared film: the release gate first (nothing is spent on a blocked film), the master gate after.
     async render(job, ctx) {
-      const run = String(job.input.run);
+      // A cloud film is copied here first; the finished file stays on this machine (nothing is published).
+      const run = job.input.filmId ? await fetchFilm(job, ctx.lease) : String(job.input.run);
       const lines = /** @type {string[]} */ ([]);
       if ((await releaseGate(["--run", run], { print: (l) => lines.push(l) })) !== 0) throw new PermanentError(`Not cleared for release:\n${lines.join("\n")}`);
       const [width, height] = String(job.input.resolution ?? "1920x1080").split("x");
@@ -101,12 +131,17 @@ export async function main(argv, env, deps = {}) {
       queue: { type: "string" }, lang: { type: "string" }, topic: { type: "string" }, minutes: { type: "string" }, format: { type: "string" }, notes: { type: "string" },
       out: { type: "string" }, run: { type: "string" }, resolution: { type: "string" }, steps: { type: "string" }, "step-ms": { type: "string" },
       name: { type: "string" }, kinds: { type: "string" }, concurrency: { type: "string" }, "lease-ms": { type: "string" }, "poll-ms": { type: "string" }, once: { type: "boolean" },
+      api: { type: "string" },
     },
   });
   const lang = values.lang === "bn" ? "bn" : "en";
   const dir = resolve(values.queue ?? join("films", "queue"));
   const leaseMs = Number(values["lease-ms"] ?? 120_000);
-  const queue = createQueue({ store: folderJobStore(dir), defaults: { leaseMs } });
+  // A worker for the cloud studio talks to it over HTTP; everything else uses the queue folder.
+  if (values.api && positionals[0] !== "work") throw new Error("--api is for workers; queue films and renders from the studio.");
+  if (values.api && !env.WORKER_TOKEN) throw new Error("Set WORKER_TOKEN (the studio's worker secret) to take jobs from the studio.");
+  const remote = values.api ? remoteQueue({ api: values.api, token: String(env.WORKER_TOKEN) }) : null;
+  const queue = /** @type {ReturnType<typeof createQueue>} */ (remote ?? createQueue({ store: folderJobStore(dir), defaults: { leaseMs } }));
   const [command, what] = positionals;
 
   if (command === "add") {
@@ -171,7 +206,7 @@ export async function main(argv, env, deps = {}) {
     const stop = () => { if (shutdown.signal.aborted) process.exit(130); print("Stopping: the current jobs are handed back for another worker…"); shutdown.abort(); };
     if (!deps.shutdown) { process.on("SIGINT", stop); process.on("SIGTERM", stop); }
     deps.shutdown?.addEventListener("abort", () => shutdown.abort(), { once: true });
-    const all = handlers(env, print);
+    const all = handlers(env, print, remote);
     const outcomes = await Promise.all(Array.from({ length: concurrency }, (_, i) => runWorker({
       queue,
       worker: { id: `${name}-${process.pid}-${i + 1}`, name: concurrency > 1 ? `${name} #${i + 1}` : name, kinds, capabilities: profile.capabilities, resources: profile.resources },
