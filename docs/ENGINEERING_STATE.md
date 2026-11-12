@@ -307,6 +307,13 @@ no picture is chosen for a Quran film yet, so nothing checks one.
 Each step ends with tests passing, the type check, the build check, a commit
 and a push.
 
+**Owner decision, 12 Nov 2026:** the live Phase 0 Gemini experiment (Tenerife,
+arms A/B) is **skipped for now**. The Gemini key was rejected (HTTP 400 "API key
+not valid") in this session. Nothing ran live; no A-vs-B result exists, so the
+research engine's value over model knowledge stays **unmeasured**. All
+Phase 0 code, gold sheet and readiness docs stay as built; the run can be
+resumed any time with a valid free-tier key. Work continues on the Boss agent.
+
 0. **Owner decisions first** (section 7): deploying, the brain machine,
    `WORKER_TOKEN`, repository privacy.
 1. **First real free run.** On a machine that can download a model: run
