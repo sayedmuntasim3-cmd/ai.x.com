@@ -129,7 +129,7 @@ export async function planVoiceVisuals(o) {
     }
     for (const p of plan) if (!p.assets.length) messages.push(msg("voice.noAsset", { scene: p.sc }));
   }
-  return { markdown, plan, findings, messages, brainUsed, changedByBrain: [...new Set(changed)], media: media ? media.stats : null };
+  return { markdown, plan, findings, messages, brainUsed, changedByBrain: [...new Set(changed)], media: media ? media.stats : null, chapterMedia: media };
 }
 
 /** Living beings, faces and things the documented Quran rules keep off screen (titles and tags are all a non-seeing check has). */

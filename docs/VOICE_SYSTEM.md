@@ -50,3 +50,14 @@ checks them; no model is trusted with them.
 - General STT is weak on Quran recitation; a Quran-tuned model is still needed (matching tolerates slips, but not a bad transcript).
 - No licensed Quran translation is bundled yet; meanings stay a reported gap.
 - Picture choice without a seeing brain uses titles and tags only (`canSee` false): it cannot judge a picture.
+
+## State (12 Nov 2026, verified by running it)
+
+Run: `node local/voice-film.mjs --audio a.mp3 --stt faster-whisper [--script text.txt] [--topic "..."] [--media]`,
+then `node render/render-film.mjs --run voice-runs/a --out film.mp4 --one-track a.mp3 --words voice-runs/a/words.json`.
+
+- Real faster-whisper (small.en) on the LibriVox Gettysburg Address: GitHub Actions run 43270503417 (`voice-stt.yml`, runs on push of STT code); 268 words, first word heard "IV" for "Four". Output kept as `engine/test/fixtures/voice/gettysburg-librivox-whisper.json`; `engine/test/voice-exit.test.mjs` runs steps 2-4 on it.
+- pocketsphinx ran here on an espeak-ng reading: 23% of words right, but with the script, 9 of 10 sentence starts land within 0.13 s of the truth (all within 0.54 s).
+- Live Commons search (`--media`) returned public-domain Gettysburg pictures with licences; files could not be downloaded here (upload.wikimedia.org blocked), so the test render used text cards.
+- One-track render: narration.wav is sample-identical to the recording (resampled to 48 kHz); the film can end up to one frame before the recording's last sample.
+- Not built: upload route, studio switch, brain in the CLI (Gemini key invalid; any `Model` works in `planVoiceVisuals`), picture judging, Quran STT, Uthmani text, licensed meanings.

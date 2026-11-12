@@ -210,6 +210,10 @@ export async function pictures(o) {
   }
   const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({}) : [] });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
+  // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
+  await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
+  await writeFile(join(o.out, "s5-C1.md"), r.markdown + "\n");
+  if (r.chapterMedia) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
   return { ok: r.findings.length === 0, messages: r.messages, problems: r.findings.map((f) => f.detail), gaps: [] };
 }
