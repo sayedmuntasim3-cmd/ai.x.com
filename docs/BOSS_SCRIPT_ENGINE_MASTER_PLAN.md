@@ -1,6 +1,9 @@
 # Boss Script Engine: master development plan
 
-Version 2, 12 Nov 2026 (version 1 the same day; version 2 adds the owner's
+Version 3, 12 Nov 2026: adds §22 Trend intelligence, §23 Cost and provider
+independence, §24 Benchmark and continuous evaluation, Phase 1b, and
+consistency fixes against `docs/BOSSISM_VISION.md` (the canonical vision) and
+`docs/OPENAI_PLATFORM_RESEARCH.md` v2. Version 2 (the same day) added the owner's
 decisions: Gemini free tier for the baseline only, restricted research
 access, the evaluation structure, dynamic token budgets, four gate statuses,
 and the baseline experiment protocol, section 21 and Appendix C). Branch `ccr-2867bb13-8ohb4z`. **Planning only: no
@@ -24,7 +27,9 @@ Ground rules this plan keeps:
 
 1. Evidence, not promises: a capability counts as working only after a
    real-model test (section 18) shows it.
-2. No paid service is required. Claude and Gemini stay optional adapters.
+2. No paid service is required. Claude, Gemini and OpenAI stay optional
+   adapters; paid ones are off by default, capped, and never an automatic
+   fallback (§23).
 3. en-US is the default production language and the US YouTube audience the
    default audience. Arabic is a separate profile. Bangla stays an optional
    profile, not the default.
@@ -33,6 +38,9 @@ Ground rules this plan keeps:
    a recorded justification (section 14).
 5. Nothing is presented as fact without a checked source, and the engine
    says what it could not check.
+6. Providers produce candidates; Bossism decides. A provider's citation is a
+   lead, never verification.
+7. The canonical vision is `docs/BOSSISM_VISION.md`; this plan implements it.
 
 ---
 
@@ -544,13 +552,17 @@ chapter as padding; a 120-minute run completes on a 64k-window brain.
 |---|---|---|
 | 0 | same model in the same conversation | not a review; never used |
 | 1 | same model, fresh context, critic prompt, no writer reasoning | "self-review (same model)"; never called independent |
-| 2 | a different model (another family, or another vendor) | "independent model review" |
+| 1b | a different model from the **same vendor** | "same-vendor review"; never called independent |
+| 2 | a model from a **different vendor and model family** | "independent model review" (still AI evaluation) |
 | 3 | a human reviewer | "human review" |
 
 Policy: the assigner (B4) picks a level-2 critic when one is available
-(e.g. a local writer with Gemini free tier as critic, or two different local
-models run one after the other); otherwise level 1, and the release record
-and the studio say so. Bossism never writes "independent" for level 1.
+(e.g. a local writer with Gemini free tier as critic, two local models of
+different families run one after the other, or, if the owner enables it
+under §23, an OpenAI critic for a Gemini or local writer); otherwise level 1b
+or 1, and the release record and the studio say so. Bossism never writes
+"independent" below level 2, and no AI level is ever presented as human
+review.
 
 ### V2 Rubrics and calibration
 
@@ -672,6 +684,7 @@ assigner uses measured values, not declared ones.
 | Local 70B class | free per token | 48 GB+ GPU memory or 64–128 GB unified memory | better writer or critic |
 | Gemini free tier | free within daily limits; limits and data terms change and must be read by the owner | none | search-grounded research and a level-2 critic |
 | Claude API | paid per token (optional, owner's decision) | none | optional writer or critic |
+| OpenAI API | paid per token; no free API for this project unless the owner has an eligible ChatGPT Pro or Business credit (research report B5) | none | optional cross-vendor critic first (§23.4); estimates in research report §4 |
 | Cloudflare Worker + R2 | free tier for current use | none | already used for the studio and the queue |
 
 Execution time (estimate, to be measured in Phase 0): a 60-minute script
@@ -829,7 +842,8 @@ and time.
   labelled "not independent", or (b) this Claude Code session reading the
   finished script as an outside critic, which is a different model family
   (independence level 2) but uses the owner's Claude Code usage; the owner
-  chooses. The AI critic never sees the human scores, and humans never see
+  chooses. (c) Later, optionally, an OpenAI model as a paid cross-vendor
+  critic, only under the conditions in the research report B12 and §23. The AI critic never sees the human scores, and humans never see
   the AI scores before submitting.
 - **Blind and independent.** Each reader gets the script alone (no engine QA,
   viewer-panel score, gate result or other reader's score), scores every
@@ -910,13 +924,15 @@ parallel.
 |---|---|---|---|
 | **0 Real baseline** (blocking) | owner configures the Gemini free-tier key and the restricted research access (Appendix C); verify both; run the **current** engine, unchanged, on the 3 topics at 10 minutes (section 21); readers score; record/replay fixtures saved | owner approval of Appendix C | 3 baseline records (section 21.4) with Reader 1 scores and Reader 2 scores or "pending"; known failure list; thresholds in sections 14 and 16.1 tuned from measurements |
 | **1 Truth fixes in the current engine** | G7 placeholder and unresolved-marker gate; the four gate statuses (PASS, FAIL, BLOCKED, NOT APPLICABLE with allow-list); `lintNarration` for all formats feeding gates; story gate critical with owner override; Gemini grounding URLs | 0 (can start in parallel) | Ramesh Babu production blocked until its 37 placeholders (10 in narration) are resolved; seeded tests pass; mock suite green |
-| **2 Dossier + registry + executor** | D1 schemas; B2 registry with computed role status; B1 executor running the legacy graph unchanged | 1 | golden test: legacy run identical through the executor; studio role counts equal the registry |
+| **1b Cost controls** (required before any paid adapter) | §23 E1–E4 and E8: budget reservation, dated price registry, provider enable flags with no paid fallback, kill switch, free-path test | 1 | property tests: spend never exceeds caps; unknown model refuses; paid provider never called without its flag |
+| **2 Dossier + registry + executor** | D1 schemas; B2 registry with computed role status; B1 executor running the legacy graph unchanged; §23 E5–E7 | 1 | golden test: legacy run identical through the executor; studio role counts equal the registry |
 | **3 Research v2** | R1–R9, free providers, span verification, completion gate G1–G3 | 2 | on the 3 topics: 100% spans verified, 0 dead URLs, gold-sheet key-fact recall ≥80%, disputes recorded |
 | **4 Claim verification v2** | C1–C5, sentence tags, G4, G5, G8, G15 | 3 | seeded defects: 100% numbers/dates/placeholders, ≥90% overstatements |
 | **5 Critic and calibration** | V1–V3, rubrics, calibration set, independence levels, G9, G16 | 2 (parallel with 3–4) | critic recall measured per brain; level-2 critic working with at least one free pairing |
 | **6 Story v2** | S1–S5, S7, S9, genre profiles, factuality modes, en-US module L1, modular prompts | 4, 5 | beats baseline in ≥70% of blind pairwise judgements on the 3 topics at 30 minutes; G10–G14 pass |
 | **7 Targeted revision** | V4, V5, B5 escalation, up to 3 rounds | 5, 6 | ≥80% of seeded fixable defects fixed with no new critical defect |
 | **8 Long-form** | hierarchical outline, context packs, cross-chapter checks, act-level critic, updated `windowNeeds` | 6, 7 | 60-minute runs on the 3 topics pass all gates; one 120-minute run on a 64k brain |
+| **TI Trend intelligence v1** (§22) | T1–T3, T6, T7 on the existing radar; T4, T5, T8 after 90 days of records | 3 | demand records dated and reproducible; seeded structure copies caught ≥90%; forecasts shown only with backtest error |
 | **9 Supervisor v2** | B3 model-assisted expansions, B4 reassignment and fallback, parallel scheduling | 2, 5 | failure-injection tests pass; parallel chapter reviews cut wall time measurably with identical outputs |
 | **10 More genres** | Roanoke, biography and sleep-story runs; profile tuning | 8 | each genre's gates pass; human scores ≥ the 3 core topics |
 | **11 Arabic profile** | L2 | 8 and an Arabic-qualified brain | native review ≥4/5 fluency; en-US goldens unchanged |
@@ -928,6 +944,9 @@ read-only research access from the cloud environment; Reader 1 the owner,
 Reader 2 an independent US-English reader (pending until named), plus a
 separately labelled AI critic. **Still open:** approval to perform the setup
 in Appendix C, the choice of AI critic (section 18), and Reader 2's name.
+
+The benchmark (§24) is the measure for every phase: Phase 0 is Doc Bench v0;
+Phases 6, 8 and 10 extend it to v1 and v2.
 
 ## 21. Baseline experiment protocol (Phase 0, three 10-minute films)
 
@@ -958,7 +977,10 @@ minute or multi-hour films. Nothing below has been run yet.
    (about 12–25 requests, below); output limit ≥ 32k; context ≥ 128k; Google
    Search grounding on the free tier. Prefer the adapter's default
    (`gemini-2.5-flash`) if it still qualifies, so the baseline tests today's
-   code; otherwise the closest free model, passed as `GEMINI_MODEL`.
+   code; otherwise the closest free model, passed as `GEMINI_MODEL`. Note:
+   official excerpts gathered for the research report did not show
+   `gemini-2.5-flash` among current models and mention a free tier for
+   Gemini 3 Flash preview; this is unverified until step 1 is done.
 4. Record the choice and its reasons in the experiment record. Gemini stays
    an optional adapter; nothing in the plan depends on it after Phase 0.
 
@@ -1049,6 +1071,183 @@ File `docs/evals/2026-11-<dd>-baseline-<slug>.md`:
 3. One run, Tenerife first (best documented, cheapest research), then
    Bhola, then CRISPR; each record written before the next run.
 4. Readers score; records completed; Phase 0 exit review with the owner.
+
+## 22. Trend intelligence
+
+Purpose: choose topics and angles that audiences want **and** that Bossism
+can make better and differently. Signals and decisions belong to Bossism; a
+model may summarise, never decide. Vision: `docs/BOSSISM_VISION.md` §5.
+
+### 22.1 What exists today (code and mock tests only; never run live)
+
+| Piece | Where | Tests |
+|---|---|---|
+| Outlier ranking: views vs the channel's own average, damped for tiny channels, freshness bonus | `engine/src/topic-radar.mjs` `rankOutliers` | `worker/youtube.test.mjs` |
+| YouTube search for outliers in a niche, cached a day in R2; `/api/ideas` | `worker/youtube.mjs` `radarSearch`, `findOutliers`; `worker/index.mjs` | `worker/youtube.test.mjs` |
+| Market desk: proven titles fed to S1 and S7 | `film-run.mjs` `market` stage | `engine/test/film-run.test.mjs` |
+| Title too close to a proven title | `film-run.mjs` `titleTooClose` | `engine/test/film-run.test.mjs` |
+| Originality against the channel's own films | `engine/src/originality.mjs` | `engine/test/originality.test.mjs` |
+| Channel lessons from YouTube Analytics retention | `engine/src/retention.mjs`, `worker/youtube-analytics.mjs` | `retention.test.mjs`, `youtube-analytics.test.mjs` |
+
+Missing: evergreen vs spike, saturation, angle map and gaps, documentary
+feasibility before choosing, structure-level originality, backtesting,
+probabilities with measured error.
+
+### 22.2 Components
+
+| ID | Purpose | Inputs → outputs | Reuse / new | Acceptance (measurable) |
+|---|---|---|---|---|
+| T1 Demand record | one dated record per topic: outliers, outlier ratio, views per day, distinct channels with outliers, upload ages | YouTube Data API results → `trend/demand.json` | reuse `radarSearch`, `rankOutliers`; new record schema | every record carries its data date and query; no record without its source calls logged |
+| T2 Evergreen vs spike | classify demand as evergreen (old outliers still earning) or spike (recent cluster) | T1 history → class + probability | new | backtest calibration error reported (T8); never shown without its probability |
+| T3 Saturation | how crowded the topic and angle already are | recent uploads for the topic and angle → count and trend | new | counts reproducible from logged calls |
+| T4 Angle map and gaps | cluster the angles of leading videos from public titles, descriptions and chapter lists; list angles not yet covered that our research can support | T1 videos + research claims → `trend/angles.json` | new; a model may cluster, code validates that each gap cites ≥3 verified claims | each proposed angle names its supporting claims; no angle copied from a single existing video |
+| T5 Why audiences care | the question and emotional engine behind the demand | T1, T4 → a stated reason | manual's S1 topic score made explicit | critic review; reason must not contradict research |
+| T6 Documentary feasibility | research depth available, visual provability, sensitivity, runtime the evidence supports | quick research probe (R1–R2) → feasibility note | new; uses Master Plan §12 claims-per-minute rule | refuses or narrows runtime when evidence is too thin |
+| T7 Originality guard | no copied title, structure or beat sequence | outline + T1 videos → findings | extend `titleTooClose`, `originality.mjs` to outline beats | seeded copies detected at ≥90% |
+| T8 Backtest | snapshot signals at a past date, compare with what happened 90 days later | stored T1 history → calibration report | new | calibration error published with every forecast |
+
+### 22.3 Rules
+
+- Forecasts are probabilities with a data date and a measured error; **no
+  view count is ever promised**.
+- A trending topic must still pass the research and story gates; trend
+  signals never lower a quality threshold.
+- Only public metadata is used (titles, descriptions, chapter lists,
+  counts); no downloading of other creators' videos or transcripts.
+- Quotas: YouTube Data API calls are free but quota-limited (exact quota and
+  unit costs to re-check); calls are cached and counted per day.
+- Other signals (Wikipedia pageviews, search interest) are optional
+  providers, availability UNVERIFIED; each must be free or owner-approved
+  under §23.
+
+### 22.4 Place in the roadmap
+
+Trend intelligence v1 (T1–T3, T6, T7) follows Phase 3 (research v2), because
+T6 needs the research probe. T4, T5 and T8 follow once enough T1 history
+exists for a backtest (at least 90 days of stored records). Until then the
+studio's existing radar remains the topic tool, labelled as uncalibrated.
+
+## 23. Cost and provider independence
+
+Purpose: every run can complete on free options; paid providers are
+optional, explicit and capped; nothing is spent silently. Vision:
+`docs/BOSSISM_VISION.md` §6. Evidence: `docs/OPENAI_PLATFORM_RESEARCH.md`
+(sections 3–5, B4, B5).
+
+### 23.1 Policy (binding on all components)
+
+1. **No mandatory paid AI.** A full script run must be possible on free
+   options: a local model, or a free tier within its limits.
+2. **Paid providers are off by default**, enabled per project by the owner,
+   with a cap.
+3. **No automatic paid fallback.** When a free provider fails or runs out of
+   quota, the run pauses or degrades with a recorded decision; it never
+   switches to a paid provider on its own.
+4. **No silent spending.** Every paid request is reserved, logged and
+   attributable to a run.
+5. **Provider outputs are candidates; Bossism decides.** No provider citation
+   counts as verification (Master Plan §6–7).
+6. **Honest infrastructure costs.** Compute, storage, hosting, rendering,
+   voice and human review are real costs even when no AI provider is paid
+   (research report §4.4); the platform is not promised to be free in every
+   circumstance.
+
+### 23.2 Current state (from the code)
+
+| Fact | Where |
+|---|---|
+| Budget checked only between stages; a run can overrun by one stage | `film-run.mjs` `budgetUsd`, `BudgetReached` |
+| Gemini priced at $0, so the budget cannot see charges on a billed project | `film-run.mjs` `PRICES` |
+| Claude adapter priced per token | `film-run.mjs` `PRICES`, `worker/anthropic.mjs` |
+| No OpenAI adapter; the OpenAI-compatible path in the local brain is untested against OpenAI | `worker/local-brain.mjs` |
+| Brain choice: `BRAIN=local\|gemini\|claude`, otherwise the first configured (local → Claude → Gemini) | `worker/brain.mjs` `chooseBrain` |
+
+Contradiction resolved here: `chooseBrain` picks Claude automatically when
+its key is set and `BRAIN` is not. That is consistent with policy 3 only
+because Claude is never configured without the owner adding its key; once E3
+exists, an explicit per-project enable replaces "key present means allowed".
+
+### 23.3 Components
+
+| ID | Purpose | Reuse / new | Acceptance (measurable) |
+|---|---|---|---|
+| E1 Budget ledger | reserve worst-case cost before each request (counted input × price + `max_output_tokens` × output price, reasoning included, plus tool calls); refuse if run, day or month cap would be exceeded; settle with reported usage | reuse `record`, `costOf`, `BudgetReached`; new reservation | property tests: spend never exceeds the cap with fake providers reporting any usage up to the reservation; one-stage overrun eliminated |
+| E2 Price registry | prices per provider and model with date and source URL | new; replaces the inline `PRICES` table | unknown model id → refuse to run, never $0; entries older than 30 days produce a warning |
+| E3 Provider enable flags | per project: which providers may run, which are paid, caps | new | a paid provider with no enable flag is never called (test); free→paid fallback impossible (test) |
+| E4 Kill switch | stop before the next request when set; automatic stop on repeated billing or 429 errors | new; uses the existing `signal` stop between stages, extended to every request | stops within one request in tests |
+| E5 Usage and cost report | per run: tokens, money, time, failures per provider and stage | reuse run.json usage | report present for 100% of runs |
+| E6 Lifecycle guard | model ids in configuration with known shutdown dates; startup checks the provider's model list | new | a retired model fails preflight, not mid-run |
+| E7 Data-handling profile | what each provider may receive (e.g. no production manual to a provider whose retention the owner has not accepted) | new | requests that break the profile are refused before sending |
+| E8 Free-path test | CI test that a full mock run plans only free providers when no paid one is enabled; real check in Phase 0 | new | passes on every commit |
+
+### 23.4 Providers in this architecture (all optional)
+
+| Provider | Role it may fill | Condition |
+|---|---|---|
+| Local / open-source | default free route; extraction, critique, writing if qualified (M2) | owner's hardware |
+| Gemini free tier | Phase 0 baseline writer and critic | key per Appendix C; free-tier limits |
+| OpenAI API | optional cross-vendor critic first; writer only if tests justify | paid; conditions in the research report B12 (human baseline scores, seeded-defect set, prepaid $5 with auto-recharge off, project hard limit, no manual sent, payment from Bangladesh works); not approved yet |
+| Claude API | optional writer or critic | paid; owner's decision |
+
+### 23.5 Place in the roadmap
+
+E1–E4 and E8 are **required before any paid adapter is enabled** (new
+Phase 1b). E5–E7 follow with Phase 2 (registry and executor).
+
+## 24. Benchmark and continuous evaluation
+
+Purpose: turn "world-class" into measured evidence and catch regressions.
+Vision: `docs/BOSSISM_VISION.md` §1.
+
+### 24.1 Doc Bench
+
+| Version | Items | Runtimes |
+|---|---|---|
+| v0 (= Phase 0) | Bhola cyclone, CRISPR, Tenerife | 10 min |
+| v1 | v0 + Roanoke (mystery), a biography, a sleep story | 10 and 30 min |
+| v2 | v1 at 60 min + one 120-min item | 60, 120 min |
+| hold-out | 2–3 topics never used while developing, rotated each version | as v1 |
+
+Each item has a frozen brief, a gold fact sheet with known disputes (marked
+AI-drafted until a person checks it), and its genre profile.
+
+### 24.2 Metrics per run
+
+| Kind | Metrics |
+|---|---|
+| Automatic | gate statuses (§14), claims per minute, verified share, unsupported sentences, placeholders, repetition, chronology conflicts, budget misses, tokens, cost, time, failures |
+| Factual | precision and key-fact recall against the gold sheet; disputes recorded |
+| Human | §18 rubric, Reader 1 and Reader 2, blind; pending if a reader is missing |
+| AI evaluation | the same rubric, labelled with model and independence level; never averaged with human scores |
+
+### 24.3 Protocol
+
+- Inputs frozen per item; engine commit, prompt versions, model ids and
+  dates recorded; results in `docs/evals/`.
+- Run the affected items on every change to the script path; the full suite
+  before any claim of improvement, and before calling an engine version
+  ready.
+- Recorded real outputs are replayed in CI (T2 in §18), so code changes
+  are checked without new model calls.
+- Contamination note: models may know famous topics from training; hold-out
+  items and gold-sheet scoring limit the effect.
+
+### 24.4 Regression and release rules
+
+- No version may lower factual precision, raise unsupported sentences, or
+  lower any human dimension mean by more than 0.3 against the previous
+  version on the same items.
+- An engine version is "ready for a runtime" only when every Doc Bench item
+  at that runtime passes all mandatory gates and the human thresholds in §18.
+- Comparisons with other products are made only on this suite, with their
+  outputs obtained legitimately, and are reported with the method; no
+  competitive claim is made otherwise.
+
+### 24.5 Cost of the benchmark
+
+Free-tier or local runs by default. A paid run of the suite needs the
+owner's approval under §23; the research report §4 gives per-script
+estimates.
 
 ## Appendix C: owner setup for the baseline (nothing done yet)
 
@@ -1199,6 +1398,9 @@ Where the two audits differ:
 | V1–V5 | `applyFixes`, viewer panel pattern | `engine/src/review/{critic,rubrics,findings,revise}.mjs`, `engine/test/fixtures/seeded/` |
 | M1, M2 | `worker/brain.mjs` and adapters | `engine/src/models/qualify.mjs`, `docs/evals/` |
 | Prompts | `prompts/1-...full.txt`, `prompts/4-...squad-brains.txt` | `prompts/modules/*.txt` (versioned) |
+| T1–T8 (§22) | `topic-radar.mjs`, `worker/youtube.mjs`, `originality.mjs`, `retention.mjs`, `titleTooClose` | `engine/src/trend/{demand,lifecycle,saturation,angles,feasibility,originality,backtest}.mjs` |
+| E1–E8 (§23) | `record`, `costOf`, `BudgetReached`, `PRICES`, `chooseBrain`, run `signal` | `engine/src/cost/{ledger,prices,providers,killswitch,report,lifecycle,data-profile}.mjs` |
+| Doc Bench (§24) | §21 records, §18 rubric | `docs/evals/`, `engine/test/fixtures/bench/` |
 
 Every new user-facing message goes into `engine/src/messages.mjs` (en + bn),
 and after editing `engine/src/` the studio copy is synced (`npm run sync`),
