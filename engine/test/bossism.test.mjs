@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { AGENTS } from "../src/agent-roster.mjs";
-import { applyRevision, cleared, dependents, GATES_VERSION, masterGate, ownerOverride, parseLedger, preflight, productionGraph, recordDecision, releaseDecision, reviewRun, revisionPlan, understand, windowNeeds } from "../src/bossism.mjs";
+import { applyRevision, cleared, dependents, GATES_VERSION, gateMessage, masterGate, NOT_RUN, ownerOverride, parseLedger, preflight, productionGraph, recordDecision, releaseDecision, reviewRun, revisionPlan, understand, windowNeeds } from "../src/bossism.mjs";
 import { MESSAGES, msg, say } from "../src/messages.mjs";
 import { applyFixes, checkChapter, parseSceneLines } from "../src/scene-lines.mjs";
 import { buildTimeline } from "../src/timeline.mjs";
@@ -107,9 +107,10 @@ test("the finished Ramesh Babu film: its unresolved number markers block release
   assert.ok(review.gates.find((g) => g.id === "research")?.findings.some((f) => f.code === "research.unchecked"));
   assert.equal(v.visual, "block", "no footage was searched");
   assert.equal(review.release.allowed, false);
-  assert.deepEqual(review.release.blockedBy, ["research", "claims", "visual"]);
+  assert.deepEqual(review.release.blockedBy, ["research", "claims", "story", "visual"], "the viewer panel never read it: the story gate could not run");
+  assert.equal(review.gates.find((g) => g.id === "story")?.status, "BLOCKED");
   assert.equal(review.gatesVersion, GATES_VERSION);
-  assert.match(review.release.message.bn, /রিসার্চ, দাবি, ছবি/, "the Bengali message names the gates in Bengali");
+  assert.match(review.release.message.bn, /রিসার্চ, দাবি, গল্প, ছবি/, "the Bengali message names the gates in Bengali");
 });
 
 /** A small finished run in memory, for the gates' findings. */
@@ -474,6 +475,33 @@ test("C2: an edit that drops or breaks a tag is caught by the chapter check, so 
 test("C2: an invented story needs no claim tags, and a review by the previous gates clears nothing", async () => {
   const ledger = ["| **C01** | A wage of the time | 3 shillings | none |", "| **C02** | The town | real | none |"];
   assert.deepEqual((await claimsGate(claimRun({ header: "| ID | Detail | Value | Sources |", ledger, narr: ["He earned three shillings.", "It rained in March."] }), STORY)).codes, []);
-  assert.equal(GATES_VERSION, 3);
+  assert.equal(GATES_VERSION, 4);
   assert.equal(cleared({ at: "2026-01-01T00:00:00.000Z", film: "f", gatesVersion: 2, gates: [], release: releaseDecision([]) }, []).ok, false);
+});
+
+// ---------------------------------------------------------------- gate statuses: PASS, FAIL, BLOCKED, NOT APPLICABLE
+
+test("every gate reports PASS, FAIL, BLOCKED or NOT APPLICABLE; a gate that could not run blocks release", async () => {
+  const empty = await reviewRun({ store: memoryStore({}), film: { id: "empty", topic: "x", durationSeconds: 600, versionId: "en-US", formatId: null } });
+  const s = Object.fromEntries(empty.gates.map((g) => [g.id, g.status]));
+  assert.deepEqual(s, { research: "BLOCKED", claims: "BLOCKED", script: "BLOCKED", story: "BLOCKED", visual: "BLOCKED", rights: "PASS", packaging: "BLOCKED" }, "nothing to read is never a pass; no pictures used means no licence is missing");
+  assert.equal(empty.scope, "film");
+  for (const g of empty.gates) for (const f of g.findings) if (NOT_RUN.has(f.code)) assert.equal(f.severity, "block", `${f.code} blocks`);
+  const run = await claimsGate(claimRun({ narr: ["The mill opened in 1790. {C01}", "It closed. {C09}"] }));
+  assert.equal(run.gate.status, "FAIL", "a check that ran and found a defect is a FAIL");
+  assert.equal((await claimsGate(claimRun())).gate.status, "PASS");
+  const story = run.review.gates.find((g) => g.id === "story");
+  assert.equal(story?.status, "BLOCKED", "no viewer panel: the story gate had no evidence");
+  assert.ok(run.review.release.blockedBy.includes("story"));
+});
+
+test("release: BLOCKED blocks whatever its verdict says, NOT APPLICABLE does not, and each status has its message", () => {
+  const g = (/** @type {any} */ x) => ({ critical: false, findings: [], evidence: {}, ...x });
+  assert.deepEqual(releaseDecision([g({ id: "visual", verdict: "revise", status: "BLOCKED" })]).blockedBy, ["visual"]);
+  assert.equal(releaseDecision([g({ id: "visual", verdict: "pass", status: "NOT APPLICABLE", justification: "x" }), g({ id: "story", verdict: "pass", status: "PASS" })]).allowed, true);
+  assert.equal(gateMessage(g({ id: "story", verdict: "block", status: "BLOCKED" })).code, "gate.notRun");
+  assert.match(gateMessage(g({ id: "visual", verdict: "pass", status: "NOT APPLICABLE" })).en, /not applicable \(a script-only review/);
+  assert.match(gateMessage(g({ id: "visual", verdict: "pass", status: "NOT APPLICABLE" })).bn, /প্রযোজ্য নয়/);
+  assert.equal(gateMessage(g({ id: "story", verdict: "revise", status: "FAIL" })).code, "gate.revise");
+  assert.equal(gateMessage(g({ id: "story", verdict: "pass" })).code, "gate.pass", "a review saved before statuses still prints");
 });

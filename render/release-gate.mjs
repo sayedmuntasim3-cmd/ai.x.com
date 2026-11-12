@@ -17,7 +17,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { cleared, masterGate } from "../engine/src/bossism.mjs";
+import { cleared, gateMessage, masterGate } from "../engine/src/bossism.mjs";
 import { say } from "../engine/src/messages.mjs";
 
 /** @param {string} file @returns {Promise<number | null>} seconds, from the file itself */
@@ -77,7 +77,7 @@ export async function main(argv, deps = {}) {
     return 1;
   }
   const decision = cleared(review, (await read("decisions.json")) ?? []);
-  for (const g of review.gates ?? []) print(both({ code: `gate.${g.verdict}`, params: { gate: g.id } }));
+  for (const g of review.gates ?? []) print(both(gateMessage(g)));
   if (decision.ok) {
     print(decision.by === "owner" ? "Cleared by the owner's approval.\nমালিকের অনুমতিতে ছাড়পত্র দেওয়া হয়েছে।" : both(review.release.message));
     return 0;

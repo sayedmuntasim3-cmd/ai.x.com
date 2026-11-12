@@ -10,6 +10,7 @@
  *   options: --topic <text> --minutes <1-300> --format <id | auto> --notes <text>
  *            --out <folder> (default films/<topic slug>) --budget <USD, for a paid brain>
  *            --no-edit --no-viewers --lang bn (messages in Bengali) --max-revisions <0-3>
+ *            --script-only (research, script, QA and packaging; no pictures, never cleared for release)
  *   resume:  node local/run-film.mjs --out films/<slug>   (finished stages are kept)
  *   approve: node local/run-film.mjs --out films/<slug> --approve "why it may be released"
  *
@@ -32,7 +33,7 @@ import { parseArgs } from "node:util";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { researchProviders } from "../engine/src/research-desk.mjs";
-import { cleared, ownerOverride, preflight, productionGraph, understand } from "../engine/src/bossism.mjs";
+import { cleared, gateMessage, ownerOverride, preflight, productionGraph, understand } from "../engine/src/bossism.mjs";
 import { say } from "../engine/src/messages.mjs";
 import { superviseFilm } from "../engine/src/supervise.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
@@ -130,7 +131,7 @@ export async function main(argv, env, deps = {}) {
     options: {
       topic: { type: "string" }, minutes: { type: "string" }, format: { type: "string" }, notes: { type: "string" },
       out: { type: "string" }, budget: { type: "string" }, "no-edit": { type: "boolean" }, "no-viewers": { type: "boolean" },
-      lang: { type: "string" }, "max-revisions": { type: "string" }, approve: { type: "string" },
+      lang: { type: "string" }, "max-revisions": { type: "string" }, approve: { type: "string" }, "script-only": { type: "boolean" },
     },
   });
   const lang = values.lang === "bn" ? "bn" : "en";
@@ -158,7 +159,7 @@ export async function main(argv, env, deps = {}) {
     print(`Resuming "${film.topic}" in ${out}`);
   } else {
     if (!values.topic) throw new Error('Give a topic: --topic "..." (or --out <folder> to resume a film).');
-    const made = newFilm({ topic: values.topic, minutes: values.minutes ?? "10", formatId: values.format, notes: values.notes }, slug(values.topic));
+    const made = newFilm({ topic: values.topic, minutes: values.minutes ?? "10", formatId: values.format, notes: values.notes, scriptOnly: values["script-only"] === true }, slug(values.topic));
     if (!made.ok) throw new Error(made.error);
     film = made.film;
     await store.put("film.json", JSON.stringify({ ...film, createdAt: new Date().toISOString() }, null, 1));
@@ -179,12 +180,12 @@ export async function main(argv, env, deps = {}) {
   print(`\n${state.status}${state.costUsd ? `, $${state.costUsd} spent` : ""}. Files in ${out}`);
   for (const gap of state.gaps) print(`  GAP ${gap}`);
   for (const g of review.gates) {
-    print(`  ${tell({ code: `gate.${g.verdict}`, params: { gate: g.id } })}`);
+    print(`  ${tell(gateMessage(g))}`);
     for (const f of g.findings) print(`    ${f.severity}: ${tell(f.message)}`);
   }
   print(`\n${tell(review.release.message)}`);
   if (cleared(review, JSON.parse((await store.get("decisions.json")) ?? "[]")).ok) print(`\nRender it:\n  node render/render-film.mjs --run ${out} --out ${join(out, "film.mp4")}`);
-  else print(`\nTo release it anyway, with your reason on record:\n  node local/run-film.mjs --out ${out} --approve "why"`);
+  else if (review.scope !== "script") print(`\nTo release it anyway, with your reason on record:\n  node local/run-film.mjs --out ${out} --approve "why"`);
   return state;
 }
 

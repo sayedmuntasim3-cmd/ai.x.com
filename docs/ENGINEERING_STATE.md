@@ -26,7 +26,8 @@ owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
 
-- Tests: **173 engine + 73 platform = 246, all passing** (`npm test`); strict
+- Tests (third session, 12 Nov 2026): **197 engine + 73 platform = 270, all passing** after `npm ci` at the
+  root (a fresh container has no root `node_modules`). Earlier: 173 + 73 = 246; strict
   JSDoc type check passes (`cd engine && npm run typecheck`); Cloudflare build
   check passes (`npm run check`). Before this session: 141 + 48 = 189.
 - Size: about 54,600 tracked lines, of which about **16,500 are application
@@ -111,6 +112,32 @@ policy). Both are tested against fixtures that follow the documented formats.
    window cannot hold the whole film.
 6. **Bilingual messages:** every job, plan, gate and decision message in
    English and Bengali, checked by a test.
+
+## 4c. What the third session changed (12 Nov 2026)
+
+Plans: `docs/BOSSISM_VISION.md` (canonical vision), `docs/BOSS_SCRIPT_ENGINE_MASTER_PLAN.md` (v3),
+`docs/OPENAI_PLATFORM_RESEARCH.md` (v2; desk research only), two audits. Code (all mock-tested, never run
+with a real model):
+
+- **Claims gate** (`bossism.mjs`): unresolved markers (`[C12 low]`, `[TBD]` ...) block; a marker replaced
+  by a number while the ledger has no value blocks; cited claims need evidence the research kept, a FACT
+  needs a confirmed page, a bare FACT rated low blocks. The Ramesh Babu film is now blocked by it (43 markers).
+- **C2, sentence claim tags** (`scene-lines.mjs`): every NARR sentence of a true-story film ends with
+  `{C01}` or `{N}`; tags are never spoken. S5 is told; `checkChapter` reports missing tags so repairs fix
+  them and QA/viewer fixes that drop one are reverted; the gate also blocks `{N}` sentences with numbers,
+  dates or new names, UNKNOWN claims stating values, and on-screen numbers with no claim. A ledger row that
+  names research fact IDs uses exactly those facts; a shared page is "ambiguous" for a FACT.
+- **Gate statuses**: every gate reports PASS, FAIL, BLOCKED or NOT APPLICABLE; a gate that could not run
+  (no research check, no ledger, no viewer panel, no pictures ...) blocks. **Script-only films**
+  (`newFilm({ scriptOnly: true })`, `local/run-film.mjs --script-only`) skip the edit and pictures; their
+  visual and rights gates are NOT APPLICABLE with the reason; their review never clears a film for release.
+- Reviews carry `GATES_VERSION` (now 4): a review by older gates clears nothing and is redone.
+
+Deliberately not done: making the story gate critical (its signals today are the writer's own model and a
+regex; that waits for an independent critic), and gating on `lintNarration` (on the Ramesh Babu script it
+only flags three sentences starting with "a"/"the": too weak to block on).
+
+Phase 0 is blocked: the owner declined the research-access environment on 12 Nov 2026; no Gemini key is set.
 
 ## 5. Role entries corrected
 

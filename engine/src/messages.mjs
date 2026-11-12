@@ -46,6 +46,8 @@ export const MESSAGES = Object.freeze({
   "plan.noAutoRender": { en: () => "GitHub is not connected: the film is not rendered automatically.", bn: () => "GitHub সংযুক্ত নেই: ফিল্ম নিজে থেকে রেন্ডার হবে না।" },
 
   // Bossism: gates
+  "gate.notRun": { en: (p) => `${names(p.gate, "en")}: could not run (BLOCKED), so it blocks release.`, bn: (p) => `${names(p.gate, "bn")}: চালানো যায়নি (BLOCKED), তাই প্রকাশ আটকে আছে।` },
+  "gate.naScript": { en: (p) => `${names(p.gate, "en")}: not applicable (a script-only review has no pictures to check; it never clears a film for release).`, bn: (p) => `${names(p.gate, "bn")}: প্রযোজ্য নয় (শুধু স্ক্রিপ্টের রিভিউতে যাচাই করার মতো ছবি নেই; এটা কখনো ফিল্ম প্রকাশের ছাড়পত্র দেয় না)।` },
   "gate.pass": { en: (p) => `${names(p.gate, "en")}: passed.`, bn: (p) => `${names(p.gate, "bn")}: পাস করেছে।` },
   "gate.revise": { en: (p) => `${names(p.gate, "en")}: needs revision.`, bn: (p) => `${names(p.gate, "bn")}: সংশোধন দরকার।` },
   "gate.block": { en: (p) => `${names(p.gate, "en")}: blocked.`, bn: (p) => `${names(p.gate, "bn")}: আটকে দেওয়া হয়েছে।` },
@@ -92,6 +94,8 @@ export const MESSAGES = Object.freeze({
 
   // Bossism: decisions
   "release.stale": { en: () => "This review was made by an older version of the checks, so it clears nothing. Review the film again before release.", bn: () => "এই রিভিউ চেকের পুরোনো সংস্করণে করা, তাই এটি কোনো ছাড়পত্র দেয় না। প্রকাশের আগে ফিল্মটি আবার রিভিউ করুন।" },
+  "script.approved": { en: () => "Script approved by every gate that applies. This is a script-only review: the film still needs its pictures and a full review before any release.", bn: () => "প্রযোজ্য সব gate স্ক্রিপ্টটি অনুমোদন করেছে। এটা শুধু স্ক্রিপ্টের রিভিউ: যেকোনো প্রকাশের আগে ফিল্মটির ছবি আর পূর্ণ রিভিউ লাগবে।" },
+  "script.blocked": { en: (p) => `Script not approved: ${names(p.gates, "en")}. This is a script-only review; it never clears a film for release.`, bn: (p) => `স্ক্রিপ্ট অনুমোদিত হয়নি: ${names(p.gates, "bn")}। এটা শুধু স্ক্রিপ্টের রিভিউ; এটা কখনো ফিল্ম প্রকাশের ছাড়পত্র দেয় না।` },
   "release.allowed": { en: () => "Every critical check passed: the film may be rendered and released.", bn: () => "সব গুরুত্বপূর্ণ যাচাই পাস করেছে: ফিল্মটি রেন্ডার ও প্রকাশ করা যাবে।" },
   "release.blocked": { en: (p) => `Release blocked by: ${names(p.gates, "en")}. Fix these or approve the release yourself, with a reason.`, bn: (p) => `প্রকাশ আটকে দিয়েছে: ${names(p.gates, "bn")}। এগুলো ঠিক করুন, অথবা কারণ লিখে নিজে প্রকাশের অনুমতি দিন।` },
   "release.override": { en: (p) => `The owner approved the release despite: ${names(p.gates, "en")}. Reason: ${p.reason}`, bn: (p) => `${names(p.gates, "bn")} থাকা সত্ত্বেও মালিক প্রকাশের অনুমতি দিয়েছেন। কারণ: ${p.reason}` },

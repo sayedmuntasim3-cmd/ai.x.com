@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { BudgetReached, estimateRun, newFilm, runFilm, validateChapterPlan } from "../src/film-run.mjs";
 import { applyFixes, checkChapter, checkFilm, countWords, toSeconds } from "../src/scene-lines.mjs";
-import { productionGraph, understand } from "../src/bossism.mjs";
+import { cleared, ownerOverride, productionGraph, understand } from "../src/bossism.mjs";
 import { superviseFilm } from "../src/supervise.mjs";
 
 const USA = new URL("../../productions/ramesh-babu/USA/", import.meta.url);
@@ -239,6 +239,31 @@ test("Bossism sends a weak opening back with notes, redoes only what depends on 
   assert.equal(decisions[2].gates.story, "pass", "the second review finds the opening fixed");
   const review = JSON.parse(store.m.get("review.json"));
   assert.deepEqual(review.release.blockedBy.sort(), ["research", "visual"], "still blocked for what this test never connected: the source desk and footage");
+});
+
+test("a script-only film stops at the script: no edit or pictures, visual and rights NOT APPLICABLE with the reason, never cleared for release", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2, scriptOnly: true }, "script-only");
+  assert.ok(made.ok && made.film.scriptOnly === true);
+  assert.equal(newFilm({ topic: "The old mill", minutes: 2 }, "x").ok && "scriptOnly" in /** @type {any} */ (newFilm({ topic: "The old mill", minutes: 2 }, "x")).film, false, "an ordinary film carries no flag");
+  const model = scriptedModel();
+  const store = memoryStore();
+  const { review } = await superviseFilm({ film: made.film, store, maxRevisions: 0, runOnce: () => runFilm({ film: made.film, manual: "M", model, store, media: { providers: [/** @type {any} */ ({ id: "never", search: async () => { throw new Error("a script-only film searched for pictures"); } })] } }) });
+  assert.ok(!model.calls.some((c) => c.startsWith("edit:") || c.startsWith("media:")), "no edit plan and no picture search");
+  assert.ok(model.calls.includes("s7"), "packaging still runs");
+  assert.equal(review.scope, "script");
+  const byId = Object.fromEntries(review.gates.map((g) => [g.id, g]));
+  for (const id of ["visual", "rights"]) {
+    assert.equal(byId[id].status, "NOT APPLICABLE");
+    assert.match(String(byId[id].justification), /script-only review/);
+  }
+  assert.ok(review.gates.every((g) => ["PASS", "FAIL", "BLOCKED", "NOT APPLICABLE"].includes(String(g.status))), "every gate reports one of the four statuses");
+  assert.equal(byId.research.status, "BLOCKED", "this test connected no source desk: the research gate could not run");
+  assert.equal(review.release.allowed, false, "a script-only review never allows release");
+  assert.equal(review.release.scriptApproved, false);
+  assert.ok(review.release.blockedBy.includes("research") && !review.release.blockedBy.includes("visual"), "not-applicable gates do not block; gates that could not run do");
+  assert.equal(review.release.message.code, "script.blocked");
+  assert.deepEqual(cleared({ ...review, release: { ...review.release, allowed: true } }, []), { ok: false, by: null, scriptOnly: true }, "even a forged allowed flag clears nothing");
+  assert.equal((await ownerOverride(memoryStore(), review, "I checked the pictures myself, honestly.")).ok, false, "the owner cannot release a film whose pictures were never chosen");
 });
 
 test("a brain whose window cannot hold the whole film gets QA chapter by chapter, and the run says so", async () => {

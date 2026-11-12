@@ -46,7 +46,7 @@ export const PRICES = Object.freeze({
 export const WEB_SEARCH_USD = 0.01;
 
 /**
- * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string, formatId?: string | null, saving?: boolean }} Film
+ * @typedef {{ id: string, topic: string, durationSeconds: number, versionId: string, allowAi?: boolean, notes?: string, formatId?: string | null, saving?: boolean, scriptOnly?: boolean }} Film  scriptOnly: research, script and packaging only; no pictures, edit or release
  * @typedef {{ text: string, cache?: boolean, image?: string }} Block  image: an https image URL; text is ignored then
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number, batch?: number }} Usage
@@ -63,7 +63,7 @@ export const WEB_SEARCH_USD = 0.01;
  * Validate a new film request. formatId picks one of the format presets
  * (formats.mjs: motivational life story, dramatized story, history epic ...);
  * "auto" lets the topic choose; none keeps the general documentary.
- * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown, saving?: unknown }} input
+ * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown, saving?: unknown, scriptOnly?: unknown }} input
  * @param {string} id
  * @returns {{ ok: true, film: Film } | { ok: false, error: string }}
  */
@@ -82,7 +82,9 @@ export function newFilm(input, id) {
   const allowAi = typeof input.allowAi === "boolean" ? input.allowAi : format?.mode === "story";
   // Half-price mode (Batch API): same model and quality, slower; the owner chooses per film.
   const saving = input.saving === true;
-  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null, saving } };
+  // A script-only film (for script tests and baselines) never reaches pictures, render or release.
+  const scriptOnly = input.scriptOnly === true;
+  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null, saving, ...(scriptOnly ? { scriptOnly } : {}) } };
 }
 
 /**
@@ -721,7 +723,8 @@ export async function runFilm(o) {
     }
 
     // The Edit Director: the edit on top of the script, per chapter, checked in code.
-    if (o.edit !== false) {
+    // A script-only film stops at the script: no edit plan and no pictures.
+    if (o.edit !== false && !film.scriptOnly) {
       for (const c of plan.chapters) {
         await stage(`edit:${c.id}`, async () => {
           const markdown = await read(`s5-${c.id}.md`);
@@ -744,7 +747,7 @@ export async function runFilm(o) {
 
     // Media: free stock footage for every shot, in film order, so no clip
     // repeats within 10 minutes across chapters (earlier picks are reloaded).
-    if (o.media?.providers.length) {
+    if (o.media?.providers.length && !film.scriptOnly) {
       const providers = o.media.providers;
       const history = createUseHistory();
       for (const c of plan.chapters) {
@@ -763,7 +766,7 @@ export async function runFilm(o) {
         const saved = await store.get(key);
         if (saved) history.load(JSON.parse(saved));
       }
-    } else if (o.media) {
+    } else if (o.media && !film.scriptOnly) {
       state.media = "skipped: no PEXELS_API_KEY or PIXABAY_API_KEY";
     }
 

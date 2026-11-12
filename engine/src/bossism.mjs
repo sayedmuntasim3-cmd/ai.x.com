@@ -35,8 +35,9 @@ import { checkFilm, factualSignals, parseSceneLines } from "./scene-lines.mjs";
  *   roles: string[], needs: Need[], optional: Need[], parallelSafe: boolean }} StageNode
  * @typedef {{ system: System, wired: boolean, nodes: StageNode[] }} Graph
  * @typedef {{ code: string, severity: "block" | "revise" | "note", message: Msg, target?: string, note?: string }} Finding
- * @typedef {{ id: string, verdict: "pass" | "revise" | "block", critical: boolean, findings: Finding[], evidence: Record<string, unknown> }} Gate
- * @typedef {{ at: string, film: string, gatesVersion?: number, gates: Gate[], release: { allowed: boolean, blockedBy: string[], message: Msg } }} Review
+ * @typedef {"PASS" | "FAIL" | "BLOCKED" | "NOT APPLICABLE"} GateStatus
+ * @typedef {{ id: string, verdict: "pass" | "revise" | "block", status?: GateStatus, justification?: string, critical: boolean, findings: Finding[], evidence: Record<string, unknown> }} Gate
+ * @typedef {{ at: string, film: string, gatesVersion?: number, scope?: "film" | "script", gates: Gate[], release: { allowed: boolean, blockedBy: string[], message: Msg, scriptApproved?: boolean } }} Review
  */
 
 /** Thresholds, in one place so they are visible and tested. */
@@ -56,9 +57,11 @@ export const LIMITS = Object.freeze({
  * The version of the gates. A review made by older gates cannot clear a film:
  * it is reviewed again (2: the claims gate blocks unresolved markers, guessed
  * values and claims without evidence; 3: every narrated sentence of a true-story
- * film is linked to its claims, and evidence is matched to the claim it supports).
+ * film is linked to its claims, and evidence is matched to the claim it supports;
+ * 4: every gate reports PASS, FAIL, BLOCKED or NOT APPLICABLE, and a gate that
+ * could not run blocks).
  */
-export const GATES_VERSION = 3;
+export const GATES_VERSION = 4;
 
 /** Gates whose failure stops a release; the others ask for revision and are listed. */
 export const CRITICAL_GATES = Object.freeze(["research", "claims", "script", "rights", "master"]);
@@ -247,7 +250,38 @@ async function readJson(store, key) {
 /** @param {Finding[]} findings @param {string} id @param {Record<string, unknown>} evidence @returns {Gate} */
 function gate(id, findings, evidence) {
   const verdict = findings.some((f) => f.severity === "block") ? "block" : findings.some((f) => f.severity === "revise") ? "revise" : "pass";
-  return { id, verdict, critical: CRITICAL_GATES.includes(id), findings, evidence };
+  // A gate that had nothing to read did not run: BLOCKED, never PASS. Otherwise a finding that asks for work is a FAIL.
+  const status = findings.some((f) => NOT_RUN.has(f.code)) ? "BLOCKED" : verdict === "pass" ? "PASS" : "FAIL";
+  return { id, verdict, status: /** @type {GateStatus} */ (status), critical: CRITICAL_GATES.includes(id), findings, evidence };
+}
+
+/** Findings that mean the gate's evidence does not exist, so the gate could not run. Each is a block. */
+export const NOT_RUN = new Set(["research.unchecked", "claims.noLedger", "script.missing", "story.noScript", "story.notRead", "visual.none", "packaging.missing", "master.missing"]);
+
+/**
+ * The only cases where a gate is NOT APPLICABLE, with the reason recorded on the gate.
+ * Any other gate applies; one that cannot run is BLOCKED.
+ */
+export const NOT_APPLICABLE = Object.freeze({
+  script: Object.freeze({
+    visual: "A script-only review: no pictures are chosen in this run, so there are no pictures to judge. Such a review never clears a film for rendering or release.",
+    rights: "A script-only review: no pictures are used in this run, so there are no licences or credits to check. Such a review never clears a film for rendering or release.",
+  }),
+});
+
+/** @param {string} id @param {string} justification @returns {Gate} */
+function notApplicable(id, justification) {
+  return { id, verdict: "pass", status: "NOT APPLICABLE", justification, critical: CRITICAL_GATES.includes(id), findings: [], evidence: {} };
+}
+
+/**
+ * The message for a gate's status, for logs and the release gate.
+ * @param {Gate} g
+ */
+export function gateMessage(g) {
+  if (g.status === "NOT APPLICABLE") return msg("gate.naScript", { gate: g.id });
+  if (g.status === "BLOCKED") return msg("gate.notRun", { gate: g.id });
+  return msg(`gate.${g.verdict}`, { gate: g.id });
 }
 
 /** Normalise a claim for comparing facts: lower case, no punctuation or digits. @param {string} s */
@@ -665,7 +699,8 @@ export async function reviewRun({ store, film }) {
     const stay = Number(viewer?.stayScore);
     // A gate with nothing to judge does not pass: there is no story yet.
     if (!Object.values(chapters).some(Boolean)) f.push({ code: "story.noScript", severity: "block", message: msg("story.noScript") });
-    if (!viewer) f.push({ code: "story.notRead", severity: "note", message: msg("story.notRead") });
+    // Not read is not passed: the gate had no evidence (redoing the run without the panel would not help, so no revision target).
+    if (!viewer) f.push({ code: "story.notRead", severity: "block", message: msg("story.notRead") });
     else if (Number.isFinite(stay) && stay < LIMITS.stayScore) {
       const leaves = (Array.isArray(viewer.leaves) ? viewer.leaves : []).slice(0, 6).map((/** @type {any} */ l) => `${l.scene}: ${l.viewer} leaves (${l.reason})`).join("; ");
       f.push({ code: "story.lowStay", severity: "revise", message: msg("story.lowStay", { score: stay, why: String(viewer.why ?? "").slice(0, 160) }), target: `s5:${first}`, note: `A cold panel of target viewers would leave the opening: ${leaves || viewer.why}. Rewrite the opening scenes so they would stay, keeping every fact and the scene times.` });
@@ -683,7 +718,9 @@ export async function reviewRun({ store, film }) {
 
   // 5. Pictures: every shot has a fitting licensed picture; what was not checked by eye is said.
   // 6. Rights: every picture used has an acceptable licence record, and every credit it needs is in the description.
-  {
+  // A script-only film has no pictures: both gates are NOT APPLICABLE, with the reason, and its review clears nothing for release.
+  if (film.scriptOnly) gates.push(notApplicable("visual", NOT_APPLICABLE.script.visual), notApplicable("rights", NOT_APPLICABLE.script.rights));
+  else {
     /** @type {Finding[]} */
     const visual = [];
     /** @type {Finding[]} */
@@ -739,7 +776,12 @@ export async function reviewRun({ store, film }) {
     gates.push(gate("packaging", f, { originality: originality?.verdict ?? null }));
   }
 
-  return { at: new Date().toISOString(), film: film.id, gatesVersion: GATES_VERSION, gates, release: releaseDecision(gates) };
+  if (film.scriptOnly) {
+    // The script's own decision; the film itself can never be released from it.
+    const d = releaseDecision(gates);
+    return { at: new Date().toISOString(), film: film.id, gatesVersion: GATES_VERSION, scope: "script", gates, release: { allowed: false, scriptApproved: d.allowed, blockedBy: d.blockedBy, message: d.allowed ? msg("script.approved") : msg("script.blocked", { gates: d.blockedBy.join(",") }) } };
+  }
+  return { at: new Date().toISOString(), film: film.id, gatesVersion: GATES_VERSION, scope: "film", gates, release: releaseDecision(gates) };
 }
 
 /**
@@ -748,7 +790,8 @@ export async function reviewRun({ store, film }) {
  * @param {Gate[]} gates
  */
 export function releaseDecision(gates) {
-  const blockedBy = gates.filter((g) => g.verdict === "block" || (g.critical && g.verdict === "revise")).map((g) => g.id);
+  // A gate that could not run blocks like a failed one; a NOT APPLICABLE gate carries its reason and does not block.
+  const blockedBy = gates.filter((g) => g.status === "BLOCKED" || g.verdict === "block" || (g.critical && g.verdict === "revise")).map((g) => g.id);
   return {
     allowed: blockedBy.length === 0,
     blockedBy,
@@ -856,6 +899,7 @@ export function verdicts(gates) {
 export async function ownerOverride(store, review, reason) {
   const why = String(reason ?? "").trim();
   if (review.gatesVersion !== GATES_VERSION) return { ok: /** @type {const} */ (false), error: "This review was made by an older version of the checks. Review the film again before approving its release." };
+  if (review.scope === "script") return { ok: /** @type {const} */ (false), error: "This is a script-only review: its pictures were never chosen or checked. Make the full film before approving a release." };
   if (why.length < 10) return { ok: /** @type {const} */ (false), error: "Write the reason for releasing a film that failed its checks (at least 10 characters)." };
   const entry = await recordDecision(store, { actor: "owner", action: "release-override", message: msg("release.override", { gates: review.release.blockedBy.join(","), reason: why.slice(0, 500) }), gates: verdicts(review.gates), reason: why.slice(0, 500) });
   return { ok: /** @type {const} */ (true), entry };
@@ -870,6 +914,8 @@ export function cleared(review, decisions) {
   if (!review) return { ok: false, by: null };
   // A review by older gates clears nothing, not even with an earlier approval: the film is reviewed again.
   if (review.gatesVersion !== GATES_VERSION) return { ok: false, by: null, stale: true };
+  // A script-only review never clears a film: its pictures were not chosen.
+  if (review.scope === "script") return { ok: false, by: null, scriptOnly: true };
   if (review.release.allowed) return { ok: true, by: "bossism" };
   const override = (decisions ?? []).filter((d) => d.actor === "owner" && d.action === "release-override" && d.at >= review.at).pop();
   return override ? { ok: true, by: "owner" } : { ok: false, by: null };
