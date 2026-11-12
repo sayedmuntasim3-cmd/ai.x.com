@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { folderStore, guardedFetch, main, slug } from "./run-film.mjs";
+import { callLedger, folderStore, GEMINI_MAX_CALLS, guardedFetch, main, slug } from "./run-film.mjs";
 
 test("the local runner keeps a film in a folder, says what the brain can do, and resumes from the folder", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "zupona-local-"));
@@ -98,4 +98,66 @@ test("a paid brain never runs without a hard cap, and a STOP file stops the run 
   assert.equal(calls, 0, "stopped before the first call");
   await assert.rejects(main(["--out", out], { ZUPONA_STOP: "1" }, { model: free, log: () => {} }), /ZUPONA_STOP=1/);
   assert.equal(calls, 0);
+});
+
+test("the request cap stops a run before the call that would pass it, counts across resumes, and every call is logged as evidence", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-cap-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  let calls = 0;
+  const free = { name: "local-test", price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: async () => { calls += 1; return { text: "ANGLE: x", stopReason: "end_turn", usage: { input_tokens: 5, output_tokens: 2 } }; } };
+  const out = join(dir, "a");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "1"], {}, { model: free, log: () => {} }), /request cap of 1 is reached/);
+  assert.equal(calls, 1);
+  const log = readFileSync(join(out, "calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(log.length, 1);
+  assert.equal(log[0].stage, "s01");
+  assert.equal(log[0].requests, 1);
+  assert.equal(log[0].manualIncluded, true, "the log says the production manual was sent");
+  assert.match(log[0].sentSha256, /^[0-9a-f]{64}$/);
+  assert.match(log[0].replySha256, /^[0-9a-f]{64}$/);
+  // Resuming with the same cap makes no call: the count is kept in the folder.
+  await assert.rejects(main(["--out", out, "--max-calls", "1"], {}, { model: free, log: () => {} }), /request cap of 1 is reached/);
+  assert.equal(calls, 1);
+  await assert.rejects(main(["--out", out, "--max-calls", "0"], {}, { model: free, log: () => {} }), /--max-calls must be a whole number above 0/);
+});
+
+test("Gemini is capped at 40 requests by default, retries count, and Google's response id and model version are logged", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-gem-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  /** @type {string[]} */
+  const hosts = [];
+  const brainFetch = /** @type {typeof fetch} */ (async (input) => {
+    hosts.push(new URL(String(input)).hostname);
+    return Response.json({ responseId: "r-1", modelVersion: "gemini-test-001", candidates: [{ content: { parts: [{ text: "ANGLE: x" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 3 } });
+  });
+  /** @type {string[]} */
+  const lines = [];
+  const out = join(dir, "g");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "1"], { BRAIN: "gemini", GEMINI_API_KEY: "dummy", GEMINI_SEARCH: "off" }, { brainFetch, log: (l) => lines.push(l) }), /request cap of 1/);
+  assert.deepEqual(hosts, ["generativelanguage.googleapis.com"]);
+  assert.ok(lines.some((l) => /research through the code desk/.test(l)), "arm B: no Google Search");
+  const entry = JSON.parse(readFileSync(join(out, "calls.jsonl"), "utf8").trim());
+  assert.equal(entry.responseId, "r-1");
+  assert.equal(entry.modelVersion, "gemini-test-001");
+  assert.equal(entry.webSearch, false);
+  assert.deepEqual(entry.usage, { input_tokens: 7, output_tokens: 3 });
+
+  const lines2 = /** @type {string[]} */ ([]);
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", join(dir, "h"), "--max-calls", "1"], { BRAIN: "gemini", GEMINI_API_KEY: "dummy" }, { brainFetch, log: (l) => lines2.push(l) }), /request cap/);
+  assert.equal(GEMINI_MAX_CALLS, 40);
+  const lines3 = /** @type {string[]} */ ([]);
+  mkdirSync(join(dir, "i"), { recursive: true });
+  writeFileSync(join(dir, "i", "STOP"), "");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", join(dir, "i")], { BRAIN: "gemini", GEMINI_API_KEY: "dummy" }, { brainFetch, log: (l) => lines3.push(l) }), /STOP file/);
+  assert.ok(lines3.some((l) => /Request cap: 40 requests/.test(l)), "40 without --max-calls");
+
+  // Every HTTP request counts, so the brain's own retries cannot pass the cap.
+  const store = folderStore(join(dir, "j"));
+  const ledger = await callLedger(store, 2);
+  const f = ledger.fetch(/** @type {typeof fetch} */ (async () => new Response("busy", { status: 503 })));
+  await f("https://generativelanguage.googleapis.com/a");
+  await f("https://generativelanguage.googleapis.com/a");
+  await assert.rejects(f("https://generativelanguage.googleapis.com/a"), /request cap of 2 is reached/);
+  assert.equal(ledger.requests, 2);
+  assert.match(String(ledger.halt()), /request cap of 2/);
 });

@@ -21,3 +21,22 @@ test("Gemini writes like the Claude stages: system, messages, search, cut-off an
   assert.deepEqual(sent[1].body.contents[0].parts, [{ text: "go" }], "images by URL are not sent");
   assert.deepEqual(sent[1].body.tools, [{ google_search: {} }]);
 });
+
+test("GEMINI_SEARCH off (Phase 0 arm B): no Google Search tool is ever sent, the brain says it cannot search; replies carry Google's response id and model version", async () => {
+  /** @type {any[]} */
+  const bodies = [];
+  const get = /** @type {typeof fetch} */ (async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return Response.json({ responseId: "resp-123", modelVersion: "gemini-x-001", candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 2 } });
+  });
+  const off = geminiModel({ apiKey: "k", webSearch: false, fetch: get });
+  assert.equal(off.capabilities?.webSearch, false);
+  const reply = await off.call({ system: [{ text: "s" }], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 100, webSearch: { maxUses: 30 } });
+  assert.equal(bodies[0].tools, undefined, "even when a stage asks for search");
+  assert.equal(reply.responseId, "resp-123");
+  assert.equal(reply.modelVersion, "gemini-x-001");
+  const on = geminiModel({ apiKey: "k", fetch: get });
+  assert.equal(on.capabilities?.webSearch, true, "the default is unchanged");
+  await on.call({ system: [{ text: "s" }], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 100, webSearch: { maxUses: 30 } });
+  assert.deepEqual(bodies[1].tools, [{ google_search: {} }]);
+});

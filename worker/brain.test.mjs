@@ -51,3 +51,12 @@ test("health shows the brain without its address or any key", () => {
   assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk" }).connected, false, "a paid key alone connects nothing");
   assert.equal(brainHealth({}).connected, false);
 });
+
+test("GEMINI_SEARCH=off turns Google Search off for Gemini only; unset keeps it on (the studio's setting)", () => {
+  const on = brainFromEnv({ GEMINI_API_KEY: "k" });
+  const off = brainFromEnv({ GEMINI_API_KEY: "k", GEMINI_SEARCH: "OFF" });
+  assert.ok(on.ok && off.ok);
+  assert.equal(on.model.capabilities?.webSearch, true);
+  assert.equal(off.model.capabilities?.webSearch, false);
+  assert.equal(brainFromEnv({ GEMINI_API_KEY: "k", GEMINI_SEARCH: "yes" }).ok && /** @type {any} */ (brainFromEnv({ GEMINI_API_KEY: "k", GEMINI_SEARCH: "yes" })).model.capabilities.webSearch, true);
+});

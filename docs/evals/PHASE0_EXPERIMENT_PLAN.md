@@ -1,6 +1,6 @@
 # Phase 0 experiment plan: first real AI script, one topic
 
-Date: 12 Nov 2026. Status: **plan only; nothing run; no key requested.**
+Date: 12 Nov 2026. Status: **C1–C4 built and tested (§10); no live run; no key requested.**
 Builds on Master Plan §21 (baseline protocol), §18 (rubric) and State §4e
 (cost control), §4h (research sources). Narrowed to **one topic**, as asked.
 
@@ -158,3 +158,44 @@ repetition, **American English**, chapter coherence, retention potential
 One topic, one genre, 10 minutes, one model: it does not show quality at
 30–60 minutes, in other genres, with other models, or with real audiences.
 Retention potential is a reader's judgement; no views are predicted.
+
+## 10. Implementation of C1–C4 (12 Nov 2026)
+
+| ID | Files | What it does |
+|---|---|---|
+| C1 | `worker/gemini.mjs`, `worker/brain.mjs` | `GEMINI_SEARCH=off` (any case): Gemini reports `webSearch: false` and never sends the Google Search tool, even when a stage asks; the run then uses the research desk. Unset: unchanged |
+| C2 | `local/run-film.mjs` | `--max-calls N`; **40 by default for Gemini**; counts every HTTP request to the brain (adapter retries included) in the film folder, across resumes; the run stops cleanly (paused) before the next call once reached, and the fetch refuses any request beyond it |
+| C3 | `worker/gemini.mjs`, `engine/src/film-run.mjs` (type only), `local/run-film.mjs` | each reply carries Google's `responseId` and `modelVersion`; `calls.jsonl` in the film folder logs per call: stage, model, search on/off, characters sent, SHA-256 of what was sent and of the reply, **whether the production manual was in the request**, stop reason, usage, requests, error |
+| C4 | `local/copy-check.mjs` (new) | runs of 12+ identical words between the finished narration and the corpus plus every cited page (reopened, public hosts only); writes `copy-check.json` |
+
+Tests (mock and replay, **not** evidence of script quality):
+`worker/gemini.test.mjs`, `worker/brain.test.mjs`, `local/run-film.test.mjs`
+(1 + 1 + 2 new tests: search off, response id, cap, resume, log, default 40, retries counted),
+`local/copy-check.test.mjs` (3, new).
+
+Fairness of A/B: both arms use the same model id, settings, notes, commit,
+`--max-calls 40` and evaluation; the only difference is `GEMINI_SEARCH=off`
+(B) versus unset (A). Arm A is the code as it runs today.
+
+## 11. Free-tier privacy and model limits
+
+**Not verified here.** Every official page (`ai.google.dev/gemini-api/docs/pricing`,
+`rate-limits`, `models`, `terms`, `billing`) now redirects to
+`aistudio.google.com`, which this environment refuses (tested 12 Nov 2026).
+`models.list` needs the key. So the free model, its limits and the terms are
+**unconfirmed** and must be read before any run.
+
+What to confirm on the terms page (my understanding of Google's Gemini API
+terms, **unverified**): on unpaid (free) use, Google may use prompts and
+replies to provide and improve its products, and human reviewers may read
+them; users are told not to send sensitive, confidential or personal data.
+Paid use is treated differently; we will not use it.
+
+What every request would send (measured in code, `manualIncluded` in
+`calls.jsonl`): the production manual `prompts/1-zupona-master-engine-full.txt`
+(73,288 bytes) as the system prompt of the main stages, plus the topic,
+notes, research and earlier stage outputs. No keys, no personal data. The
+repository is **public** on GitHub, so the manual is already published;
+whether it still counts as confidential is the owner's decision. If it is
+confidential, the engine as it stands cannot be run on the free tier without
+sending it, and Phase 0 must wait for that decision.

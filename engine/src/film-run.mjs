@@ -50,7 +50,7 @@ export const WEB_SEARCH_USD = 0.01;
  * @typedef {{ text: string, cache?: boolean, image?: string }} Block  image: an https image URL; text is ignored then
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number, batch?: number }} Usage
- * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string }} ModelReply
+ * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string, responseId?: string, modelVersion?: string }} ModelReply
  * @typedef {{ vision?: boolean, webSearch?: boolean, contextTokens?: number, maxOutputTokens?: number }} Capabilities  what the brain can do; a missing field means yes (the Claude API can do all of it)
  * @typedef {{ input: number, output: number, cacheRead: number, cacheWrite: number }} Price  US dollars per million tokens
  * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply>, capabilities?: Capabilities, price?: Price }} Model  price: the brain's own price (a local brain is free); without it PRICES is used

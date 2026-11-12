@@ -12,7 +12,8 @@
  *                   model can see pictures), BRAIN_PRICE_INPUT / BRAIN_PRICE_OUTPUT (US dollars per
  *                   million tokens, for a paid OpenAI-compatible service; default 0)
  *   claude          ANTHROPIC_API_KEY (secret), MODEL, ANTHROPIC_BASE_URL
- *   gemini          GEMINI_API_KEY (secret, free tier), GEMINI_MODEL
+ *   gemini          GEMINI_API_KEY (secret, free tier), GEMINI_MODEL, GEMINI_SEARCH ("off": no
+ *                   Google Search; research through the code desk; Phase 0 arm B)
  *
  * The free brain comes first when it is set up: the owner does not want to
  * depend on paid APIs (docs/VISION.md, master list item 4). Gemini is used
@@ -68,7 +69,7 @@ export function brainFromEnv(env, o = {}) {
   const chosen = chooseBrain(env);
   if (!chosen.ok) return chosen;
   if (chosen.kind === "claude") return { ok: true, kind: "claude", model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, ...(o.fetch ? { fetch: o.fetch } : {}) }) };
-  if (chosen.kind === "gemini") return { ok: true, kind: "gemini", model: geminiModel({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(o.fetch ? { fetch: o.fetch } : {}) }) };
+  if (chosen.kind === "gemini") return { ok: true, kind: "gemini", model: geminiModel({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(String(env.GEMINI_SEARCH ?? "").toLowerCase() === "off" ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) }) };
   const api = String(env.BRAIN_API ?? "").toLowerCase();
   const input = num(env.BRAIN_PRICE_INPUT) ?? 0;
   const output = num(env.BRAIN_PRICE_OUTPUT) ?? 0;
