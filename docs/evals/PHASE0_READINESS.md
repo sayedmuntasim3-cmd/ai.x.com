@@ -132,7 +132,7 @@ watching 429s); whether a new project needs verification.
      --format disaster-minute-by-minute --script-only --no-edit --max-revisions 1 \
      --max-calls 40 --manual prompts/phase0-context.txt --notes "<positioning>" --out <folder>
    ```
-5. **Arm B** first: add `RESEARCH_SOURCES=crossref,europepmc,pubmed,archive,loc`,
+5. **Arm B** first: add `RESEARCH_SOURCES=crossref,europepmc,pubmed,archive,loc RESEARCH_STRICT=1`,
    `--out films/phase0-tenerife-B`; then `node local/copy-check.mjs --run films/phase0-tenerife-B`.
 6. **Arm A**: add `RESEARCH_MODE=knowledge`, `--out films/phase0-tenerife-A`;
    then the copy check (only the cited-page part is empty by design).
@@ -317,3 +317,13 @@ Cost of the rule: a stopped B wastes at most its first two requests
 (brief and research plan). Rules 1–2 change `research-desk.mjs` /
 `film-run.mjs`, which the Worker also uses; built behind an option so
 production behaviour stays the same.
+
+## 14. Fairness rule built (12 Nov 2026)
+
+`RESEARCH_STRICT=1` (opt-in; default behaviour unchanged): Wikipedia gets the
+same bounded retry as the other sources (2 retries, Retry-After up to 10 s);
+every failed provider read is now written in the research trace; if any
+research request failed, arm B stops before the research-writing call
+("Research incomplete ..."), so a partial corpus is never written from or
+scored. The setting is pinned per film folder. Tests: engine 219/219,
+platform 96/96. The key form was declined on 12 Nov; no key is set.

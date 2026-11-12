@@ -283,6 +283,14 @@ for `local/run-film.mjs`. The Worker is **not** changed (no production change).
   room document). LOC is slow. No source ranking or reliability scoring
   exists yet: that is Master Plan Phase 3 (R-stages), not built here.
 
+## 4i. Phase 0 preparation (12 Nov 2026)
+
+Everything for the first real-model experiment is built and tested; nothing
+has run live. See `docs/evals/PHASE0_READINESS.md` (model `gemini-3.8-flash`,
+free tier verified on Google's official pages; arms A = model knowledge,
+B = research desk; 40-request cap; minimal context; copy check; gold sheet
+v1 from official sources; fairness rule). Blocked only on the Gemini key.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`
