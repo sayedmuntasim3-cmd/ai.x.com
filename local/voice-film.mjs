@@ -2,7 +2,7 @@
  * Voice film, on the owner's machine:
  *   node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>]
  *        [--transcript <json|srt|vtt>] [--stt faster-whisper|pocketsphinx] [--model small.en]
- *        [--script <the words as written, .txt>]
+ *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media]
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
  * and channels, float, for the voice checks) and voice-16k.wav (16 kHz mono,
@@ -14,6 +14,9 @@
  * the words are the script's, exactly, timed by what was heard.
  * Step 3 (understanding): language, kind, scenes or ayat, structure
  * (understanding.json).
+ * Step 4 (pictures): a plan per scene (pictures.json, pictures.md); with
+ * --media, free licensed pictures from the keyless archives (network).
+ * Quran: the adab guard's problems and gaps instead.
  */
 import { execFile } from "node:child_process";
 import { open, mkdir, readFile, writeFile, stat } from "node:fs/promises";
@@ -25,6 +28,8 @@ import { msg } from "../engine/src/messages.mjs";
 import { alignScript, checkTranscript, normalizeTranscript } from "../engine/src/transcript.mjs";
 import { understandVoice } from "../engine/src/voice-understand.mjs";
 import { buildQuranIndex } from "../engine/src/quran.mjs";
+import { planVoiceVisuals, quranVisualAdabGuard } from "../engine/src/voice-visuals.mjs";
+import { mediaProviders } from "../engine/src/film-media.mjs";
 
 const run = promisify(execFile);
 
@@ -191,6 +196,24 @@ export async function understand(o) {
   return u;
 }
 
+/**
+ * Step 4. No writer model is called from here yet: the plan comes from each
+ * scene's own words (planVoiceVisuals takes any brain when one is given).
+ * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any }} o
+ */
+export async function pictures(o) {
+  const u = o.understanding;
+  if (u.kind === "quran") {
+    const guard = quranVisualAdabGuard({ plan: u.quranPlan, index: o.quranIndex ?? (await loadQuran()).index });
+    await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard }, null, 1));
+    return { ok: guard.ok, messages: guard.messages, problems: guard.problems, gaps: guard.gaps };
+  }
+  const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({}) : [] });
+  await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
+  await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
+  return { ok: r.findings.length === 0, messages: r.messages, problems: r.findings.map((f) => f.detail), gaps: [] };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (typeof args.audio !== "string") {
@@ -212,6 +235,10 @@ async function main() {
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);
     if (!step3.ok) process.exit(1);
+    const step4 = await pictures({ out, understanding: step3, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined });
+    for (const m of step4.messages) console.log("- " + m[lang]);
+    for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
+    if (!step4.ok) process.exit(1);
   }
   console.log(`Saved in ${out}`);
 }
