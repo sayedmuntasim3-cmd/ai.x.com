@@ -1,5 +1,7 @@
 # Gold fact sheet: the 1977 Tenerife airport disaster (v0)
 
+**Superseded by `tenerife-1977-v1.md` (official sources). Kept for the record.**
+
 **Status: AI-drafted, PROVISIONAL.** Written 12 Nov 2026, before any Phase 0
 run, so no script can have shaped it. Every line rests on **one secondary
 source**, the English Wikipedia article

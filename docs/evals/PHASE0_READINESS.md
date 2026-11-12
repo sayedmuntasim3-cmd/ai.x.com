@@ -273,3 +273,47 @@ unverified), or retry later; the record will say which.
    computer).
 5. Then give approval for the key (secure form; never in chat) and for the
    live runs. Until then nothing is called.
+
+## 13. Gold sheet v1 and the fairness of arm B (12 Nov 2026)
+
+**Gold sheet v1** (`gold/tenerife-1977-v1.md`): 31 facts; **25 high**
+(official: the FAA Lessons Learned page, the Spanish conclusions as printed
+in ICAO Circular 153-AN/56, the scanned Spanish report), **6 medium** (one
+secondary source: Wikipedia), each with URL, quote, confidence and
+disagreements. Gaps: no Dutch primary source, no ALPA report, Spanish report
+casualty pages illegible, no primary source for the CRM-history claim. The
+owner declined allowing the hosts that hold the Dutch and ALPA documents.
+Note: FAA-LL and the ICAO text both quote the Spanish investigation, so the
+"high" facts mostly rest on **one** investigation, not several.
+
+**Can Wikipedia rate limits weaken arm B unfairly? Yes.** Measured today
+from this cloud address: Wikipedia answered 200 once and 429 three times.
+Wikipedia is the research desk's only general source; for this topic the
+five scholarly and archive sources returned nothing usable on the accident
+(PubMed: 0 hits; Europe PMC: no abstract). A 429 during B's research would
+give B a thin corpus for reasons of this network, not of our engine, and B
+would look worse than it is. A is not affected (it uses no research).
+
+**Proposed fair rule (not built; needs approval):**
+
+1. *Same retry policy for every source.* The Wikipedia provider gets the
+   same bounded retry the other five sources already have (2 retries,
+   Retry-After honoured up to 10 s, one request at a time). No unlimited
+   retries.
+2. *Validity, not repair.* Before any writing stage, B checks its research
+   trace. If any research request failed (429, 5xx, timeout) after retries,
+   B **stops** ("research incomplete: rate limited"), is not scored, and is
+   re-run later from scratch. A thin corpus is never scored as B.
+3. *No tuning to the benchmark.* No source is added because the gold sheet
+   used it (the FAA page would help B, but adding it now would give B an
+   advantage it does not have in normal use). B's queries stay the model's
+   own.
+4. *Frozen and recorded.* B's corpus (`research-corpus.json`) is hashed in
+   the record; the 429 count and the trace are reported.
+5. *Same conditions.* A and B run on the same day, same model, same context,
+   same cap. A run stopped by a daily-quota error is resumed, never mixed.
+
+Cost of the rule: a stopped B wastes at most its first two requests
+(brief and research plan). Rules 1–2 change `research-desk.mjs` /
+`film-run.mjs`, which the Worker also uses; built behind an option so
+production behaviour stays the same.
