@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* One language at a time: every string is rendered in both (page.tsx, L). */
+html:not([data-lang="bn"]) [data-l="bn"] { display: none; }
+html[data-lang="bn"] [data-l="en"] { display: none; }
+html[data-lang="bn"] body, [lang="bn"] { font-family: "Noto Sans Bengali", "Hind Siliguri", "Nirmala UI", "Kohinoor Bangla", "Bangla Sangam MN", ui-sans-serif, system-ui, sans-serif; }
+.lang-btn { color: rgba(255,255,255,0.6); }
+.lang-btn[aria-pressed="true"] { background: #bef264; color: #09110c; font-weight: 600; }
+
+/* Motion, the same moves the renderer makes. */
+.kb { animation: kb 16s ease-in-out infinite alternate; will-change: transform; }
+.kb-slow { animation: kb-slow 16s ease-in-out infinite alternate; will-change: transform; }
+@keyframes kb { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.16) translate(-3%, -2%); } }
+@keyframes kb-slow { from { transform: translate(0, 0); } to { transform: translate(-2%, -1%); } }
+.parallax-bg { animation: pbg 9s ease-in-out infinite alternate; }
+.parallax-fg { animation: pfg 9s ease-in-out infinite alternate; }
+@keyframes pbg { from { transform: scale(1.05) translateX(2%); } to { transform: scale(1.12) translateX(-2%); } }
+@keyframes pfg { from { transform: scale(1) translateX(-4%); } to { transform: scale(1.08) translateX(4%); } }
+.rise { opacity: 0; animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.rise-loop { opacity: 0; animation: rise-loop 4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite; }
+@keyframes rise-loop { 0% { opacity: 0; transform: translateY(12px); } 15%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.stage-dot { background: rgba(255, 255, 255, 0.15); animation: stage 7.2s infinite; }
+@keyframes stage { 0%, 6% { background: rgba(255, 255, 255, 0.15); box-shadow: none; } 12%, 88% { background: #bef264; box-shadow: 0 0 10px rgba(190, 242, 100, 0.8); } 100% { background: rgba(255, 255, 255, 0.15); } }
+.bar { transform-origin: bottom; animation: bar 2.4s ease-in-out infinite alternate; }
+@keyframes bar { from { transform: scaleY(0.35); opacity: 0.6; } to { transform: scaleY(1); opacity: 1; } }
+.tile { border-radius: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.1); background: #0d1210; padding: 0.75rem; }
+.tile-title { margin: 0.9rem 0.25rem 0; font-weight: 600; }
+.tile-text { margin: 0.25rem 0.25rem 0.4rem; font-size: 0.875rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.55); }
+details summary::-webkit-details-marker { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .kb, .kb-slow, .parallax-bg, .parallax-fg, .stage-dot, .bar { animation: none !important; }
+  .rise, .rise-loop { animation: none !important; opacity: 1 !important; transform: none !important; }
+}

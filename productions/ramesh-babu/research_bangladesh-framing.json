@@ -1,0 +1,75 @@
+{
+ "topic": "Bangladesh-audience framing for a 45-minute Bangla documentary on Ramesh Babu (Bengaluru barber to Rolls-Royce car-rental owner). Exchange rates, Rolls-Royce price in Bangladesh, Dhaka barber economics, ride-share landscape, cultural framing, sensitivities, publishing norms. RESEARCH COULD NOT BE CARRIED OUT IN THIS RUN: every number is unknown.",
+ "keyFindings": [
+  {
+   "finding": "No web research could be done in this run, so none of the requested numbers, rates, prices or dates were checked. Every quantitative item is UNKNOWN.",
+   "evidence": "WebSearch refused all calls because the shared limit of 200 searches per turn was already used up by other agents. WebFetch failed with 'getaddrinfo ENOTFOUND' for en.wikipedia.org, api.worldbank.org and www.x-rates.com. Direct HTTPS requests were refused by the egress proxy (CONNECT 403, connect_rejected) for en.wikipedia.org, api.worldbank.org, www.thedailystar.net and www.bb.org.bd. The environment's network policy does not allow these hosts. The user can change Network access in the cloud environment settings: either choose a broader access level or add the hosts under Allowed domains. Alternatively, the step can be re-run in a new turn with fresh search budget.",
+   "sourceUrls": [
+    "https://code.claude.com/docs/en/cloud-environments#network-access"
+   ],
+   "confidence": "confirmed"
+  },
+  {
+   "finding": "Method for showing rupee amounts in Taka honestly (no figures retrieved): build each year's INR-to-BDT cross rate from the two official annual-average USD rates (BDT per USD divided by INR per USD). Label converted figures as money of that time (e.g. 'সে সময়ের হিসেবে প্রায় ... টাকা'). A separate inflation adjustment is needed before claiming what an amount would be worth today. Take the current rate from Bangladesh Bank or RBI reference rates and print the date on screen.",
+   "evidence": "This is a method only. I tried the World Bank indicator PA.NUS.FCRF (official exchange rate, LCU per US$, period average) for India and Bangladesh for 1979-2025 at api.worldbank.org/v2/country/IND;BGD/indicator/PA.NUS.FCRF, but the host was blocked, so no values were retrieved. Current rate (October 2026): unknown. Rates for 1979, 1989-1994, 2004, 2011 and 2015: unknown.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Rolls-Royce price in Bangladesh: UNKNOWN. Background knowledge, not checked in this run: Bangladesh charges its highest supplementary-duty bracket on cars with very large engines. Current Rolls-Royce models use a 6.75-litre V12, so they would fall in that top bracket. The exact total tax incidence, landed price and any reported sale or registration in Bangladesh are unknown and must be sourced from NBR or Bangladeshi press before use.",
+   "evidence": "From model background knowledge only. No source was fetched. Do not put any figure on screen until it is verified.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Haircut prices and barber or salon incomes in Dhaka and district towns: UNKNOWN. No data was retrieved.",
+   "evidence": "All searches and fetches failed (see first finding).",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Car-rental and ride-sharing landscape in Bangladesh (background knowledge, not checked): Uber launched in Dhaka in late 2016. Pathao is a Bangladeshi app for ride-hailing (motorbike and car) and delivery. The government issued Ride-sharing Service Guidelines dated 2017. Informal 'rent-a-car' firms that rent a car with a driver are common for weddings, airport runs and trips outside Dhaka. Off-app 'contract'/'khep' motorbike rides are widespread. This is a natural comparison point: Ramesh Babu's business is rent-a-car with driver, which Bangladeshi viewers already know.",
+   "evidence": "From model background knowledge only. Launch dates, guideline dates, user numbers and fare levels are unverified and must be sourced before use.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Suggested natural Bangla (Bangladesh standard) vocabulary. These are editorial language suggestions, not factual claims. Barber: 'নাপিত' (everyday) or 'নরসুন্দর' (respectful, formal). Shop: 'সেলুন'. Haircut: 'চুল কাটা'. Car rental: 'গাড়ি ভাড়া' / 'রেন্ট-এ-কার'. Luxury car: 'বিলাসবহুল গাড়ি'. Entrepreneur: 'উদ্যোক্তা'. Capital: 'পুঁজি'. Installment or loan: 'কিস্তি' / 'ঋণ'. Taking charge of the family: 'সংসারের হাল ধরা'. From zero to the top: 'শূন্য থেকে শিখরে'. Indian currency: 'রুপি'. In Bangladesh 'টাকা' means only BDT, so never call rupees 'টাকা'. Lakh and crore ('লাখ', 'কোটি') are used in Bangladesh too, which makes conversions easy to grasp. City name: 'বেঙ্গালুরু'. Use Bangla numerals in on-screen text.",
+   "evidence": "From model language knowledge. A native Bangladeshi reviewer should check the script.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Storytelling framing that resonates (editorial guidance, not checked): (1) A father's early death and a boy who takes charge of the family ('সংসারের হাল ধরা'). (2) A mother's sacrifice ('মায়ের ত্যাগ'), especially a mother who worked to feed the family, told with restraint rather than melodrama. (3) Honest work ('হালাল রুজি' is religious wording, so prefer the neutral 'সৎ পরিশ্রম') and humility after success. (4) Small business as a path out of poverty, which Bangladeshi viewers know from microcredit, small traders and remittance-funded family businesses. Possible local parallels (expatriate workers who built family businesses, self-made Bangladeshi industrialists) may be named only after their life stories are verified. No specific Bangladeshi rags-to-riches biography was verified in this run.",
+   "evidence": "From model background knowledge only. Named Bangladeshi examples were deliberately left out because none could be verified.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Sensitivities: India-Bangladesh relations and religion (background knowledge, every item must be verified). After the August 2024 fall of the Sheikh Hasina government and her move to India, relations became strained. Recurring public grievances include killings at the border, Indian visa curbs on Bangladeshis, 2025 trade and transit restrictions, and Indian media coverage of Bangladesh. A general election was held in February 2026. Editorial implications: keep the film apolitical. Present Ramesh Babu as a working person's story, not as 'India's success'. Avoid comparisons that run Bangladesh down ('ওরা পারে, আমরা পারি না'). Avoid national-flag or nationalist imagery and Hindi-heavy clips without Bangla subtitles or voiceover. Use Bangladesh-standard Bangla rather than Kolkata usage (e.g. 'পানি' not 'জল', 'লবণ' not 'নুন'). Show his personal faith only as plain fact. Do not attribute his success to any religion or to divine favour. Do not mention caste.",
+   "evidence": "From model background knowledge only. Dates, events and the current (October 2026) public mood are unverified and must be checked against current Bangladeshi and international reporting before the script is locked.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Publishing notes for Bangladesh (background knowledge, not checked): Facebook is the main platform where Bangladeshi audiences watch video, with YouTube second for long-form. A 45-minute film should be split into chapters, with short Facebook cut-downs that link to the full YouTube version. Use burned-in Bangla subtitles for muted autoplay. Thumbnails and titles should be dramatic but not false: misleading 'কোটিপতি' clickbait draws backlash in the comments. Platform user numbers (e.g. DataReportal Digital 2026 Bangladesh) and the names of specific Bangla documentary or explainer channels and their norms are unknown and were not checked.",
+   "evidence": "From model background knowledge only.",
+   "sourceUrls": [],
+   "confidence": "unverified"
+  }
+ ],
+ "gapsOrUnknowns": [
+  "Current INR-to-BDT exchange rate (October 2026): unknown. The source, date and value were not retrieved.",
+  "Historical INR-to-BDT cross rates for 1979, 1989, 1990, 1991, 1992, 1993, 1994, 2004, 2011 and 2015: unknown.",
+  "Inflation factors to restate past rupee or taka amounts in today's money: unknown.",
+  "Rolls-Royce price in Bangladesh, total import duty and tax incidence by engine size, and any reported Rolls-Royce imports or registrations in Bangladesh (with dates): unknown.",
+  "Haircut prices in Dhaka (street barber, neighbourhood salon, premium salon) and in district towns: unknown.",
+  "Barber or salon worker monthly incomes in Bangladesh: unknown.",
+  "Bangladesh ride-sharing and rent-a-car data (Uber/Pathao launch dates, regulation dates, fares, typical daily rent-a-car rates in taka): unknown. Only unverified background knowledge is given above.",
+  "Verified Bangladeshi rags-to-riches biographies suitable as parallels: unknown.",
+  "Current (2025-2026) state of India-Bangladesh relations and public mood, including the outcome of the February 2026 election: not verified in this run.",
+  "Facebook and YouTube usage statistics for Bangladesh, and the names and norms of Bangla YouTube documentary channels: unknown.",
+  "Ramesh Babu's own story facts (years, rupee amounts, fleet size, Rolls-Royce purchase year and price) were outside this task and were not verified here.",
+  "Reason for all gaps: the WebSearch limit (200 per turn, shared across agents) was used up, and the network policy blocked direct fetches to en.wikipedia.org, api.worldbank.org, www.x-rates.com, www.thedailystar.net and www.bb.org.bd. To fix it, add these hosts under Allowed domains, choose a broader Network access level in the cloud environment settings, or re-run this step in a new turn with fresh search budget."
+ ]
+}

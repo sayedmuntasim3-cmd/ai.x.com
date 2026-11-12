@@ -1,0 +1,72 @@
+[
+ {
+  "chapter": "C1",
+  "scene": "SC0029",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "SC0038",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "SC0039",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "SC0039",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "SC0042",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "SC0046",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "SC0049",
+  "status": "applied"
+ },
+ {
+  "chapter": "C1",
+  "scene": "QA",
+  "status": "applied"
+ },
+ {
+  "chapter": "C5",
+  "scene": "SC0192",
+  "status": "applied"
+ },
+ {
+  "chapter": "C5",
+  "scene": "SC0186",
+  "status": "applied"
+ },
+ {
+  "chapter": "C5",
+  "scene": "SC0186",
+  "status": "applied"
+ },
+ {
+  "chapter": "C5",
+  "scene": "SC0194",
+  "status": "applied"
+ },
+ {
+  "chapter": "C5",
+  "scene": "SC0194",
+  "status": "applied"
+ },
+ {
+  "chapter": "C5",
+  "scene": "QA",
+  "status": "applied"
+ }
+]
