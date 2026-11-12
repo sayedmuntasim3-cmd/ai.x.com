@@ -40,3 +40,18 @@ test("GEMINI_SEARCH off (Phase 0 arm B): no Google Search tool is ever sent, the
   await on.call({ system: [{ text: "s" }], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 100, webSearch: { maxUses: 30 } });
   assert.deepEqual(bodies[1].tools, [{ google_search: {} }]);
 });
+
+test("errors that waiting cannot fix (400, 403, 404) are not retried and say what Google answered", async () => {
+  for (const [status, msg] of [[400, "API key not valid"], [403, "PERMISSION_DENIED"], [404, "models/gemini-x is not found"]]) {
+    let calls = 0;
+    const m = geminiModel({ apiKey: "k", model: "gemini-x", fetch: /** @type {typeof fetch} */ (async () => { calls += 1; return new Response(JSON.stringify({ error: { message: msg } }), { status: /** @type {number} */ (status) }); }), sleep: async () => {} });
+    await assert.rejects(m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 }), (/** @type {any} */ e) => e.status === status && String(e.message).includes(String(msg)));
+    assert.equal(calls, 1, `${status} is not retried`);
+  }
+});
+
+test("thinking tokens count as output (they are billed as output on paid tiers)", async () => {
+  const m = geminiModel({ apiKey: "k", fetch: /** @type {typeof fetch} */ (async () => Response.json({ candidates: [{ content: { parts: [{ text: "x" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20, thoughtsTokenCount: 30 } })) });
+  const r = await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 });
+  assert.deepEqual(r.usage, { input_tokens: 100, output_tokens: 50 });
+});

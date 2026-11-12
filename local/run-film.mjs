@@ -26,7 +26,7 @@
  *
  * The brain and the optional keys come from the environment, with the same
  * names as the studio (worker/brain.mjs, docs/BRAIN.md): BRAIN_URL,
- * BRAIN_MODEL, BRAIN_CONTEXT, BRAIN_VISION, SEARXNG_URL, RESEARCH_SOURCES; PEXELS_API_KEY and
+ * BRAIN_MODEL, BRAIN_CONTEXT, BRAIN_VISION, SEARXNG_URL, RESEARCH_SOURCES, RESEARCH_MODE (knowledge); PEXELS_API_KEY and
  * PIXABAY_API_KEY (free) for stock footage; GEMINI_API_KEY or
  * ANTHROPIC_API_KEY only if you choose those brains.
  *
@@ -99,17 +99,31 @@ export async function callLedger(store, maxCalls, manual = "", context = "") {
   const contextSha256 = context ? sha256(context) : null;
   const cap = Number.isFinite(maxCalls) && /** @type {number} */ (maxCalls) > 0 ? Math.floor(/** @type {number} */ (maxCalls)) : undefined;
   const reached = () => cap !== undefined && requests >= cap;
+  /** Set when the provider says its daily free quota is used up: no request is made after that. */
+  let dailyQuota = "";
   return {
     get requests() { return requests; },
     cap,
     /** @returns {string | null} */
-    halt: () => (reached() ? `the request cap of ${cap} is reached (${requests} requests made; see calls.jsonl)` : null),
+    halt: () => (dailyQuota ? `the provider's daily free quota is used up (${dailyQuota}); resume after it resets` : reached() ? `the request cap of ${cap} is reached (${requests} requests made; see calls.jsonl)` : null),
     /** @param {typeof fetch} get @returns {typeof fetch} */
     fetch: (get) => /** @type {typeof fetch} */ (async (input, init) => {
+      if (dailyQuota) throw Object.assign(new Error(`Refused: the daily free quota is used up (${dailyQuota}).`), { permanent: "The daily free quota is used up." });
       if (reached()) throw Object.assign(new Error(`Refused: the request cap of ${cap} is reached.`), { permanent: `The request cap of ${cap} is reached.` });
       requests += 1;
       inCall += 1;
-      return get(input, init);
+      const res = await get(input, init);
+      // A 429 for a per-day quota will not pass with waiting: stop at once instead of spending retries.
+      if (res.status === 429) {
+        const body = await res.clone().text().catch(() => "");
+        const day = /"quotaId":\s*"([^"]*PerDay[^"]*)"/i.exec(body);
+        if (day) {
+          dailyQuota = day[1];
+          await res.body?.cancel().catch(() => {});
+          throw Object.assign(new Error(`The daily free quota is used up (${dailyQuota}). The run stops; resume after it resets (midnight Pacific time).`), { permanent: "The daily free quota is used up." });
+        }
+      }
+      return res;
     }),
     /** @param {import("../engine/src/film-run.mjs").Model} model @returns {import("../engine/src/film-run.mjs").Model} */
     wrap: (model) => ({
@@ -186,6 +200,8 @@ export async function produceFilm(o) {
     viewers: o.viewers ?? true,
     media: { providers: media },
     sources: { fetch: pages },
+    // Phase 0 arm A: RESEARCH_MODE=knowledge (no search, no research desk; model knowledge only).
+    ...(env.RESEARCH_MODE === "knowledge" ? { researchMode: /** @type {const} */ ("knowledge") } : {}),
     // The search providers' own APIs (Wikipedia, the owner's SearXNG, which may be on this network) use the plain fetch.
     research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES || undefined }), fetch: pages },
     channel: o.channel,
@@ -255,7 +271,10 @@ export async function main(argv, env, deps = {}) {
   const pinned = JSON.parse((await store.get("context.json")) ?? "null");
   const usedSha = sha256(manual ?? fullManual);
   if (pinned && pinned.sha256 !== usedSha) throw new Error(`This film was started with the context ${pinned.file} (sha256 ${String(pinned.sha256).slice(0, 12)}); give the same --manual to resume it.`);
-  if (!pinned && values.approve === undefined) await store.put("context.json", JSON.stringify({ file: values.manual ?? "prompts/1-zupona-master-engine-full.txt", sha256: usedSha, bytes: Buffer.byteLength(manual ?? fullManual) }, null, 1));
+  // The experiment arm is pinned too: a resume cannot change the model, search, research mode or sources.
+  const arm = { model: env.GEMINI_MODEL ?? null, geminiSearch: env.GEMINI_SEARCH ?? null, researchMode: env.RESEARCH_MODE ?? null, researchSources: env.RESEARCH_SOURCES ?? null };
+  if (pinned?.arm && JSON.stringify(pinned.arm) !== JSON.stringify(arm)) throw new Error(`This film was started with other settings (${JSON.stringify(pinned.arm)}); resume it with the same GEMINI_MODEL, GEMINI_SEARCH, RESEARCH_MODE and RESEARCH_SOURCES.`);
+  if (!pinned && values.approve === undefined) await store.put("context.json", JSON.stringify({ file: values.manual ?? "prompts/1-zupona-master-engine-full.txt", sha256: usedSha, bytes: Buffer.byteLength(manual ?? fullManual), arm }, null, 1));
   const ledger = await callLedger(store, askedCap ?? (kind === "gemini" ? GEMINI_MAX_CALLS : undefined), fullManual, manual ?? fullManual);
   const chosen = deps.model ? { ok: /** @type {const} */ (true), kind: "test", model: deps.model } : brainFromEnv(env, { fetch: ledger.fetch(deps.brainFetch ?? fetch) });
   if (!chosen.ok) throw new Error(chosen.error);

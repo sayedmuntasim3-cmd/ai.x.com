@@ -1,8 +1,8 @@
 # Phase 0 readiness report
 
-Date: 12 Nov 2026. **Status: NOT READY for a live run.** Google's official
-pages are now read (§4). Remaining: owner decisions (§9) and one small code
-change (`gemini-3.8-flash` at $0 in `PRICES`). No key requested, no live call made, no billing touched.
+Date: 12 Nov 2026. **Status: READY FOR APPROVAL, not run.** Code, tests and
+official-terms check are done. A live run still needs the owner's approval,
+the key, and the model and quota check of §5 step 3. Nothing was deployed. No key requested, no live call made, no billing touched.
 
 Plan: `PHASE0_EXPERIMENT_PLAN.md`. This report adds the preparation tasks
 of 12 Nov (minimal context, request-path limit, originality, Google terms).
@@ -24,15 +24,17 @@ of 12 Nov (minimal context, request-path limit, originality, Google terms).
   model"), 1,048,576 input and 65,536 output tokens (our adapter's cap is
   also 65,536), structured output and thinking supported. The test is of
   writing quality, so the strongest free writer is the fair choice.
-- **Arm A cannot run on the free tier**: Google Search grounding is "Not
-  available" on the free tier for every 3.x model; it is free (500 RPD) only
-  on 2.5 Flash / Flash-Lite, which new users cannot use. Arm A is recorded
-  "not run: no free grounding". A free control with the same model is
-  possible (B vs the model writing from its own knowledge, no research), but
-  needs a small code change; not built, owner to decide.
-- Code needed before a run (approval required): add `gemini-3.8-flash` to
-  `PRICES` at $0 (without it the run is priced at the most expensive model
-  and refused without `--budget`), and pass `GEMINI_MODEL=gemini-3.8-flash`.
+- **The two arms (owner decision, 12 Nov):** both on `gemini-3.8-flash`,
+  Google Search off (`GEMINI_SEARCH=off`), same context, settings, cap and
+  evaluation. **A = model knowledge only** (`RESEARCH_MODE=knowledge`: no
+  search, no research desk, every fact unsourced and labelled "model
+  knowledge (unverified)"). **B = our research engine** (research desk with
+  the 6 sources of §3, then the source desk). The difference measures what
+  our research adds. Google Search grounding is not used: it is "Not
+  available" on the free tier for every 3.x model.
+- Done: `gemini-3.8-flash` added to `PRICES` at $0 (valid only with no billing
+  account); the run selects it with `GEMINI_MODEL=gemini-3.8-flash`. The
+  Worker default is unchanged.
 - Finding outside Phase 0: the Worker's Gemini default is the deprecated
   `gemini-2.5-flash`; not changed (production).
 
@@ -119,26 +121,29 @@ watching 429s); whether a new project needs verification.
 1. `node local/experiment-context.mjs --check` (context unchanged).
 2. Gold fact sheet for Tenerife, cited, marked AI-drafted, committed
    **before** any run.
-3. Key through the secure form (proxy injects it); `models.list`; model
-   chosen and recorded (§1).
-4. **Arm B:**
+3. Key through the secure form (proxy injects it), from a project with no
+   billing account. Then `node local/gemini-check.mjs` (models.get only,
+   generates nothing): model available, limits recorded. The owner reads the
+   project's free limits at aistudio.google.com/rate-limit and records them.
+4. Common settings for both arms:
    ```
-   BRAIN=gemini GEMINI_API_KEY=injected-by-proxy GEMINI_MODEL=<chosen> GEMINI_SEARCH=off \
-   RESEARCH_SOURCES=crossref,europepmc,pubmed,archive,loc \
+   BRAIN=gemini GEMINI_API_KEY=injected-by-proxy GEMINI_MODEL=gemini-3.8-flash GEMINI_SEARCH=off
    node local/run-film.mjs --topic "The 1977 Tenerife airport disaster" --minutes 10 \
      --format disaster-minute-by-minute --script-only --no-edit --max-revisions 1 \
-     --max-calls 40 --manual prompts/phase0-context.txt --notes "<positioning>" \
-     --out films/phase0-tenerife-B
-   node local/copy-check.mjs --run films/phase0-tenerife-B
+     --max-calls 40 --manual prompts/phase0-context.txt --notes "<positioning>" --out <folder>
    ```
-5. Record B (setup, calls.jsonl summary, tokens, sources, gates, copy check);
-   commit the complete script.
-6. **Arm A** (not possible on the free tier with 3.8 Flash, §1; kept for a
-   later paid or 2.5-access run): the same command and environment without `GEMINI_SEARCH`,
-   `--out films/phase0-tenerife-A`; then the copy check. Only if quota allows;
-   otherwise "not run" with the reason.
-7. Evaluation: Claude as the AI critic (labelled, scored before seeing gates);
-   Reader 1 the owner; Reader 2 **pending**; blind A/B pairwise.
+5. **Arm B** first: add `RESEARCH_SOURCES=crossref,europepmc,pubmed,archive,loc`,
+   `--out films/phase0-tenerife-B`; then `node local/copy-check.mjs --run films/phase0-tenerife-B`.
+6. **Arm A**: add `RESEARCH_MODE=knowledge`, `--out films/phase0-tenerife-A`;
+   then the copy check (only the cited-page part is empty by design).
+7. Records for both (setup, `calls.jsonl` summary, tokens, gates, copy check);
+   both complete scripts committed.
+8. Evaluation: facts against the gold sheet; Claude as the labelled AI critic,
+   blind to arm and gates; Reader 1 the owner; Reader 2 **pending**; blind
+   pairwise A vs B.
+
+Each film folder pins its context and arm (`context.json`): a resume with
+another model, search, research mode, sources or context is refused.
 
 Only `local/run-film.mjs` is used. **`local/jobs.mjs` (the job worker)
 does not enforce the request cap or the context pin** (it calls
@@ -155,6 +160,7 @@ does not enforce the request cap or the context pin** (it calls
 | Hard ceiling | 40 calls; output ≤ 2.56 M tokens in the worst case | cap × largest output |
 | Cost | $0: the key must belong to a project with **no billing account** | Google (unverified, §4) |
 | Emergency stop | `STOP` file or `ZUPONA_STOP=1`, before every call | `halt` |
+| Daily free quota used up | a 429 whose `quotaId` says PerDay stops the run at once, no retries spent | `callLedger` |
 
 ## 7. Privacy and security safeguards
 
@@ -185,11 +191,9 @@ sources the research never opened. The AI critic and the readers judge those
 
 1. **Free-tier rate limits not published** (§4): known only in AI Studio for
    the owner's project. Arm A cannot run free (§1).
-2. **Arm A's sources may be off the allowlist**: Gemini's search can cite any
-   site; the source desk can open only allowed hosts, so A may show more
-   "unreachable" than B for reasons of this environment, not quality. The
-   record will split "blocked by allowlist" from "site error" and compare
-   facts on the gold sheet, not on reachability alone.
+2. Arm A has no sources by design, so its gates fail on sourcing; the
+   comparison is on facts against the gold sheet and on the blind reading,
+   not on gate counts.
 3. Free-tier daily limits may stop a run midway; it resumes the next day.
 4. One topic, one model, 10 minutes; AI critic is not a human; Reader 2
    pending; the gold sheet is AI-drafted until the owner checks it.
@@ -198,9 +202,34 @@ sources the research never opened. The AI critic and the readers judge those
    The owner must accept this; the context holds nothing confidential
    (§2), but the owner decides whether the manual extract counts as such.
 
-## 10. Test results (12 Nov 2026)
+## 10. Verification without the key (12 Nov 2026)
 
-Engine 217/217, platform 88/88 (82 at the last report + 3 experiment context,
-2 copy check, 1 runner `--manual`); type check clean; build check (dry run) clean;
-`experiment-context.mjs --check` clean.
-All mock or replay: **no evidence of script quality**.
+| Item | How verified | Result |
+|---|---|---|
+| Model availability | official models page; `gemini-check.mjs` built (models.get) | listed and free; live check needs the key |
+| Quota | official rate-limits page | not published per model; per project in AI Studio (owner) |
+| Request limit 40 | tests | refuses the 41st request; retries counted; kept across resumes |
+| Daily-quota 429 | test with Google's error shape (`QuotaFailure`, `...PerDay...-FreeTier`) | stops after 1 request instead of 7 |
+| Other errors | tests: 400 (bad key), 403 (denied), 404 (model not found) | not retried; message keeps Google's text |
+| Token usage | test: `promptTokenCount`, `candidatesTokenCount` + `thoughtsTokenCount` | thinking counted as output |
+| Arm A | test | no search asked, no page fetched, invented URLs removed, facts labelled |
+| Arm pin | test | resume with other settings refused |
+
+Error shapes and field names come from Google's API as recorded in the
+adapter and tests; their exact form for 3.8 Flash is confirmed only by the
+first live call (logged in `calls.jsonl`).
+
+Tests: engine 217/217, platform 94/94; type check clean; build check (dry
+run) clean; `experiment-context.mjs --check` clean. All mock or replay:
+**no evidence of script quality.**
+
+## 11. Cost report
+
+| | Value | Source |
+|---|---|---|
+| Cost of the experiment | **$0**: free tier, project with no billing account | pricing and billing pages |
+| How a charge could happen | only if a billing account is linked to the project and credit prepaid (minimum $5) | billing page |
+| Hypothetical paid price of 3.8 Flash (not our case) | input $0.75 / 1M tokens, output incl. thinking $3.75 / 1M, through 31 Dec 2026; doubles from 1 Jan 2027 | pricing page |
+| Hypothetical per arm at those prices | about $0.40–1.20 (estimate from 12–25 calls) | our estimate, unverified |
+| Hypothetical ceiling at the 40-call cap | about $12.60 (4 M input, 2.56 M output tokens) | our arithmetic |
+| Engine budget stop | priced at $0, so it cannot catch charges: the no-billing project is the real guard | code |

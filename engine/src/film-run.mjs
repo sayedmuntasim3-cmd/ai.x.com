@@ -38,8 +38,10 @@ export const PRICES = Object.freeze({
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 4 },
   "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 10 },
   "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 10 },
-  // Gemini's free tier costs nothing (its daily limits apply instead).
+  // Gemini's free tier costs nothing (its daily limits apply instead). $0 holds only for a
+  // project with no billing account linked (Google: aistudio.google.com/docs/billing, 12 Nov 2026).
   "gemini-2.5-flash": { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  "gemini-3.8-flash": { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 });
 
 /** US dollars per web search (server tool). */
@@ -332,7 +334,7 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * budgetUsd is a hard cap: before every model call the worst case of that call
  * (its whole input at the full input price plus its whole output allowance)
  * is reserved, and a call that could cross the cap is never made.
- * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -531,8 +533,26 @@ export async function runFilm(o) {
       return bound.research;
     };
 
+    // Phase 0 arm A (researchMode "knowledge"): no search, no research desk; the model writes the
+    // research file from what it already knows, every fact unsourced and labelled as such.
+    const knowledgeResearch = async (/** @type {string} */ s01) => {
+      const data = extractJson(await ask("research", [
+        { text: ctx("S0_S1", s01) },
+        { text: "Write this film's research file from your own knowledge only: you have no web access and no documents. List the facts the film needs, record conflicts you know of, and mark how sure you are. Do not give any URL or source name you have not seen here; every fact has \"sources\": []. Output ONE fenced ```json block, and nothing after it, shaped as: {\"subject\": string, \"facts\": [{\"id\": \"F01\", \"claim\": string, \"value\": string, \"sources\": [], \"confidence\": \"high\"|\"medium\"|\"low\", \"conflict\": string|null}], \"unknowns\": [string], \"doNotConfuse\": [string]}." },
+      ], 32000));
+      const facts = (Array.isArray(data?.facts) ? data.facts : []).map((/** @type {any} */ f) => ({ ...f, sources: [], basis: "model knowledge (unverified)" }));
+      state.gaps.push("research: model knowledge only (no search, no research desk); no fact has a source.");
+      return { ...data, facts, basis: "model knowledge only" };
+    };
+
     await stage("research", async () => {
       const s01 = await read("s01.md");
+      if (o.researchMode === "knowledge") {
+        const data = await knowledgeResearch(s01);
+        if (data.facts.length < 8) throw new Error(`Research from model knowledge gave only ${data.facts.length} facts (at least 8 needed).`);
+        await store.put("research.json", JSON.stringify(data, null, 1));
+        return { facts: data.facts.length };
+      }
       const data = canSearch(model) ? extractJson(await ask("research", [
         { text: ctx("S0_S1", s01) },
         { text: (isStoryFilm(film)
