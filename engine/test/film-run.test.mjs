@@ -250,6 +250,10 @@ test("a script-only film stops at the script: no edit or pictures, visual and ri
   const { review } = await superviseFilm({ film: made.film, store, maxRevisions: 0, runOnce: () => runFilm({ film: made.film, manual: "M", model, store, media: { providers: [/** @type {any} */ ({ id: "never", search: async () => { throw new Error("a script-only film searched for pictures"); } })] } }) });
   assert.ok(!model.calls.some((c) => c.startsWith("edit:") || c.startsWith("media:")), "no edit plan and no picture search");
   assert.ok(model.calls.includes("s7"), "packaging still runs");
+  const graph = productionGraph(understand({ film: made.film }), ["C1", "C2"]);
+  assert.ok(!graph.nodes.some((n) => /^(edit|media|render|master)\b/.test(n.base)), "the graph holds no stage the script-only run never executes");
+  for (const c of model.calls.filter((x) => !x.startsWith("repair"))) assert.ok(graph.nodes.some((n) => n.id === c || n.id === c.split(":")[0]), `${c} ran but is not in the graph`);
+  assert.ok(graph.nodes.every((n) => n.after.every((e) => graph.nodes.some((x) => x.id === e.id))), "no edge points at a stage that is not in the graph");
   assert.equal(review.scope, "script");
   const byId = Object.fromEntries(review.gates.map((g) => [g.id, g]));
   for (const id of ["visual", "rights"]) {

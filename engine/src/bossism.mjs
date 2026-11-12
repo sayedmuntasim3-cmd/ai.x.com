@@ -93,6 +93,9 @@ const IDEA_STAGES = Object.freeze([
   { base: "master", after: ["render"], needs: [], optional: [], roles: ["audio-audio-qc", "editing-edit-qc", "color-final-master"] },
 ]);
 
+/** Stages a script-only film never runs. */
+export const SCRIPT_ONLY_SKIPS = Object.freeze(["edit", "media", "render", "master"]);
+
 /** Stages that only read: their work does not change when an earlier stage is redone, so they never need invalidating. */
 const NOT_RERUN = new Set(["market", "review", "render", "master"]);
 
@@ -118,6 +121,8 @@ export function understand(request) {
  */
 export function productionGraph(objective, chapters = objective.chapters) {
   if (objective.system !== "idea") return { system: objective.system, wired: false, nodes: [] };
+  // A script-only film never runs the edit, the pictures, the render or the master check: they are not in its graph.
+  const skip = new Set(objective.film?.scriptOnly ? SCRIPT_ONLY_SKIPS : []);
   /** @type {StageNode[]} */
   const nodes = [];
   /** @param {string} base */
@@ -126,11 +131,13 @@ export function productionGraph(objective, chapters = objective.chapters) {
     return s && "perChapter" in s && s.perChapter ? chapters.map((c) => `${base}:${c}`) : [base];
   };
   for (const s of IDEA_STAGES) {
+    if (skip.has(s.base)) continue;
     const per = "perChapter" in s && s.perChapter;
     const make = (/** @type {string | undefined} */ chapter, /** @type {number} */ i) => {
       /** @type {StageNode["after"]} */
       const after = [];
       for (const dep of s.after) {
+        if (skip.has(dep)) continue;
         const depStage = IDEA_STAGES.find((x) => x.base === dep);
         const perDep = depStage && "perChapter" in depStage && depStage.perChapter;
         // A per-chapter stage after a per-chapter stage depends on the same chapter only (edit:C2 needs viewer, not edit:C1).

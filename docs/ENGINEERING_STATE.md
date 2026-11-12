@@ -26,7 +26,7 @@ owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
 
-- Tests (third session, 12 Nov 2026): **203 engine + 75 platform = 278, all passing** after `npm ci` at the
+- Tests (third session, 12 Nov 2026): **206 engine + 75 platform = 281, all passing** after `npm ci` at the
   root (a fresh container has no root `node_modules`). Earlier: 173 + 73 = 246; strict
   JSDoc type check passes (`cd engine && npm run typecheck`); Cloudflare build
   check passes (`npm run check`). Before this session: 141 + 48 = 189.
@@ -189,6 +189,20 @@ Not yet (Master Plan §23): a dated price registry (E2; the price table is still
 at $0, which is right only for a project without billing), per-project provider flags (E3), day and month
 caps, a studio stop button. A Gemini model missing from `PRICES` is priced like the most expensive model
 (safe, but its cost is then over-reported and it needs `--budget`).
+
+## 4f. Architecture validation (12 Nov 2026)
+
+Checked, and now kept by tests (`engine/test/architecture.test.mjs`): `engine/src` imports only its own
+modules (it runs in the browser studio and in Node), its modules have no import cycle, and every message
+code used in the engine, worker, local runner, renderer and studio exists in `messages.mjs`. Existing tests
+already keep the studio's copy identical to `engine/src` and the production graph equal to the stages the
+run executes.
+
+Fixed: a script-only film's production graph listed the edit, pictures, render and master stages it never
+runs; they are now left out of its graph (`SCRIPT_ONLY_SKIPS`).
+
+Known structural debt, unchanged on purpose (Master Plan §5, §20 Phase 2): `film-run.mjs` runs every stage
+in one long function; `ROLE_STATUS` is still written by hand; every stage receives the whole 73 KB manual.
 
 ## 5. Role entries corrected
 
