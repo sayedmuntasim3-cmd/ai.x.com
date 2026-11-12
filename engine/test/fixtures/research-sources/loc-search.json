@@ -1,0 +1,32 @@
+{
+ "pagination": {
+  "of": 52
+ },
+ "results": [
+  {
+   "id": "http://www.loc.gov/collections/wright-brothers-negatives/about-this-collection/",
+   "url": "https://www.loc.gov/collections/wright-brothers-negatives/about-this-collection/",
+   "title": "Wright Brothers Negatives",
+   "date": "1897",
+   "description": [
+    "The first powered flight was made by Orville Wright at Kitty Hawk, N.C., on December 17, 1903, the result of years of experiments and design by the Wright brothers, who were operators of a bicycle repair shop and factory in Dayton, Ohio. The brothers continued their flying experiments in Ohio and in Fort Myer, Va., and were granted a patent for the plane in 1906. In 1908 and 1909 they traveled to Europe and drew attention to their invention by flying in France, Italy, England, and Germany. In that same year they started a company to manufacture Wright airplanes, and began their successful fight against patent suits by Glenn Curtiss and other competitors. Wilbur died of typhoid fever in 1912 and Orville sold his interest in the Wright airplane company in 1915."
+   ],
+   "original_format": [
+    "collection",
+    "photo, print, drawing"
+   ]
+  },
+  {
+   "id": "http://www.loc.gov/item/00652085/",
+   "url": "https://www.loc.gov/item/00652085/",
+   "title": "[First flight, 120 feet in 12 seconds, 10:35 a.m.; Kitty Hawk, North Carolina]",
+   "date": "1903",
+   "description": [
+    "1 photograph : glass negative, dry plate ; plate 18 x 12.5 cm (5 x 7 format). | Photograph shows the first powered, controlled, sustained flight. Orville Wright at the controls of the machine, lying prone on the lower wing with hips in the cradle which operated the wing-warping mechanism. Wilbur Wright running alongside to balance the machine, has just released his hold on the forward upright of the right wing.  The starting rail, the wing-rest, a coil box, and other items needed for flight preparation are visible behind the machine. (Orville Wright preset the camera and had John T. Daniels squeeze the rubber bulb, tripping the shutter.)"
+   ],
+   "original_format": [
+    "photo, print, drawing"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+{
+ "result": {
+  "uids": [
+   "43003971",
+   "42998252"
+  ],
+  "43003971": {
+   "uid": "43003971",
+   "title": "Efficient Bioproduction of Citric Acid in Aspergillus niger.",
+   "pubdate": "2026 Nov 10",
+   "source": "Adv Biochem Eng Biotechnol",
+   "authors": [
+    {
+     "name": "Zheng X",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Sun J",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Zheng P",
+     "authtype": "Author",
+     "clusterid": ""
+    }
+   ],
+   "elocationid": "doi: 10.1007/10_2026_354"
+  },
+  "42998252": {
+   "uid": "42998252",
+   "title": "A genome-wide CRISPR screening identifies targets that drive tolerogenic dendritic cells.",
+   "pubdate": "2026 Nov 6",
+   "source": "Cell Rep",
+   "authors": [
+    {
+     "name": "Li X",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Han T",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Chen L",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Suresh M",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Rahimov F",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Gao C",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Wang J",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Ma R",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Stender JD",
+     "authtype": "Author",
+     "clusterid": ""
+    },
+    {
+     "name": "Katlinski K",
+     "authtype": "Author",
+     "clusterid": ""
+    }
+   ],
+   "elocationid": "doi: 10.1016/j.celrep.2026.118212"
+  }
+ }
+}

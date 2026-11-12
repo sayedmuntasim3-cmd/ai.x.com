@@ -22,7 +22,7 @@
  *
  * The brain and the optional keys come from the environment, with the same
  * names as the studio (worker/brain.mjs, docs/BRAIN.md): BRAIN_URL,
- * BRAIN_MODEL, BRAIN_CONTEXT, BRAIN_VISION, SEARXNG_URL; PEXELS_API_KEY and
+ * BRAIN_MODEL, BRAIN_CONTEXT, BRAIN_VISION, SEARXNG_URL, RESEARCH_SOURCES; PEXELS_API_KEY and
  * PIXABAY_API_KEY (free) for stock footage; GEMINI_API_KEY or
  * ANTHROPIC_API_KEY only if you choose those brains.
  *
@@ -118,7 +118,7 @@ export async function produceFilm(o) {
     media: { providers: media },
     sources: { fetch: pages },
     // The search providers' own APIs (Wikipedia, the owner's SearXNG, which may be on this network) use the plain fetch.
-    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined }), fetch: pages },
+    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES || undefined }), fetch: pages },
     channel: o.channel,
     log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
     signal: o.signal,

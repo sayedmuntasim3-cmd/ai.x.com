@@ -22,13 +22,14 @@
  */
 import { publicUrl, safeFetch } from "./net-guard.mjs";
 import { siteOf } from "./source-check.mjs";
+import { sourceProviders } from "./research-sources.mjs";
 
 export { privateAddress, publicUrl, safeFetch } from "./net-guard.mjs";
 
 /** @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike */
-/** @typedef {{ title: string, url: string, snippet?: string }} SearchHit */
+/** @typedef {{ title: string, url: string, snippet?: string, meta?: import("./research-sources.mjs").HitMeta }} SearchHit */
 /** @typedef {{ id: string, search(query: string, limit: number): Promise<SearchHit[]>, read?(hit: SearchHit): Promise<{ title: string, text: string, references: string[] } | null> }} ResearchProvider */
-/** @typedef {{ id: string, url: string, title: string, site: string, provider: string, via?: string, text: string }} CorpusDoc */
+/** @typedef {{ id: string, url: string, title: string, site: string, provider: string, via?: string, meta?: import("./research-sources.mjs").HitMeta, text: string }} CorpusDoc */
 
 export const DESK_LIMITS = Object.freeze({
   /** Search queries the brain may ask for. */
@@ -179,13 +180,15 @@ export function searxngProvider(o) {
 
 /**
  * The research providers a run can use: Wikipedia always, SearXNG when the
- * owner gives its address.
- * @param {{ fetch: FetchLike, searxngUrl?: string, language?: string }} o
+ * owner gives its address, and the free research APIs the owner names
+ * (`sources`, e.g. "crossref,europepmc,pubmed,archive,loc"; off by default).
+ * @param {{ fetch: FetchLike, searxngUrl?: string, language?: string, sources?: string | string[] }} o
  */
 export function researchProviders(o) {
   /** @type {ResearchProvider[]} */
   const list = [wikipediaProvider({ fetch: o.fetch, language: o.language })];
   if (o.searxngUrl) list.push(searxngProvider({ fetch: o.fetch, url: o.searxngUrl, language: o.language }));
+  if (o.sources) list.push(...sourceProviders(o.sources, { fetch: o.fetch, language: o.language }).providers);
   return list;
 }
 
@@ -243,7 +246,7 @@ export async function gatherCorpus(o) {
     if (docs.length >= limits.docs) break;
     const read = provider.read ? await provider.read(hit).catch(() => null) : await readPage(o.fetch, hit.url, limits);
     if (!read) continue;
-    docs.push({ url: hit.url, title: read.title || hit.title, site: siteOf(hit.url), provider: provider.id, text: read.text });
+    docs.push({ url: hit.url, title: read.title || hit.title, site: siteOf(hit.url), provider: provider.id, ...(hit.meta ? { meta: hit.meta } : {}), text: read.text });
     for (const ref of "references" in read ? /** @type {string[]} */ (read.references ?? []) : []) references.push({ url: ref.replace(/#.*$/, ""), from: hit.url });
   }
 
@@ -296,7 +299,7 @@ function interleave(items, key) {
 
 /** The corpus as the brain reads it. @param {CorpusDoc[]} docs */
 export function corpusText(docs) {
-  return docs.map((d) => `[${d.id}] ${d.title}\nURL: ${d.url}\n${d.text}`).join("\n\n---\n\n");
+  return docs.map((d) => `[${d.id}] ${d.title}\nURL: ${d.url}${d.meta ? `\nPage: ${d.meta.canonical} (${d.meta.kind})` : ""}\n${d.text}`).join("\n\n---\n\n");
 }
 
 /**

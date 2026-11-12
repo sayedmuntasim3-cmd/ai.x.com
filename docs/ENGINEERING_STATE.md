@@ -241,6 +241,48 @@ aviation-safety.net block scripts; ReliefWeb needs host api.reliefweb.int
 added. Next: Phase 0 needs a free Gemini key (Google project without billing),
 only with the owner's approval.
 
+**Correction (same day, later test).** With the project's own user agent
+(`ZuponaStudio/1.0 (...; https://github.com/sayedmuntasim3-cmd/ai.x.com)`, the
+one `research-desk.mjs` already sends), Wikipedia search returned **200 with
+data** (10961 hits for "Tenerife"). The 429 above came from my generic test
+agent with no contact link. Wikidata and OpenAlex still returned 429 with the
+project agent (OpenAlex: "no API key, shared daily budget used up").
+
+## 4h. Research sources module (12 Nov 2026; Blueprint step 1 / G4)
+
+New `engine/src/research-sources.mjs`: Crossref, Europe PMC, PubMed
+(E-utilities), Internet Archive, Library of Congress, each a `ResearchProvider`
+of the existing research desk (no second research path). Off by default:
+`researchProviders({ sources })`, and `RESEARCH_SOURCES=crossref,europepmc,pubmed,archive,loc`
+for `local/run-film.mjs`. The Worker is **not** changed (no production change).
+
+- Evidence: each document's `url` is the record URL whose response holds the
+  exact text kept (Crossref work, Europe PMC core record, PubMed efetch
+  abstract, Archive metadata, LOC item JSON), so the source desk can reopen it;
+  `meta.canonical` is the human page (doi.org, europepmc.org, pubmed, archive
+  details, LOC item), `meta.kind` labels it (preprint "not peer reviewed",
+  "bibliographic record", catalogued item); the brain sees both lines.
+- Safety: one https host per source; other hosts, http, ports, credentials,
+  redirects off the host and private addresses refused (`safeFetch` on every
+  hop). Per-source minimum gap, one request at a time, timeouts (LOC 45 s:
+  its search measured 13-27 s), 2 MB cap, 2 retries on 429/5xx/network with
+  backoff, Retry-After capped at 10 s; error codes (`http-404`, `timeout`,
+  `host-refused`, `bad-json`). No key, no email; NCBI gets `tool=zupona-studio`.
+- English first: Europe PMC adds `LANG:eng`; Archive searches text items only.
+- Tests (simulated, replay of real responses recorded today, trimmed):
+  `engine/test/research-sources.test.mjs`, 11 tests, fixtures in
+  `engine/test/fixtures/research-sources/`.
+- **Live check** (real requests, `node local/research-sources-check.mjs`,
+  12 Nov 2026 08:19 UTC): all 5 searched and read OK. Crossref 3 hits
+  (2.7 s), Europe PMC 3 (0.5 s), PubMed 3 (0.7 s), Archive 3 (0.7 s),
+  LOC 1 item (12.7 s).
+- **Quality limits found live:** Crossref ranked an unrelated Tenerife
+  airport-terminal record first and has no abstracts for most works: use it to
+  confirm that a cited paper exists, not as a fact source. Archive's first hit
+  was a Reddit podcast until text items only were searched (now a CIA reading
+  room document). LOC is slow. No source ranking or reliability scoring
+  exists yet: that is Master Plan Phase 3 (R-stages), not built here.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`
