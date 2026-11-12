@@ -233,3 +233,43 @@ run) clean; `experiment-context.mjs --check` clean. All mock or replay:
 | Hypothetical per arm at those prices | about $0.40–1.20 (estimate from 12–25 calls) | our estimate, unverified |
 | Hypothetical ceiling at the 40-call cap | about $12.60 (4 M input, 2.56 M output tokens) | our arithmetic |
 | Engine budget stop | priced at $0, so it cannot catch charges: the no-billing project is the real guard | code |
+
+## 12. Second preparation pass (12 Nov 2026)
+
+**Model availability and quota: what can and cannot be verified without the key.**
+
+| Item | Result | Source |
+|---|---|---|
+| `gemini-3.8-flash` exists, is current, free | verified on the official pages | models, pricing pages |
+| Available to the owner's project | **unverifiable without the key**: `node local/gemini-check.mjs` (models.get, generates nothing) is the first step after the key | — |
+| Free RPM / TPM / RPD for it | **not published**; shown only in AI Studio for the signed-in project (aistudio.google.com/rate-limit) | rate-limits page |
+| Project verification | "Required for the free tier on additional projects or projects created outside Google AI Studio. Unverified projects ... return `403` (`FREE_TIER_VERIFICATION_REQUIRED`)"; done by phone QR scan, no phone number shared. The same dialog offers "Set up billing": **must not be chosen**. The project AI Studio creates automatically for a new user does not need it, per "Google AI Studio automatically creates a project and API key for new users". | aistudio.google.com/docs/verification, /docs/api-key (llms-full.txt, read 12 Nov 2026) |
+
+`local/gemini-check.mjs` now names this 403 and warns against billing (test added).
+
+**Gold fact sheet v0** written before any run: `gold/tenerife-1977-v0.md`,
+20 facts. Limit: all from Wikipedia (secondary); the official reports did not
+open (hosts `www.transportes.gob.es`, `www.faasafety.gov`,
+`www.project-tenerife.com`).
+
+**New risk for arm B:** Wikipedia answered **429** twice today from this
+cloud address even with the project's user agent (it answered 200 earlier).
+Wikipedia is the research desk's main event source; the five scholarly and
+archive sources hold little on the accident itself. If the run hits 429, B's
+corpus will be thin and the comparison will understate our research. Options:
+run B from the owner's own computer (`local/run-film.mjs` works there,
+unverified), or retry later; the record will say which.
+
+**Owner's next steps, in order:**
+1. In Google AI Studio (aistudio.google.com), signed in: use the project AI
+   Studio made for you, or create one **in AI Studio**. Open **Projects**: it
+   must show the **Free** tier and no billing. If it shows "Verification
+   needed", verify with the phone QR code; never click "Set up billing".
+2. Open aistudio.google.com/rate-limit and write down the RPM, TPM and RPD
+   shown for Gemini 3.8 Flash.
+3. Decide whether to allow read-only access to the three official-report
+   hosts above, so the gold sheet can be checked against primary sources.
+4. Decide where arm B runs (cloud, accepting the Wikipedia risk, or your
+   computer).
+5. Then give approval for the key (secure form; never in chat) and for the
+   live runs. Until then nothing is called.

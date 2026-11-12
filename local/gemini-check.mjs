@@ -32,6 +32,10 @@ export async function checkGeminiModel(o) {
     /** @type {any} */
     let err = {};
     try { err = JSON.parse(body).error ?? {}; } catch { /* not JSON */ }
+    // Google: unverified free-tier projects answer 403 FREE_TIER_VERIFICATION_REQUIRED (aistudio.google.com/docs/verification).
+    if (res.status === 403 && /FREE_TIER_VERIFICATION_REQUIRED|must be verified before it can use the Gemini API Free tier/.test(body)) {
+      return { ok: false, model, status: 403, problems: ["HTTP 403 FREE_TIER_VERIFICATION_REQUIRED: the project must be verified with a phone (AI Studio > Projects > Verify project > Verify device, scan the QR code). Do NOT choose \"Set up billing\": that moves the project to the paid tier."] };
+    }
     const why = res.status === 404 ? "the model is not available to this project" : res.status === 403 ? "this project or key may not use the model (or the API is not enabled)" : res.status === 400 ? "the key or request was refused" : res.status === 429 ? "rate limited" : "error";
     return { ok: false, model, status: res.status, problems: [`HTTP ${res.status}${err.status ? ` ${err.status}` : ""}: ${why}${err.message ? ` (${String(err.message).slice(0, 200)})` : ""}`] };
   }

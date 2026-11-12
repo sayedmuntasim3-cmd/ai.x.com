@@ -24,3 +24,10 @@ test("missing model, refused project, bad key and small limits fail with a reaso
   assert.equal(small.problems.length, 2);
   assert.equal((await checkGeminiModel({ apiKey: "dummy", model: "../x" })).ok, false);
 });
+
+test("an unverified free-tier project is named as such, with the safe fix and a warning not to set up billing", async () => {
+  const r = await checkGeminiModel({ apiKey: "dummy", fetch: reply(403, { error: { code: 403, status: "PERMISSION_DENIED", message: "Project 123456789012 must be verified before it can use the Gemini API Free tier. Verify the project at https://aistudio.google.com/verify?project=123456789012, or set up billing at https://aistudio.google.com/billing to use the paid tier instead.", details: [{ reason: "FREE_TIER_VERIFICATION_REQUIRED" }] } }) });
+  assert.equal(r.ok, false);
+  assert.match(r.problems[0], /FREE_TIER_VERIFICATION_REQUIRED: the project must be verified with a phone/);
+  assert.match(r.problems[0], /Do NOT choose "Set up billing"/);
+});
