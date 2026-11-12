@@ -101,6 +101,32 @@ export const MESSAGES = Object.freeze({
   "release.override": { en: (p) => `The owner approved the release despite: ${names(p.gates, "en")}. Reason: ${p.reason}`, bn: (p) => `${names(p.gates, "bn")} থাকা সত্ত্বেও মালিক প্রকাশের অনুমতি দিয়েছেন। কারণ: ${p.reason}` },
   "revise.sent": { en: (p) => `Sent back for revision (round ${p.round} of ${p.max}): ${p.stages}.`, bn: (p) => `সংশোধনের জন্য ফেরত পাঠানো হয়েছে (রাউন্ড ${p.round}/${p.max}): ${p.stages}।` },
   "revise.limit": { en: (p) => `The revision limit (${p.max}) is reached; what is still wrong stays listed.`, bn: (p) => `সংশোধনের সীমা (${p.max}) শেষ; যা এখনো ঠিক হয়নি তা তালিকায় থাকছে।` },
+
+  // Voice system: intake, words, understanding, pictures
+  "voice.ready": { en: (p) => `Voice checked: ${p.seconds} s, ${p.lufs} LUFS, true peak ${p.peak} dBTP, ${p.silence}% silence.`, bn: (p) => `ভয়েস পরীক্ষা হয়েছে: ${p.seconds} সেকেন্ড, ${p.lufs} LUFS, ট্রু পিক ${p.peak} dBTP, ${p.silence}% নীরবতা।` },
+  "voice.noFfmpeg": { en: () => "ffmpeg is not installed, so the voice file cannot be read.", bn: () => "ffmpeg ইনস্টল নেই, তাই ভয়েস ফাইল পড়া যাচ্ছে না।" },
+  "voice.unreadable": { en: (p) => `The voice file could not be read as audio: ${p.error}`, bn: (p) => `ভয়েস ফাইলটি অডিও হিসেবে পড়া গেল না: ${p.error}` },
+  "voice.short": { en: () => "The recording is shorter than one second.", bn: () => "রেকর্ডিং এক সেকেন্ডের চেয়ে ছোট।" },
+  "voice.clipping": { en: (p) => `The voice clips in ${p.runs} place(s); it is repaired gently, but a new take with lower gain is better.`, bn: (p) => `ভয়েস ${p.runs} জায়গায় ক্লিপ করেছে; আলতোভাবে ঠিক করা হবে, তবে কম গেইনে নতুন করে রেকর্ড করা ভালো।` },
+  "voice.noisy": { en: (p) => `Background noise is only ${p.snr} dB under the voice.`, bn: (p) => `পেছনের শব্দ ভয়েসের চেয়ে মাত্র ${p.snr} dB কম।` },
+  "voice.quiet": { en: (p) => `The voice is very quiet (${p.lufs} LUFS); raising it also raises its noise.`, bn: (p) => `ভয়েস খুব আস্তে (${p.lufs} LUFS); বাড়ালে এর নয়েজও বাড়বে।` },
+  "voice.silent": { en: (p) => `${p.silence}% of the file is silence; check that it is the right file.`, bn: (p) => `ফাইলের ${p.silence}% নীরব; ঠিক ফাইল কি না দেখে নিন।` },
+  "voice.lowRate": { en: (p) => `The sample rate is ${p.rate} Hz, so the voice will sound dull.`, bn: (p) => `স্যাম্পল রেট ${p.rate} Hz, তাই ভয়েস ভোঁতা শোনাবে।` },
+  "voice.words": { en: (p) => `${p.count} words heard (${p.language}) by ${p.engine} ${p.model}.`, bn: (p) => `${p.engine} ${p.model} ${p.count}টি শব্দ শুনেছে (${p.language})।` },
+  "voice.noWords": { en: () => "No words were found in the voice, so no film can be planned on it.", bn: () => "ভয়েসে কোনো শব্দ পাওয়া যায়নি, তাই এর উপর ফিল্মের পরিকল্পনা করা যাবে না।" },
+  "voice.wordsEstimated": { en: () => "The transcript has times per line only; word times inside a line are estimated, so cuts may be off by a fraction of a second.", bn: () => "ট্রান্সক্রিপ্টে শুধু লাইনের সময় আছে; লাইনের ভেতরে শব্দের সময় অনুমান করা, তাই কাট সেকেন্ডের ভগ্নাংশ এদিক-ওদিক হতে পারে।" },
+  "voice.lowConfidence": { en: (p) => `${p.share}% of the words were heard with low confidence; check the transcript before the film is made.`, bn: (p) => `${p.share}% শব্দ কম নিশ্চয়তায় শোনা গেছে; ফিল্ম বানানোর আগে ট্রান্সক্রিপ্ট দেখে নিন।` },
+  "voice.badTimes": { en: (p) => `${p.count} word time(s) were out of order or past the end of the recording.`, bn: (p) => `${p.count}টি শব্দের সময় উল্টাপাল্টা বা রেকর্ডিংয়ের শেষের পরে ছিল।` },
+  "voice.kind": { en: (p) => `This voice is ${p.kind === "quran" ? "Quran recitation" : "narration"} (${p.language}).`, bn: (p) => `এই ভয়েসটি ${p.kind === "quran" ? "কুরআন তিলাওয়াত" : "বর্ণনা (narration)"} (${p.language})।` },
+  "voice.quranFound": { en: (p) => `Recognised Surah ${p.surah}, ayat ${p.from}-${p.to} (${p.coverage}% of the words match Tanzil).`, bn: (p) => `চেনা গেছে সূরা ${p.surah}, আয়াত ${p.from}-${p.to} (${p.coverage}% শব্দ Tanzil-এর সাথে মেলে)।` },
+  "voice.quranNotFound": { en: () => "Quran recitation was asked for, but no ayah was recognised; the transcript may be too weak.", bn: () => "কুরআন তিলাওয়াত বলা হয়েছে, কিন্তু কোনো আয়াত চেনা যায়নি; ট্রান্সক্রিপ্ট হয়তো দুর্বল।" },
+  "voice.scenes": { en: (p) => `${p.count} scenes cut on the voice's own word times.`, bn: (p) => `ভয়েসের নিজের শব্দ-সময় ধরে ${p.count}টি দৃশ্য কাটা হয়েছে।` },
+  "voice.wordsKept": { en: () => "Every spoken word is in the plan, unchanged and in order.", bn: () => "প্রতিটি বলা শব্দ পরিকল্পনায় আছে, অপরিবর্তিত ও ক্রমমতো।" },
+  "voice.wordsChanged": { en: (p) => `The picture plan changed the words of ${p.scenes}; they were put back from the voice.`, bn: (p) => `ছবির পরিকল্পনা ${p.scenes}-এর শব্দ বদলেছিল; ভয়েস থেকে আবার ঠিক করে বসানো হয়েছে।` },
+  "voice.noBrain": { en: () => "No writer model answered, so pictures were chosen from each scene's own words.", bn: () => "কোনো লেখক মডেল সাড়া দেয়নি, তাই প্রতিটি দৃশ্যের নিজের শব্দ থেকে ছবি বাছা হয়েছে।" },
+  "voice.assetRefused": { en: (p) => `A picture from ${p.source} was refused: ${p.reason}`, bn: (p) => `${p.source} থেকে একটি ছবি বাদ দেওয়া হয়েছে: ${p.reason}` },
+  "voice.noAsset": { en: (p) => `No free licensed picture was found for ${p.scene}.`, bn: (p) => `${p.scene}-এর জন্য বিনামূল্যের লাইসেন্সসহ কোনো ছবি পাওয়া যায়নি।` },
+  "voice.meaningGap": { en: () => "No translation with a licence that allows its use is bundled, so meanings are not shown.", bn: () => "ব্যবহারের অনুমতিসহ কোনো অনুবাদ সাথে নেই, তাই অর্থ দেখানো হচ্ছে না।" },
 });
 
 /** Names of gates and stages, in both languages. */
