@@ -1,20 +1,26 @@
 /**
  * Voice film, on the owner's machine:
  *   node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>]
+ *        [--transcript <json|srt|vtt>] [--stt faster-whisper|pocketsphinx] [--model small.en]
+ *        [--script <the words as written, .txt>]
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
  * and channels, float, for the voice checks) and voice-16k.wav (16 kHz mono,
  * what speech-to-text listens to). The voice report holds duration,
  * loudness, true peak, clipping, silence and noise, each problem as a coded
  * message (engine/src/messages.mjs) in English and Bengali.
+ * Step 2 (words): a transcript that came with the voice (--transcript), or
+ * speech-to-text run here (--stt, local/stt/transcribe.py). With --script,
+ * the words are the script's, exactly, timed by what was heard.
  */
 import { execFile } from "node:child_process";
-import { open, mkdir, writeFile, stat } from "node:fs/promises";
+import { open, mkdir, readFile, writeFile, stat } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { createRecordingAnalyzer } from "../engine/src/loudness.mjs";
 import { measureWavFile } from "../engine/src/wav.mjs";
 import { msg } from "../engine/src/messages.mjs";
+import { alignScript, checkTranscript, normalizeTranscript } from "../engine/src/transcript.mjs";
 
 const run = promisify(execFile);
 
@@ -129,6 +135,38 @@ export async function intake(o) {
   return { ok: report.ok, report, analysisWav, sttWav, messages: report.messages };
 }
 
+/**
+ * Run local/stt/transcribe.py on the 16 kHz copy. Python and the engine's
+ * package must be installed on this machine (pip install faster-whisper).
+ * @param {{ wav: string, out: string, engine: string, model?: string, language?: string, python?: string }} o
+ */
+export async function speechToText(o) {
+  const script = new URL("./stt/transcribe.py", import.meta.url).pathname;
+  const args = ["-I", script, o.wav, "--engine", o.engine, "--out", o.out];
+  if (o.model) args.push("--model", o.model);
+  if (o.language) args.push("--language", o.language);
+  await run(o.python ?? "python3", args, { maxBuffer: 1 << 24, timeout: 6 * 3600 * 1000 });
+  return normalizeTranscript(await readFile(o.out, "utf8"));
+}
+
+/**
+ * Step 2: the timed words, checked against the recording.
+ * @param {{ out: string, totalSeconds: number, sttWav?: string, transcript?: string, stt?: string, model?: string, language?: string, script?: string }} o
+ */
+export async function words(o) {
+  let t;
+  if (o.transcript) t = normalizeTranscript(await readFile(o.transcript, "utf8"), { name: o.transcript });
+  else if (o.stt && o.sttWav) t = await speechToText({ wav: o.sttWav, out: join(o.out, "heard.json"), engine: o.stt, model: o.model, language: o.language });
+  else throw new Error("Give --transcript <file> or --stt faster-whisper|pocketsphinx.");
+  /** @type {any} */
+  let final = t;
+  if (o.script) final = alignScript(await readFile(o.script, "utf8"), t);
+  const check = checkTranscript(final, o.totalSeconds);
+  const result = { ...final, words: check.words, check: { ok: check.ok, problems: check.problems, lowConfidenceShare: check.lowConfidenceShare }, messages: check.messages };
+  await writeFile(join(o.out, "words.json"), JSON.stringify(result, null, 1));
+  return result;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (typeof args.audio !== "string") {
@@ -139,7 +177,14 @@ async function main() {
   const lang = args.lang === "bn" ? "bn" : "en";
   const step1 = await intake({ audio: resolve(args.audio), out });
   for (const m of step1.messages) console.log("- " + m[lang]);
-  if (!step1.ok) process.exit(1);
+  if (!step1.ok || !step1.report) process.exit(1);
+  /** @param {string | boolean | undefined} x */
+  const str = (x) => (typeof x === "string" ? resolve(x) : undefined);
+  if (args.transcript || args.stt) {
+    const step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : undefined, script: str(args.script) });
+    for (const m of step2.messages) console.log("- " + m[lang]);
+    if (!step2.check.ok) process.exit(1);
+  }
   console.log(`Saved in ${out}`);
 }
 
