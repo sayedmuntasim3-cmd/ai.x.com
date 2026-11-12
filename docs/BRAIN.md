@@ -14,8 +14,9 @@ free brain, what it costs in practice, and where it is weaker than Claude.
 | **Claude** | secret `ANTHROPIC_API_KEY` | about $7–15 for 45 minutes (studio estimate) | best tested so far |
 
 Which one runs: `BRAIN=local|gemini|claude` chooses. Without `BRAIN`, the
-first one that is set up runs, in the order local → Claude → Gemini. Claude
-and Gemini are never used unless their keys are set.
+first free one that is set up runs, local then Gemini. **Claude (paid) runs
+only when `BRAIN=claude` names it**: a Claude key alone never starts spending.
+Gemini is never used unless its key is set.
 
 ## 2. Quick start on your own computer (recommended)
 

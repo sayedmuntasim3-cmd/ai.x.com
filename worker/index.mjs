@@ -176,6 +176,8 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       model,
       store,
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
+      // The emergency stop, asked before every model call: the key control/stop in the films bucket stops every running film.
+      halt: async () => ((await env.FILMS.get("control/stop")) ? "the key control/stop is set in storage" : null),
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
       // What the channel's published films taught (where viewers left and stayed), for the writers and the editor.
       lessons: { load: async () => { const o = await env.FILMS.get("channel/lessons.json"); return o ? lessonsText(JSON.parse(await o.text())) : ""; } },

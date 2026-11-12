@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { brainFromEnv, brainHealth, chooseBrain } from "./brain.mjs";
 
-test("the free brain comes first; Claude and Gemini only when their keys are set or BRAIN names them", () => {
+test("the free brain comes first; the paid brain (Claude) runs only when BRAIN names it, never by itself", () => {
   const all = { BRAIN_URL: "http://localhost:11434", BRAIN_MODEL: "qwen3:32b", ANTHROPIC_API_KEY: "sk", GEMINI_API_KEY: "g" };
   assert.deepEqual(chooseBrain(all), { ok: true, kind: "local" });
   assert.deepEqual(chooseBrain({ ...all, BRAIN: "claude" }), { ok: true, kind: "claude" });
   assert.deepEqual(chooseBrain({ ...all, BRAIN: "Gemini" }), { ok: true, kind: "gemini" });
-  assert.deepEqual(chooseBrain({ ANTHROPIC_API_KEY: "sk", GEMINI_API_KEY: "g" }), { ok: true, kind: "claude" }, "the order before the brain plug is kept for keys");
+  assert.deepEqual(chooseBrain({ ANTHROPIC_API_KEY: "sk", GEMINI_API_KEY: "g" }), { ok: true, kind: "gemini" }, "with both keys and no BRAIN, the free brain runs, not the paid one");
+  const paidOnly = chooseBrain({ ANTHROPIC_API_KEY: "sk" });
+  assert.equal(paidOnly.ok, false, "a paid key alone never starts spending");
+  assert.match(String(/** @type {any} */ (paidOnly).error), /never chosen automatically: set BRAIN=claude/);
+  assert.deepEqual(chooseBrain({ ANTHROPIC_API_KEY: "sk", BRAIN: "claude" }), { ok: true, kind: "claude" });
   assert.deepEqual(chooseBrain({ GEMINI_API_KEY: "g" }), { ok: true, kind: "gemini" });
 });
 
@@ -43,6 +47,7 @@ test("health shows the brain without its address or any key", () => {
   assert.deepEqual(h, { connected: true, kind: "local", model: "qwen3:32b", seesPictures: false, searchesWeb: false, contextTokens: 32768, maxOutputTokens: 8192, pricing: "free (runs on your own machine)" });
   assert.ok(!JSON.stringify(h).includes("secret-tunnel") && !JSON.stringify(h).includes("k3y") && !JSON.stringify(h).includes("sk-ant"));
   assert.deepEqual(brainHealth({ GEMINI_API_KEY: "g" }), { connected: true, kind: "gemini", model: "gemini-2.5-flash", seesPictures: false, searchesWeb: true, pricing: "free tier (daily limits apply)" });
-  assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk" }).seesPictures, true);
+  assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk", BRAIN: "claude" }).seesPictures, true);
+  assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk" }).connected, false, "a paid key alone connects nothing");
   assert.equal(brainHealth({}).connected, false);
 });

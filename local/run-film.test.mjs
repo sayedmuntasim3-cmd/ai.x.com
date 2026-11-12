@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -81,4 +81,21 @@ test("the local runner opens a page only when its host resolves to public addres
   await assert.rejects(guarded("http://127.0.0.1/"), /non-public address/);
   assert.equal((await guarded("http://8.8.8.8/")).status, 200, "a public IP needs no lookup");
   assert.deepEqual(opened, ["https://public.example/a", "http://8.8.8.8/"]);
+});
+
+test("a paid brain never runs without a hard cap, and a STOP file stops the run before its next call", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-cost-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  let calls = 0;
+  const paid = { name: "claude-opus-5-5", call: async () => { calls += 1; throw new Error("no call should be made"); } };
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", join(dir, "a")], {}, { model: paid, log: () => {} }), /costs money .* --budget <USD>; nothing is spent without one/);
+  assert.equal(calls, 0);
+  const out = join(dir, "b");
+  const free = { name: "local-test", price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: paid.call };
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "STOP"), "");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out], {}, { model: free, log: () => {} }), /emergency stop before s01: a STOP file/);
+  assert.equal(calls, 0, "stopped before the first call");
+  await assert.rejects(main(["--out", out], { ZUPONA_STOP: "1" }, { model: free, log: () => {} }), /ZUPONA_STOP=1/);
+  assert.equal(calls, 0);
 });

@@ -3,7 +3,8 @@
  * settings (Cloudflare vars and secrets, or the environment of the local
  * runner). Kept apart from worker/index.mjs so it runs and is tested in Node.
  *
- *   BRAIN           "local" | "claude" | "gemini"; unset: the first one configured, in that order
+ *   BRAIN           "local" | "claude" | "gemini"; unset: the first free one configured (local, then
+ *                   gemini). The paid brain (claude) is never chosen unless BRAIN names it.
  *   local           BRAIN_URL (the owner's Ollama, llama.cpp, vLLM or LM Studio, reachable from
  *                   where the run happens), BRAIN_MODEL, optional BRAIN_KEY (secret),
  *                   BRAIN_API ("ollama" | "openai"; guessed from the URL), BRAIN_CONTEXT (tokens,
@@ -14,8 +15,8 @@
  *   gemini          GEMINI_API_KEY (secret, free tier), GEMINI_MODEL
  *
  * The free brain comes first when it is set up: the owner does not want to
- * depend on paid APIs (docs/VISION.md, master list item 4). Claude and
- * Gemini are used only when their keys are set or BRAIN names them.
+ * depend on paid APIs (docs/VISION.md, master list item 4). Gemini is used
+ * only when its key is set; Claude only when BRAIN=claude asks for it.
  */
 import { anthropicModel } from "./anthropic.mjs";
 import { geminiModel } from "./gemini.mjs";
@@ -25,6 +26,8 @@ import { localBrain } from "./local-brain.mjs";
 /** @typedef {"local" | "claude" | "gemini"} BrainKind */
 
 const KINDS = /** @type {const} */ (["local", "claude", "gemini"]);
+/** The brains chosen without BRAIN, in this order: never a paid one. */
+const FREE_KINDS = /** @type {const} */ (["local", "gemini"]);
 
 /** @param {unknown} v */
 const num = (v) => {
@@ -49,7 +52,9 @@ export function chooseBrain(env) {
     const why = ready[/** @type {BrainKind} */ (asked)];
     return why ? { ok: false, error: `BRAIN is ${asked}, but ${why}.` } : { ok: true, kind: /** @type {BrainKind} */ (asked) };
   }
-  for (const kind of KINDS) if (!ready[kind]) return { ok: true, kind };
+  // Without BRAIN only a free brain is chosen; the paid one (Claude) runs only when BRAIN=claude names it.
+  for (const kind of FREE_KINDS) if (!ready[kind]) return { ok: true, kind };
+  if (!ready.claude) return { ok: false, error: "Only the paid brain (Claude) is set up. It is never chosen automatically: set BRAIN=claude to use it, or set up a free brain (BRAIN_URL and BRAIN_MODEL, or GEMINI_API_KEY)." };
   return { ok: false, error: "No brain is connected. Set up the free local brain (BRAIN_URL and BRAIN_MODEL, docs/BRAIN.md), or a GEMINI_API_KEY or ANTHROPIC_API_KEY secret." };
 }
 

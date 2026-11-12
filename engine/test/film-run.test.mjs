@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { BudgetReached, estimateRun, newFilm, runFilm, validateChapterPlan } from "../src/film-run.mjs";
+import { BudgetReached, estimateRun, newFilm, runFilm, validateChapterPlan, worstCost } from "../src/film-run.mjs";
 import { applyFixes, checkChapter, checkFilm, countWords, toSeconds } from "../src/scene-lines.mjs";
 import { cleared, ownerOverride, productionGraph, understand } from "../src/bossism.mjs";
 import { superviseFilm } from "../src/supervise.mjs";
@@ -324,14 +324,47 @@ test("a run stops at its budget and resumes where it stopped", async () => {
   assert.ok(made.ok);
   const model = scriptedModel();
   const store = memoryStore();
-  await assert.rejects(runFilm({ film: made.film, manual: "M", model, store, budgetUsd: 0.02 }), BudgetReached);
-  const stopped = JSON.parse(store.m.get("run.json"));
-  assert.equal(stopped.status, "stopped-budget");
-  const spent = model.calls.length;
-  assert.ok(spent >= 1 && spent < 15);
+  // A budget smaller than the worst case of the first call: no call is made at all.
+  await assert.rejects(runFilm({ film: made.film, manual: "M", model, store, budgetUsd: 0.02 }), /could cost up to \$[\d.]+ and \$0 is already spent, so it was not made/);
+  assert.equal(model.calls.length, 0, "nothing is spent when the next call could cross the cap");
+  assert.equal(JSON.parse(store.m.get("run.json")).status, "stopped-budget");
+  // A budget that allows a few calls: the run stops before the call that could cross it, and never spends past it.
+  for (const budgetUsd of [0.5, 1]) {
+    const s = memoryStore();
+    const m = scriptedModel();
+    await assert.rejects(runFilm({ film: made.film, manual: "M", model: m, store: s, budgetUsd }), BudgetReached);
+    const stopped = JSON.parse(s.m.get("run.json"));
+    assert.equal(stopped.status, "stopped-budget");
+    assert.ok(m.calls.length >= 1 && m.calls.length < 15, `${m.calls.length} calls at $${budgetUsd}`);
+    assert.ok(stopped.costUsd <= budgetUsd, `spent $${stopped.costUsd} of a $${budgetUsd} cap`);
+  }
   const done = await runFilm({ film: made.film, manual: "M", model, store });
   assert.equal(done.status, "done");
   assert.equal(model.calls.length, 15, "nothing already paid for is asked again");
+});
+
+test("the worst case of a call is reserved before it is made; an unknown model is never priced at $0", () => {
+  const req = { system: [{ text: "x".repeat(32000) }], messages: [{ content: [{ text: "y".repeat(32000) }] }], maxTokens: 10000 };
+  // 64,000 characters = 20,000 tokens at the highest of input and cache-write prices, plus 10,000 output tokens.
+  assert.equal(Math.round(worstCost(req, { name: "claude-opus-5-5" }) * 1000) / 1000, Math.round(((20000 * 8 + 10000 * 20) / 1e6) * 1000) / 1000);
+  assert.ok(worstCost({ ...req, webSearch: { maxUses: 30 } }, { name: "claude-opus-5-5" }) - worstCost(req, { name: "claude-opus-5-5" }) > 0.299, "every web search it may make is reserved");
+  assert.ok(worstCost(req, { name: "some-new-model" }) >= worstCost(req, { name: "claude-opus-5" }), "an unknown model is priced at the highest listed price");
+  assert.equal(worstCost({ ...req, webSearch: { maxUses: 30 } }, { name: "local", price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }), 0, "a free brain reserves nothing, searches included");
+  assert.equal(estimateRun(600, "gemini-2.5-flash", { capabilities: { webSearch: true, vision: false } }).usdHigh, 0, "Gemini's free tier is estimated at $0, its searches too");
+});
+
+test("the emergency stop is asked before every model call and stops the run at once", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "halt");
+  assert.ok(made.ok);
+  const model = scriptedModel();
+  const store = memoryStore();
+  let asked = 0;
+  const halt = async () => (++asked > 3 ? "the owner pressed stop" : null);
+  await assert.rejects(runFilm({ film: made.film, manual: "M", model, store, halt }), /emergency stop before s3: the owner pressed stop/);
+  assert.deepEqual(model.calls, ["s01", "research", "s2"], "no call after the stop");
+  assert.equal(JSON.parse(store.m.get("run.json")).status, "paused", "saved as paused; it resumes when the stop is lifted");
+  const done = await runFilm({ film: made.film, manual: "M", model, store });
+  assert.equal(done.status, "done");
 });
 
 test("the media step writes media-C1.json per chapter, never repeats a clip, and resumes without searching again", async () => {

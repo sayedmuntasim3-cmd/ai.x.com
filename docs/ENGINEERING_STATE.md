@@ -26,7 +26,7 @@ owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
 
-- Tests (third session, 12 Nov 2026): **201 engine + 74 platform = 275, all passing** after `npm ci` at the
+- Tests (third session, 12 Nov 2026): **203 engine + 75 platform = 278, all passing** after `npm ci` at the
   root (a fresh container has no root `node_modules`). Earlier: 173 + 73 = 246; strict
   JSDoc type check passes (`cd engine && npm run typecheck`); Cloudflare build
   check passes (`npm run check`). Before this session: 141 + 48 = 189.
@@ -165,6 +165,30 @@ Open (needs an owner decision or a production change):
   localStorage; a `public/_headers` file would add them (a production configuration change).
 - DNS rebinding between the check and the connection is not fully excluded on the owner's machine.
 - Pictures the owner adds by URL and provider clips are downloaded by the renderer without this guard.
+
+## 4e. Cost control (12 Nov 2026; Master Plan Phase 1b, first part)
+
+Found in code: the budget was checked only between stages, so a run could overrun it by a whole stage;
+with both keys set and no `BRAIN`, the paid brain (Claude) was chosen before the free one (Gemini); the
+local runner ran a paid brain with no budget at all; there was no emergency stop.
+
+Now:
+- **Hard cap per call** (`film-run.mjs` `worstCost`): before every model call its worst case (all input at
+  the highest input price, the whole output allowance, every search it may make) is reserved; a call that
+  could cross `budgetUsd` is never made. A model with no known price is priced at the highest listed one.
+  A brain that is free per token (local, Gemini's free tier) reserves nothing, searches included.
+- **No automatic paid brain** (`worker/brain.mjs`): without `BRAIN`, only a free brain is chosen (local,
+  then Gemini); Claude runs only with `BRAIN=claude`. A Claude key alone connects nothing.
+- **No paid run without a cap** (`local/run-film.mjs`): a brain whose estimate is above $0 needs `--budget`.
+  The studio already applies `BUDGET_USD` (default $60).
+- **Emergency stop**, asked before every model call: a `STOP` file in the film's folder or `ZUPONA_STOP=1`
+  on the owner's machine; the key `control/stop` in the films bucket in the studio. The run is saved as
+  paused and resumes when the stop is lifted.
+
+Not yet (Master Plan §23): a dated price registry (E2; the price table is still inline and Gemini is listed
+at $0, which is right only for a project without billing), per-project provider flags (E3), day and month
+caps, a studio stop button. A Gemini model missing from `PRICES` is priced like the most expensive model
+(safe, but its cost is then over-reported and it needs `--budget`).
 
 ## 5. Role entries corrected
 

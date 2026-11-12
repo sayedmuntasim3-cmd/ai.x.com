@@ -12,6 +12,8 @@
  *            --no-edit --no-viewers --lang bn (messages in Bengali) --max-revisions <0-3>
  *            --script-only (research, script, QA and packaging; no pictures, never cleared for release)
  *   resume:  node local/run-film.mjs --out films/<slug>   (finished stages are kept)
+ *   stop:    create a file named STOP in the film's folder (or set ZUPONA_STOP=1): the run stops
+ *            before its next model call; delete it and resume. A paid brain needs --budget.
  *   approve: node local/run-film.mjs --out films/<slug> --approve "why it may be released"
  *
  * Bossism checks first (preflight: refused with reasons if it cannot work,
@@ -93,6 +95,11 @@ export async function produceFilm(o) {
     researchDesk: true, mediaProviders: media.length, youtube: false, autoRender: false, minutes: film.durationSeconds / 60, manualChars: manual.length,
   });
   await store.put("preflight.json", JSON.stringify(plan, null, 1));
+  // A brain that costs money never runs without a hard cap.
+  if (estimate.usdHigh > 0 && o.budgetUsd === undefined) {
+    const why = `The brain ${brain.model.name} costs money (estimate $${estimate.usdLow}-$${estimate.usdHigh}). Give a hard cap with --budget <USD>; nothing is spent without one.`;
+    throw Object.assign(new Error(why), { permanent: why });
+  }
   if (!plan.ok) throw Object.assign(new Error(plan.blockers.map((b) => tell(b)).join(" ")), { permanent: plan.blockers.map((b) => b.en).join(" ") });
   for (const d of plan.degradations) print(`  NOTE ${tell(d)}`);
 
@@ -115,6 +122,8 @@ export async function produceFilm(o) {
     channel: o.channel,
     log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
     signal: o.signal,
+    // The emergency stop, asked before every model call: a file named STOP in the film's folder, or ZUPONA_STOP=1.
+    halt: async () => (env.ZUPONA_STOP === "1" ? "ZUPONA_STOP=1 is set" : (await store.get("STOP")) !== null ? "a STOP file is in the film's folder" : null),
   };
   const max = Number.isFinite(o.maxRevisions) ? Math.max(0, Math.min(3, Number(o.maxRevisions))) : 1;
   const { state, review } = await superviseFilm({ film, store, runOnce: () => runFilm(options), maxRevisions: max, log: options.log });

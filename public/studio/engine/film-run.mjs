@@ -249,7 +249,8 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5", brain = 
   const judgeCalls = sees ? Math.ceil((minutes * 6.3) / 6) : 0;
   const judgeUsd = (judgeCalls * (30000 * price.cacheRead + 3500 * price.input + 400 * price.output)) / 1e6;
   const tokenUsd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6;
-  const usd = tokenUsd + searches * WEB_SEARCH_USD + judgeUsd;
+  // A brain that charges nothing for tokens (a local model, Gemini's free tier) is not charged per search either.
+  const usd = tokenUsd + (isFree(price) ? 0 : searches * WEB_SEARCH_USD) + judgeUsd;
   // Half-price mode: the writing stages go through the Batch API (50% of every token); the footage desk stays fast.
   const saving = tokenUsd * 0.5 + searches * WEB_SEARCH_USD + judgeUsd;
   return { model, chapters, outputTokens, inputTokens: cachedIn + freshIn, judgeCalls, usdLow: round2(usd * 0.7), usdHigh: round2(usd * 1.5), savingUsdLow: round2(saving * 0.7), savingUsdHigh: round2(saving * 1.5) };
@@ -268,6 +269,29 @@ export function costOf(u, model, ownPrice) {
   // The Batch API (half-price mode) bills every token at 50%.
   const tokens = ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6;
   return tokens * (u.batch ? 0.5 : 1) + (u.web_search_requests ?? 0) * WEB_SEARCH_USD;
+}
+
+/**
+ * The most a model call can cost: every input character as a full-price input
+ * token (3.2 characters a token, more tokens than English usually needs, no
+ * cache discount), the whole output allowance at the output price (reasoning
+ * included), and every web search it may make. A model with no known price is
+ * priced at the highest listed one, never at $0.
+ * @param {{ system: Block[], messages: { content: Block[] }[], maxTokens: number, webSearch?: { maxUses: number } }} req
+ * @param {{ name: string, price?: Price }} model
+ */
+export function worstCost(req, model) {
+  const p = model.price ?? PRICES[/** @type {keyof typeof PRICES} */ (model.name)] ?? highestPrice();
+  const blocks = [...req.system, ...req.messages.flatMap((m) => m.content)];
+  const chars = blocks.reduce((n, b) => n + (b.text?.length ?? 0), 0);
+  const inputTokens = Math.ceil(chars / 3.2) + 1600 * blocks.filter((b) => b.image).length;
+  const tokens = (inputTokens * Math.max(p.input, p.cacheWrite, p.cacheRead) + req.maxTokens * p.output) / 1e6;
+  return tokens + (isFree(p) ? 0 : (req.webSearch?.maxUses ?? 0) * WEB_SEARCH_USD);
+}
+
+/** A price of zero for every kind of token. @param {Price} p */
+function isFree(p) {
+  return !p.input && !p.output && !p.cacheRead && !p.cacheWrite;
 }
 
 /** The highest listed price, for a model with no price of its own. @returns {Price} */
@@ -303,7 +327,12 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * (research-desk.mjs) and the brain writes from that corpus only.
  * signal (optional) stops the run before the next stage when it fires; the
  * run is saved as "paused" and resumes from there.
- * @param {{ film: Film, signal?: AbortSignal, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * halt (optional) is the emergency stop: asked before every model call, a
+ * reason it returns stops the run at once (saved as "paused"; nothing more is spent).
+ * budgetUsd is a hard cap: before every model call the worst case of that call
+ * (its whole input at the full input price plus its whole output allowance)
+ * is reserved, and a call that could cross the cap is never made.
+ * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -336,6 +365,18 @@ export async function runFilm(o) {
     const messages = [{ role: "user", content: notes ? [...content, { text: `REVISION NOTES: this stage's earlier output was sent back by the review because it failed these checks. Fix every point; keep everything else that was right.\n\n${notes}` }] : content }];
     let text = "";
     for (let part = 0; part < 4; part += 1) {
+      // The emergency stop and the hard budget are checked before every call, not only between stages.
+      const halted = o.halt ? await o.halt() : null;
+      if (halted) throw Object.assign(new RunStopped(`Stopped by the emergency stop before ${stage}: ${halted}`), { permanent: `Stopped by the emergency stop: ${halted}` });
+      if (o.budgetUsd !== undefined) {
+        const worst = worstCost({ system: extra.system ?? system, messages, maxTokens, webSearch: extra.webSearch }, model);
+        const spent = state.costUsd + (pending?.costUsd ?? 0);
+        if (worst > 0 && spent + worst > o.budgetUsd) {
+          state.status = "stopped-budget";
+          const why = `Budget of $${o.budgetUsd}: the next call (${stage}) could cost up to $${round2(worst)} and $${round2(spent)} is already spent, so it was not made.`;
+          throw Object.assign(new BudgetReached(why), { permanent: why });
+        }
+      }
       const reply = await model.call({ stage, system: extra.system ?? system, messages, maxTokens, effort: extra.effort ?? STAGE_EFFORT[/** @type {keyof typeof STAGE_EFFORT} */ (stage.split(":")[0])] ?? "medium", webSearch: extra.webSearch });
       record(stage, reply);
       if (reply.stopReason === "refusal") throw new Error(`The model declined stage ${stage}.`);
