@@ -204,6 +204,43 @@ runs; they are now left out of its graph (`SCRIPT_ONLY_SKIPS`).
 Known structural debt, unchanged on purpose (Master Plan §5, §20 Phase 2): `film-run.mjs` runs every stage
 in one long function; `ROLE_STATUS` is still written by hand; every stage receives the whole 73 KB manual.
 
+## 4g. Research source test (12 Nov 2026; step 4)
+
+Environment ai.x.com (19-host allowlist). `curl -sS -o /dev/null -m 15
+-w '%{http_code} %{time_total}'`, generic user agent `research-source-check/1.0`,
+no personal data. Root `https://<host>/`, no redirect follow unless stated.
+
+| Host | Root status, time (s) | Real read request | Result |
+|---|---|---|---|
+| ai.google.dev | 301 0.32 (to ai.google, not allowed: proxy 403) | `/gemini-api/docs` → 301 | reachable; docs page redirects, not followed |
+| en.wikipedia.org | 301 0.07; followed 200 | api.php search "Tenerife" | **FAIL: 429** "too many requests" (twice) |
+| www.wikidata.org | 301 0.45; followed 200 | wbsearchentities "Tenerife" | **FAIL: 429** (twice) |
+| api.openalex.org | 200 0.06 | /works?search=CRISPR&per-page=1 | **FAIL: 429** "no API key, shared daily budget used up" |
+| api.crossref.org | 302 0.22; followed 200 | /works?query=CRISPR&rows=1 | OK: 51112 hits, DOI 10.1089/crispr.2020.29108.kda |
+| www.ebi.ac.uk | 200 7.07 | Europe PMC search CRISPR | OK: 241933 hits |
+| eutils.ncbi.nlm.nih.gov | 301 0.30 (to www.ncbi, not allowed) | esearch pubmed CRISPR | OK: 72606 hits, first id 43014682 |
+| pmc.ncbi.nlm.nih.gov | 200 0.20 | – | reachable |
+| www.nobelprize.org | 200 2.00 | – | reachable |
+| www.uspto.gov | 200 0.45 | – | reachable |
+| www.cafc.uscourts.gov | 200 1.19 | – | reachable |
+| archive.org | 200 0.32 | advancedsearch "Tenerife" | OK: 3238 hits |
+| www.loc.gov | 200 0.09 | /search/?q=Tenerife&fo=json | first try **timeout 15 s**; retry (30 s) OK: 6363 hits |
+| wmo.int | 200 2.01 | – | reachable |
+| reliefweb.int | 200 0.29 | api.reliefweb.int | **FAIL: api.reliefweb.int is not on the allowlist** (proxy 403) |
+| www.britannica.com | **403** 0.33 | – | **FAIL: Cloudflare bot challenge** (`cf-mitigated: challenge`) |
+| www.faa.gov | 200 0.21 | – | reachable |
+| aviation-safety.net | **403** 0.25 | – | **FAIL: Cloudflare bot challenge** |
+| skybrary.aero | 302 0.30; followed 200 | – | reachable |
+| example.com (not listed) | `CONNECT tunnel failed, response 403` 000 | – | refused, as expected: the allowlist holds |
+
+Meaning: 19/19 hosts pass the proxy. Data came back from Crossref, Europe PMC,
+NCBI, archive.org, LOC. Wikipedia/Wikidata/OpenAlex refuse by rate limit on
+the shared cloud IP (Wikimedia wants a contact UA; OpenAlex wants a free key);
+from the owner's own machine they may work, unverified. Britannica and
+aviation-safety.net block scripts; ReliefWeb needs host api.reliefweb.int
+added. Next: Phase 0 needs a free Gemini key (Google project without billing),
+only with the owner's approval.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`
