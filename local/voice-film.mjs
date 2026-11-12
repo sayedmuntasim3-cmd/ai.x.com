@@ -12,6 +12,8 @@
  * Step 2 (words): a transcript that came with the voice (--transcript), or
  * speech-to-text run here (--stt, local/stt/transcribe.py). With --script,
  * the words are the script's, exactly, timed by what was heard.
+ * Step 3 (understanding): language, kind, scenes or ayat, structure
+ * (understanding.json).
  */
 import { execFile } from "node:child_process";
 import { open, mkdir, readFile, writeFile, stat } from "node:fs/promises";
@@ -21,6 +23,8 @@ import { createRecordingAnalyzer } from "../engine/src/loudness.mjs";
 import { measureWavFile } from "../engine/src/wav.mjs";
 import { msg } from "../engine/src/messages.mjs";
 import { alignScript, checkTranscript, normalizeTranscript } from "../engine/src/transcript.mjs";
+import { understandVoice } from "../engine/src/voice-understand.mjs";
+import { buildQuranIndex } from "../engine/src/quran.mjs";
 
 const run = promisify(execFile);
 
@@ -167,6 +171,26 @@ export async function words(o) {
   return result;
 }
 
+/** The Tanzil index and surah names, read once. */
+export async function loadQuran() {
+  const dir = new URL("../engine/data/quran/", import.meta.url);
+  const index = buildQuranIndex(JSON.parse(await readFile(new URL("tanzil-quran-simple-1.0.2.json", dir), "utf8")));
+  const surahNames = JSON.parse(await readFile(new URL("surah-names.json", dir), "utf8"));
+  return { index, surahNames };
+}
+
+/**
+ * Step 3: understand the voice and save understanding.json.
+ * @param {{ out: string, transcript: any, totalSeconds: number, kind: "auto" | "narration" | "quran" }} o
+ */
+export async function understand(o) {
+  const needQuran = o.kind !== "narration";
+  const q = needQuran ? await loadQuran() : null;
+  const u = understandVoice({ transcript: o.transcript, totalSeconds: o.totalSeconds, kind: o.kind, quranIndex: q?.index ?? null, surahNames: q?.surahNames ?? [] });
+  await writeFile(join(o.out, "understanding.json"), JSON.stringify({ ...u, match: undefined }, null, 1));
+  return u;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (typeof args.audio !== "string") {
@@ -184,6 +208,10 @@ async function main() {
     const step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : undefined, script: str(args.script) });
     for (const m of step2.messages) console.log("- " + m[lang]);
     if (!step2.check.ok) process.exit(1);
+    const step3 = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (args.kind) });
+    for (const m of step3.messages) console.log("- " + m[lang]);
+    for (const p of step3.problems) console.log("! " + p);
+    if (!step3.ok) process.exit(1);
   }
   console.log(`Saved in ${out}`);
 }

@@ -28,11 +28,22 @@ def version(pkg):
         return None
 
 
+def read_16k(path):
+    """The 16 kHz mono 16-bit WAV as float samples, read without PyAV (whose
+    versions break faster-whisper's own decoder)."""
+    import numpy as np
+
+    with wave.open(path, "rb") as f:
+        if f.getframerate() != 16000 or f.getnchannels() != 1 or f.getsampwidth() != 2:
+            raise SystemExit("A 16 kHz mono 16-bit WAV is needed (voice-16k.wav from local/voice-film.mjs).")
+        return np.frombuffer(f.readframes(f.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+
+
 def whisper(path, model_name, language):
     from faster_whisper import WhisperModel
 
     model = WhisperModel(model_name, device="auto", compute_type="int8")
-    segments, info = model.transcribe(path, language=language, word_timestamps=True, beam_size=5, vad_filter=False)
+    segments, info = model.transcribe(read_16k(path), language=language, word_timestamps=True, beam_size=5, vad_filter=False)
     words = []
     for seg in segments:
         for w in seg.words or []:
