@@ -162,6 +162,9 @@ export function savingModel(fast, batch) {
  * @param {unknown} error
  */
 export function permanentError(error) {
+  // A brain adapter that already knows the request cannot succeed says why (worker/local-brain.mjs).
+  const own = /** @type {any} */ (error)?.permanent;
+  if (typeof own === "string" && own) return own.slice(0, 500);
   const status = Number(/** @type {any} */ (error)?.status);
   const raw = error instanceof Error ? error.message : String(error);
   if (status === 401) return "The Claude API key is wrong or revoked (401). Set ANTHROPIC_API_KEY again, then resume the film.";

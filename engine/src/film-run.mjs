@@ -21,6 +21,7 @@ import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
 import { applyFixes, checkChapter, checkFilm, hookFindings, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
+import { bindToCorpus, corpusBudget, corpusText, gatherCorpus, queryInstruction, writeInstruction } from "./research-desk.mjs";
 import { checkSources, sourceGaps } from "./source-check.mjs";
 import { getVersion } from "./versions.mjs";
 
@@ -50,7 +51,9 @@ export const WEB_SEARCH_USD = 0.01;
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number, batch?: number }} Usage
  * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string }} ModelReply
- * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply> }} Model
+ * @typedef {{ vision?: boolean, webSearch?: boolean, contextTokens?: number }} Capabilities  what the brain can do; a missing field means yes (the Claude API can do all of it)
+ * @typedef {{ input: number, output: number, cacheRead: number, cacheWrite: number }} Price  US dollars per million tokens
+ * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply>, capabilities?: Capabilities, price?: Price }} Model  price: the brain's own price (a local brain is free); without it PRICES is used
  * @typedef {{ get: (key: string) => Promise<string | null>, put: (key: string, text: string) => Promise<void> }} Store
  * @typedef {<T>(name: string, fn: () => Promise<T>) => Promise<T>} Step
  * @typedef {{ id: string, title: string, start: string, end: string, firstScene: string, lastScene: string, brief: string }} ChapterPlan
@@ -211,12 +214,19 @@ export function chapterSpec(c, versionId) {
  * Based on the Ramesh Babu film (45 min: about 15k output tokens per
  * 7.5-minute chapter, thinking included at 1.5x). Real usage is logged per
  * call in run.json and replaces this estimate as the run goes.
+ * A brain with its own price (a local brain is free) passes itself; a model
+ * with no price of its own and none in PRICES is estimated at the highest
+ * listed price, never $0. A brain that cannot search the web pays for no
+ * searches (the code research desk reads free sources), and one that cannot
+ * see has no footage desk.
  * @param {number} durationSeconds
  * @param {string} [model]
+ * @param {{ price?: Price, capabilities?: Capabilities }} [brain]
  */
-export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
-  const price = PRICES[/** @type {keyof typeof PRICES} */ (model)];
-  if (!price) throw new Error(`No price for ${model}.`);
+export function estimateRun(durationSeconds, model = "claude-opus-5-5", brain = {}) {
+  const price = brain.price ?? PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? highestPrice();
+  const sees = brain.capabilities?.vision !== false;
+  const searchesWeb = brain.capabilities?.webSearch !== false;
   const minutes = durationSeconds / 60;
   const chapters = Math.max(1, Math.round(minutes / 7.5));
   const outPerChapter = Math.max(4000, (minutes / chapters) * 2000) * 1.5;
@@ -224,10 +234,10 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
   // Edit Director: one call per chapter, about 3k tokens out (with thinking) from a short scene sheet.
   const outputTokens = Math.round(chapters * outPerChapter * 1.2 + fixedOut + chapters * 3000 * 1.5); // 1.2: repairs
   const cachedIn = 30000 * (chapters * 2 + 8); // manual + brief + ledger + bibles, read from cache (S5 and the edit per chapter)
-  const searches = 30; // research stage: web_search max_uses
+  const searches = searchesWeb ? 30 : 0; // research stage: web_search max_uses
   const freshIn = Math.round(chapters * 12000 + minutes * 600 + 8 * 15000 + minutes * 3000 + searches * 10000); // stage inputs, edit sheets, QA reads the film, search results
   // Footage desk: about 6.3 stock shots a minute, judged six at a time from 320 px thumbnails.
-  const judgeCalls = Math.ceil((minutes * 6.3) / 6);
+  const judgeCalls = sees ? Math.ceil((minutes * 6.3) / 6) : 0;
   const judgeUsd = (judgeCalls * (30000 * price.cacheRead + 3500 * price.input + 400 * price.output)) / 1e6;
   const tokenUsd = (outputTokens * price.output + cachedIn * price.cacheRead + freshIn * price.input + 60000 * price.cacheWrite) / 1e6;
   const usd = tokenUsd + searches * WEB_SEARCH_USD + judgeUsd;
@@ -239,14 +249,21 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5") {
 /**
  * What a call cost. A model with no listed price is charged at the highest
  * listed price, so the budget is never under-counted.
+ * A brain that states its own price (worker/local-brain.mjs) is charged at it.
  * @param {Usage} u
  * @param {string} model
+ * @param {Price} [ownPrice]
  */
-export function costOf(u, model) {
-  const p = PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? Object.values(PRICES).reduce((a, b) => (b.output > a.output ? b : a));
+export function costOf(u, model, ownPrice) {
+  const p = ownPrice ?? PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? highestPrice();
   // The Batch API (half-price mode) bills every token at 50%.
   const tokens = ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6;
   return tokens * (u.batch ? 0.5 : 1) + (u.web_search_requests ?? 0) * WEB_SEARCH_USD;
+}
+
+/** The highest listed price, for a model with no price of its own. @returns {Price} */
+function highestPrice() {
+  return Object.values(PRICES).reduce((a, b) => (b.output > a.output ? b : a));
 }
 
 /** Effort per stage: the writing and checking stages think hardest. */
@@ -272,7 +289,10 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * checked in code; edit: false leaves the edit to the script alone.
  * channel (optional) holds the fingerprints of the channel's earlier films;
  * the finished film is compared with them (originality.json) and added.
- * @param {{ film: Film, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * research (needed for a brain that cannot search the web) is the code
+ * research desk: the brain lists searches, code opens free sources
+ * (research-desk.mjs) and the brain writes from that corpus only.
+ * @param {{ film: Film, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -321,7 +341,7 @@ export async function runFilm(o) {
     s.calls += 1;
     for (const k of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "web_search_requests"]) if (/** @type {any} */ (u)[k] || s[k] !== undefined) s[k] = (s[k] ?? 0) + (/** @type {any} */ (u)[k] ?? 0);
     if (reply.model && reply.model !== model.name) s.servedBy = reply.model;
-    state.costUsd = round2(state.costUsd + costOf(u, reply.model ?? model.name));
+    state.costUsd = round2(state.costUsd + costOf(u, reply.model ?? model.name, model.price));
   }
 
   /**
@@ -389,15 +409,39 @@ export async function runFilm(o) {
       return { chars: text.length };
     });
 
+    /**
+     * Research for a brain that cannot search: the brain chooses what to look
+     * up, code opens the pages, the brain writes from them, code keeps only
+     * facts that cite the opened pages.
+     * @param {string} s01
+     */
+    const deskResearch = async (s01) => {
+      if (!o.research?.providers.length) throw new Error(`The brain ${model.name} cannot search the web, and this run has no research desk. Give the run research providers (research-desk.mjs).`);
+      const story = isStoryFilm(film);
+      // The desk's two calls need the brief, not the whole production manual, so a small window has room for the pages.
+      const deskSystem = [{ text: brief, cache: true }];
+      const asked = safeJson(await ask("research-plan", [{ text: ctx("S0_S1", s01) }, { text: queryInstruction(story) }], 4000, { system: deskSystem }));
+      const listed = Array.isArray(asked?.queries) ? asked.queries.map(String).filter(Boolean) : [];
+      const queries = listed.length ? listed : [film.topic];
+      const { docs, trace } = await gatherCorpus({ queries, providers: o.research.providers, fetch: o.research.fetch, limits: { corpusChars: corpusBudget(model.capabilities?.contextTokens) } });
+      await store.put("research-corpus.json", JSON.stringify({ queries, trace, docs }, null, 1));
+      if (!docs.length) throw new Error(`The research desk opened no readable pages (searched: ${queries.join("; ").slice(0, 300)}).`);
+      const text = await ask("research", [{ text: ctx("S0_S1", s01) }, { text: ctx("CORPUS", corpusText(docs)) }, { text: writeInstruction(story) }], 16000, { system: deskSystem });
+      const bound = bindToCorpus(extractJson(text), docs);
+      if (bound.outside) state.gaps.push(`research: ${bound.outside} fact${bound.outside > 1 ? "s" : ""} cited no page the research desk opened and ${bound.outside > 1 ? "were" : "was"} dropped.`);
+      const sites = new Set(docs.map((d) => d.site)).size;
+      bound.research.desk = { queries, documents: docs.length, sites, providers: [...new Set(docs.map((d) => d.provider))] };
+      return bound.research;
+    };
+
     await stage("research", async () => {
       const s01 = await read("s01.md");
-      const text = await ask("research", [
+      const data = canSearch(model) ? extractJson(await ask("research", [
         { text: ctx("S0_S1", s01) },
         { text: (isStoryFilm(film)
           ? "This film is an invented story. Research on the web the real-world details it needs to feel exact: prices, wages and costs of the time and place, laws and procedures, jobs and how they are done, places, distances, customs and era details. Record conflicts between sources instead of resolving them; list famous real people the invented characters must not be confused with."
           : "Research this film's subject on the web. Find primary and reliable secondary sources; record conflicts between sources instead of resolving them; note people or things that could be confused with the subject.") + " Then output ONE fenced ```json block, and nothing after it, shaped as: {\"subject\": string, \"facts\": [{\"id\": \"F01\", \"claim\": string, \"value\": string, \"sources\": [url, ...], \"confidence\": \"high\"|\"medium\"|\"low\", \"conflict\": string|null}], \"unknowns\": [string], \"doNotConfuse\": [string]}. Every fact needs at least one source URL you actually opened or found in search results. Never invent a URL." },
-      ], 32000, { webSearch: { maxUses: 30 } });
-      const data = extractJson(text);
+      ], 32000, { webSearch: { maxUses: 30 } })) : await deskResearch(s01);
       const facts = Array.isArray(data?.facts) ? data.facts : [];
       const sourced = facts.filter((/** @type {any} */ f) => Array.isArray(f.sources) && f.sources.some((/** @type {unknown} */ u) => typeof u === "string" && /^https?:\/\//.test(u)));
       const needed = isStoryFilm(film) ? 5 : 8;
@@ -622,12 +666,14 @@ export async function runFilm(o) {
       for (const c of plan.chapters) {
         const key = `media-${c.id}.json`;
         await stage(`media:${c.id}`, async () => {
-          const judge = o.media?.review === false ? undefined : createFootageJudge(ask);
+          // A brain that cannot see pictures would judge blind: skip the desk and say so.
+          const judge = o.media?.review === false || !canSee(model) ? undefined : createFootageJudge(ask);
           const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, judge, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep });
           await store.put(key, JSON.stringify(media, null, 1));
           if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no fitting free clip yet (see ${key}).`);
-          const unreviewed = media.shots.filter((s) => s.review === "unreviewed").length;
-          if (unreviewed) state.gaps.push(`${c.id} media: ${unreviewed} picks could not be checked by eye and use the first search result.`);
+          const blind = !judge && o.media?.review !== false;
+          const unreviewed = media.shots.filter((s) => s.review === "unreviewed" || (blind && s.status === "found")).length;
+          if (unreviewed) state.gaps.push(`${c.id} media: ${unreviewed} picks could not be checked by eye and use the first search result${canSee(model) ? "" : " (the brain cannot see pictures)"}.`);
           return media.stats;
         });
         const saved = await store.get(key);
@@ -789,6 +835,23 @@ export function storyNote(film) {
 
 /** Thrown when a run stops at its budget; the run can be resumed with a higher one. */
 export class BudgetReached extends Error {}
+
+/**
+ * True when the brain can look at pictures. A model without capabilities
+ * (the Claude API) can; a brain that says vision: false cannot.
+ * @param {Model} model
+ */
+export function canSee(model) {
+  return model.capabilities?.vision !== false;
+}
+
+/**
+ * True when the brain searches the web by itself during a request.
+ * @param {Model} model
+ */
+export function canSearch(model) {
+  return model.capabilities?.webSearch !== false;
+}
 
 const TITLE_STOP = new Set(["the", "a", "an", "of", "and", "to", "in", "on", "for", "how", "why", "what", "who", "this", "that", "is", "was", "his", "her", "their", "from", "with", "by", "at"]);
 

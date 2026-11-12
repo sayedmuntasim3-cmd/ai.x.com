@@ -9,7 +9,7 @@
  * Runtime-agnostic like film-run.mjs: model, store and providers are injected.
  */
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
-import { chapterSpec, costOf, createFootageJudge, filmBrief } from "./film-run.mjs";
+import { canSee, chapterSpec, costOf, createFootageJudge, filmBrief } from "./film-run.mjs";
 import { checkChapter, parseSceneLines } from "./scene-lines.mjs";
 
 /**
@@ -56,7 +56,7 @@ export async function remakeScene(o) {
   /** @param {string} stage @param {Block[]} content @param {number} maxTokens @param {{ effort?: string }} [extra] */
   const ask = async (stage, content, maxTokens, extra = {}) => {
     const reply = await o.model.call({ stage, system, messages: [{ role: "user", content }], maxTokens, effort: extra.effort ?? "medium" });
-    const cost = costOf(reply.usage ?? {}, reply.model ?? o.model.name);
+    const cost = costOf(reply.usage ?? {}, reply.model ?? o.model.name, o.model.price);
     spent += cost;
     const u = (run.usage[stage] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 });
     u.calls += 1;
@@ -114,7 +114,7 @@ export async function remakeScene(o) {
       const m = c.id === ch.id ? existing : JSON.parse((await o.store.get(`media-${c.id}.json`)) ?? "null");
       if (m) history.load({ ...m, shots: m.shots.filter((/** @type {any} */ s) => s.scene !== scene) });
     }
-    const fresh = await chapterMedia({ chapter: ch.id, markdown: after, providers: o.providers, history, judge: o.review === false ? undefined : createFootageJudge(ask) });
+    const fresh = await chapterMedia({ chapter: ch.id, markdown: after, providers: o.providers, history, judge: o.review === false || !canSee(o.model) ? undefined : createFootageJudge(ask) });
     const shots = [...existing.shots.filter((/** @type {any} */ s) => s.scene !== scene), ...fresh.shots].sort((a, b) => a.scene.localeCompare(b.scene) || a.shot - b.shot);
     const stats = { shots: shots.length, found: shots.filter((s) => s.status === "found").length, missing: shots.filter((s) => s.status === "missing").length, noQuery: shots.filter((s) => s.status === "no-query").length };
     await o.store.put(mediaKey, JSON.stringify({ ...existing, shots, stats }, null, 1));

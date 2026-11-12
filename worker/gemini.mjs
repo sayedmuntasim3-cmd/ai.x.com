@@ -3,7 +3,8 @@
  * aistudio.google.com). Same interface as worker/anthropic.mjs: call(request)
  * -> { text, stopReason, usage, model }. Web search uses Gemini's Google
  * Search tool. Images by URL are not sent (Gemini needs the bytes), so the
- * footage desk is skipped on Gemini and picks keep the search order.
+ * brain says it cannot see (capabilities.vision false): the footage desk is
+ * skipped on Gemini and picks keep the search order.
  */
 export const GEMINI_DEFAULT = "gemini-2.5-flash";
 
@@ -17,6 +18,7 @@ export function geminiModel(o) {
   const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   return {
     name: model,
+    capabilities: { vision: false, webSearch: true },
     async call(req) {
       const text = (/** @type {{ text: string, image?: string }[]} */ blocks) => blocks.filter((b) => !b.image).map((b) => ({ text: b.text }));
       const body = {

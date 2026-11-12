@@ -257,6 +257,85 @@ test("the footage desk sees the thumbnails, its verdict picks the clip, and its 
   assert.equal(state.status, "done");
 });
 
+test("a brain that cannot see is never asked to judge thumbnails, and a free brain is not charged", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f4b");
+  assert.ok(made.ok);
+  let n = 0;
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const pexels = { id: "pexels", layer: 2, kinds: ["video"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search() {
+    return [0, 1].map(() => { n += 1; return { id: `pexels:video:${n}`, source: "pexels", mediaType: "video", title: "mill", previewUrl: `https://images.pexels.com/${n}.jpg?w=320`, mediaUrl: `https://v/${n}.mp4`, sourcePageUrl: `https://www.pexels.com/video/${n}/`, creator: null, license: "Pexels License", licenseUrl: null, durationSeconds: 10, width: 1920, height: 1080, attributionRequired: false }; });
+  } };
+  const base = scriptedModel();
+  const model = {
+    ...base,
+    name: "qwen3:32b",
+    capabilities: { vision: false },
+    price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
+      if (r.stage.startsWith("media-judge:")) throw new Error("a blind brain was asked to judge pictures");
+      return base.call(r);
+    },
+  };
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "M", model, store, media: { providers: [pexels] } });
+  const c1 = JSON.parse(store.m.get("media-C1.json"));
+  assert.equal(c1.shots[0].pick.id, "pexels:video:1", "the first search result is kept");
+  assert.equal(c1.shots[0].review, undefined, "no desk looked at it");
+  assert.ok(state.gaps.some((/** @type {string} */ g) => /could not be checked by eye .*\(the brain cannot see pictures\)/.test(g)), "the owner is told why");
+  assert.ok(!Object.keys(state.usage).some((k) => k.startsWith("media-judge")));
+  assert.equal(state.costUsd, 0, "a brain on the owner's machine costs nothing, so the budget is not used up");
+  const free = estimateRun(2700, "qwen3:32b", { price: model.price, capabilities: { vision: false, webSearch: false } });
+  assert.deepEqual([free.usdLow, free.usdHigh, free.judgeCalls], [0, 0, 0], "no tokens, searches or footage desk to pay for");
+  assert.ok(estimateRun(2700, "some-unpriced-model").usdHigh >= estimateRun(2700, "claude-opus-5-5").usdHigh, "an unknown model is estimated at the highest price, never as free");
+});
+
+test("a brain that cannot search researches through the code desk: it picks the searches, code opens the pages, facts cite only them", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f4c");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  /** @type {import("../src/film-run.mjs").ModelRequest[]} */
+  const desk = [];
+  const model = {
+    ...base,
+    name: "qwen3:32b",
+    capabilities: { vision: false, webSearch: false, contextTokens: 65536 },
+    price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
+      if (r.stage === "research-plan") { desk.push(r); return { text: "```json\n{\"queries\": [\"old mill history\", \"watermill\"]}\n```", stopReason: "end_turn", usage: {} }; }
+      if (r.stage === "research") {
+        desk.push(r);
+        assert.equal(r.webSearch, undefined, "no search tool is offered to a brain that has none");
+        const facts = Array.from({ length: 9 }, (_, i) => ({ id: `F0${i}`, claim: "c", value: "v", sources: [i % 2 ? "D1" : "D2"], confidence: "high", conflict: null }));
+        facts.push({ id: "F99", claim: "from memory", value: "1850", sources: ["https://invented.example/mill"], confidence: "high", conflict: null });
+        return { text: "```json\n" + JSON.stringify({ subject: "mill", facts, unknowns: [], doNotConfuse: [] }) + "\n```", stopReason: "end_turn", usage: {} };
+      }
+      return base.call(r);
+    },
+  };
+  /** @type {import("../src/research-desk.mjs").ResearchProvider} */
+  const wiki = {
+    id: "wikipedia",
+    async search(q) { return [{ title: q, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(q.replace(/ /g, "_"))}` }]; },
+    async read(hit) { return { title: hit.title, text: `${hit.title} is a mill that ground grain for the town from 1790 until the river was diverted in 1921.`, references: [] }; },
+  };
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "THE WHOLE MANUAL", model, store, research: { providers: [wiki], fetch: /** @type {any} */ (async () => new Response("", { status: 404 })) } });
+  assert.equal(state.status, "done-with-gaps");
+  assert.deepEqual(desk.map((r) => r.stage), ["research-plan", "research"]);
+  assert.ok(desk.every((r) => r.system.length === 1 && !r.system[0].text.includes("THE WHOLE MANUAL")), "the desk sends the brief, not the manual, so the pages fit a small window");
+  assert.ok(desk[1].messages[0].content.some((b) => b.text.includes("[D1] old mill history") && b.text.includes("URL: https://en.wikipedia.org/wiki/old_mill_history")));
+  const research = JSON.parse(store.m.get("research.json"));
+  assert.equal(research.facts.length, 9, "the fact cited from memory is dropped");
+  assert.ok(research.facts.every((/** @type {any} */ f) => f.sources.every((/** @type {string} */ u) => u.startsWith("https://en.wikipedia.org/wiki/"))));
+  assert.deepEqual(research.desk, { queries: ["old mill history", "watermill"], documents: 2, sites: 1, providers: ["wikipedia"] });
+  assert.ok(state.gaps.some((/** @type {string} */ g) => /1 fact cited no page the research desk opened/.test(g)));
+  const corpus = JSON.parse(store.m.get("research-corpus.json"));
+  assert.equal(corpus.docs.length, 2, "what the brain read is kept for the owner to audit");
+
+  const nodesk = await runFilm({ film: { ...made.film, id: "f4d" }, manual: "M", model, store: memoryStore() }).catch((error) => error);
+  assert.match(String(nodesk), /cannot search the web, and this run has no research desk/);
+});
+
 test("the finished film is compared with the channel's earlier films and added to them", async () => {
   const made = newFilm({ topic: "The old mill", minutes: 2 }, "f5");
   assert.ok(made.ok);

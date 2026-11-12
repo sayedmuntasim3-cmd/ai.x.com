@@ -30,6 +30,7 @@ const T = {
     token: "স্টুডিও টোকেন",
     tokenHint: "Cloudflare-এ যে STUDIO_TOKEN দিয়েছেন। শুধু এই ব্রাউজারে থাকে।",
     estimate: "আনুমানিক খরচ",
+    freeBrain: (/** @type {string} */ m) => `খরচ নেই: আপনার নিজের মডেল (${m}) লিখবে`,
     start: "ফিল্ম শুরু করো",
     starting: "শুরু হচ্ছে…",
     notConnected: "সার্ভার এখনও কানেক্ট হয়নি। Cloudflare আর Claude API key কানেক্ট হলে এখান থেকে ফিল্ম চলবে।",
@@ -98,6 +99,7 @@ const T = {
     token: "Studio token",
     tokenHint: "The STUDIO_TOKEN you set in Cloudflare. It stays in this browser only.",
     estimate: "Estimated cost",
+    freeBrain: (/** @type {string} */ m) => `No cost: your own model (${m}) writes it`,
     start: "Start the film",
     starting: "Starting…",
     notConnected: "The server is not connected yet. Once Cloudflare and the Claude API key are connected, films run from here.",
@@ -167,11 +169,26 @@ function render() {
   if (id) poll(id);
 }
 
-function showEstimate() {
+let estimateSeq = 0;
+/**
+ * The price before a run. The server knows which brain is connected (a free
+ * local model, Gemini or Claude); without a server the Claude estimate is shown.
+ */
+async function showEstimate() {
   const minutes = Number(/** @type {HTMLInputElement} */ ($("film-minutes")).value);
   if (!(minutes >= 1 && minutes <= 300)) { $("film-estimate").textContent = ""; return; }
-  const e = estimateRun(Math.round(minutes * 60));
-  $("film-estimate").textContent = `${L().estimate}: $${e.usdLow}–$${e.usdHigh} · ${L().savingPrice} $${e.savingUsdLow}–$${e.savingUsdHigh} (${e.chapters} ch, ${e.model})`;
+  const seq = (estimateSeq += 1);
+  /** @type {any} */
+  let e = null;
+  try {
+    const res = await fetch(`/api/estimate?minutes=${minutes}`);
+    if (res.ok) e = await res.json();
+  } catch { /* no server: the static studio */ }
+  if (seq !== estimateSeq) return;
+  e ??= estimateRun(Math.round(minutes * 60));
+  $("film-estimate").textContent = e.usdHigh === 0
+    ? `${L().freeBrain(e.model)} · ${e.chapters} ch`
+    : `${L().estimate}: $${e.usdLow}–$${e.usdHigh} · ${L().savingPrice} $${e.savingUsdLow}–$${e.savingUsdHigh} (${e.chapters} ch, ${e.model})`;
 }
 
 /** @param {string} msg */
