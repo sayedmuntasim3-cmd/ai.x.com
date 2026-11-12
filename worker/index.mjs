@@ -44,6 +44,8 @@ import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../eng
 import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { researchProviders } from "../engine/src/research-desk.mjs";
+import { cleared, ownerOverride, preflight, productionGraph, recordDecision, reviewRun, understand } from "../engine/src/bossism.mjs";
+import { superviseFilm } from "../engine/src/supervise.mjs";
 import { anthropicBatchModel, permanentError, savingModel } from "./anthropic.mjs";
 import { brainFromEnv, brainHealth } from "./brain.mjs";
 import { dispatchRender } from "./github.mjs";
@@ -106,6 +108,40 @@ const webFetch = (url, init) => fetch(url, init);
 /** The research desk for a brain that cannot search the web: Wikipedia, and the owner's SearXNG when set. @param {any} env */
 const researchDesk = (env) => ({ providers: researchProviders({ fetch: webFetch, searxngUrl: env.SEARXNG_URL || undefined }), fetch: webFetch });
 
+/**
+ * Bossism's preflight for a new film with this deployment's connections.
+ * @param {any} env @param {import("../engine/src/film-run.mjs").Film} film
+ */
+function planFor(env, film) {
+  const graph = productionGraph(understand({ film }));
+  return preflight(graph, {
+    brain: brainHealth(env),
+    researchDesk: true,
+    mediaProviders: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }).length,
+    youtube: Boolean(env.YOUTUBE_API_KEY),
+    autoRender: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL),
+    minutes: film.durationSeconds / 60,
+    manualChars: MANUAL.length,
+  });
+}
+
+/**
+ * The film's latest review, made now from its files when there is none yet
+ * (a film finished before reviews existed).
+ * @param {any} env @param {string} id
+ */
+async function latestReview(env, id) {
+  const store = r2Store(env.FILMS, id);
+  const saved = JSON.parse((await store.get("review.json")) ?? "null");
+  if (saved) return { store, review: saved };
+  const film = JSON.parse((await store.get("film.json")) ?? "null");
+  if (!film) return { store, review: null };
+  const review = await reviewRun({ store, film });
+  await store.put("review.json", JSON.stringify(review, null, 1));
+  await recordDecision(store, { actor: "bossism", action: review.release.allowed ? "release-allowed" : "release-blocked", message: review.release.message });
+  return { store, review };
+}
+
 /** The estimate for the connected brain (Claude's prices when none is connected yet). @param {any} env @param {number} seconds */
 function estimateFor(env, seconds) {
   const b = brainFromEnv(env);
@@ -124,11 +160,13 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
     const model = film.saving && brain.kind === "claude" ? savingModel(fast, anthropicBatchModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, store: r2Store(env.FILMS, film.id) })) : fast;
     // A resume may raise the budget for this film; otherwise the deployment's BUDGET_USD applies.
     const budget = Number(event.payload.budgetUsd ?? env.BUDGET_USD);
-    await runFilm({
+    const store = r2Store(env.FILMS, film.id);
+    // Each revision round redoes stages under new step names: a Workflow returns a finished step's stored result by name.
+    const runOnce = (/** @type {number} */ round) => runFilm({
       film,
       manual: MANUAL,
       model,
-      store: r2Store(env.FILMS, film.id),
+      store,
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
       // What the channel's published films taught (where viewers left and stayed), for the writers and the editor.
@@ -154,7 +192,7 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       log: (line) => console.log(`[${film.id}] ${line}`),
       // A long chapter (64k output tokens, up to four continued parts) can take well over 30 minutes; a timeout would pay for it twice.
       // In half-price mode a step can wait hours for its batch: each attempt polls for up to an hour, and a retry polls the same batch again.
-      step: (name, fn) => step.do(name, film.saving ? { retries: { limit: 30, delay: "1 minute", backoff: "constant" }, timeout: "1 hour" } : { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, async () => {
+      step: (name, fn) => step.do(round ? `r${round}:${name}` : name, film.saving ? { retries: { limit: 30, delay: "1 minute", backoff: "constant" }, timeout: "1 hour" } : { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, async () => {
         try {
           return await fn();
         } catch (error) {
@@ -163,10 +201,22 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
         }
       }),
     });
-    // The finished film goes straight to the renderer when GitHub is connected.
+    // Bossism reviews the evidence, sends what failed back (bounded), and decides the release.
+    const maxRevisions = Number(env.MAX_REVISIONS ?? 1);
+    const { review } = await superviseFilm({
+      film, store, runOnce,
+      maxRevisions: Number.isFinite(maxRevisions) && maxRevisions >= 0 ? Math.min(3, maxRevisions) : 1,
+      step: (name, fn) => step.do(`boss:${name}`, { retries: { limit: 2, delay: "30 seconds", backoff: "exponential" }, timeout: "10 minutes" }, fn),
+      log: (line) => console.log(`[${film.id}] ${line}`),
+    });
+    // Only a film that passed its critical checks goes to the renderer by itself; a blocked one waits for the owner.
     if (env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL) {
-      const result = await step.do("render", async () => dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: film.id, site: String(env.SITE_URL).replace(/\/$/, "") }));
-      await r2Store(env.FILMS, film.id).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
+      if (review.release.allowed) {
+        const result = await step.do("render", async () => dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: film.id, site: String(env.SITE_URL).replace(/\/$/, "") }));
+        await store.put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
+      } else {
+        await store.put("render.json", JSON.stringify({ ok: false, blocked: true, blockedBy: review.release.blockedBy, message: review.release.message, at: new Date().toISOString() }, null, 1));
+      }
     }
   }
 }
@@ -215,10 +265,14 @@ export default {
         const id = crypto.randomUUID();
         const made = newFilm(/** @type {any} */ (body), id);
         if (!made.ok) return json({ error: made.error }, 400);
+        // Bossism checks before anything is spent: a film that cannot be made is refused with its reasons.
+        const plan = planFor(env, made.film);
+        if (!plan.ok) return json({ error: plan.blockers.map((b) => b.en).join(" "), blockers: plan.blockers, degradations: plan.degradations }, 422);
         const store = r2Store(env.FILMS, id);
         await store.put("film.json", JSON.stringify({ ...made.film, createdAt: new Date().toISOString() }, null, 1));
+        await store.put("preflight.json", JSON.stringify(plan, null, 1));
         await env.FILM_RUN.create({ id, params: { film: made.film } });
-        return json({ id, film: made.film, brain: brain.kind, estimate: estimateRun(made.film.durationSeconds, brain.model.name, brain.model) }, 202);
+        return json({ id, film: made.film, brain: brain.kind, degradations: plan.degradations, window: plan.window, estimate: estimateRun(made.film.durationSeconds, brain.model.name, brain.model) }, 202);
       }
       const remake = /^\/api\/films\/([0-9a-f-]{36})\/scenes\/(SC\d{4,5})$/i.exec(url.pathname);
       if (remake && request.method === "POST") {
@@ -285,6 +339,17 @@ export default {
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first." }, 503);
         if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
         if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return json({ error: "Connect GitHub first: the GITHUB_TOKEN secret and the GITHUB_REPO var (docs/CONNECT.md)." }, 503);
+        if (!env.FILMS) return json({ error: "Storage is not connected yet." }, 503);
+        // A film is rendered (and its release published) only when Bossism cleared it, or the owner approves it with a reason.
+        const { store: filmStore, review } = await latestReview(env, render[1]);
+        if (!review) return json({ error: "Not found." }, 404);
+        const decisions = JSON.parse((await filmStore.get("decisions.json")) ?? "[]");
+        if (!cleared(review, decisions).ok) {
+          const body = /** @type {any} */ (await request.json().catch(() => ({})));
+          if (body?.override !== true) return json({ error: review.release.message.en, message: review.release.message, blockedBy: review.release.blockedBy, gates: review.gates.map((/** @type {any} */ g) => ({ id: g.id, verdict: g.verdict, findings: g.findings.map((/** @type {any} */ f) => f.message) })), override: "To release anyway, send { override: true, reason } with your reason." }, 409);
+          const approved = await ownerOverride(filmStore, review, body.reason);
+          if (!approved.ok) return json({ error: approved.error }, 400);
+        }
         const result = await dispatchRender({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, filmId: render[1], site: url.origin });
         if (env.FILMS && result.ok) await r2Store(env.FILMS, render[1]).put("render.json", JSON.stringify({ ...result, at: new Date().toISOString() }, null, 1));
         return json(result, result.ok ? 202 : 502);
@@ -334,7 +399,14 @@ export default {
         }
         const run = (await store.get("run.json")) ?? (await store.get("film.json"));
         if (run === null) return json({ error: "Not found." }, 404);
-        return json({ run: JSON.parse(run), workflow: await currentInstance(env, m[1]) });
+        const review = JSON.parse((await store.get("review.json")) ?? "null");
+        const plan = JSON.parse((await store.get("preflight.json")) ?? "null");
+        return json({
+          run: JSON.parse(run),
+          workflow: await currentInstance(env, m[1]),
+          review: review ? { at: review.at, release: review.release, gates: review.gates.map((/** @type {any} */ g) => ({ id: g.id, verdict: g.verdict, critical: g.critical, findings: g.findings.map((/** @type {any} */ f) => ({ severity: f.severity, message: f.message })) })) } : null,
+          degradations: plan?.degradations ?? [],
+        });
       }
       return json({ error: "Not found." }, 404);
     } catch (error) {

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { BudgetReached, estimateRun, newFilm, runFilm, validateChapterPlan } from "../src/film-run.mjs";
 import { applyFixes, checkChapter, checkFilm, countWords, toSeconds } from "../src/scene-lines.mjs";
+import { productionGraph, understand } from "../src/bossism.mjs";
+import { superviseFilm } from "../src/supervise.mjs";
 
 const USA = new URL("../../productions/ramesh-babu/USA/", import.meta.url);
 const usaPlan = JSON.parse(readFileSync(new URL("s3-chapters.json", USA), "utf8"));
@@ -178,6 +180,101 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   assert.deepEqual(e2.scenes.map((/** @type {any} */ x) => [x.scene, x.shakes]), [["SC0008", [75]]]);
   assert.ok(e2.problems.some((/** @type {string} */ p) => p.startsWith("SC0099")));
   assert.deepEqual(state.stages["edit:C1"].result, { scenes: 6, transitions: 1, photos: 0, punchIns: 6, shakes: 0, hits: 1, dropped: 1, longHolds: 6, uncovered: 0 });
+});
+
+test("Bossism's production graph is the run itself: every stage the run executes is a node, in an order the graph allows", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "graph-check");
+  assert.ok(made.ok);
+  const store = memoryStore();
+  /** @type {string[]} */
+  const order = [];
+  await runFilm({ film: made.film, manual: "M", model: scriptedModel(), store, log: (l) => { const m = /^(\S+): start$/.exec(l); if (m) order.push(m[1]); } });
+  const graph = productionGraph(understand({ film: made.film }), ["C1", "C2"]);
+  const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
+  for (const id of order) assert.ok(nodes.has(id), `the run executed ${id}, which the graph does not know`);
+  // Every dependency of a stage that ran, if it also ran, ran before it.
+  for (const [i, id] of order.entries()) for (const dep of /** @type {any} */ (nodes.get(id)).after) {
+    const at = order.indexOf(dep.id);
+    assert.ok(at === -1 || at < i, `${id} ran before its dependency ${dep.id}`);
+  }
+  const skipped = graph.nodes.map((n) => n.id).filter((id) => !order.includes(id));
+  assert.deepEqual(skipped, ["market", "sources", "media:C1", "media:C2", "originality", "review", "render", "master"], "only the stages this test does not connect are absent");
+});
+
+test("Bossism sends a weak opening back with notes, redoes only what depends on it, and stops at the revision limit", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "supervise");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  let round = 0;
+  let firstRound = 0;
+  /** @type {string[]} */
+  const notesSeen = [];
+  const model = {
+    ...base,
+    async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
+      const reply = await base.call(r);
+      if (r.stage === "s5:C1" && r.messages[0].content.some((b) => b.text?.startsWith("REVISION NOTES"))) notesSeen.push(r.messages[0].content.map((b) => b.text).join(" "));
+      if (r.stage === "viewer" && round === 0) return { ...reply, text: reply.text.replace('"stayScore":7', '"stayScore":4').replace("the mill grabs you", "nothing happens for twenty seconds") };
+      return reply;
+    },
+  };
+  const store = memoryStore();
+  const result = await superviseFilm({
+    film: made.film, store, maxRevisions: 1,
+    runOnce: async (r) => { round = r; if (r === 1) firstRound = base.calls.length; return runFilm({ film: made.film, manual: "M", model, store }); },
+  });
+  assert.equal(result.rounds, 1);
+  assert.equal(notesSeen.length, 1, "the redone chapter was told why");
+  assert.match(notesSeen[0], /cold panel of target viewers would leave the opening/);
+  const redone = base.calls.slice(firstRound);
+  assert.ok(firstRound > 0 && redone.length > 0);
+  assert.deepEqual(redone.filter((c) => ["s01", "research", "s2", "s3", "s4", "s5:C2"].includes(c)), [], "nothing before the chapter, and not the next chapter, is paid for again");
+  assert.deepEqual(redone.filter((c) => c === "s5:C1" || c === "qa" || c === "viewer"), ["s5:C1", "qa", "viewer"], "the chapter and what reads it are redone");
+  assert.ok(!result.state.gaps.some((/** @type {string} */ g) => /scored 4\/10/.test(g)), "the old panel's gap is withdrawn with the stage that made it");
+  assert.equal(result.state.revisions, 1);
+  assert.equal(result.state.resumes ?? 0, 0, "a revision is not counted as a resume");
+  const decisions = JSON.parse(store.m.get("decisions.json"));
+  assert.deepEqual(decisions.map((/** @type {any} */ d) => d.action).slice(0, 3), ["release-blocked", "revise", "release-blocked"]);
+  assert.equal(decisions[1].gates.story, "revise");
+  assert.equal(decisions[2].gates.story, "pass", "the second review finds the opening fixed");
+  const review = JSON.parse(store.m.get("review.json"));
+  assert.deepEqual(review.release.blockedBy.sort(), ["research", "visual"], "still blocked for what this test never connected: the source desk and footage");
+});
+
+test("a brain whose window cannot hold the whole film gets QA chapter by chapter, and the run says so", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "qa-split");
+  assert.ok(made.ok);
+  const base = scriptedModel();
+  /** @type {string[]} */
+  const qaStages = [];
+  // Chapters long enough (a production note after the scenes) that both together overflow a 32k window but one fits.
+  const note = "\n\nProduction note: " + "the mill stands by the river. ".repeat(1400);
+  const model = {
+    ...base,
+    name: "qwen3:32b",
+    capabilities: { vision: false, webSearch: true, contextTokens: 32768, maxOutputTokens: 8192 },
+    price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
+      if (r.stage.startsWith("qa:")) {
+        qaStages.push(r.stage);
+        const c = r.stage.slice(3);
+        assert.ok(r.messages[0].content[0].text.includes(`<S5_${c}>`) && !r.messages[0].content[0].text.includes(`<S5_${c === "C1" ? "C2" : "C1"}>`), "each QA call reads one chapter");
+        return { text: "```json\n" + JSON.stringify({ mustFix: c === "C1" ? [{ lens: "facts", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }] : [], passed: ["p"], notChecked: [] }) + "\n```", stopReason: "end_turn", usage: {} };
+      }
+      const reply = await base.call(r);
+      return /^s5:C[12]$/.test(r.stage) ? { ...reply, text: reply.text + note } : reply;
+    },
+  };
+  const store = memoryStore();
+  const state = await runFilm({ film: made.film, manual: "M", model, store });
+  assert.deepEqual(qaStages, ["qa:C1", "qa:C2"]);
+  assert.ok(!base.calls.includes("qa"), "the whole-film QA was not sent");
+  assert.equal(state.qaMode, "per-chapter");
+  const qa = JSON.parse(store.m.get("qa.json"));
+  assert.equal(qa.mode, "per-chapter");
+  assert.match(qa.notChecked[0], /did not compare chapters with each other/, "the lowered check is written down");
+  assert.deepEqual(qa.mustFix.map((/** @type {any} */ f) => f.chapter), ["C1"], "a fix keeps the chapter it was found in");
+  assert.match(store.m.get("s5-C1.md"), /NARR: Marker2 a /, "and is applied");
 });
 
 test("a run stops at its budget and resumes where it stopped", async () => {

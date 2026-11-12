@@ -101,6 +101,7 @@ export function brainHealth(env) {
     seesPictures: caps.vision !== false,
     searchesWeb: caps.webSearch !== false,
     ...(caps.contextTokens ? { contextTokens: caps.contextTokens } : {}),
+    ...(caps.maxOutputTokens ? { maxOutputTokens: caps.maxOutputTokens } : {}),
     pricing: b.kind === "local" ? (free ? "free (runs on your own machine)" : "metered at BRAIN_PRICE_INPUT / BRAIN_PRICE_OUTPUT") : b.kind === "gemini" ? "free tier (daily limits apply)" : "paid per token (Claude API)",
   };
 }

@@ -194,7 +194,7 @@ export function localBrain(o) {
 
   return {
     name: o.model,
-    capabilities: { vision, webSearch: false, contextTokens },
+    capabilities: { vision, webSearch: false, contextTokens, maxOutputTokens },
     price: o.price ?? FREE_PRICE,
     async call(req) {
       const { out } = budget(req);

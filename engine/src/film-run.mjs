@@ -51,7 +51,7 @@ export const WEB_SEARCH_USD = 0.01;
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number, batch?: number }} Usage
  * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string }} ModelReply
- * @typedef {{ vision?: boolean, webSearch?: boolean, contextTokens?: number }} Capabilities  what the brain can do; a missing field means yes (the Claude API can do all of it)
+ * @typedef {{ vision?: boolean, webSearch?: boolean, contextTokens?: number, maxOutputTokens?: number }} Capabilities  what the brain can do; a missing field means yes (the Claude API can do all of it)
  * @typedef {{ input: number, output: number, cacheRead: number, cacheWrite: number }} Price  US dollars per million tokens
  * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply>, capabilities?: Capabilities, price?: Price }} Model  price: the brain's own price (a local brain is free); without it PRICES is used
  * @typedef {{ get: (key: string) => Promise<string | null>, put: (key: string, text: string) => Promise<void> }} Store
@@ -305,7 +305,8 @@ export async function runFilm(o) {
   /** @type {any} */
   const state = JSON.parse((await store.get("run.json")) ?? "null") ?? { film, model: model.name, stages: {}, usage: {}, costUsd: 0, gaps: [], status: "running" };
   // A failed or budget-stopped run that is started again resumes: finished stages are kept, the rest runs.
-  if (state.status !== "running") { state.resumes = (state.resumes ?? 0) + 1; state.status = "running"; }
+  // A revision sent back by Bossism is not a resume; both keep every finished stage.
+  if (state.status !== "running") { if (state.status !== "revising") state.resumes = (state.resumes ?? 0) + 1; state.status = "running"; }
   delete state.error;
   delete state.lastError;
   const save = () => store.put("run.json", JSON.stringify(state, null, 1));
@@ -315,8 +316,11 @@ export async function runFilm(o) {
    * @param {string} stage @param {Block[]} content @param {number} maxTokens @param {{ webSearch?: { maxUses: number }, effort?: string, system?: Block[] }} [extra]
    */
   async function ask(stage, content, maxTokens, extra = {}) {
+    // Work sent back by Bossism carries its notes to the stage that redoes it (research also to its search plan).
+    const noteKey = Object.keys(state.revisionNotes ?? {}).find((k) => stage === k || stage.startsWith(`${k}-`));
+    const notes = noteKey ? state.revisionNotes[noteKey] : "";
     /** @type {ModelRequest["messages"]} */
-    const messages = [{ role: "user", content }];
+    const messages = [{ role: "user", content: notes ? [...content, { text: `REVISION NOTES: this stage's earlier output was sent back by the review because it failed these checks. Fix every point; keep everything else that was right.\n\n${notes}` }] : content }];
     let text = "";
     for (let part = 0; part < 4; part += 1) {
       const reply = await model.call({ stage, system: extra.system ?? system, messages, maxTokens, effort: extra.effort ?? STAGE_EFFORT[/** @type {keyof typeof STAGE_EFFORT} */ (stage.split(":")[0])] ?? "medium", webSearch: extra.webSearch });
@@ -334,14 +338,38 @@ export async function runFilm(o) {
     throw new Error(`Stage ${stage} did not finish in 4 parts.`);
   }
 
+  /**
+   * What the stage now running has spent. It is applied to the run state
+   * once, from the step's own result, so a Workflow step replayed from its
+   * stored result keeps its cost and gaps instead of losing them.
+   * @type {{ costUsd: number, usage: Record<string, any> } | null}
+   */
+  let pending = null;
+
   /** @param {string} stage @param {ModelReply} reply */
   function record(stage, reply) {
     const u = reply.usage ?? {};
-    const s = (state.usage[stage] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 });
+    const book = pending ?? { costUsd: 0, usage: state.usage };
+    const s = (book.usage[stage] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 });
     s.calls += 1;
     for (const k of ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "web_search_requests"]) if (/** @type {any} */ (u)[k] || s[k] !== undefined) s[k] = (s[k] ?? 0) + (/** @type {any} */ (u)[k] ?? 0);
     if (reply.model && reply.model !== model.name) s.servedBy = reply.model;
-    state.costUsd = round2(state.costUsd + costOf(u, reply.model ?? model.name, model.price));
+    const cost = costOf(u, reply.model ?? model.name, model.price);
+    if (pending) pending.costUsd += cost;
+    else state.costUsd = round2(state.costUsd + cost);
+  }
+
+  /** Add a stage's spending to the run state. @param {{ costUsd: number, usage: Record<string, any> } | null | undefined} spent */
+  function mergeSpent(spent) {
+    if (!spent) return;
+    for (const [key, u] of Object.entries(spent.usage)) {
+      const s = (state.usage[key] ??= { calls: 0, input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 });
+      for (const [k, v] of Object.entries(u)) {
+        if (typeof v === "number") s[k] = (s[k] ?? 0) + v;
+        else s[k] = v;
+      }
+    }
+    state.costUsd = round2(state.costUsd + spent.costUsd);
   }
 
   /**
@@ -355,18 +383,31 @@ export async function runFilm(o) {
       throw new BudgetReached(`Budget of $${o.budgetUsd} reached ($${state.costUsd} spent) before ${id}.`);
     }
     log(`${id}: start`);
-    const result = await step(id, async () => {
+    const out = await step(id, async () => {
+      const before = state.gaps.length;
+      pending = { costUsd: 0, usage: {} };
       try {
-        return await fn();
+        const result = await fn();
+        const gaps = state.gaps.splice(before);
+        return { result, gaps, spent: pending };
       } catch (error) {
+        // A failed attempt's gaps go (the retry reports its own); its spending stays, because it was spent.
+        state.gaps.splice(before);
+        mergeSpent(pending);
         // Shown in the studio while the step is retried, so a wrong key or an outage is visible at once.
         state.lastError = { stage: id, message: error instanceof Error ? error.message.slice(0, 500) : String(error), at: new Date().toISOString() };
         await save().catch(() => {});
         throw error;
+      } finally {
+        pending = null;
       }
     });
+    mergeSpent(out.spent);
+    state.gaps.push(...out.gaps);
+    const result = out.result;
     delete state.lastError;
-    state.stages[id] = { status: "done", result };
+    // The stage's own gaps are kept with it, so a revision that redoes the stage withdraws exactly them.
+    state.stages[id] = { status: "done", result, gaps: out.gaps };
     await save();
     log(`${id}: done`);
     return result;
@@ -568,11 +609,40 @@ export async function runFilm(o) {
         return { chapter: c.id, cardShare: t.durationSeconds ? Math.round((cards / t.durationSeconds) * 100) : 0 };
       });
       const craft = [...hook, ...mix.filter((m) => m.cardShare > 40).map((m) => ({ code: "card-heavy", detail: `${m.chapter}: ${m.cardShare}% of the time is text cards; swap some for real pictures (R2 archive, R3 footage) so the eye has something to see.` }))];
-      const reply = await ask("qa", [
-        { text: ctx("S2", await read("s2.md")) + "\n" + chapters.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
-        { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(machine.errors.slice(0, 60)) + (craft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(craft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
-      ], 32000);
-      const qa = safeJson(reply) ?? { mustFix: [], passed: [], notChecked: ["The QA reply was not valid JSON."] };
+      const s2 = await read("s2.md");
+      /**
+       * One QA request over some chapters, with the code findings that concern them.
+       * @param {string} name @param {typeof chapters} part
+       */
+      const qaAsk = (name, part) => {
+        const whole = part.length === chapters.length;
+        const scenes = new Set(part.flatMap((c) => parseSceneLines(c.markdown).map((x) => x.sc)));
+        const errors = whole ? machine.errors : machine.errors.filter((e) => !e.scene || scenes.has(e.scene));
+        const partCraft = whole ? craft : craft.filter((x) => (x.code === "card-heavy" ? part.some((c) => x.detail.startsWith(`${c.id}:`)) : part[0]?.id === chapters[0]?.id));
+        return ask(name, [
+          { text: ctx("S2", s2) + "\n" + part.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
+          { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(errors.slice(0, 60)) + (partCraft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(partCraft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
+        ], 32000);
+      };
+      // A brain whose window cannot hold the whole film reads it chapter by chapter, and the run says so.
+      const window = model.capabilities?.contextTokens;
+      const reserve = Math.min(32000, model.capabilities?.maxOutputTokens ?? 8192);
+      const tokensFor = (/** @type {typeof chapters} */ part) => Math.ceil((manual.length + brief.length + s2.length + part.reduce((n, c) => n + c.markdown.length, 0) + 6000) / 3.2) + reserve;
+      const perChapter = Boolean(window) && chapters.length > 1 && tokensFor(chapters) > /** @type {number} */ (window);
+      /** @type {any} */
+      let qa;
+      if (!perChapter) qa = safeJson(await qaAsk("qa", chapters)) ?? { mustFix: [], passed: [], notChecked: ["The QA reply was not valid JSON."] };
+      else {
+        qa = { mode: "per-chapter", mustFix: [], passed: [], notChecked: [`The model did not compare chapters with each other: the brain's window (${window} tokens) holds one chapter at a time, so QA read each chapter on its own. Code still checked the clock and the open loops across the whole film.`] };
+        for (const c of chapters) {
+          const part = safeJson(await qaAsk(`qa:${c.id}`, [c]));
+          if (!part) { qa.notChecked.push(`${c.id}: the QA reply was not valid JSON.`); continue; }
+          qa.mustFix.push(...(Array.isArray(part.mustFix) ? part.mustFix : []).map((/** @type {any} */ f) => ({ ...f, chapter: c.id })));
+          qa.passed.push(...(Array.isArray(part.passed) ? part.passed : []).map((/** @type {any} */ x) => `${c.id}: ${x}`));
+          qa.notChecked.push(...(Array.isArray(part.notChecked) ? part.notChecked : []).map((/** @type {any} */ x) => `${c.id}: ${x}`));
+        }
+        state.qaMode = "per-chapter";
+      }
       /** @type {{ chapter: string, scene: string, status: string }[]} */
       const fixLog = [];
       for (const c of chapters) {

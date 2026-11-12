@@ -36,7 +36,7 @@ test("Ollama: native /api/chat with the window set per request, thinking removed
   assert.equal(sent[0].body.options.num_predict, 8192, "the reply is capped at the brain's output limit; the run continues it");
   assert.equal(sent[0].body.stream, false);
   assert.deepEqual([r.text, r.stopReason, r.usage.input_tokens, r.usage.output_tokens], ["## S0\nIntake.", "end_turn", 1200, 90]);
-  assert.deepEqual(brain.capabilities, { vision: false, webSearch: false, contextTokens: 65536 });
+  assert.deepEqual(brain.capabilities, { vision: false, webSearch: false, contextTokens: 65536, maxOutputTokens: 8192 });
   assert.deepEqual(brain.price, FREE_PRICE, "a brain on the owner's machine costs nothing per token");
 });
 

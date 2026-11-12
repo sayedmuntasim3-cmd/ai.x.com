@@ -30,6 +30,11 @@ const T = {
     token: "স্টুডিও টোকেন",
     tokenHint: "Cloudflare-এ যে STUDIO_TOKEN দিয়েছেন। শুধু এই ব্রাউজারে থাকে।",
     estimate: "আনুমানিক খরচ",
+    review: "Bossism-এর রিভিউ (প্রমাণ দেখে কোডের যাচাই)",
+    lowered: "চালুর আগেই জানানো: যেখানে মান কম হবে",
+    overrideReason: "তবুও প্রকাশ করতে চাইলে কারণ লিখুন (রেকর্ডে থাকবে)",
+    overrideGo: "কারণসহ তবুও প্রকাশ করো",
+    gates: { research: "রিসার্চ", claims: "দাবি", script: "স্ক্রিপ্ট", story: "গল্প", visual: "ছবি", rights: "অধিকার", packaging: "প্যাকেজিং" },
     freeBrain: (/** @type {string} */ m) => `খরচ নেই: আপনার নিজের মডেল (${m}) লিখবে`,
     start: "ফিল্ম শুরু করো",
     starting: "শুরু হচ্ছে…",
@@ -99,6 +104,11 @@ const T = {
     token: "Studio token",
     tokenHint: "The STUDIO_TOKEN you set in Cloudflare. It stays in this browser only.",
     estimate: "Estimated cost",
+    review: "Bossism's review (code checking the evidence)",
+    lowered: "Said before the run: where quality is lower",
+    overrideReason: "To release it anyway, write your reason (it is kept on record)",
+    overrideGo: "Release anyway, with my reason",
+    gates: { research: "Research", claims: "Claims", script: "Script", story: "Story", visual: "Pictures", rights: "Rights", packaging: "Packaging" },
     freeBrain: (/** @type {string} */ m) => `No cost: your own model (${m}) writes it`,
     start: "Start the film",
     starting: "Starting…",
@@ -230,18 +240,69 @@ async function start(/** @type {SubmitEvent} */ ev) {
 
 /** @type {number | undefined} */
 let timer;
+/** The film being watched, and how long to wait after a failed check. */
+let watching = "";
+let backoffMs = 15000;
+/**
+ * Watch a film while its Workflow works: every 15 s, longer after network
+ * errors (up to 2 min, so a phone on a weak signal keeps trying without
+ * draining the battery), and not at all while the tab is hidden.
+ */
 async function poll(/** @type {string} */ id) {
   clearTimeout(timer);
+  watching = id;
+  if (document.visibilityState === "hidden") return;
   try {
     const res = await fetch(`/api/films/${id}`);
-    if (!res.ok) return;
-    const { run } = await res.json();
-    showRun(id, run);
-    if (run.status === "running" || !run.status) timer = window.setTimeout(() => poll(id), 15000);
-  } catch { /* offline: try again on the next visit */ }
+    if (res.status === 404) return;
+    if (!res.ok) throw new Error(String(res.status));
+    const body = await res.json();
+    backoffMs = 15000;
+    showRun(id, body.run, body);
+    const working = ["queued", "running", "waiting", "paused", "waitingForPause"].includes(body.workflow?.status) || body.run.status === "running" || body.run.status === "revising" || !body.run.status;
+    if (working) timer = window.setTimeout(() => poll(id), backoffMs);
+  } catch {
+    backoffMs = Math.min(120000, backoffMs * 2);
+    timer = window.setTimeout(() => poll(id), backoffMs);
+  }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && watching) poll(watching); });
+
+/**
+ * Bossism's verdicts for the film: each gate, what it found, and the release decision, in the page's language.
+ * @param {any} review @param {any[]} degradations
+ */
+function reviewPanel(review, degradations) {
+  const l = L();
+  const bn = lang() === "bn";
+  const text = (/** @type {any} */ m) => (m ? (bn ? m.bn : m.en) ?? m.en ?? "" : "");
+  const panel = document.createElement("div");
+  const h = (/** @type {string} */ tag, /** @type {string} */ s) => { const e = document.createElement(tag); e.textContent = s; return e; };
+  if (degradations?.length) {
+    panel.append(h("h4", l.lowered));
+    const ul = document.createElement("ul");
+    for (const d of degradations) ul.append(h("li", text(d)));
+    panel.append(ul);
+  }
+  if (!review) return panel;
+  panel.append(h("h4", l.review));
+  const mark = { pass: "✓", revise: "↻", block: "✗" };
+  const ul = document.createElement("ul");
+  for (const g of review.gates) {
+    const li = h("li", `${mark[/** @type {keyof typeof mark} */ (g.verdict)] ?? "?"} ${l.gates[g.id] ?? g.id}`);
+    const findings = (g.findings ?? []).filter((/** @type {any} */ f) => f.severity !== "note" || g.verdict === "pass");
+    if (findings.length) {
+      const inner = document.createElement("ul");
+      for (const f of findings.slice(0, 6)) inner.append(h("li", text(f.message)));
+      li.append(inner);
+    }
+    ul.append(li);
+  }
+  panel.append(ul, h("p", text(review.release?.message)));
+  return panel;
 }
 
-function showRun(/** @type {string} */ id, /** @type {any} */ run) {
+function showRun(/** @type {string} */ id, /** @type {any} */ run, /** @type {any} */ extra = {}) {
   const l = L();
   const out = $("film-out");
   out.replaceChildren();
@@ -257,6 +318,7 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run) {
     list.append(h("li", `✓ ${label}${info.result && info.result.ok === false ? " (GAP)" : ""}`));
   }
   out.append(list);
+  out.append(reviewPanel(extra.review ?? null, extra.degradations ?? []));
   if (run.gaps?.length) {
     out.append(h("h4", l.gaps));
     const g = document.createElement("ul");
@@ -426,16 +488,35 @@ function renderButton(id) {
   go.textContent = l.render;
   const result = document.createElement("span");
   result.setAttribute("aria-live", "polite");
-  go.addEventListener("click", async () => {
+  // A film Bossism blocked is released only with the owner's written reason, which goes on the record.
+  const reason = document.createElement("textarea");
+  reason.rows = 2;
+  reason.placeholder = l.overrideReason;
+  reason.hidden = true;
+  const anyway = document.createElement("button");
+  anyway.type = "button";
+  anyway.className = "ghost";
+  anyway.textContent = l.overrideGo;
+  anyway.hidden = true;
+  const send = async (/** @type {any} */ body) => {
     const token = /** @type {HTMLInputElement} */ ($("film-token")).value.trim();
     if (!token) { result.textContent = ` ${l.remakeFailed} ${l.token}`; return; }
     go.disabled = true;
+    anyway.disabled = true;
     result.textContent = " …";
     try {
-      const res = await fetch(`/api/films/${id}/render`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/films/${id}/render`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
       const r = await res.json().catch(() => ({ error: l.notConnected }));
       result.replaceChildren();
+      if (res.status === 409 && r.message) {
+        result.textContent = ` ${lang() === "bn" ? r.message.bn : r.message.en}`;
+        reason.hidden = false;
+        anyway.hidden = false;
+        return;
+      }
       if (r.ok) {
+        reason.hidden = true;
+        anyway.hidden = true;
         const a = document.createElement("a");
         a.href = r.actionsUrl;
         a.target = "_blank";
@@ -449,9 +530,12 @@ function renderButton(id) {
       result.textContent = ` ${l.remakeFailed} ${error instanceof Error ? error.message : error}`;
     } finally {
       go.disabled = false;
+      anyway.disabled = false;
     }
-  });
-  wrap.append(go, result);
+  };
+  go.addEventListener("click", () => send({}));
+  anyway.addEventListener("click", () => send({ override: true, reason: reason.value.trim() }));
+  wrap.append(go, result, reason, anyway);
   return wrap;
 }
 

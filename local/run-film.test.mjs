@@ -35,6 +35,18 @@ test("the local runner keeps a film in a folder, says what the brain can do, and
   assert.equal(JSON.parse(readFileSync(join(out, "run.json"), "utf8")).resumes, 1);
 });
 
+test("Bossism refuses a film the brain cannot hold before any model call, in the owner's language", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-preflight-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  let calls = 0;
+  const small = { name: "llama3.2:3b", capabilities: { vision: false, webSearch: false, contextTokens: 8192, maxOutputTokens: 4096 }, price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, async call() { calls += 1; throw new Error("must not be called"); } };
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "45", "--out", join(dir, "f"), "--lang", "bn"], {}, { model: small, log: () => {} }), /ব্রেইনের উইন্ডো \(8192 টোকেন\) 45 মিনিটের ফিল্মের/);
+  assert.equal(calls, 0, "nothing was spent");
+  const plan = JSON.parse(readFileSync(join(dir, "f", "preflight.json"), "utf8"));
+  assert.deepEqual(plan.blockers.map((/** @type {any} */ b) => b.code), ["plan.windowSmall"], "the refusal is kept with the film");
+  await assert.rejects(main(["--out", join(dir, "f"), "--approve", "fine"], {}, { model: small, log: () => {} }), /no review to approve/);
+});
+
 test("without a brain or a topic the runner says what to do", async () => {
   await assert.rejects(main(["--topic", "x y z"], {}), /No brain is connected.*BRAIN_URL/);
   await assert.rejects(main([], { BRAIN_URL: "http://localhost:11434", BRAIN_MODEL: "m" }, { log: () => {} }), /Give a topic/);
