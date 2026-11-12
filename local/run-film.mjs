@@ -26,12 +26,15 @@
  *
  * When it finishes it prints the render command (render/render-film.mjs).
  */
+import { lookup } from "node:dns/promises";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { isIP } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
+import { privateAddress, publicUrl } from "../engine/src/net-guard.mjs";
 import { researchProviders } from "../engine/src/research-desk.mjs";
 import { cleared, gateMessage, ownerOverride, preflight, productionGraph, understand } from "../engine/src/bossism.mjs";
 import { say } from "../engine/src/messages.mjs";
@@ -70,7 +73,7 @@ export function folderStore(dir) {
  * preflight with this machine's brain, the supervised run, the review.
  * @param {{ film: import("../engine/src/film-run.mjs").Film, store: import("../engine/src/film-run.mjs").Store,
  *   brain: { kind: string, model: import("../engine/src/film-run.mjs").Model }, env: Record<string, string | undefined>,
- *   fetch?: typeof fetch, signal?: AbortSignal, print: (line: string) => void, lang: "en" | "bn",
+ *   fetch?: typeof fetch, lookup?: (host: string, o: { all: true }) => Promise<{ address: string }[]>, signal?: AbortSignal, print: (line: string) => void, lang: "en" | "bn",
  *   budgetUsd?: number, edit?: boolean, viewers?: boolean, maxRevisions?: number,
  *   channel?: { load(): Promise<any[]>, save(list: any[]): Promise<void> } }} o
  */
@@ -95,6 +98,8 @@ export async function produceFilm(o) {
 
   const get = o.fetch ?? fetch;
   const web = (/** @type {string} */ url, /** @type {RequestInit | undefined} */ init) => get(url, init);
+  // Pages a model or a web page pointed at are opened only on hosts that resolve to public addresses (no SSRF into this network).
+  const pages = guardedFetch(web, o.lookup);
   const options = {
     film,
     manual,
@@ -104,8 +109,9 @@ export async function produceFilm(o) {
     edit: o.edit ?? true,
     viewers: o.viewers ?? true,
     media: { providers: media },
-    sources: { fetch: web },
-    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined }), fetch: web },
+    sources: { fetch: pages },
+    // The search providers' own APIs (Wikipedia, the owner's SearXNG, which may be on this network) use the plain fetch.
+    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined }), fetch: pages },
     channel: o.channel,
     log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
     signal: o.signal,
@@ -115,6 +121,27 @@ export async function produceFilm(o) {
   return { state, review, plan };
 }
 
+/**
+ * A fetch that opens a URL only when its host resolves to public addresses
+ * only, checked on every call (safeFetch calls it once per redirect hop).
+ * The check and the connection are separate lookups, so a host that changes
+ * its answer in between (DNS rebinding) is not fully excluded.
+ * @param {(url: string, init?: RequestInit) => Promise<Response>} get
+ * @param {(host: string, o: { all: true }) => Promise<{ address: string }[]>} [resolve]
+ */
+export function guardedFetch(get, resolve = /** @type {any} */ (lookup)) {
+  return async (/** @type {string} */ url, /** @type {RequestInit | undefined} */ init) => {
+    if (!publicUrl(url)) throw new Error(`Refused a non-public address: ${url.slice(0, 120)}`);
+    const host = new URL(url).hostname.replace(/^\[|\]$/g, "");
+    if (!isIP(host)) {
+      const answers = await resolve(host, { all: true });
+      const bad = answers.find((a) => privateAddress(a.address));
+      if (!answers.length || bad) throw new Error(`Refused ${host}: it resolves to ${bad ? bad.address : "nothing"}, not a public address.`);
+    }
+    return get(url, init);
+  };
+}
+
 /** @param {string} topic */
 export function slug(topic) {
   return topic.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "film";
@@ -122,7 +149,7 @@ export function slug(topic) {
 
 /**
  * @param {string[]} argv @param {Record<string, string | undefined>} env
- * @param {{ model?: import("../engine/src/film-run.mjs").Model, fetch?: typeof fetch, log?: (line: string) => void, signal?: AbortSignal }} [deps] tests, and the job worker (signal stops the run between stages)
+ * @param {{ model?: import("../engine/src/film-run.mjs").Model, fetch?: typeof fetch, lookup?: (host: string, o: { all: true }) => Promise<{ address: string }[]>, log?: (line: string) => void, signal?: AbortSignal }} [deps] tests, and the job worker (signal stops the run between stages)
  */
 export async function main(argv, env, deps = {}) {
   const print = deps.log ?? ((/** @type {string} */ line) => console.log(line));
@@ -168,7 +195,7 @@ export async function main(argv, env, deps = {}) {
   const channelDir = join(dirname(out), "channel");
   const budget = Number(values.budget);
   const { state, review } = await produceFilm({
-    film, store, brain, env, fetch: deps.fetch, signal: deps.signal, print, lang,
+    film, store, brain, env, fetch: deps.fetch, lookup: deps.lookup, signal: deps.signal, print, lang,
     budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
     edit: !values["no-edit"], viewers: !values["no-viewers"],
     maxRevisions: Number(values["max-revisions"] ?? 1),

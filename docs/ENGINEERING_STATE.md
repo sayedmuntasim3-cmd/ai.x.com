@@ -26,7 +26,7 @@ owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
 
-- Tests (third session, 12 Nov 2026): **197 engine + 73 platform = 270, all passing** after `npm ci` at the
+- Tests (third session, 12 Nov 2026): **201 engine + 74 platform = 275, all passing** after `npm ci` at the
   root (a fresh container has no root `node_modules`). Earlier: 173 + 73 = 246; strict
   JSDoc type check passes (`cd engine && npm run typecheck`); Cloudflare build
   check passes (`npm run check`). Before this session: 141 + 48 = 189.
@@ -138,6 +138,33 @@ regex; that waits for an independent critic), and gating on `lintNarration` (on 
 only flags three sentences starting with "a"/"the": too weak to block on).
 
 Phase 0 is blocked: the owner declined the research-access environment on 12 Nov 2026; no Gemini key is set.
+
+## 4d. Security audit (12 Nov 2026)
+
+Checked in code: routes and tokens (`worker/index.mjs`, `worker/jobs-api.mjs`), file names, the render
+workflow, pages the engine opens, secrets in logs, dependencies (`npm audit`: 0 known vulnerabilities).
+
+Fixed:
+- **SSRF on the owner's machine.** The source desk opened every URL a model cited, with no address check,
+  and both desks followed redirects blindly; `publicUrl` missed forms such as `[::ffff:127.0.0.1]`,
+  `fe80::`, single-label names (`router`), `.lan`, credentials in the URL. Now `engine/src/net-guard.mjs`:
+  `publicUrl` (private, reserved, link-local and metadata addresses refused in every notation),
+  `safeFetch` (redirects followed by hand, each hop checked, at most 5), used by the research and source
+  desks; `local/run-film.mjs` `guardedFetch` also refuses hosts whose DNS answers include a private
+  address. The search providers' own APIs (Wikipedia, the owner's SearXNG) are not guarded.
+- **Prompt injection.** The research instructions now say web pages are data, never instructions.
+
+Already sound: constant-time token comparison; owner routes need `STUDIO_TOKEN`, workers a separate
+`WORKER_TOKEN` with job leases; file names cannot leave a film's folder; the render workflow validates its
+inputs through environment variables; the film page has a strict CSP and no script.
+
+Open (needs an owner decision or a production change):
+- Film files, pages and scripts are readable by anyone who has the film's UUID (no token); renders publish
+  films as public pre-releases while the repository is public.
+- The studio page (`public/studio/`) is served without security headers (CSP) and keeps the studio token in
+  localStorage; a `public/_headers` file would add them (a production configuration change).
+- DNS rebinding between the check and the connection is not fully excluded on the owner's machine.
+- Pictures the owner adds by URL and provider clips are downloaded by the renderer without this guard.
 
 ## 5. Role entries corrected
 

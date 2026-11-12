@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { folderStore, main, slug } from "./run-film.mjs";
+import { folderStore, guardedFetch, main, slug } from "./run-film.mjs";
 
 test("the local runner keeps a film in a folder, says what the brain can do, and resumes from the folder", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "zupona-local-"));
@@ -65,4 +65,20 @@ test("the folder store keeps nested keys and refuses paths outside the film", as
   assert.equal(slug("The Rise & Fall of Lamborghini!"), "the-rise-fall-of-lamborghini");
   assert.equal(slug("كتاب"), "كتاب", "letters of any script are kept");
   assert.equal(slug("!!!"), "film");
+});
+
+test("the local runner opens a page only when its host resolves to public addresses", async () => {
+  /** @type {string[]} */
+  const opened = [];
+  const get = async (/** @type {string} */ url) => { opened.push(url); return new Response("ok"); };
+  const dns = /** @type {Record<string, string[]>} */ ({ "public.example": ["93.184.216.34"], "rebind.example": ["93.184.216.34", "10.0.0.5"], "nas.example": ["192.168.1.20"], "none.example": [] });
+  const lookup = async (/** @type {string} */ host) => (dns[host] ?? []).map((address) => ({ address }));
+  const guarded = guardedFetch(get, lookup);
+  assert.equal((await guarded("https://public.example/a")).status, 200);
+  await assert.rejects(guarded("https://nas.example/"), /resolves to 192\.168\.1\.20/);
+  await assert.rejects(guarded("https://rebind.example/"), /resolves to 10\.0\.0\.5/, "one private answer is enough to refuse");
+  await assert.rejects(guarded("https://none.example/"), /resolves to nothing/);
+  await assert.rejects(guarded("http://127.0.0.1/"), /non-public address/);
+  assert.equal((await guarded("http://8.8.8.8/")).status, 200, "a public IP needs no lookup");
+  assert.deepEqual(opened, ["https://public.example/a", "http://8.8.8.8/"]);
 });

@@ -14,6 +14,8 @@
  * Runtime-agnostic: the caller injects fetch (the Worker's, or a fake in tests).
  */
 
+import { publicUrl, safeFetch } from "./net-guard.mjs";
+
 /** @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike */
 /** @typedef {"verified" | "opened" | "unconfirmed" | "unreachable"} FactCheck */
 
@@ -65,7 +67,9 @@ export function siteOf(url) {
  */
 async function openPage(get, url, timeoutMs, maxBytes) {
   try {
-    const res = await get(url, { redirect: "follow", headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.5" }, signal: AbortSignal.timeout(timeoutMs) });
+    // A page the research cites is opened only if it is public, and every redirect is checked too (safeFetch).
+    if (!publicUrl(url)) return { status: 0, text: "", kind: "error" };
+    const res = await safeFetch(get, url, { headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.5" }, signal: AbortSignal.timeout(timeoutMs) });
     const type = String(res.headers.get("content-type") ?? "").toLowerCase();
     if (!res.ok) { await res.body?.cancel().catch(() => {}); return { status: res.status, text: "", kind: "error" }; }
     if (type.includes("pdf")) { await res.body?.cancel().catch(() => {}); return { status: res.status, text: "", kind: "pdf" }; }
