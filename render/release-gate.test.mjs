@@ -4,10 +4,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { GATES_VERSION } from "../engine/src/bossism.mjs";
 import { main, probeSeconds } from "./release-gate.mjs";
 
 const ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
-const blocked = { at: "2026-01-01T00:00:00.000Z", gates: [{ id: "research", verdict: "block" }, { id: "visual", verdict: "pass" }], release: { allowed: false, blockedBy: ["research"], message: { code: "release.blocked", params: { gates: "research" } } } };
+const blocked = { at: "2026-01-01T00:00:00.000Z", gatesVersion: GATES_VERSION, gates: [{ id: "research", verdict: "block" }, { id: "visual", verdict: "pass" }], release: { allowed: false, blockedBy: ["research"], message: { code: "release.blocked", params: { gates: "research" } } } };
 
 /** @param {Record<string, unknown>} files */
 function fakeStudio(files) {
@@ -34,6 +35,11 @@ test("before rendering: a blocked film stops the render, in both languages; an o
   const approved = fakeStudio({ "review.json": blocked, "decisions.json": [{ actor: "owner", action: "release-override", at: "2026-02-01T00:00:00.000Z" }] });
   assert.equal(await main(["--api", "https://ai.zupona.com", "--id", ID], { fetch: approved.fetch, print: (l) => out.push(l) }), 0);
   assert.match(out.join("\n"), /Cleared by the owner's approval/);
+
+  out.length = 0;
+  const old = { ...blocked, gatesVersion: undefined, release: { allowed: true, blockedBy: [], message: { code: "release.allowed" } } };
+  assert.equal(await main(["--api", "https://ai.zupona.com", "--id", ID], { fetch: fakeStudio({ "review.json": old }).fetch, print: (l) => out.push(l) }), 1, "a review by older gates clears nothing");
+  assert.match(out.join("\n"), /older version of the checks/);
 
   out.length = 0;
   assert.equal(await main(["--api", "https://ai.zupona.com", "--id", ID], { fetch: fakeStudio({}).fetch, print: (l) => out.push(l) }), 1, "no review is no clearance");

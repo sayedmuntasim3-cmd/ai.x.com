@@ -36,7 +36,7 @@ import { checkFilm, parseSceneLines } from "./scene-lines.mjs";
  * @typedef {{ system: System, wired: boolean, nodes: StageNode[] }} Graph
  * @typedef {{ code: string, severity: "block" | "revise" | "note", message: Msg, target?: string, note?: string }} Finding
  * @typedef {{ id: string, verdict: "pass" | "revise" | "block", critical: boolean, findings: Finding[], evidence: Record<string, unknown> }} Gate
- * @typedef {{ at: string, film: string, gates: Gate[], release: { allowed: boolean, blockedBy: string[], message: Msg } }} Review
+ * @typedef {{ at: string, film: string, gatesVersion?: number, gates: Gate[], release: { allowed: boolean, blockedBy: string[], message: Msg } }} Review
  */
 
 /** Thresholds, in one place so they are visible and tested. */
@@ -51,6 +51,13 @@ export const LIMITS = Object.freeze({
   targetLufs: -14,
   ceilingDbtp: -1,
 });
+
+/**
+ * The version of the gates. A review made by older gates cannot clear a film:
+ * it is reviewed again (2: the claims gate blocks unresolved markers, guessed
+ * values and claims without evidence).
+ */
+export const GATES_VERSION = 2;
 
 /** Gates whose failure stops a release; the others ask for revision and are listed. */
 export const CRITICAL_GATES = Object.freeze(["research", "claims", "script", "rights", "master"]);
@@ -246,6 +253,193 @@ function gate(id, findings, evidence) {
 const claimKey = (s) => String(s ?? "").toLowerCase().replace(/[\d.,%$₹€£]+/g, " ").replace(/[^\p{L}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
 /**
+ * Markers that must never reach narration or the screen: claim placeholders
+ * ("[C12 low]", "$[C40 high]") and editing notes ("[TBD]", "[VERIFY]" ...).
+ */
+export const UNRESOLVED = /\$?\[C\d{2,3}[^\]]*\]|\[(?:TBD|TBC|TODO|FIXME|VERIFY|CHECK|PENDING|CITATION NEEDED|NEEDS? SOURCE|SOURCE\?|XX+)\b[^\]]*\]/gi;
+
+/**
+ * @typedef {{ id: string, kind: "fact" | "attributed" | "hedged" | "unknown" | "unresolved", value: string,
+ *   lowConfidence: boolean, urls: string[], facts: string[], refs: string[] }} LedgerRow
+ */
+
+/** A URL as a comparable key: host without www, path without a trailing slash, query kept. @param {string} url */
+function urlKey(url) {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.toLowerCase().replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "")}${u.search}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The pages a ledger cell cites, with or without a scheme ("fred.stlouisfed.org/series/X" counts).
+ * @param {string} text
+ */
+const urlsIn = (text) => (text.match(/(?:https?:\/\/|\b(?=(?:[a-z0-9-]+\.)+[a-z]{2,}\/))[^\s|<>"'`·]+/gi) ?? [])
+  .map((u) => u.replace(/[).,;:»”’'\]]+$/, ""))
+  .map((u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`));
+
+/**
+ * The S2 claim ledger by ID. Columns are found by their headers (status or
+ * type, value, sources, confidence), so a ledger written in another column
+ * order still reads correctly. A status the code cannot classify counts as
+ * FACT: the strictest reading.
+ * @param {string | null} s2 @returns {Map<string, LedgerRow>}
+ */
+export function parseLedger(s2) {
+  /** @type {Map<string, LedgerRow>} */
+  const rows = new Map();
+  /** @type {string[]} */
+  let header = [];
+  const cells = (/** @type {string} */ line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  const col = (/** @type {RegExp} */ re) => header.findIndex((h) => re.test(h));
+  const lines = String(s2 ?? "").split("\n");
+  for (let n = 0; n < lines.length; n += 1) {
+    const line = lines[n];
+    if (/^\s*\|/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[n + 1] ?? "")) { header = cells(line).map((h) => h.toLowerCase()); continue; }
+    const m = /^\s*\|\s*\*{0,2}(C\d{2,3})\*{0,2}\s*\|/.exec(line);
+    if (!m) continue;
+    const c = cells(line);
+    const at = (/** @type {number} */ i) => (i >= 0 ? c[i] ?? "" : "");
+    const status = at(col(/status|type/)).toLowerCase();
+    const src = col(/source/) >= 0 ? at(col(/source/)) : c.slice(1).join(" | ");
+    // The status word comes first ("FACT (year unknown)" is a FACT, not an UNKNOWN).
+    const kind = /^\W*unknown\b/.test(status) ? "unknown"
+      : /^\W*(unsupported|unverified|pending|tbd|missing)\b/.test(status) ? "unresolved"
+      : /^\W*fact\b/.test(status) && /attribut|reported|according/.test(status) ? "attributed"
+      : /contested|disputed|estimate|quote|paraphrase|reported|interpretation|inferred/.test(status) ? "hedged"
+      : "fact";
+    rows.set(m[1], {
+      id: m[1], kind, value: at(col(/value/)),
+      lowConfidence: /^\W*(very\s+)?(low|none)\W*$/i.test(at(col(/conf/))),
+      urls: urlsIn(src), facts: src.match(/\bF\d{2,3}\b/g) ?? [], refs: (src.match(/\bC\d{2,3}\b/g) ?? []).filter((r) => r !== m[1]),
+    });
+  }
+  return rows;
+}
+
+/**
+ * What the research kept after the source desk: facts by ID and by the pages
+ * they cite, with the desk's check of each. Null without a research file.
+ * @param {any} research @param {any} check
+ */
+function researchEvidence(research, check) {
+  const facts = Array.isArray(research?.facts) ? research.facts : null;
+  if (!facts) return null;
+  /** @type {Map<string, any>} */ const byId = new Map();
+  /** @type {Map<string, any[]>} */ const byUrl = new Map();
+  for (const fact of facts) {
+    if (fact?.id) byId.set(String(fact.id), fact);
+    for (const u of Array.isArray(fact?.sources) ? fact.sources : []) {
+      const k = urlKey(String(u));
+      if (!k) continue;
+      if (!byUrl.has(k)) byUrl.set(k, []);
+      /** @type {any[]} */ (byUrl.get(k)).push(fact);
+    }
+  }
+  /** @param {LedgerRow} row */
+  const matched = (row) => [...row.facts.map((id) => byId.get(id)).filter(Boolean), ...row.urls.flatMap((u) => byUrl.get(urlKey(u)) ?? [])];
+  return {
+    matched,
+    /**
+     * "confirmed" when a page the desk opened supports the claim, "unconfirmed" when every
+     * matched fact was unconfirmed or unreachable, null when the desk did not run.
+     * @param {LedgerRow} row
+     */
+    statusOf(row) {
+      if (!check) return null;
+      const statuses = matched(row).map((x) => x?.check?.status).filter(Boolean);
+      if (!statuses.length) return null;
+      return statuses.some((s) => s === "verified" || s === "opened") ? "confirmed" : "unconfirmed";
+    },
+  };
+}
+
+/**
+ * Does a ledger row rest on evidence: a page or fact the research kept, or
+ * other ledger rows that all do (a derived value)? Without a research file, any
+ * cited page or fact counts (the research gate blocks that film anyway).
+ * @param {LedgerRow} row @param {Map<string, LedgerRow>} rows @param {ReturnType<typeof researchEvidence>} evidence
+ * @param {Set<string>} [path] the rows being followed (a cycle is not evidence)
+ * @returns {boolean}
+ */
+function hasEvidence(row, rows, evidence, path = new Set()) {
+  if (row.kind === "unresolved" || path.has(row.id)) return false;
+  const direct = evidence ? evidence.matched(row).length > 0 : row.urls.length + row.facts.length > 0;
+  if (direct) return true;
+  if (!row.refs.length) return false;
+  path.add(row.id);
+  // A derived value is only as good as every row it is derived from.
+  /** @type {boolean} */
+  const ok = row.refs.every((id) => {
+    const ref = rows.get(id);
+    return Boolean(ref) && /** @type {LedgerRow} */ (ref).kind !== "unknown" && hasEvidence(/** @type {LedgerRow} */ (ref), rows, evidence, path);
+  });
+  path.delete(row.id);
+  return ok;
+}
+
+const NUMBER_WORD = /^(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|crore|lakh|point|half|quarter|dozen)$/;
+
+/**
+ * The numbers a scene says or shows (narration, on-screen text, shot text),
+ * without timecodes, IDs and markers: digits, and runs of number words.
+ * @param {import("./scene-lines.mjs").SceneLine} s
+ */
+function sceneNumbers(s) {
+  const text = [s.narration, s.fields.OST ?? "", s.fields.SHOTS ?? ""].join(" ")
+    .replace(UNRESOLVED, " ")
+    .replace(/\b\d+:\d{2}(?::\d{2})?(?:\s*-\s*\d+:\d{2}(?::\d{2})?)?/g, " ")
+    .replace(/\b[A-Z]{1,6}(?:-[A-Z]{1,4})*-?\d+[a-z]?\b/g, " ")
+    .replace(/\(\d+\)/g, " ");
+  /** @type {Set<string>} */
+  const out = new Set();
+  for (const d of text.match(/\d[\d,.]*/g) ?? []) out.add(d.replace(/[.,]+$/, ""));
+  let run = [];
+  for (const w of text.toLowerCase().split(/[^a-z]+/)) {
+    if (NUMBER_WORD.test(w)) run.push(w);
+    else if (run.length) { out.add(run.join(" ")); run = []; }
+  }
+  if (run.length) out.add(run.join(" "));
+  return out;
+}
+
+/**
+ * Markers that an earlier draft of the chapter had and the final one does not,
+ * replaced by a new number while the ledger still has no value for the claim.
+ * Removing "[C12 low]" does not resolve C12; only a value in the ledger does.
+ * @param {Store} store @param {string} chapter @param {import("./scene-lines.mjs").SceneLine[]} finalScenes
+ * @param {Map<string, LedgerRow>} rows
+ */
+async function guessedValues(store, chapter, finalScenes, rows) {
+  const final = new Map(finalScenes.map((s) => [s.sc, s]));
+  /** @type {Set<string>} */
+  const out = new Set();
+  for (const key of [`s5-${chapter}.draft.md`, `s5-${chapter}.viewer-draft.md`]) {
+    const draft = await store.get(key);
+    if (!draft) continue;
+    for (const before of parseSceneLines(draft)) {
+      const after = final.get(before.sc);
+      const markers = before.raw.match(UNRESOLVED) ?? [];
+      if (!after || !markers.length) continue;
+      const was = sceneNumbers(before);
+      const added = [...sceneNumbers(after)].filter((n) => !was.has(n));
+      if (!added.length) continue;
+      for (const m of markers) {
+        const id = /C\d{2,3}/.exec(m)?.[0];
+        if (!id || after.raw.includes(m)) continue;
+        const row = rows.get(id);
+        const resolved = row && row.kind !== "unknown" && row.kind !== "unresolved" && row.value && !/pending|unknown|\btbd\b|n\/a/i.test(row.value);
+        if (!resolved) out.add(`${before.sc} ${m} -> "${added.slice(0, 3).join(", ")}"`);
+      }
+    }
+  }
+  return [...out];
+}
+
+/**
  * The seven evidence gates over a finished run, from its own files.
  * @param {{ store: Store, film: Film }} o
  * @returns {Promise<Review>}
@@ -295,27 +489,63 @@ export async function reviewRun({ store, film }) {
     gates.push(gate("research", f, { facts: facts.length, sites: Number.isFinite(sites) ? sites : null, unconfirmed, checked: Boolean(check) }));
   }
 
-  // 2. Claims: every claim a scene cites exists in the S2 ledger (an unsupported claim never reaches the script silently).
+  // 2. Claims: every claim a scene cites exists in the S2 ledger and is resolved, with evidence behind it.
+  // Nothing unresolved reaches narration or the screen, and removing a marker does not resolve the claim.
   {
     /** @type {Finding[]} */
     const f = [];
     const s2 = await store.get("s2.md");
-    const ledger = new Set([...String(s2 ?? "").matchAll(/^\|\s*\*{0,2}(C\d{2,3})\*{0,2}\s*\|/gm)].map((m) => m[1]));
+    const rows = parseLedger(s2);
+    const ledger = new Set(rows.keys());
+    const factual = !isStoryFilm(film);
+    const evidence = factual ? researchEvidence(await readJson(store, "research.json"), await readJson(store, "sources-check.json")) : null;
     let cited = 0;
+    let markers = 0;
     if (!s2 || !ledger.size) f.push({ code: "claims.noLedger", severity: "block", message: msg("claims.noLedger") });
-    else for (const c of plan) {
-      const unknown = new Set();
-      for (const s of parseSceneLines(chapters[c.id] ?? "")) {
+    for (const c of plan) {
+      const scenes = parseSceneLines(chapters[c.id] ?? "");
+      // Unresolved markers block in every film: a narrator would read "[C12 low]" aloud, a viewer would see it.
+      const open = scenes.flatMap((s) => [...new Set(s.raw.match(UNRESOLVED) ?? [])].map((m) => `${s.sc} ${m}`));
+      markers += open.length;
+      if (open.length) {
+        const list = open.slice(0, 12).join("; ");
+        f.push({ code: "claims.placeholder", severity: "block", message: msg("claims.placeholder", { chapter: c.id, count: open.length, list }), target: `s5:${c.id}`, note: `These scenes still hold unresolved markers: ${list}. Replace each with the value the S2 ledger gives, written as spoken, or remove the number; never guess a value.` });
+      }
+      // A marker that disappeared while the ledger still has no value means a number was written without evidence.
+      const guessed = await guessedValues(store, c.id, scenes, rows);
+      if (guessed.length) {
+        const list = guessed.slice(0, 12).join("; ");
+        f.push({ code: "claims.markerResolved", severity: "block", message: msg("claims.markerResolved", { chapter: c.id, list }), target: `s5:${c.id}`, note: `In these scenes a marker was replaced by a number, but the S2 ledger has no value for its claim: ${list}. Remove the number, or say it is not known.` });
+      }
+      if (!ledger.size) continue;
+      /** @type {Set<string>} */ const unknown = new Set();
+      /** @type {Set<string>} */ const noEvidence = new Set();
+      /** @type {Set<string>} */ const unverified = new Set();
+      /** @type {Set<string>} */ const weak = new Set();
+      for (const s of scenes) {
         const ids = (s.positional[3] ?? "").match(/\bC\d{2,3}\b/g) ?? [];
         cited += ids.length;
-        for (const id of ids) if (!ledger.has(id)) unknown.add(`${s.sc}:${id}`);
+        for (const id of ids) {
+          const row = rows.get(id);
+          if (!row) { unknown.add(`${s.sc}:${id}`); continue; }
+          if (!factual || row.kind === "unknown") continue; // an UNKNOWN claim is narrated as not known
+          if (!hasEvidence(row, rows, evidence)) noEvidence.add(`${s.sc}:${id}`);
+          else if (row.kind === "fact" && evidence && evidence.statusOf(row) === "unconfirmed") unverified.add(`${s.sc}:${id}`);
+          else if (row.kind === "fact" && row.lowConfidence) weak.add(`${s.sc}:${id}`);
+        }
       }
-      if (unknown.size) {
-        const list = [...unknown].slice(0, 12).join(", ");
-        f.push({ code: "claims.unknown", severity: "block", message: msg("claims.unknown", { chapter: c.id, ids: list }), target: `s5:${c.id}`, note: `These scenes cite claim IDs that are not in the S2 ledger: ${list}. Cite only ledger IDs, and say only what the ledger supports; remove anything else.` });
-      }
+      /** @param {string} code @param {Set<string>} set @param {(ids: string) => string} note */
+      const add = (code, set, note) => {
+        if (!set.size) return;
+        const ids = [...set].slice(0, 12).join(", ");
+        f.push({ code, severity: "block", message: msg(code, { chapter: c.id, ids }), target: `s5:${c.id}`, note: note(ids) });
+      };
+      add("claims.unknown", unknown, (ids) => `These scenes cite claim IDs that are not in the S2 ledger: ${ids}. Cite only ledger IDs, and say only what the ledger supports; remove anything else.`);
+      add("claims.noEvidence", noEvidence, (ids) => `These scenes cite claims with no evidence the research kept (no source page or fact, or a status such as UNSUPPORTED): ${ids}. Say them only with a source from the research, or cut them.`);
+      add("claims.unverified", unverified, (ids) => `These scenes state claims as FACT that no page the source desk opened confirms: ${ids}. Attribute each to its source ("according to ..."), or cut it.`);
+      add("claims.lowConfidence", weak, (ids) => `The ledger rates these FACT claims low confidence: ${ids}. Attribute each to its source, or cut it.`);
     }
-    gates.push(gate("claims", f, { ledger: ledger.size, citations: cited }));
+    gates.push(gate("claims", f, { ledger: ledger.size, citations: cited, markers, evidenceChecked: Boolean(evidence) }));
   }
 
   // 3. Script: every chapter written and passing the code checks, run here again (a report file is not proof).
@@ -423,7 +653,7 @@ export async function reviewRun({ store, film }) {
     gates.push(gate("packaging", f, { originality: originality?.verdict ?? null }));
   }
 
-  return { at: new Date().toISOString(), film: film.id, gates, release: releaseDecision(gates) };
+  return { at: new Date().toISOString(), film: film.id, gatesVersion: GATES_VERSION, gates, release: releaseDecision(gates) };
 }
 
 /**
@@ -539,6 +769,7 @@ export function verdicts(gates) {
  */
 export async function ownerOverride(store, review, reason) {
   const why = String(reason ?? "").trim();
+  if (review.gatesVersion !== GATES_VERSION) return { ok: /** @type {const} */ (false), error: "This review was made by an older version of the checks. Review the film again before approving its release." };
   if (why.length < 10) return { ok: /** @type {const} */ (false), error: "Write the reason for releasing a film that failed its checks (at least 10 characters)." };
   const entry = await recordDecision(store, { actor: "owner", action: "release-override", message: msg("release.override", { gates: review.release.blockedBy.join(","), reason: why.slice(0, 500) }), gates: verdicts(review.gates), reason: why.slice(0, 500) });
   return { ok: /** @type {const} */ (true), entry };
@@ -551,6 +782,8 @@ export async function ownerOverride(store, review, reason) {
  */
 export function cleared(review, decisions) {
   if (!review) return { ok: false, by: null };
+  // A review by older gates clears nothing, not even with an earlier approval: the film is reviewed again.
+  if (review.gatesVersion !== GATES_VERSION) return { ok: false, by: null, stale: true };
   if (review.release.allowed) return { ok: true, by: "bossism" };
   const override = (decisions ?? []).filter((d) => d.actor === "owner" && d.action === "release-override" && d.at >= review.at).pop();
   return override ? { ok: true, by: "owner" } : { ok: false, by: null };

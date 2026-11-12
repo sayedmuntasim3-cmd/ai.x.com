@@ -55,6 +55,11 @@ export const MESSAGES = Object.freeze({
   "research.unconfirmed": { en: (p) => `${p.count} of ${p.total} facts state a number no opened page shows.`, bn: (p) => `${p.total}টি তথ্যের মধ্যে ${p.count}টিতে এমন সংখ্যা আছে যা খোলা কোনো পেজে নেই।` },
   "research.contradiction": { en: (p) => `Facts ${p.ids} make the same claim with different values and no conflict note.`, bn: (p) => `${p.ids} তথ্যগুলো একই দাবি ভিন্ন মানে করছে, কিন্তু কোনো দ্বন্দ্ব-নোট নেই।` },
   "claims.unknown": { en: (p) => `${p.chapter}: scenes cite claims that are not in the S2 ledger (${p.ids}).`, bn: (p) => `${p.chapter}: দৃশ্যগুলো এমন দাবি উদ্ধৃত করছে যা S2 লেজারে নেই (${p.ids})।` },
+  "claims.placeholder": { en: (p) => `${p.chapter}: ${p.count} unresolved markers would be read aloud or shown on screen (${p.list}).`, bn: (p) => `${p.chapter}: ${p.count}টি অমীমাংসিত চিহ্ন জোরে পড়া হবে বা পর্দায় দেখা যাবে (${p.list})।` },
+  "claims.markerResolved": { en: (p) => `${p.chapter}: a marker was replaced by a number although the S2 ledger has no value for its claim (${p.list}).`, bn: (p) => `${p.chapter}: S2 লেজারে দাবিটির কোনো মান না থাকা সত্ত্বেও একটি চিহ্নের জায়গায় সংখ্যা বসানো হয়েছে (${p.list})।` },
+  "claims.noEvidence": { en: (p) => `${p.chapter}: scenes cite claims with no evidence the research kept (${p.ids}).`, bn: (p) => `${p.chapter}: দৃশ্যগুলো এমন দাবি উদ্ধৃত করছে যার পক্ষে গবেষণায় রাখা কোনো প্রমাণ নেই (${p.ids})।` },
+  "claims.unverified": { en: (p) => `${p.chapter}: scenes state as fact claims that no opened page confirms (${p.ids}).`, bn: (p) => `${p.chapter}: দৃশ্যগুলো এমন দাবিকে তথ্য হিসেবে বলছে যা খোলা কোনো পেজ নিশ্চিত করে না (${p.ids})।` },
+  "claims.lowConfidence": { en: (p) => `${p.chapter}: scenes state as fact claims the ledger rates low confidence (${p.ids}).`, bn: (p) => `${p.chapter}: দৃশ্যগুলো এমন দাবিকে তথ্য হিসেবে বলছে যার আস্থা লেজারে কম (${p.ids})।` },
   "claims.noLedger": { en: () => "There is no S2 claim ledger to check the script against.", bn: () => "স্ক্রিপ্ট যাচাই করার মতো কোনো S2 দাবি-লেজার নেই।" },
   "script.missing": { en: (p) => `${p.chapter} has not been written.`, bn: (p) => `${p.chapter} এখনো লেখা হয়নি।` },
   "script.errors": { en: (p) => `${p.chapter}: ${p.count} code check(s) still fail (${p.codes}).`, bn: (p) => `${p.chapter}: ${p.count}টি কোড-চেক এখনো ব্যর্থ (${p.codes})।` },
@@ -81,6 +86,7 @@ export const MESSAGES = Object.freeze({
   "master.voice": { en: (p) => `Only ${p.voiced} of ${p.narrated} narrated scenes have a voice.`, bn: (p) => `বর্ণনাসহ ${p.narrated}টি দৃশ্যের মধ্যে মাত্র ${p.voiced}টিতে কণ্ঠ আছে।` },
 
   // Bossism: decisions
+  "release.stale": { en: () => "This review was made by an older version of the checks, so it clears nothing. Review the film again before release.", bn: () => "এই রিভিউ চেকের পুরোনো সংস্করণে করা, তাই এটি কোনো ছাড়পত্র দেয় না। প্রকাশের আগে ফিল্মটি আবার রিভিউ করুন।" },
   "release.allowed": { en: () => "Every critical check passed: the film may be rendered and released.", bn: () => "সব গুরুত্বপূর্ণ যাচাই পাস করেছে: ফিল্মটি রেন্ডার ও প্রকাশ করা যাবে।" },
   "release.blocked": { en: (p) => `Release blocked by: ${names(p.gates, "en")}. Fix these or approve the release yourself, with a reason.`, bn: (p) => `প্রকাশ আটকে দিয়েছে: ${names(p.gates, "bn")}। এগুলো ঠিক করুন, অথবা কারণ লিখে নিজে প্রকাশের অনুমতি দিন।` },
   "release.override": { en: (p) => `The owner approved the release despite: ${names(p.gates, "en")}. Reason: ${p.reason}`, bn: (p) => `${names(p.gates, "bn")} থাকা সত্ত্বেও মালিক প্রকাশের অনুমতি দিয়েছেন। কারণ: ${p.reason}` },

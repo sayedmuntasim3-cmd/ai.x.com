@@ -105,7 +105,7 @@ function scriptedModel() {
         case "research":
           assert.ok(r.webSearch && r.webSearch.maxUses > 0);
           return reply("```json\n" + JSON.stringify({ subject: "mill", facts: Array.from({ length: 9 }, (_, i) => ({ id: `F0${i}`, claim: "c", value: "v", sources: ["https://example.org/" + i], confidence: "high", conflict: null })), unknowns: [], doNotConfuse: [] }) + "\n```");
-        case "s2": return reply("| C01 | claim |");
+        case "s2": return reply("| C01 | claim | FACT | v | https://example.org/0 | high |"); // a ledger row with the page the research kept
         case "s3": return reply("## S3\n```json\n" + JSON.stringify([
           { id: "C1", title: "A", start: "0:00:00", end: "0:01:00", firstScene: "SC0001", lastScene: "SC0006", brief: "opens L01" },
           { id: "C2", title: "B", start: "0:01:00", end: "0:02:00", firstScene: "SC0007", lastScene: "SC0012", brief: "pays L01" },

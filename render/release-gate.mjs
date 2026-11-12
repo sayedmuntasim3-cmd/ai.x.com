@@ -82,7 +82,7 @@ export async function main(argv, deps = {}) {
     print(decision.by === "owner" ? "Cleared by the owner's approval.\nমালিকের অনুমতিতে ছাড়পত্র দেওয়া হয়েছে।" : both(review.release.message));
     return 0;
   }
-  print(both(review.release.message));
+  print(both(decision.stale ? { code: "release.stale" } : review.release.message));
   return 1;
 }
 

@@ -47,7 +47,7 @@ import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../eng
 import { remakeScene } from "../engine/src/scene-remake.mjs";
 import MANUAL from "../prompts/1-zupona-master-engine-full.txt";
 import { researchProviders } from "../engine/src/research-desk.mjs";
-import { cleared, ownerOverride, preflight, productionGraph, recordDecision, reviewRun, understand } from "../engine/src/bossism.mjs";
+import { cleared, GATES_VERSION, ownerOverride, preflight, productionGraph, recordDecision, reviewRun, understand } from "../engine/src/bossism.mjs";
 import { superviseFilm } from "../engine/src/supervise.mjs";
 import { windowNeeds } from "../engine/src/bossism.mjs";
 import { renderNeed } from "../engine/src/device-profile.mjs";
@@ -140,7 +140,8 @@ function planFor(env, film) {
 async function latestReview(env, id) {
   const store = r2Store(env.FILMS, id);
   const saved = JSON.parse((await store.get("review.json")) ?? "null");
-  if (saved) return { store, review: saved };
+  // A review by older gates is redone, so a film is never released on checks that have since become stricter.
+  if (saved && saved.gatesVersion === GATES_VERSION) return { store, review: saved };
   const film = JSON.parse((await store.get("film.json")) ?? "null");
   if (!film) return { store, review: null };
   const review = await reviewRun({ store, film });
