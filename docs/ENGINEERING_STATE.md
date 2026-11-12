@@ -1,6 +1,8 @@
 # Engineering state (read this first)
 
-Last updated: 12 November 2026, branch `ccr-2867bb13-8ohb4z`.
+Last updated: 12 November 2026 (second session the same day), branch `ccr-2867bb13-8ohb4z`.
+How the system is built to survive failures and spread work across devices,
+and how Bossism decides: `docs/ARCHITECTURE.md`.
 Every number here was produced by running code in that session, not copied
 from earlier documents. Where something was not verified, it says so.
 
@@ -24,7 +26,7 @@ owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
 
-- Tests: **148 engine + 62 platform = 210, all passing** (`npm test`); strict
+- Tests: **173 engine + 73 platform = 246, all passing** (`npm test`); strict
   JSDoc type check passes (`cd engine && npm run typecheck`); Cloudflare build
   check passes (`npm run check`). Before this session: 141 + 48 = 189.
 - Size: about 54,600 tracked lines, of which about **16,500 are application
@@ -48,14 +50,16 @@ owner's decisions.
 | **System A: idea to documentary** | Built end to end in code for English (USA); tested only with fakes; **never run against real APIs or deployed** | `engine/src/film-run.mjs`, `worker/`, `render/` |
 | **System B: voiceover to documentary** | Pieces built and tested, **not wired**: scene split on word times, words-unchanged check, captions from the recording. Missing: upload route, speech-to-text, the run path, one-track render, studio switch | `engine/src/voice-scenes.mjs`; plan in `docs/NEXT_SESSION.md` ("NEXT BIG TASK") |
 | Quran recitation films | Recognition from a transcript and an ayah-by-ayah plan with verbatim Tanzil text, built and tested, **not wired**. Missing: Quran speech recognition, Uthmani text and font, meanings, picture choice, render | `engine/src/quran.mjs`, `engine/src/quran-film.mjs` |
-| **Bossism (central orchestrator)** | **Not built as such.** `runFilm` is a fixed sequence with checkpoints, resume, budget stop, code gates and repair loops; `pipeline.mjs` plans which roles a film needs but only for display | `engine/src/film-run.mjs`, `engine/src/pipeline.mjs` |
+| **Bossism (central supervisor)** | **Built, first version:** production graph of the real run with roster roles; preflight that refuses what cannot work and names every lowered quality; seven evidence gates; bounded revision with notes; release gate and master gate; decision record; owner approval with a reason. Not yet: an independent critic model, parallel stage execution | `engine/src/bossism.mjs`, `engine/src/supervise.mjs`, `render/release-gate.mjs` |
+| **Distributed work** | **Built:** durable job queue (leases, checkpoints, bounded retries, time limits, eligibility by capability), workers on the owner's machines pulling from the cloud studio, device tiers | `engine/src/jobs.mjs`, `engine/src/job-runner.mjs`, `worker/jobs-api.mjs`, `local/jobs.mjs` |
+| **Phones** | Voice check in constant memory (WAV exact, MP3 in parts, others refused when they do not fit); polling that survives weak signal | `engine/src/loudness.mjs`, `engine/src/wav.mjs`, `public/studio/` |
 | Script intelligence | Model stages S1–S5 under a long manual, with code checks per scene line, a cold-read viewer panel, originality guard, hook check; same-model QA | `prompts/1-...full.txt`, `scene-lines.mjs`, `film-run.mjs` |
 | YouTube packaging | S7 (titles, 3 thumbnail briefs, description, chapters, tags, Shorts, Facebook cut); code checks titles; thumbnails rendered; market desk with `YOUTUBE_API_KEY` | `film-run.mjs` S7, `render/thumbnails.mjs`, `worker/youtube.mjs` |
 | Visual intelligence | Per-shot queries, 9 licensed sources with item-level licence records, no repeat within 10 minutes, footage desk judging thumbnails (only for a brain that can see), owner's own pictures | `engine/src/film-media.mjs`, `film-run.mjs` |
 | Voice | ElevenLabs per scene (paid for commercial use); the owner's own takes used first; studio recording check. **No open-source TTS yet** | `render/voice.mjs`, `engine/src/loudness.mjs` |
 | Production blueprint | Yes: S5 compact scene lines (narration, shots, FX, transition, motion, SFX, music, look per scene), turned into a frame-exact timeline | `scene-lines.mjs`, `timeline.mjs` |
 | Long-form | Runs accept 1–300 minutes; the run resumes; render segments are cached by content hash. Reported earlier: a 45-minute film rendered at 320×180. **Not verified at 1080p or beyond 45 minutes** | `film-run.mjs`, `render/render-film.mjs` |
-| Quality gates | Code: scene and film checks, sources, holds, b-roll share, titles, originality; renderer measures loudness, true peak, black stretches. S6 report is model-written from code counts. Gaps are listed, not blocking | various |
+| Quality gates | Bossism's seven gates and the master gate decide release (section 5 of `docs/ARCHITECTURE.md`); a film that fails a critical gate is neither rendered nor published without the owner's recorded approval | `engine/src/bossism.mjs` |
 | **Zero mandatory paid API** | **Done this session for the writer**: free local brain, research without paid search, local runner. Voice still needs ElevenLabs or the owner's recording | `worker/local-brain.mjs`, `worker/brain.mjs`, `engine/src/research-desk.mjs`, `local/run-film.mjs`, `docs/BRAIN.md` |
 
 ## 4. What this session changed (12 Nov 2026)
@@ -88,6 +92,26 @@ Not verified this session: no real local model (model downloads are blocked
 here) and no live Wikipedia call (blocked by this environment's network
 policy). Both are tested against fixtures that follow the documented formats.
 
+## 4b. What the second session changed (12 Nov 2026)
+
+1. **Publication safety fixed:** a film that finished with gaps used to be
+   rendered and published as a public GitHub release automatically. Now only
+   a film Bossism cleared, or the owner approved with a reason, is rendered;
+   the render workflow checks before spending anything and measures the
+   master before publishing.
+2. **Bossism, first version** (see `docs/ARCHITECTURE.md` section 5).
+3. **Durable job queue and remote workers** (sections 3 and 4 there): a
+   machine killed mid-job is replaced and the job continues from its
+   checkpoint, verified with real processes and in the local Workers runtime.
+4. **Phones:** the voice check no longer loads whole recordings (measured:
+   a 10-minute WAV +463 MB before, +99 MB now).
+5. **film-run.mjs:** each stage's gaps and spending travel in its step
+   result (no loss on a replayed step, no duplicate gaps on a retry); a stop
+   signal pauses between stages; QA reads chapter by chapter when the brain's
+   window cannot hold the whole film.
+6. **Bilingual messages:** every job, plan, gate and decision message in
+   English and Bengali, checked by a test.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`
@@ -104,6 +128,8 @@ no picture is chosen for a Quran film yet, so nothing checks one.
 Each step ends with tests passing, the type check, the build check, a commit
 and a push.
 
+0. **Owner decisions first** (section 7): deploying, the brain machine,
+   `WORKER_TOKEN`, repository privacy.
 1. **First real free run.** On a machine that can download a model: run
    `local/run-film.mjs` for a 5-minute film with a 30B-class model, fix what
    breaks (likely: JSON formatting from smaller models, repair loops,
@@ -115,13 +141,15 @@ and a push.
    `voice-scenes` stage in place of S5 using `voice-scenes.mjs`, one-track
    render, studio switch. Exit: an uploaded voiceover becomes a film whose
    words are unchanged, checked in code.
-3. **Bossism, first version.** A production graph per system (idea, voice,
-   Quran) built from the stages that exist, a capability preflight before a
-   run starts (the brain's window, search, vision; media keys; voice source)
-   so a run that cannot succeed is refused with reasons, and gate verdicts
-   (pass / revise / block) per stage with a capped revise loop. Then an
-   independent critic (a second brain or model) for QA. Exit: the studio
-   shows the plan and the blockers before any stage runs.
+3. **Bossism, next:** an independent critic (a second brain or model) for
+   QA and the story gate; graphs for the voice and Quran systems once they are
+   wired; parallel execution of the stages the graph marks parallel-safe (the
+   Edit Director's chapters). Exit: a film reviewed by a model other than its
+   writer, with the disagreement recorded.
+3b. **Phones, next:** WebCodecs decoding so long M4A recordings are read in
+   parts; a real Android device check. **Workers, next:** a render job on a
+   worker end to end with a real film; uploading the finished file to private
+   storage; a Durable Object queue for many users.
 4. **Free narration:** an open-source TTS (Kokoro or Piper; check each voice's
    licence) as a renderer option, measured against the owner's own
    recording. Exit: a free narrated 5-minute film.
@@ -135,6 +163,8 @@ and a push.
 
 - Merge this branch into `main` and deploy (production changes need the
   owner's approval).
+- Create the `WORKER_TOKEN` secret and start a worker on the brain machine,
+  if films should run on the owner's own computer from the studio.
 - The computer that will run the free brain (RAM, graphics card) decides
   the model size.
 - Quran imagery rules (`docs/STUDIO_STATUS.md` section 6).

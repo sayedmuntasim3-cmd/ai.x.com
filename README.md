@@ -11,6 +11,7 @@ a rendered film with licensed footage.
 Start here:
 
 - `docs/ENGINEERING_STATE.md`: what is built, verified and missing, and what comes next.
+- `docs/ARCHITECTURE.md`: what runs on which device, how every failure is handled, how Bossism decides.
 - `docs/BRAIN.md`: making films with your own free model, no paid API.
 - `docs/VISION.md`: the owner's goals (the master list at the top).
 - `docs/CONNECT.md`: connecting Cloudflare and the optional keys.
