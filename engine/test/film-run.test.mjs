@@ -82,7 +82,7 @@ const FILLER = "the river runs past the old mill while the town wakes slowly und
 /** @param {number} n @param {number} sec */
 function line(n, sec, words = 25) {
   const t = (/** @type {number} */ s) => `0:${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  const narr = [`Marker${n}`, ...FILLER].slice(0, words).join(" ") + ".";
+  const narr = [`Marker${n}`, ...FILLER].slice(0, words).join(" ") + ". {C01}"; // the claim tag every sentence of a true-story film carries
   return `**SC${String(n).padStart(4, "0")}** | ${t(sec)}-${t(sec + 10)} | C${n <= 6 ? 1 : 2} | beat | E | C01 | NARR: ${narr} | W ${words}/25 | ANCHOR: "river" -> mill | SHOTS: (1) R3 mill | EV: R1 0 / R3 1 | SRC: Pexels · Q1 "old mill" | LOOK: LOOK-M`;
 }
 const chapter = (/** @type {number} */ first, /** @type {number} */ short = 0) =>
@@ -119,7 +119,7 @@ function scriptedModel() {
           const text = r.messages[0].content[0].text;
           const bad = /NARR: (Marker9 [^|]*) \| W 10\/25/.exec(text);
           assert.ok(bad, "the repair sees the failing scene");
-          return reply("```json\n" + JSON.stringify([{ find: `NARR: ${bad[1]} | W 10/25`, replace: `NARR: ${[`Marker9`, ...FILLER].slice(0, 25).join(" ")}. | W 25/25` }]) + "\n```");
+          return reply("```json\n" + JSON.stringify([{ find: `NARR: ${bad[1]} | W 10/25`, replace: `NARR: ${[`Marker9`, ...FILLER].slice(0, 25).join(" ")}. {C01} | W 25/25` }]) + "\n```");
         }
         case "qa": return reply("```json\n" + JSON.stringify({ mustFix: [{ lens: "facts", chapter: "C1", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }], passed: ["p"], notChecked: [] }) + "\n```");
         case "edit:C1":

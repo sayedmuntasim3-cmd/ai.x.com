@@ -61,6 +61,116 @@ const FIELD = /^([A-Z][A-Z0-9]*(?: [A-Z0-9]+)?):\s?(.*)$/s;
 const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/g;
 
 /**
+ * A claim tag closes each narrated sentence in a true-story film:
+ * "{C01}" or "{C01, C02}" for a sentence that rests on ledger claims, "{N}"
+ * for one that states nothing factual (a question, a transition, commentary).
+ * Tags are never spoken: the parser removes them from the narration.
+ */
+const CLAIM_TAG = /\{([^{}\n]*)\}/g;
+
+/** Words a period follows without ending a sentence. */
+const ABBREVIATIONS = /(?:^|\s)(?:Mr|Mrs|Ms|Dr|St|Mt|Jr|Sr|Prof|Gen|Col|Capt|Lt|Sgt|Rev|Gov|Sen|Rep|Pres|Inc|Ltd|Co|Corp|vs|etc|approx|No|Vol|Fig|[A-Z])\.$|(?:[A-Za-z]\.){2,}$/;
+
+/**
+ * Sentences of a narration text. A boundary is ., ! or ? (with any closing
+ * quote or bracket) before a space, except after an abbreviation or an initial.
+ * Splitting prose is never perfect; this errs towards fewer, longer sentences.
+ * @param {string} text
+ */
+export function splitSentences(text) {
+  const out = [];
+  let start = 0;
+  for (const m of text.matchAll(/[.!?…]+["”’)\]]*(?=\s+\S)/g)) {
+    const end = /** @type {number} */ (m.index) + m[0].length;
+    if (/^\.+$/.test(m[0]) && ABBREVIATIONS.test(text.slice(start, /** @type {number} */ (m.index) + 1).trim())) continue;
+    const s = text.slice(start, end).trim();
+    if (s) out.push(s);
+    start = end;
+  }
+  const rest = text.slice(start).trim();
+  if (rest) out.push(rest);
+  return out;
+}
+
+/**
+ * @typedef {{ text: string, tag: string | null, claims: string[], none: boolean, valid: boolean }} Sentence
+ */
+
+/**
+ * A NARR text split into its sentences with their claim tags, and the
+ * narration without tags (what is spoken). A tag belongs to the one sentence
+ * it follows; any other sentence before it has no tag.
+ * @param {string} narr
+ * @returns {{ text: string, sentences: Sentence[] }}
+ */
+export function narrationSentences(narr) {
+  /** @type {Sentence[]} */
+  const sentences = [];
+  const untagged = (/** @type {string} */ chunk) => { for (const s of splitSentences(chunk)) sentences.push({ text: s, tag: null, claims: [], none: false, valid: false }); };
+  let at = 0;
+  for (const m of narr.matchAll(CLAIM_TAG)) {
+    const parts = splitSentences(narr.slice(at, m.index));
+    at = /** @type {number} */ (m.index) + m[0].length;
+    const last = parts.pop();
+    for (const s of parts) sentences.push({ text: s, tag: null, claims: [], none: false, valid: false });
+    const inner = m[1].trim();
+    const none = /^N$/i.test(inner);
+    const ids = inner.split(/[\s,;]+/).filter(Boolean);
+    const valid = none || (ids.length > 0 && ids.every((id) => /^C\d{2,3}$/.test(id)));
+    // A tag with no sentence before it (two tags in a row) tags nothing: it is reported as invalid.
+    sentences.push({ text: last ?? "", tag: m[0], claims: valid && !none ? ids : [], none, valid: valid && Boolean(last) });
+  }
+  untagged(narr.slice(at));
+  // Narration without tags is returned exactly as written.
+  if (!at) return { text: narr, sentences };
+  return { text: narr.replace(CLAIM_TAG, " ").replace(/\s+([.,;:!?])/g, "$1").replace(/\s+/g, " ").trim(), sentences };
+}
+
+const MONTHS = /\b(January|February|March|April|June|July|August|September|October|November|December)\b|\bMay\s+\d|\b\d{1,2}\s+May\b/;
+const NUMBER_WORD_RUN = /\b(?:zero|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|crore|lakh|percent)\b/i;
+
+/**
+ * What in a sentence is a factual signal that needs a claim: a number (digits
+ * or number words; "one" alone is not counted), a month. Names need the
+ * film's known entities and are read by the claims gate.
+ * @param {string} text
+ */
+export function factualSignals(text) {
+  const clean = text.replace(PLACEHOLDER, " ");
+  /** @type {string[]} */
+  const out = [];
+  const digits = clean.match(/\d[\d,.:]*/);
+  if (digits) out.push(digits[0].replace(/[.,:]+$/, ""));
+  const word = NUMBER_WORD_RUN.exec(clean);
+  if (word) out.push(word[0]);
+  const month = MONTHS.exec(clean);
+  if (month) out.push(month[0]);
+  return out;
+}
+
+/**
+ * Claim linkage of narrated sentences, for a true-story film: every sentence
+ * carries a valid tag, and a sentence tagged {N} states no number or date.
+ * The ledger itself (does the claim exist, is it resolved) is the claims gate's job.
+ * @param {SceneLine[]} scenes
+ * @returns {Finding[]}
+ */
+export function linkFindings(scenes) {
+  /** @type {Finding[]} */
+  const out = [];
+  for (const s of scenes) {
+    if (s.wordless) continue;
+    for (const x of s.sentences) {
+      const quote = `"${x.text.slice(0, 80)}${x.text.length > 80 ? "..." : ""}"`;
+      if (!x.tag) out.push({ code: "claim-untagged", scene: s.sc, detail: `${quote} has no claim tag: end it with {C..} for the ledger claims it states, or {N} if it states nothing factual.` });
+      else if (!x.valid) out.push({ code: "claim-tag-invalid", scene: s.sc, detail: `The tag ${x.tag}${x.text ? ` after ${quote}` : ""} is not {C01}, {C01, C02} or {N}, or follows no sentence.` });
+      else if (x.none && factualSignals(x.text).length) out.push({ code: "claim-n-factual", scene: s.sc, detail: `${quote} is tagged {N} (nothing factual) but states ${factualSignals(x.text).join(", ")}: tag it with its ledger claim.` });
+    }
+  }
+  return out;
+}
+
+/**
  * "1:02:03" or "0:00:07.4" to seconds.
  * @param {string} t
  */
@@ -93,7 +203,7 @@ export function countWords(narration) {
  * @typedef {{
  *   id: number, sc: string, start: number, end: number, seconds: number,
  *   fields: Record<string, string>, positional: string[],
- *   narration: string, words: number, wordless: boolean, declaredTarget: number | null,
+ *   narration: string, sentences: Sentence[], words: number, wordless: boolean, declaredTarget: number | null,
  *   r1: number, r3: number, raw: string,
  * }} SceneLine
  */
@@ -124,13 +234,14 @@ export function parseSceneLines(markdown) {
       else positional.push(piece);
     }
     // A scripted alternative ("· ALT if LEAD-02 fails: ...") is not read as well.
-    const narration = (fields.NARR ?? "").split(/\s·\s*ALT\b/)[0].trim();
+    // Claim tags are removed from what is spoken and kept per sentence.
+    const { text: narration, sentences } = narrationSentences((fields.NARR ?? "").split(/\s·\s*ALT\b/)[0].trim());
     const words = countWords(narration);
     const declared = /^W\s+(\d+)\s*\/\s*([\d.]+)/.exec(positional.find((p) => /^W\s+\d/.test(p)) ?? "");
     const ev = /R1\s*(\d+)\s*\/\s*R3\s*(\d+)/.exec(fields.EV ?? "");
     scenes.push({
       id: Number(m[1]), sc: "SC" + m[1], start, end, seconds: end - start, fields, positional,
-      narration, words, wordless: words === 0, declaredTarget: declared ? Number(declared[2]) : null,
+      narration, sentences: words === 0 ? [] : sentences, words, wordless: words === 0, declaredTarget: declared ? Number(declared[2]) : null,
       r1: ev ? Number(ev[1]) : 0, r3: ev ? Number(ev[2]) : 0, raw,
     });
   }
@@ -141,7 +252,7 @@ export function parseSceneLines(markdown) {
  * @typedef {{ code: string, scene?: string, detail: string }} Finding
  * @typedef {{
  *   startSeconds: number, endSeconds: number, firstScene: number, lastScene: number,
- *   versionId?: string, wpm?: number, sceneTolerance?: number, totalTolerance?: number,
+ *   versionId?: string, wpm?: number, sceneTolerance?: number, totalTolerance?: number, linkClaims?: boolean,
  * }} ChapterSpec
  */
 
@@ -223,6 +334,8 @@ export function checkChapter(markdown, spec) {
     const purity = checkVersionPurity(allNarration, versionId);
     for (const p of purity.problems) errors.push({ code: "version-purity", detail: p });
   }
+  // True-story films: every narrated sentence is linked to its claims, so an edit that drops a tag fails here.
+  if (spec.linkClaims) errors.push(...linkFindings(scenes));
 
   const placeholders = [...new Set(scenes.flatMap((s) => s.raw.match(PLACEHOLDER) ?? []))];
   const stats = {

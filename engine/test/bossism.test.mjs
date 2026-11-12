@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { AGENTS } from "../src/agent-roster.mjs";
 import { applyRevision, cleared, dependents, GATES_VERSION, masterGate, ownerOverride, parseLedger, preflight, productionGraph, recordDecision, releaseDecision, reviewRun, revisionPlan, understand, windowNeeds } from "../src/bossism.mjs";
 import { MESSAGES, msg, say } from "../src/messages.mjs";
+import { applyFixes, checkChapter, parseSceneLines } from "../src/scene-lines.mjs";
+import { buildTimeline } from "../src/timeline.mjs";
 
 const USA = new URL("../../productions/ramesh-babu/USA/", import.meta.url);
 /** A read-only store over the finished Ramesh Babu film. */
@@ -90,7 +92,8 @@ test("the finished Ramesh Babu film: its unresolved number markers block release
   const v = Object.fromEntries(review.gates.map((g) => [g.id, g.verdict]));
   const claims = /** @type {any} */ (review.gates.find((g) => g.id === "claims"));
   assert.equal(v.claims, "block", "43 markers such as [C12 low] would be read aloud or shown on screen");
-  assert.deepEqual(claims.evidence, { ledger: 73, citations: 409, markers: 43, evidenceChecked: false });
+  assert.deepEqual(claims.evidence, { ledger: 73, citations: 414, markers: 43, evidenceChecked: false, linkedSentences: 0, commentarySentences: 0 }, "414 citations: chips on screen count");
+  assert.ok(claims.findings.filter((/** @type {any} */ f) => f.code === "claims.unlinked").length === 6, "the hand-made film predates claim tags: every chapter has unlinked sentences");
   const placeholders = claims.findings.filter((/** @type {any} */ f) => f.code === "claims.placeholder");
   assert.deepEqual(placeholders.map((/** @type {any} */ f) => f.target), ["s5:C1", "s5:C2", "s5:C4", "s5:C5", "s5:C6"]);
   assert.match(placeholders[0].message.en, /SC0030 \[C12 low\]/);
@@ -219,7 +222,7 @@ const PAGE = "https://www.example.org/mill/";
  * @param {{ ledger?: string[], header?: string, narr?: [string, string], claims?: [string, string], ost?: [string, string], research?: any, check?: any, files?: Record<string, string> }} o
  */
 function claimRun(o = {}) {
-  const narr = o.narr ?? ["The mill opened in 1790.", "It closed."];
+  const narr = o.narr ?? ["The mill opened in 1790. {C01}", "It closed. {C02}"];
   const claims = o.claims ?? ["C01", "C02"];
   const ost = o.ost ?? ["", ""];
   const line = (/** @type {number} */ i) => `**SC000${i + 1}** | 0:00:0${i * 5}-0:00:${i ? "10" : "05"} | C1 | beat | E | ${claims[i]} | NARR: ${narr[i]} | W 1/1 | SHOTS: (1) R3 mill | OST: ${ost[i]} | LOOK: LOOK-M`;
@@ -246,12 +249,12 @@ test("claims gate: a resolved claim with a page the source desk confirmed passes
   const { gate, review } = await claimsGate(claimRun());
   assert.deepEqual(gate.findings, []);
   assert.equal(gate.verdict, "pass");
-  assert.deepEqual(gate.evidence, { ledger: 2, citations: 2, markers: 0, evidenceChecked: true });
+  assert.deepEqual(gate.evidence, { ledger: 2, citations: 2, markers: 0, evidenceChecked: true, linkedSentences: 2, commentarySentences: 0 });
   assert.ok(!review.release.blockedBy.includes("claims"));
 });
 
 test("claims gate: an unresolved marker in narration or on screen blocks release, and the release flow cannot pass it", async () => {
-  const store = claimRun({ narr: ["The mill cost about [C01 low] dollars.", "It closed."], ost: ["", "chip $[C02]"] });
+  const store = claimRun({ narr: ["The mill cost about [C01 low] dollars. {C01}", "It closed. {C02}"], ost: ["", "chip $[C02]"] });
   const { gate, review, codes } = await claimsGate(store);
   assert.deepEqual(codes, ["claims.placeholder"]);
   assert.equal(gate.verdict, "block");
@@ -267,10 +270,10 @@ test("claims gate: an unresolved marker in narration or on screen blocks release
 
 test("claims gate: editing markers block; delivery tags and ordinary brackets do not", async () => {
   for (const marker of ["[TBD]", "[VERIFY date]", "[citation needed]", "[TODO: source]", "[XX]"]) {
-    const { codes } = await claimsGate(claimRun({ narr: [`The mill opened in ${marker}.`, "It closed."] }));
+    const { codes } = await claimsGate(claimRun({ narr: [`The mill opened in ${marker}. {C01}`, "It closed. {C02}"] }));
     assert.deepEqual(codes, ["claims.placeholder"], marker);
   }
-  const { codes } = await claimsGate(claimRun({ narr: ["[softly] The mill opened in 1790.", "It closed [sic]."] }));
+  const { codes } = await claimsGate(claimRun({ narr: ["[softly] The mill opened in 1790. {C01}", "It closed [sic]. {C02}"] }));
   assert.deepEqual(codes, [], "ElevenLabs delivery tags and [sic] are not unresolved markers");
 });
 
@@ -298,8 +301,15 @@ test("claims gate: a FACT no opened page confirms blocks; the same claim attribu
     const ledger = [`| **C01** | The mill opened in 1790 | ${status} | 1790 | ${PAGE} | high |`, `| **C02** | It closed | ${status} | 1921 | ${PAGE} | medium |`];
     assert.deepEqual((await claimsGate(claimRun({ research, ledger }))).codes, [], status);
   }
+  // One page, two facts: the desk confirmed F03 and not F01. A claim citing only the page cannot borrow F03's check.
   const mixed = { facts: [...research.facts, { id: "F03", claim: "y", value: "1790", sources: [PAGE], check: { status: "opened" } }] };
-  assert.deepEqual((await claimsGate(claimRun({ research: mixed }))).codes, [], "one opened page that supports it is enough");
+  const shared = await claimsGate(claimRun({ research: mixed }));
+  assert.deepEqual(shared.codes, ["claims.ambiguousEvidence"], "a shared page does not make every claim on it verified");
+  assert.match(shared.gate.findings[0].note, /cite the research fact ID/);
+  const named = [`| **C01** | The mill opened in 1790 | FACT | 1790 | F03 ${PAGE} | high |`, `| **C02** | It closed | FACT | 1921 | F03 | medium |`];
+  assert.deepEqual((await claimsGate(claimRun({ research: mixed, ledger: named }))).codes, [], "naming the confirmed fact settles it");
+  const wrong = [`| **C01** | The mill opened in 1790 | FACT | 1790 | F01 ${PAGE} | high |`, `| **C02** | It closed | FACT | 1921 | F03 | medium |`];
+  assert.deepEqual((await claimsGate(claimRun({ research: mixed, ledger: wrong }))).codes, ["claims.unverified"], "naming the unconfirmed fact is not rescued by the page it shares");
   const noDesk = await claimsGate(claimRun({ research, check: null, files: { "sources-check.json": "null" } }));
   assert.ok(!noDesk.codes.includes("claims.unverified"), "without the source desk the research gate blocks instead (research.unchecked)");
   assert.ok(noDesk.review.gates.find((g) => g.id === "research")?.findings.some((f) => f.code === "research.unchecked"));
@@ -315,7 +325,7 @@ test("claims gate: a bare FACT rated low confidence blocks; partial or other rat
 
 test("claims gate: an UNKNOWN claim narrated as unknown passes; columns are found by their headers", async () => {
   const ledger = [`| **C01** | The mill opened in 1790 | FACT | 1790 | ${PAGE} | high |`, "| **C02** | Why it closed | UNKNOWN | — | — | none |"];
-  assert.deepEqual((await claimsGate(claimRun({ ledger, narr: ["The mill opened in 1790.", "Why it closed, nobody recorded."] }))).codes, []);
+  assert.deepEqual((await claimsGate(claimRun({ ledger, narr: ["The mill opened in 1790. {C01}", "Why it closed, nobody recorded. {C02}"] }))).codes, []);
   const reordered = await claimsGate(claimRun({ header: "| ID | Sources | Value | Type | Claim | Confidence |", ledger: [`| **C01** | ${PAGE} | 1790 | FACT | opened | high |`, `| **C02** | ${PAGE} | 1921 | FACT | closed | low |`] }));
   assert.deepEqual(reordered.codes, ["claims.lowConfidence"], "the confidence column is read wherever it is");
 });
@@ -329,16 +339,16 @@ test("claims gate: a derived value needs every row it is derived from; a cycle i
 });
 
 test("claims gate: removing a marker does not resolve the claim; only a value in the ledger does", async () => {
-  const draft = `**SC0001** | 0:00:00-0:00:05 | C1 | beat | E | C01 | NARR: The mill opened in 1790. | W 1/1 | SHOTS: (1) R3 mill | OST:  | LOOK: LOOK-M\n**SC0002** | 0:00:05-0:00:10 | C1 | beat | E | C02 | NARR: It cost about [C02 low] cents. | W 1/1 | SHOTS: (1) R3 mill | OST:  | LOOK: LOOK-M`;
+  const draft = `**SC0001** | 0:00:00-0:00:05 | C1 | beat | E | C01 | NARR: The mill opened in 1790. {C01} | W 1/1 | SHOTS: (1) R3 mill | OST:  | LOOK: LOOK-M\n**SC0002** | 0:00:05-0:00:10 | C1 | beat | E | C02 | NARR: It cost about [C02 low] cents. {C02} | W 1/1 | SHOTS: (1) R3 mill | OST:  | LOOK: LOOK-M`;
   const pending = [`| **C01** | The mill opened in 1790 | FACT | 1790 | ${PAGE} | high |`, `| **C02** | Its cost in today's money | ESTIMATE | ₹5; USD PENDING | ${PAGE} | medium |`];
-  const guessed = await claimsGate(claimRun({ ledger: pending, narr: ["The mill opened in 1790.", "It cost about six cents."], files: { "s5-C1.draft.md": draft } }));
+  const guessed = await claimsGate(claimRun({ ledger: pending, narr: ["The mill opened in 1790. {C01}", "It cost about six cents. {C02}"], files: { "s5-C1.draft.md": draft } }));
   assert.deepEqual(guessed.codes, ["claims.markerResolved"]);
   assert.match(guessed.gate.findings[0].message.en, /SC0002 \[C02 low\] -> "six"/);
-  const viewer = await claimsGate(claimRun({ ledger: pending, narr: ["The mill opened in 1790.", "It cost about 6 cents."], files: { "s5-C1.viewer-draft.md": draft } }));
+  const viewer = await claimsGate(claimRun({ ledger: pending, narr: ["The mill opened in 1790. {C01}", "It cost about 6 cents. {C02}"], files: { "s5-C1.viewer-draft.md": draft } }));
   assert.deepEqual(viewer.codes, ["claims.markerResolved"], "the viewer panel's fixes are checked the same way");
   const resolved = [pending[0], `| **C02** | Its cost in today's money | ESTIMATE | about 6 cents | ${PAGE} | medium |`];
-  assert.deepEqual((await claimsGate(claimRun({ ledger: resolved, narr: ["The mill opened in 1790.", "It cost about six cents."], files: { "s5-C1.draft.md": draft } }))).codes, [], "the ledger has the value: a legitimate resolution");
-  assert.deepEqual((await claimsGate(claimRun({ ledger: pending, narr: ["The mill opened in 1790.", "It cost very little."], files: { "s5-C1.draft.md": draft } }))).codes, [], "the number was removed, not guessed");
+  assert.deepEqual((await claimsGate(claimRun({ ledger: resolved, narr: ["The mill opened in 1790. {C01}", "It cost about six cents. {C02}"], files: { "s5-C1.draft.md": draft } }))).codes, [], "the ledger has the value: a legitimate resolution");
+  assert.deepEqual((await claimsGate(claimRun({ ledger: pending, narr: ["The mill opened in 1790. {C01}", "It cost very little. {C02}"], files: { "s5-C1.draft.md": draft } }))).codes, [], "the number was removed, not guessed");
 });
 
 test("claims gate: an invented story needs no evidence for its claims, but never ships a marker", async () => {
@@ -373,4 +383,97 @@ test("the ledger parser keeps statuses, values, confidence and sources apart", (
   assert.equal(parseLedger(null).size, 0);
   const words = parseLedger("| ID | Status |\n|---|---|\n| C01 | FACT (year unknown) |\n| C02 | Unknown |\n| C03 | PENDING |");
   assert.deepEqual([...words.values()].map((r) => r.kind), ["fact", "unknown", "unresolved"], "the status word comes first");
+});
+
+// ---------------------------------------------------------------- C2: every narrated sentence of a true-story film is linked to its claims
+
+test("C2: a sentence with no claim tag blocks, whatever it states: a number, a date, a name, an event", async () => {
+  for (const sentence of ["It closed in 1921.", "It closed in March.", "Hart sold it to the Crown.", "Then the war came to the valley.", "It was never the same."]) {
+    const { codes, gate } = await claimsGate(claimRun({ narr: ["The mill opened in 1790. {C01}", sentence] }));
+    assert.deepEqual(codes, ["claims.unlinked"], sentence);
+    assert.ok(gate.findings[0].message.en.includes(`SC0002 "${sentence}"`), sentence);
+    assert.equal(gate.findings[0].target, "s5:C1");
+  }
+});
+
+test("C2: a tag belongs to the one sentence it follows; splitting a tagged sentence leaves the new one unlinked", async () => {
+  const split = await claimsGate(claimRun({ narr: ["The mill opened in 1790. It was the first in the county. {C01}", "It closed. {C02}"] }));
+  assert.deepEqual(split.codes, ["claims.unlinked"]);
+  assert.match(split.gate.findings[0].message.en, /SC0001 "The mill opened in 1790\."/);
+  const abbreviations = await claimsGate(claimRun({ narr: ["Dr. Hart met Mr. Lee in the U.S. in 1790. {C01}", "It closed. {C02}"] }));
+  assert.deepEqual(abbreviations.codes, [], "abbreviations and initials do not end a sentence");
+});
+
+test("C2: missing or malformed tags are rejected", async () => {
+  for (const narr of ["It closed. {C2}", "It closed. {X}", "It closed. {}", "It closed. {C02} {N}", "It closed {C02"]) {
+    const { codes } = await claimsGate(claimRun({ narr: ["The mill opened in 1790. {C01}", narr] }));
+    assert.deepEqual(codes, ["claims.unlinked"], narr);
+  }
+  const unknownId = await claimsGate(claimRun({ narr: ["The mill opened in 1790. {C01}", "It closed. {C09}"] }));
+  assert.deepEqual(unknownId.codes, ["claims.unknown"], "a sentence tag citing an ID the ledger lacks is an unsupported claim");
+  assert.match(unknownId.gate.findings[0].message.en, /SC0002:C09/);
+});
+
+test("C2: {N} marks commentary; a number, a date or a name the film has not established is not commentary", async () => {
+  const ledger = [`| **C01** | Hart opened the mill in 1790 | FACT | 1790 | ${PAGE} | high |`, `| **C02** | It closed | FACT | 1921 | ${PAGE} | medium |`];
+  const legit = ["So who paid for it? {N}", "One question remains. {N}", "But that is only half the story. {N}", "Hart never explained it. {N}", "Here is where it turns. {N}"];
+  for (const n of legit) {
+    const { codes } = await claimsGate(claimRun({ ledger, narr: ["Hart opened the mill in 1790. {C01}", `It closed. {C02} ${n}`] }));
+    assert.deepEqual(codes, [], n);
+  }
+  const factual = { "Two hundred people worked there. {N}": /two hundred|hundred/i, "In March the river froze. {N}": /March/, "The Treaty of Paris ended it. {N}": /Treaty|Paris/, "It burned in 1890. {N}": /1890/, "Then the Liberation War began. {N}": /Liberation/ };
+  for (const [n, what] of Object.entries(factual)) {
+    const { codes, gate } = await claimsGate(claimRun({ ledger, narr: ["Hart opened the mill in 1790. {C01}", `It closed. {C02} ${n}`] }));
+    assert.deepEqual(codes, ["claims.unlinkedFact"], n);
+    assert.match(gate.findings[0].message.en, what, n);
+  }
+});
+
+test("C2: a sentence resting only on an UNKNOWN claim says it is not known; it states no value", async () => {
+  const ledger = [`| **C01** | The mill opened in 1790 | FACT | 1790 | ${PAGE} | high |`, "| **C02** | Why it closed | UNKNOWN | — | — | none |"];
+  assert.deepEqual((await claimsGate(claimRun({ ledger, narr: ["The mill opened in 1790. {C01}", "Why it closed, nobody recorded. {C02}"] }))).codes, []);
+  const stated = await claimsGate(claimRun({ ledger, narr: ["The mill opened in 1790. {C01}", "It closed in 1921. {C02}"] }));
+  assert.deepEqual(stated.codes, ["claims.unknownStated"]);
+  assert.deepEqual((await claimsGate(claimRun({ ledger, narr: ["The mill opened in 1790. {C01}", "It closed in 1790, nobody knows why. {C01, C02}"] }))).codes, [], "a value from a resolved claim beside the unknown one is fine");
+});
+
+test("C2: numbers shown on screen need a claim in the scene; a source chip counts, production notes do not", async () => {
+  const run = (/** @type {string} */ ost, /** @type {string} */ claims = "none") => claimRun({ claims: ["C01", claims], narr: ["The mill opened in 1790. {C01}", "Look closer. {N}"], ost: ["", ost] });
+  const bare = await claimsGate(run('"1921" kinetic'));
+  assert.deepEqual(bare.codes, ["claims.unlinkedScreen"]);
+  assert.match(bare.gate.findings[0].message.en, /SC0002 1921/);
+  assert.deepEqual((await claimsGate(run('"1921" (chip "C02 · example.org")'))).codes, [], "the chip cites C02");
+  assert.deepEqual((await claimsGate(run('"1921"', "C02"))).codes, [], "the scene's claims field cites C02");
+  assert.deepEqual((await claimsGate(run('"The end of an era" (stake card, Source Serif 4, 0:00:27.8-0:00:29.6, 4.3 s)'))).codes, [], "fonts and timings are notes, not on-screen numbers");
+});
+
+test("C2: tags are never spoken: the narration, its word count and the timeline carry none", async () => {
+  const [s] = parseSceneLines("**SC0001** | 0:00:00-0:00:05 | C1 | beat | E | C01 | NARR: The mill opened in seventeen ninety. {C01} So who paid? {N} | W 9/9 | SHOTS: (1) R3 mill | LOOK: LOOK-M");
+  assert.equal(s.narration, "The mill opened in seventeen ninety. So who paid?");
+  assert.equal(s.words, 9);
+  assert.deepEqual(s.sentences.map((x) => [x.claims, x.none]), [[["C01"], false], [[], true]]);
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: s.raw }], autoSound: false });
+  assert.ok(t.narration.every((n) => !/[{}]/.test(n.text)), "the voice and the captions get the clean text");
+});
+
+test("C2: an edit that drops or breaks a tag is caught by the chapter check, so QA and viewer fixes that do it are reverted", () => {
+  const spec = { startSeconds: 0, endSeconds: 10, firstScene: 1, lastScene: 2, versionId: "en-US", linkClaims: true };
+  const lineOf = (/** @type {number} */ i, /** @type {string} */ narr) => `**SC000${i + 1}** | 0:00:0${i * 5}-0:00:${i ? "10" : "05"} | C1 | beat | E | C01 | NARR: ${narr} | W 12/12 | ANCHOR: x | SHOTS: (1) R3 mill | LOOK: LOOK-M`;
+  const md = [lineOf(0, "The mill on the river opened in seventeen ninety, the first in the valley. {C01}"), lineOf(1, "It closed after a long winter, and nobody wrote down the reason why. {N}")].join("\n");
+  const codes = (/** @type {string} */ text) => checkChapter(text, spec).errors.map((e) => e.code).filter((c) => c.startsWith("claim-"));
+  assert.deepEqual(codes(md), []);
+  const dropped = applyFixes(md, [{ find: "seventeen ninety, the first in the valley. {C01}", replace: "seventeen ninety, the first in the valley." }]).text;
+  assert.deepEqual(codes(dropped), ["claim-untagged"]);
+  const added = applyFixes(md, [{ find: "the first in the valley. {C01}", replace: "the first in the valley. It had twelve wheels. {C01}" }]).text;
+  assert.deepEqual(codes(added), ["claim-untagged"], "a sentence added before the tag is unlinked");
+  const numbered = applyFixes(md, [{ find: "after a long winter", replace: "after the winter of eighteen twenty" }]).text;
+  assert.deepEqual(codes(numbered), ["claim-n-factual"]);
+  assert.deepEqual(checkChapter(dropped, { ...spec, linkClaims: false }).errors.filter((e) => e.code.startsWith("claim-")), [], "films without the rule are not affected");
+});
+
+test("C2: an invented story needs no claim tags, and a review by the previous gates clears nothing", async () => {
+  const ledger = ["| **C01** | A wage of the time | 3 shillings | none |", "| **C02** | The town | real | none |"];
+  assert.deepEqual((await claimsGate(claimRun({ header: "| ID | Detail | Value | Sources |", ledger, narr: ["He earned three shillings.", "It rained in March."] }), STORY)).codes, []);
+  assert.equal(GATES_VERSION, 3);
+  assert.equal(cleared({ at: "2026-01-01T00:00:00.000Z", film: "f", gatesVersion: 2, gates: [], release: releaseDecision([]) }, []).ok, false);
 });

@@ -23,7 +23,7 @@ import { AGENTS, ROLE_STATUS } from "./agent-roster.mjs";
 import { FREE_LICENCES } from "./film-media.mjs";
 import { chapterSpec, isStoryFilm, pictureCredits, titleProblems } from "./film-run.mjs";
 import { msg } from "./messages.mjs";
-import { checkFilm, parseSceneLines } from "./scene-lines.mjs";
+import { checkFilm, factualSignals, parseSceneLines } from "./scene-lines.mjs";
 
 /** @typedef {import("./film-run.mjs").Film} Film */
 /** @typedef {import("./film-run.mjs").Store} Store */
@@ -55,9 +55,10 @@ export const LIMITS = Object.freeze({
 /**
  * The version of the gates. A review made by older gates cannot clear a film:
  * it is reviewed again (2: the claims gate blocks unresolved markers, guessed
- * values and claims without evidence).
+ * values and claims without evidence; 3: every narrated sentence of a true-story
+ * film is linked to its claims, and evidence is matched to the claim it supports).
  */
-export const GATES_VERSION = 2;
+export const GATES_VERSION = 3;
 
 /** Gates whose failure stops a release; the others ask for revision and are listed. */
 export const CRITICAL_GATES = Object.freeze(["research", "claims", "script", "rights", "master"]);
@@ -259,7 +260,7 @@ const claimKey = (s) => String(s ?? "").toLowerCase().replace(/[\d.,%$₹€£]+
 export const UNRESOLVED = /\$?\[C\d{2,3}[^\]]*\]|\[(?:TBD|TBC|TODO|FIXME|VERIFY|CHECK|PENDING|CITATION NEEDED|NEEDS? SOURCE|SOURCE\?|XX+)\b[^\]]*\]/gi;
 
 /**
- * @typedef {{ id: string, kind: "fact" | "attributed" | "hedged" | "unknown" | "unresolved", value: string,
+ * @typedef {{ id: string, kind: "fact" | "attributed" | "hedged" | "unknown" | "unresolved", text: string, value: string,
  *   lowConfidence: boolean, urls: string[], facts: string[], refs: string[] }} LedgerRow
  */
 
@@ -312,7 +313,7 @@ export function parseLedger(s2) {
       : /contested|disputed|estimate|quote|paraphrase|reported|interpretation|inferred/.test(status) ? "hedged"
       : "fact";
     rows.set(m[1], {
-      id: m[1], kind, value: at(col(/value/)),
+      id: m[1], kind, text: col(/claim|detail/) >= 0 ? at(col(/claim|detail/)) : c.slice(1).join(" "), value: at(col(/value/)),
       lowConfidence: /^\W*(very\s+)?(low|none)\W*$/i.test(at(col(/conf/))),
       urls: urlsIn(src), facts: src.match(/\bF\d{2,3}\b/g) ?? [], refs: (src.match(/\bC\d{2,3}\b/g) ?? []).filter((r) => r !== m[1]),
     });
@@ -339,20 +340,33 @@ function researchEvidence(research, check) {
       /** @type {any[]} */ (byUrl.get(k)).push(fact);
     }
   }
-  /** @param {LedgerRow} row */
-  const matched = (row) => [...row.facts.map((id) => byId.get(id)).filter(Boolean), ...row.urls.flatMap((u) => byUrl.get(urlKey(u)) ?? [])];
+  /**
+   * The research facts behind a ledger row. Fact IDs name them exactly; a page
+   * alone can be shared by facts it does not support, so pages are used only
+   * when the row names no fact.
+   * @param {LedgerRow} row
+   */
+  const matched = (row) => {
+    const named = row.facts.map((id) => byId.get(id)).filter(Boolean);
+    return named.length ? named : [...new Set(row.urls.flatMap((u) => byUrl.get(urlKey(u)) ?? []))];
+  };
   return {
     matched,
     /**
-     * "confirmed" when a page the desk opened supports the claim, "unconfirmed" when every
-     * matched fact was unconfirmed or unreachable, null when the desk did not run.
+     * "confirmed" when the source desk confirmed the facts the row rests on, "unconfirmed"
+     * when it confirmed none of them, "ambiguous" when the row names only a page shared by
+     * confirmed and unconfirmed facts (which one supports this claim is not known), null
+     * when the desk did not run.
      * @param {LedgerRow} row
      */
     statusOf(row) {
       if (!check) return null;
       const statuses = matched(row).map((x) => x?.check?.status).filter(Boolean);
       if (!statuses.length) return null;
-      return statuses.some((s) => s === "verified" || s === "opened") ? "confirmed" : "unconfirmed";
+      const ok = statuses.map((s) => s === "verified" || s === "opened");
+      if (ok.every(Boolean)) return "confirmed";
+      if (!ok.some(Boolean)) return "unconfirmed";
+      return row.facts.some((id) => byId.has(id)) ? "confirmed" : "ambiguous";
     },
   };
 }
@@ -379,6 +393,41 @@ function hasEvidence(row, rows, evidence, path = new Set()) {
   });
   path.delete(row.id);
   return ok;
+}
+
+/** Capitalised words that are not names. */
+const NOT_NAMES = new Set(["I", "I'm", "I've", "I'd", "I'll", "OK"]);
+
+/**
+ * The capitalised words of a text, as candidate names ("Tenerife", "KLM", "Liberation").
+ * The first word of a sentence is skipped when asked (it is capitalised anyway).
+ * @param {string} text @param {boolean} [skipFirst]
+ */
+function names(text, skipFirst = false) {
+  /** @type {string[]} */
+  const out = [];
+  for (const sentence of String(text).split(/(?<=[.!?])\s+/)) {
+    const words = sentence.replace(/\$?\[[^\]]*\]/g, " ").split(/\s+/).filter(Boolean);
+    words.forEach((w, i) => {
+      const n = w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "").replace(/['’]s$/, "");
+      if ((skipFirst && i === 0) || !/^\p{Lu}[\p{L}'’-]+$/u.test(n) || NOT_NAMES.has(n)) return;
+      out.push(n);
+    });
+  }
+  return out;
+}
+
+/**
+ * Numbers a viewer reads on screen: the quoted text of on-screen text (OST) and
+ * of text cards (R1 shots). Unquoted words there are production notes (fonts,
+ * timings), so they are not read; claim IDs inside a chip are not numbers.
+ * @param {import("./scene-lines.mjs").SceneLine} s
+ */
+function screenNumbers(s) {
+  const shots = (s.fields.SHOTS ?? "").split(/(?=\(\d+\)\s)/).filter((x) => /\bR1\b/.test(x)).join(" ");
+  const quoted = [s.fields.OST ?? "", shots].join(" ").match(/"[^"]*"|“[^”]*”/g) ?? [];
+  const text = quoted.join(" ").replace(/\$?\[[^\]]*\]/g, " ").replace(/\b[A-Z]{1,6}(?:-[A-Z]{1,4})*-?\d+[a-z]?\b/g, " ");
+  return (text.match(/\d[\d,.]*/g) ?? []).map((n) => n.replace(/[.,]+$/, ""));
 }
 
 const NUMBER_WORD = /^(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|trillion|crore|lakh|point|half|quarter|dozen)$/;
@@ -501,9 +550,15 @@ export async function reviewRun({ store, film }) {
     const evidence = factual ? researchEvidence(await readJson(store, "research.json"), await readJson(store, "sources-check.json")) : null;
     let cited = 0;
     let markers = 0;
+    let linked = 0;
+    let commentary = 0;
     if (!s2 || !ledger.size) f.push({ code: "claims.noLedger", severity: "block", message: msg("claims.noLedger") });
+    const parsed = new Map(plan.map((c) => [c.id, parseSceneLines(chapters[c.id] ?? "")]));
+    // Names the film may mention without a new claim: those in the ledger and in sentences already linked to claims.
+    const known = new Set([...rows.values()].flatMap((r) => names(r.text)));
+    for (const scenes of parsed.values()) for (const s of scenes) for (const x of s.sentences) if (x.claims.length) for (const n of names(x.text)) known.add(n);
     for (const c of plan) {
-      const scenes = parseSceneLines(chapters[c.id] ?? "");
+      const scenes = /** @type {import("./scene-lines.mjs").SceneLine[]} */ (parsed.get(c.id));
       // Unresolved markers block in every film: a narrator would read "[C12 low]" aloud, a viewer would see it.
       const open = scenes.flatMap((s) => [...new Set(s.raw.match(UNRESOLVED) ?? [])].map((m) => `${s.sc} ${m}`));
       markers += open.length;
@@ -517,20 +572,46 @@ export async function reviewRun({ store, film }) {
         const list = guessed.slice(0, 12).join("; ");
         f.push({ code: "claims.markerResolved", severity: "block", message: msg("claims.markerResolved", { chapter: c.id, list }), target: `s5:${c.id}`, note: `In these scenes a marker was replaced by a number, but the S2 ledger has no value for its claim: ${list}. Remove the number, or say it is not known.` });
       }
-      if (!ledger.size) continue;
       /** @type {Set<string>} */ const unknown = new Set();
       /** @type {Set<string>} */ const noEvidence = new Set();
       /** @type {Set<string>} */ const unverified = new Set();
+      /** @type {Set<string>} */ const ambiguous = new Set();
       /** @type {Set<string>} */ const weak = new Set();
+      /** @type {Set<string>} */ const unlinked = new Set();
+      /** @type {Set<string>} */ const unlinkedFact = new Set();
+      /** @type {Set<string>} */ const unknownStated = new Set();
+      /** @type {Set<string>} */ const screen = new Set();
       for (const s of scenes) {
-        const ids = (s.positional[3] ?? "").match(/\bC\d{2,3}\b/g) ?? [];
+        // The scene's claims field, its on-screen source chips and every sentence tag: an ID cited anywhere is checked.
+        const ids = [...new Set([...((s.positional[3] ?? "").match(/\bC\d{2,3}\b/g) ?? []), ...((s.fields.OST ?? "").replace(/\$?\[[^\]]*\]/g, " ").match(/\bC\d{2,3}\b/g) ?? []), ...s.sentences.flatMap((x) => x.claims)])];
         cited += ids.length;
+        if (factual) {
+          // Every narrated sentence is linked: a claim tag, or {N} for a sentence that states nothing factual.
+          for (const x of s.sentences) {
+            const quote = `"${x.text.slice(0, 80)}${x.text.length > 80 ? "..." : ""}"`;
+            if (!x.tag || !x.valid) { unlinked.add(`${s.sc} ${x.tag && !x.valid ? `${x.tag} after ` : ""}${quote}`); continue; }
+            if (x.claims.length) linked += 1;
+            if (x.none) {
+              commentary += 1;
+              const facts = [...factualSignals(x.text), ...names(x.text, true).filter((n) => !known.has(n))];
+              if (facts.length) unlinkedFact.add(`${s.sc} ${quote} states ${facts.slice(0, 3).join(", ")}`);
+            }
+            // A sentence resting only on UNKNOWN claims says that something is not known; it states no value.
+            const rowsOf = x.claims.map((id) => rows.get(id)).filter(Boolean);
+            if (rowsOf.length && rowsOf.every((r) => /** @type {LedgerRow} */ (r).kind === "unknown") && factualSignals(x.text).length) unknownStated.add(`${s.sc} "${x.text.slice(0, 80)}" (${x.claims.join(", ")})`);
+          }
+          // Numbers shown on screen (on-screen text, text cards) need a claim in the scene.
+          if (!ids.length && screenNumbers(s).length) screen.add(`${s.sc} ${screenNumbers(s).slice(0, 3).join(", ")}`);
+        }
+        if (!ledger.size) continue;
         for (const id of ids) {
           const row = rows.get(id);
           if (!row) { unknown.add(`${s.sc}:${id}`); continue; }
           if (!factual || row.kind === "unknown") continue; // an UNKNOWN claim is narrated as not known
+          const status = evidence ? evidence.statusOf(row) : null;
           if (!hasEvidence(row, rows, evidence)) noEvidence.add(`${s.sc}:${id}`);
-          else if (row.kind === "fact" && evidence && evidence.statusOf(row) === "unconfirmed") unverified.add(`${s.sc}:${id}`);
+          else if (row.kind === "fact" && status === "unconfirmed") unverified.add(`${s.sc}:${id}`);
+          else if (row.kind === "fact" && status === "ambiguous") ambiguous.add(`${s.sc}:${id}`);
           else if (row.kind === "fact" && row.lowConfidence) weak.add(`${s.sc}:${id}`);
         }
       }
@@ -544,8 +625,13 @@ export async function reviewRun({ store, film }) {
       add("claims.noEvidence", noEvidence, (ids) => `These scenes cite claims with no evidence the research kept (no source page or fact, or a status such as UNSUPPORTED): ${ids}. Say them only with a source from the research, or cut them.`);
       add("claims.unverified", unverified, (ids) => `These scenes state claims as FACT that no page the source desk opened confirms: ${ids}. Attribute each to its source ("according to ..."), or cut it.`);
       add("claims.lowConfidence", weak, (ids) => `The ledger rates these FACT claims low confidence: ${ids}. Attribute each to its source, or cut it.`);
+      add("claims.ambiguousEvidence", ambiguous, (ids) => `These FACT claims cite only a page that the research uses for several facts, some confirmed and some not, so which one supports the claim is not known: ${ids}. In S2, cite the research fact ID (F01 ...) the claim rests on.`);
+      add("claims.unlinked", unlinked, (ids) => `These narrated sentences have no valid claim tag: ${ids}. End each sentence with {C..} for the ledger claims it states, or {N} if it states nothing factual.`);
+      add("claims.unlinkedFact", unlinkedFact, (ids) => `These sentences are tagged {N} (nothing factual) but state a number, a date or a name the ledger does not hold: ${ids}. Tag each with its ledger claim, or remove the fact.`);
+      add("claims.unknownStated", unknownStated, (ids) => `These sentences rest only on UNKNOWN claims but state a value: ${ids}. Say that it is not known, or tag the claim that gives the value.`);
+      add("claims.unlinkedScreen", screen, (ids) => `These scenes show numbers on screen but cite no claim: ${ids}. Cite the claim the number comes from, or remove it.`);
     }
-    gates.push(gate("claims", f, { ledger: ledger.size, citations: cited, markers, evidenceChecked: Boolean(evidence) }));
+    gates.push(gate("claims", f, { ledger: ledger.size, citations: cited, markers, evidenceChecked: Boolean(evidence), ...(factual ? { linkedSentences: linked, commentarySentences: commentary } : {}) }));
   }
 
   // 3. Script: every chapter written and passing the code checks, run here again (a report file is not proof).

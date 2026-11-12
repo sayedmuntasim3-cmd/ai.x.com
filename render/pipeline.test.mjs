@@ -23,7 +23,7 @@ const WORDS = "the river runs past the old mill while the town wakes slowly unde
 function scene(n) {
   const t = (/** @type {number} */ s) => `0:${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const start = (n - 1) * 10;
-  return `**SC${String(n).padStart(4, "0")}** | ${t(start)}-${t(start + 10)} | C${n <= 6 ? 1 : 2} | beat | E | C01 | NARR: ${[`Mill${n}`, ...WORDS].slice(0, 25).join(" ")}. | W 25/25 | ANCHOR: "river" -> mill | SHOTS: (1) R3 old mill wheel; (2) R1 card | EV: R1 1 / R3 1 | FX: FX-KINETIC, FX-SOURCECHIP | SRC: Pexels · Q1 "old mill" | OST: "THE MILL · 1887"; chip "C01 · example.org" | MUS: M01 | SFX: SND-AMB-01 room tone | LOOK: LOOK-M`;
+  return `**SC${String(n).padStart(4, "0")}** | ${t(start)}-${t(start + 10)} | C${n <= 6 ? 1 : 2} | beat | E | C01 | NARR: ${[`Mill${n}`, ...WORDS].slice(0, 25).join(" ")}. {C01} | W 25/25 | ANCHOR: "river" -> mill | SHOTS: (1) R3 old mill wheel; (2) R1 card | EV: R1 1 / R3 1 | FX: FX-KINETIC, FX-SOURCECHIP | SRC: Pexels · Q1 "old mill" | OST: "THE MILL · 1887"; chip "C01 · example.org" | MUS: M01 | SFX: SND-AMB-01 room tone | LOOK: LOOK-M`;
 }
 
 function fakeModel() {

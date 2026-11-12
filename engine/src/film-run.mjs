@@ -201,13 +201,20 @@ export function validateChapterPlan(plan, durationSeconds) {
   return { ok: errors.length === 0, errors };
 }
 
-/** @param {ChapterPlan} c @param {string} versionId */
-export function chapterSpec(c, versionId) {
+/**
+ * @param {ChapterPlan} c @param {string} versionId
+ * @param {{ linkClaims?: boolean }} [o] linkClaims: every narrated sentence must carry its claim tag (true-story films)
+ */
+export function chapterSpec(c, versionId, o = {}) {
   return {
     startSeconds: toSeconds(c.start), endSeconds: toSeconds(c.end),
     firstScene: Number(c.firstScene.replace(/^SC/, "")), lastScene: Number(c.lastScene.replace(/^SC/, "")), versionId,
+    ...(o.linkClaims ? { linkClaims: true } : {}),
   };
 }
+
+/** The tagging rule S5 is given for a true-story film (scene-lines.mjs linkFindings checks it). */
+export const CLAIM_TAG_RULE = "CLAIM TAGS (true-story films; code checks every sentence): end every sentence in NARR with a tag in curly braces: {C01} or {C01, C02} for a sentence that states anything from the S2 ledger (a fact, a number, a date, a name, an event, an estimate, a contested or an unknown point), or {N} for a sentence that states nothing factual (a question, a transition, commentary). Example: NARR: The mill opened in seventeen ninety. {C01} Nobody wrote down why. {C02} So who paid for it? {N} Tags are never spoken; code removes them before the voice and the captions. A sentence tagged {N} may hold no number and no date.";
 
 /**
  * A rough cost estimate before a run, so the owner sees the price first.
@@ -298,6 +305,8 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
+  // A true-story film links every narrated sentence to its ledger claims.
+  const factual = !isStoryFilm(film);
   const step = o.step ?? (async (_name, fn) => fn());
   const log = o.log ?? (() => {});
   const maxRepairs = o.maxRepairs ?? 2;
@@ -514,7 +523,7 @@ export async function runFilm(o) {
         { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("RESEARCH", await read("research.json")) },
         { text: isStoryFilm(film)
           ? "Write S2 for an invented story: (a) the realism ledger, one row per real-world detail the story uses, with ID (C01...), detail, exact value, sources and chapter use, from the research file only; (b) the story bible: each invented character's name (no famous real person's name), age, want, wound, fear and the price they pay; (c) if money is involved, the money path: every jump in wealth with its cause and the exact figures, adding up." + CHECKED_FACTS
-          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources, confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." + CHECKED_FACTS },
+          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources (first the research fact IDs, F01 ..., the claim rests on, then their URLs), confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." + CHECKED_FACTS },
       ], 32000);
       await store.put("s2.md", text);
       return { claims: (text.match(/\bC\d{2,3}\b/g) ?? []).length };
@@ -554,13 +563,14 @@ export async function runFilm(o) {
     let previousTail = "";
     for (const ch of plan.chapters) {
       const key = `s5-${ch.id}.md`;
-      const spec = chapterSpec(ch, film.versionId);
+      const spec = chapterSpec(ch, film.versionId, { linkClaims: factual });
       await stage(`s5:${ch.id}`, async () => {
         const instruction = [
           `Write stage S5 for chapter ${ch.id} "${ch.title}" only: ${ch.start}-${ch.end}, scenes ${ch.firstScene}-${ch.lastScene}, every scene in order, one compact scene line each, exactly in this shape:`,
           SCENE_LINE_EXAMPLE,
           `Rules the code will check: the first scene starts at ${ch.start} and the last ends at ${ch.end}; each scene starts where the previous one ends; scene IDs have no gap; every narrated scene has (seconds × ${(getVersion(film.versionId)?.narrationWpm.target ?? 150) / 60}) words ±10% (wordless scenes say NARR: (wordless)); the W field states written/target; every line has NARR, ANCHOR, SHOTS and LOOK; no banned phrase (section 16); footage only from the allowed sites.`,
           "Start with a header line, the word budget and the chapter's reuse log; end with one QA line.",
+          factual ? CLAIM_TAG_RULE : "",
           learned,
           ctx("CHAPTER_BRIEF", JSON.stringify(ch, null, 1)),
           previousTail ? ctx("PREVIOUS_CHAPTER_END", previousTail) : "",
@@ -603,7 +613,7 @@ export async function runFilm(o) {
 
     // QA over the whole film: code first, then the model's three lenses.
     await stage("qa", async () => {
-      const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId) })));
+      const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId, { linkClaims: factual }) })));
       const machine = checkFilm(chapters, { durationSeconds: film.durationSeconds });
       // Craft that code can measure: the hook, and how much of each chapter is planned text cards rather than pictures.
       const hook = hookFindings(parseSceneLines(chapters[0]?.markdown ?? ""));
@@ -625,7 +635,7 @@ export async function runFilm(o) {
         const partCraft = whole ? craft : craft.filter((x) => (x.code === "card-heavy" ? part.some((c) => x.detail.startsWith(`${c.id}:`)) : part[0]?.id === chapters[0]?.id));
         return ask(name, [
           { text: ctx("S2", s2) + "\n" + part.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
-          { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(errors.slice(0, 60)) + (partCraft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(partCraft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
+          { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(errors.slice(0, 60)) + (partCraft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(partCraft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). " + (factual ? "Keep every claim tag ({C01}, {N}) in NARR and give each new sentence its own tag; a fix that drops or breaks a tag is reverted. " : "") + "Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
         ], 32000);
       };
       // A brain whose window cannot hold the whole film reads it chapter by chapter, and the run says so.
@@ -687,7 +697,7 @@ export async function runFilm(o) {
           state.gaps.push("viewer panel: the reply was not valid JSON; the opening was not test-read.");
           return { ok: false };
         }
-        const spec = chapterSpec(first, film.versionId);
+        const spec = chapterSpec(first, film.versionId, { linkClaims: factual });
         const fixes = (Array.isArray(panel.fixes) ? panel.fixes : []).filter((/** @type {any} */ f) => f && typeof f.find === "string" && typeof f.replace === "string");
         let applied = 0;
         if (fixes.length) {
@@ -758,7 +768,7 @@ export async function runFilm(o) {
     }
 
     await stage("s6", async () => {
-      const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId) })));
+      const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId, { linkClaims: factual }) })));
       const machine = checkFilm(chapters, { durationSeconds: film.durationSeconds });
       await store.put("film-check.json", JSON.stringify({ ok: machine.ok, errors: machine.errors, warnings: machine.warnings.length, stats: machine.stats }, null, 1));
       const text = await ask("s6", [
