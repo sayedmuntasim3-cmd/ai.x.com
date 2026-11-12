@@ -1,28 +1,40 @@
 # Phase 0 readiness report
 
-Date: 12 Nov 2026. **Status: NOT READY for a live run.** The code side is
-ready and tested; the run is blocked because Google's official model, limit,
-pricing and terms pages could not be read (§4), and on the owner decisions in
-§9. No key requested, no live call made, no billing touched.
+Date: 12 Nov 2026. **Status: NOT READY for a live run.** Google's official
+pages are now read (§4). Remaining: owner decisions (§9) and one small code
+change (`gemini-3.8-flash` at $0 in `PRICES`). No key requested, no live call made, no billing touched.
 
 Plan: `PHASE0_EXPERIMENT_PLAN.md`. This report adds the preparation tasks
 of 12 Nov (minimal context, request-path limit, originality, Google terms).
 
 ## 1. Model selection
 
-**Not finalised: no official source could be read.**
+**Recommended: `gemini-3.8-flash`, arm B only.** (Official pages read
+12 Nov 2026; §4.)
 
-- Candidate: `gemini-2.5-flash`, the adapter's default and the only Gemini
-  model in `PRICES` at $0. Reason: Phase 0 should test today's code.
-- Unverified: whether it is still current, still free, and what its limits
-  are. A note in Master Plan §21.1 says earlier excerpts did not list it and
-  mentioned a newer Flash preview; also unverified.
-- Rule: the model is chosen only after (a) the official pages are read and
-  (b) `models.list` with the key (no generation) shows it. Both arms then use
-  that one model id (`GEMINI_MODEL`), recorded with the `modelVersion` Google
-  returns on every call. A model not in `PRICES` is priced at the most
-  expensive one and refused without `--budget` (existing safeguard), so it
-  must be added at $0 only once its free tier is confirmed.
+- `gemini-2.5-flash` (today's adapter default) is **deprecated**, "no longer
+  available to select in Google AI Studio (API access to the 2.5 models is
+  limited to existing users)", and from **1 Dec 2026** its requests route to
+  `gemini-3.5-flash-lite`. A new free project should not expect access.
+- Free text models a new project can use: `gemini-3.8-flash` (newest Flash,
+  Sept 2026), `gemini-3.6-flash`, `gemini-3.5-flash-lite`,
+  `gemini-3.1-flash-lite`, `gemini-3-flash-preview`. Paid only:
+  `gemini-4-carbon`, `gemini-4-argon`, `gemini-3.1-pro-preview`.
+- Why 3.8 Flash: the most capable free model ("our most intelligent Flash
+  model"), 1,048,576 input and 65,536 output tokens (our adapter's cap is
+  also 65,536), structured output and thinking supported. The test is of
+  writing quality, so the strongest free writer is the fair choice.
+- **Arm A cannot run on the free tier**: Google Search grounding is "Not
+  available" on the free tier for every 3.x model; it is free (500 RPD) only
+  on 2.5 Flash / Flash-Lite, which new users cannot use. Arm A is recorded
+  "not run: no free grounding". A free control with the same model is
+  possible (B vs the model writing from its own knowledge, no research), but
+  needs a small code change; not built, owner to decide.
+- Code needed before a run (approval required): add `gemini-3.8-flash` to
+  `PRICES` at $0 (without it the run is priced at the most expensive model
+  and refused without `--budget`), and pass `GEMINI_MODEL=gemini-3.8-flash`.
+- Finding outside Phase 0: the Worker's Gemini default is the deprecated
+  `gemini-2.5-flash`; not changed (production).
 
 ## 2. What is sent to Google
 
@@ -73,24 +85,34 @@ All replied live on 12 Nov (State §4g, §4h). The source desk then opens every
 cited page through the guarded fetch; only this environment's allowed hosts
 answer. Arm A uses Gemini's own Google Search instead.
 
-## 4. Google free tier: verified and unverified
+## 4. Google free tier: verified on 12 Nov 2026
 
-Tried on 12 Nov 2026, from this container (curl) and through the web fetch
-tool: every page (`ai.google.dev/gemini-api/docs/pricing`, `rate-limits`,
-`models`, `terms`, `billing`) answers **301 to `aistudio.google.com/docs/...`**,
-and that host is refused here (container) or does not resolve (fetch tool).
+Read-only, after the owner allowed `aistudio.google.com` in this environment
+(the `ai.google.dev` docs redirect there). Pages show no "last updated" date
+except the terms; the date below is the date read.
 
-| Item | State |
-|---|---|
-| Current model ids, input/output limits, grounding support | **unverified** |
-| Free tier per model; RPM, TPM, RPD; grounding requests per day | **unverified** |
-| Whether a project with no billing account is always on the free tier and gets errors, not charges, past the limits | **unverified** (our safety rests on it) |
-| Whether free-tier prompts and replies are used to improve Google's products, read by human reviewers; region limits on unpaid use | **unverified** (my understanding: yes to use and review; not relied on) |
-| Endpoint `generativelanguage.googleapis.com` reachable from here | verified (answers 404 at the root; no key sent) |
+| Question | Official answer (quoted or exact) | Source |
+|---|---|---|
+| Free models | per pricing page: 3.8 Flash, 3.6 Flash, 3.5 Flash-Lite, 3.1 Flash-Lite, 3 Flash Preview, 2.5 Pro/Flash/Flash-Lite: input and output "Free of charge"; 4 Carbon, 4 Argon, 3.1 Pro Preview "Not available" on the free tier | aistudio.google.com/docs/pricing |
+| 2.5 models | `gemini-2.5-flash` "is deprecated ... API access to the 2.5 models is limited to existing users. Effective December 1, 2026, all API requests to `gemini-2.5-flash` will automatically route to `gemini-3.5-flash-lite`" | aistudio.google.com/docs/models |
+| 3.8 Flash limits | input 1,048,576 tokens; output 65,536; latest update September 2026 | aistudio.google.com/docs/models/gemini-3.8-flash |
+| Free grounding | Google Search: "500 RPD free (limit shared for Flash and Flash-Lite)" on 2.5 only; 3.x free tier: "Not available" | pricing page |
+| Free RPM / TPM / RPD | **not published** for these models: "Rate limits depend on a variety of factors (such as your usage tier) and can be viewed in Google AI Studio" (aistudio.google.com/rate-limit, signed in); "applied per project, not per API key"; RPD "reset at midnight Pacific time"; "not guaranteed" | aistudio.google.com/docs/rate-limits |
+| Who is on the free tier | Free: "Active project or free trial; some projects need verification"; Tier 1: "Set up and link an active billing account" | rate-limits page |
+| Charges | paid tier requires "linking a billing account and prepaying ... a minimum of $5"; free tier spend limit "N/A"; "You can unlink a project from its billing account to return to the free tier" | aistudio.google.com/docs/billing |
+| Data use (free) | "Google uses the content you submit to the Services and any generated responses to provide, improve, and develop Google products ..."; "human reviewers may read, annotate, and process your API input and output"; "**Do not submit sensitive, confidential, or personal information to the Unpaid Services.**" | aistudio.google.com/docs/terms, effective March 23, 2026 |
+| Data use (paid) | "Content **not** used to improve our products" | pricing page |
+| Region | Bangladesh is on the available-regions list; the EEA/UK/Switzerland paid-only rule applies to apps offered to users there | aistudio.google.com/docs/available-regions; terms |
+| Use | "for developers building with Google AI models for professional or business purposes, not for consumer use" | terms |
 
-Nothing here is assumed. To verify: allow `aistudio.google.com` (read-only)
-in this environment, or the owner reads the five pages and records the
-answers with the page date.
+**Billing risk:** by these pages, a project with no linked billing account
+stays on the free tier and cannot be charged; charges need a linked billing
+account and prepaid credit. The risk is a human one: linking billing to the
+same project later. Rule: a dedicated project, never linked to billing.
+
+**Still unverified:** the actual free RPM, TPM and RPD for `gemini-3.8-flash`
+(visible only in AI Studio for the owner's project, or after the key, by
+watching 429s); whether a new project needs verification.
 
 ## 5. Execution sequence (after approval only)
 
@@ -111,7 +133,8 @@ answers with the page date.
    ```
 5. Record B (setup, calls.jsonl summary, tokens, sources, gates, copy check);
    commit the complete script.
-6. **Arm A:** the same command and environment without `GEMINI_SEARCH`,
+6. **Arm A** (not possible on the free tier with 3.8 Flash, §1; kept for a
+   later paid or 2.5-access run): the same command and environment without `GEMINI_SEARCH`,
    `--out films/phase0-tenerife-A`; then the copy check. Only if quota allows;
    otherwise "not run" with the reason.
 7. Evaluation: Claude as the AI critic (labelled, scored before seeing gates);
@@ -160,8 +183,8 @@ sources the research never opened. The AI critic and the readers judge those
 
 ## 9. Remaining risks, limits and owner decisions
 
-1. **Google pages unread** (§4): model, limits, billing behaviour, data use.
-   Decision: allow `aistudio.google.com` here, or read them yourself.
+1. **Free-tier rate limits not published** (§4): known only in AI Studio for
+   the owner's project. Arm A cannot run free (§1).
 2. **Arm A's sources may be off the allowlist**: Gemini's search can cite any
    site; the source desk can open only allowed hosts, so A may show more
    "unreachable" than B for reasons of this environment, not quality. The
@@ -171,7 +194,9 @@ sources the research never opened. The AI critic and the readers judge those
 4. One topic, one model, 10 minutes; AI critic is not a human; Reader 2
    pending; the gold sheet is AI-drafted until the owner checks it.
 5. Copy check limits (§8).
-6. The data-use terms must be accepted by the owner once read.
+6. Data use: Google may use and humans may read what is sent (terms, §4).
+   The owner must accept this; the context holds nothing confidential
+   (§2), but the owner decides whether the manual extract counts as such.
 
 ## 10. Test results (12 Nov 2026)
 
