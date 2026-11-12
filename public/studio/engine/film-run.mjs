@@ -292,7 +292,9 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * research (needed for a brain that cannot search the web) is the code
  * research desk: the brain lists searches, code opens free sources
  * (research-desk.mjs) and the brain writes from that corpus only.
- * @param {{ film: Film, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * signal (optional) stops the run before the next stage when it fires; the
+ * run is saved as "paused" and resumes from there.
+ * @param {{ film: Film, signal?: AbortSignal, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -378,6 +380,8 @@ export async function runFilm(o) {
    */
   async function stage(id, fn) {
     if (state.stages[id]?.status === "done") return state.stages[id].result;
+    // Stopped from outside (the worker lost its lease, the owner cancelled, a shutdown): stop between stages; finished ones stay.
+    if (o.signal?.aborted) throw new RunStopped(String(o.signal.reason instanceof Error ? o.signal.reason.message : o.signal.reason ?? "stopped"));
     if (o.budgetUsd !== undefined && state.costUsd >= o.budgetUsd) {
       state.status = "stopped-budget";
       throw new BudgetReached(`Budget of $${o.budgetUsd} reached ($${state.costUsd} spent) before ${id}.`);
@@ -806,7 +810,8 @@ export async function runFilm(o) {
 
     state.status = state.gaps.length ? "done-with-gaps" : "done";
   } catch (error) {
-    if (!(error instanceof BudgetReached)) state.status = "failed";
+    if (error instanceof RunStopped) state.status = "paused";
+    else if (!(error instanceof BudgetReached)) state.status = "failed";
     state.error = (error instanceof Error ? error.message : String(error)).replace(/^NonRetryableError:\s*/, "");
     await save();
     throw error;
@@ -905,6 +910,9 @@ export function storyNote(film) {
 
 /** Thrown when a run stops at its budget; the run can be resumed with a higher one. */
 export class BudgetReached extends Error {}
+
+/** The run was stopped from outside between stages; it resumes from the next stage. */
+export class RunStopped extends Error {}
 
 /**
  * True when the brain can look at pictures. A model without capabilities

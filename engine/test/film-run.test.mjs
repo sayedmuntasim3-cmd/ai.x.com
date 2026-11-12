@@ -277,6 +277,23 @@ test("a brain whose window cannot hold the whole film gets QA chapter by chapter
   assert.match(store.m.get("s5-C1.md"), /NARR: Marker2 a /, "and is applied");
 });
 
+test("a run told to stop pauses between stages and resumes from the next one", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "stop");
+  assert.ok(made.ok);
+  const model = scriptedModel();
+  const stop = new AbortController();
+  const store = memoryStore();
+  const stopper = { ...model, async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) { const out = await model.call(r); if (r.stage === "s2") stop.abort(new Error("the worker lost its lease")); return out; } };
+  await assert.rejects(runFilm({ film: made.film, manual: "M", model: stopper, store, signal: stop.signal }), /lost its lease/);
+  const paused = JSON.parse(store.m.get("run.json"));
+  assert.equal(paused.status, "paused", "a stop is not a failure");
+  assert.deepEqual(Object.keys(paused.stages), ["s01", "research", "s2"], "the stage that was running finished and was kept");
+  const before = model.calls.length;
+  const state = await runFilm({ film: made.film, manual: "M", model, store });
+  assert.equal(state.status, "done");
+  assert.ok(!model.calls.slice(before).some((c) => c === "s01" || c === "research" || c === "s2"), "finished stages are not paid for again");
+});
+
 test("a run stops at its budget and resumes where it stopped", async () => {
   const made = newFilm({ topic: "The old mill", minutes: 2 }, "f2");
   assert.ok(made.ok);

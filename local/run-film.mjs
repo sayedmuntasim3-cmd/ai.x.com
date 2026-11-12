@@ -70,7 +70,7 @@ export function slug(topic) {
 
 /**
  * @param {string[]} argv @param {Record<string, string | undefined>} env
- * @param {{ model?: import("../engine/src/film-run.mjs").Model, fetch?: typeof fetch, log?: (line: string) => void }} [deps] for tests
+ * @param {{ model?: import("../engine/src/film-run.mjs").Model, fetch?: typeof fetch, log?: (line: string) => void, signal?: AbortSignal }} [deps] tests, and the job worker (signal stops the run between stages)
  */
 export async function main(argv, env, deps = {}) {
   const print = deps.log ?? ((/** @type {string} */ line) => console.log(line));
@@ -149,6 +149,7 @@ export async function main(argv, env, deps = {}) {
       save: async (list) => { mkdirSync(channelDir, { recursive: true }); writeFileSync(join(channelDir, "fingerprints.json"), JSON.stringify(list)); },
     },
     log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
+    signal: deps.signal,
   };
   const maxRevisions = Number(values["max-revisions"] ?? 1);
   const { state, review } = await superviseFilm({
