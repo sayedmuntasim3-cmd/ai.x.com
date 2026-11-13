@@ -304,6 +304,12 @@ timing and pitch proofs passed. **Not verified by ear**; the owner's own recordi
 Next: tune by ear with the owner's recording; stereo in the renderer; chunked processing over 30 minutes;
 real ayah times into the send automation; studio page and upload.
 
+## 4k. Quran recitation documentary: direction and plan (13 Nov 2026)
+
+The owner's direction for the next phase is recorded in `docs/QURAN_DOCUMENTARY.md` (rules, audit of
+what exists and what is missing, design, stages Q1 to Q7 with measured exits); his full text is in
+`docs/QURAN_DIRECTION_OWNER.md`. This phase is Quran only. Nothing of Q1 to Q7 is built yet.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`
@@ -316,6 +322,9 @@ four Quran roles (built, not wired). `quran-visual-adab-guard` stays planned:
 no picture is chosen for a Quran film yet, so nothing checks one.
 
 ## 6. Next work, in order
+
+**First (owner, 13 Nov 2026): the Quran recitation documentary**, stages Q1 to Q7 in
+`docs/QURAN_DOCUMENTARY.md`, in that order. The list below waits until he says otherwise.
 
 Each step ends with tests passing, the type check, the build check, a commit
 and a push.

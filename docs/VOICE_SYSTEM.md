@@ -1,5 +1,7 @@
 # Voice system (System B): any voice file to a film
 
+Next phase (owner, 13 Nov 2026): the Quran recitation documentary, `docs/QURAN_DOCUMENTARY.md`.
+
 The owner gives a voice file (own recording, ElevenLabs, anything ffmpeg reads).
 The system first understands it, then plans pictures scene by scene and makes
 the film. **The spoken words are never changed**: code puts them back and
