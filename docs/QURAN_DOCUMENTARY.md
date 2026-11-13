@@ -341,3 +341,43 @@ Al-Fatiha with a spoken translation is asked about (half the speech is not Quran
 reciter (al-Husary, Yunus 1-45) placed 15 of 44 cuts in the true gap; the ends it called sure were right.
 The phone and mosque copies are made by code from a clean recording, not recorded in a real mosque or on a
 real phone; the owner's own recording is the real test.
+
+## Production-standard pass (owner's directive of 13 Nov 2026, evening)
+
+Status words: PASS (built and verified), FAIL (tested, failed), PARTIAL, NOT TESTED.
+
+**Missing visuals: root cause and fix.** The pixel audit (`render/visual-audit.mjs`, frame detail and
+brightness every 0.5 s) measured the earlier films: runner Ad-Duha empty at 2-7.5 s and 82.5-144 s
+(67 s of 141); runner Yusuf 9:16 empty at 2-3.5, 22-73.5, 104.5-113 and 129-179 s (111 s of 177); the
+local Ad-Duha 30 s empty. Causes, in order: (1) a shot with no asset got a dark card silently;
+(2) searches used only the exact phrase of the shot, never wider words; (3) a video shorter than its shot
+was held on its last frame (S006: 14.5 s of video for a 39.7 s shot). Fixes: the search ladder (own
+picture, family, plain nouns, reverent landscapes; the rung is recorded), Commons "Quality images" first;
+a video must cover its shot (slowed to two thirds at most, never held); every render is audited for empty
+and frozen stretches with times; any card or empty stretch blocks `--ready`. Result, local Ad-Duha:
+6 of 6 shots with a licensed picture, coverage 100%, no empty or frozen stretch (PASS). Looking at the
+frames: a city at dawn, plastic tree shelters, and a fogged-out mountain are weak choices (PARTIAL: the
+relevance check below is not yet tuned; the person's review must catch these).
+
+**Media verification** (`local/media/detect.py`, `frameVerdict`):
+- Paintings: laion/CLIP-ViT-B-32-laion2B-s34B-b79K (MIT; its card limits it to fixed labels, tested; used
+  only to refuse). On 9 photographs and 10 Commons paintings, rule "painting + drawing + rendering >= 0.2":
+  9 of 10 paintings refused (a Chinese ink landscape passed), 0 of 9 photographs refused. PARTIAL.
+- Orientation (sky at a side): on 9 upright Commons landscapes and 9 turned copies, 5 of 9 turned caught,
+  0 of 9 upright refused; the real sideways Commons video was caught. PARTIAL (the review sheet keeps it).
+- Commons categories (artworks, PD-Art, paintings, people, portraits) refused. PASS (unit tests).
+- Near-duplicates: 64-bit difference hash, 6 bits or fewer apart refused. PASS (unit test); NOT TESTED on a film.
+- Faces and people: OpenCV, 8 of 8 portraits flagged, 1 of 8 Earth photos falsely; small figures in a
+  painting were missed. PARTIAL.
+- Visual relevance score: computed with --query, NOT TUNED (no threshold yet; reported only).
+
+**Audio** (`render/audio-audit.mjs`, in every render report and the publish gate): length against the
+voice, offset of the best envelope match (to 10 ms), silences the voice does not have, R128 loudness,
+loudness range, true peak, full-scale samples, channel balance. Ad-Duha film: offset 0 s, no added
+silence, -14 LUFS, LRA 7.9 LU (the voice's range kept), true peak -4 dBTP, no clipping, balance 0 dB. PASS.
+A test cuts 1 s out of a voice and the audit finds it at 5 s. PASS. The mastering engine and its proofs are
+unchanged (it targets -14 LUFS with its own pitch and timing proofs; the audit reports the distance and the
+range, it does not force anything).
+
+**Recognition:** the runner QA run found that a misheard isti'adha became 16:98; fixed (see Q7). The
+Jawad Farogi Ad-Duha is still not recognised by the base model (NOT FIXED).

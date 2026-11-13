@@ -9,7 +9,7 @@ const surahNames = JSON.parse(readFileSync(new URL("../data/quran/surah-names.js
 const shot = (id, ayah, start, end) => ({ id, surah: 93, ayah, start, end, motif: "dawn", because: { detail: "x", source: "y" } });
 const direction = /** @type {any} */ ({ shots: [shot("S001", 1, 0, 8), shot("S002", 3, 8, 20), shot("S003", 5, 20, 30)] });
 const media = { shots: [{ shot: "S001", asset: { id: "w:1", title: "Dawn", page: "p", licenceName: "CC0" } }, { shot: "S002", asset: { id: "w:2", title: "Valley", page: "p", licenceName: "CC BY 4.0" } }, { shot: "S003", asset: null }] };
-const goodRender = { lengthMatches: true, black: [], frozen: [], cutsInsideTheVoice: 0, integratedLufs: -14, truePeakDbtp: -1.5 };
+const goodRender = { lengthMatches: true, black: [], frozen: [], cutsInsideTheVoice: 0, integratedLufs: -14, truePeakDbtp: -1.5, cards: [], visual: { ok: true, empty: [], frozen: [] }, audio: { ok: true, offsetSeconds: 0, addedSilences: [], clippedSamples: 0 } };
 
 test("Q6 exit: a film cannot be marked ready without every scene approved and a reviewer's name", () => {
   let review = reviewSheet(direction, media);
@@ -32,6 +32,14 @@ test("Q6 exit: a film cannot be marked ready without every scene approved and a 
   assert.deepEqual(readyToPublish(review, { ...goodRender, frozen: [{ start: 3, end: 7 }] }).why.map((m) => m.code), ["quran.review.renderFailed"]);
   assert.deepEqual(readyToPublish(review, { ...goodRender, integratedLufs: -10 }).why.map((m) => m.code), ["quran.review.loudness"]);
   assert.deepEqual(readyToPublish(review, null).why.map((m) => m.code), ["quran.review.notRendered"]);
+  // Every second needs a real picture: a placeholder card or an empty stretch blocks publishing, with its time.
+  const carded = readyToPublish(review, { ...goodRender, cards: [{ start: 82.2, end: 106.9 }] });
+  assert.deepEqual(carded.why.map((m) => m.code), ["quran.review.cards"]);
+  assert.match(carded.why[0].en, /82-107 s/);
+  assert.deepEqual(readyToPublish(review, { ...goodRender, visual: { ok: false, empty: [{ start: 2, end: 7.5 }], frozen: [] } }).why.map((m) => m.code), ["quran.review.visual"]);
+  assert.deepEqual(readyToPublish(review, { ...goodRender, audio: { ok: false, offsetSeconds: 0, addedSilences: [{ start: 40, end: 41.2 }], clippedSamples: 0 } }).why.map((m) => m.code), ["quran.review.audio"]);
+  const { visual, ...old } = goodRender;
+  assert.deepEqual(readyToPublish(review, old).why.map((m) => m.code), ["quran.review.noAudit"]);
   for (const m of [...unsigned.why, ...readyToPublish(null, null).why]) assert.ok(m.code in MESSAGES && m.bn !== m.en);
 });
 

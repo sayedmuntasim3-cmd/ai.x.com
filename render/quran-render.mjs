@@ -83,16 +83,18 @@ export function clipArgs(seg, shot, asset, f, out) {
   const cover = `scale=${f.width}:${f.height}:force_original_aspect_ratio=increase:flags=lanczos,crop=${f.width}:${f.height},setsar=1`;
   /** @type {string[]} */
   let input;
+  let slow = 1;
   if (!asset) input = ["-f", "lavfi", "-i", `gradients=s=${f.width}x${f.height}:c0=${CARD.c0}:c1=${CARD.c1}:speed=0.01:rate=${f.fps}:duration=${seg.length + 1}`];
   else if (asset.kind === "image") input = ["-loop", "1", "-framerate", String(f.fps), "-t", String(seg.length + 1), "-i", asset.url];
   else {
     // Skip a video's first tenth (titles, a shaky start), but keep enough to cover the shot.
     const start = asset.seconds && asset.seconds > seg.length + 2 ? Math.min(asset.seconds * 0.1, asset.seconds - seg.length - 1) : 0;
-    input = ["-ss", String(r3(start)), "-t", String(seg.length + 1), "-i", asset.url];
+    const available = asset.seconds ? asset.seconds - start : seg.length;
+    // A video a little shorter than its shot is slowed (at most to two thirds of its speed), never held on a frame.
+    slow = available < seg.length ? Math.min(1.5, (seg.length + 0.1) / available) : 1;
+    input = ["-ss", String(r3(start)), "-t", String(r3(seg.length / slow + 1)), "-i", asset.url];
   }
-  // A video shorter than its shot holds its last frame for the rest (rare: media needs 8 s or the shot's length).
-  const pad = asset?.kind === "video" ? `,tpad=stop_mode=clone:stop_duration=${Math.ceil(seg.length)}` : "";
-  const filter = `[0:v]fps=${f.fps}${pad},${cover},${moveFilter(shot.move, seg.length, f)},${GRADE},format=yuv420p,trim=end_frame=${frames},setpts=PTS-STARTPTS[v]`;
+  const filter = `[0:v]${slow > 1 ? `setpts=${r3(slow)}*PTS,` : ""}fps=${f.fps},${cover},${moveFilter(shot.move, seg.length, f)},${GRADE},format=yuv420p,trim=end_frame=${frames},setpts=PTS-STARTPTS[v]`;
   return ["-hide_banner", "-loglevel", "error", "-y", ...input, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-r", String(f.fps), out];
 }
 
@@ -250,10 +252,19 @@ export async function renderQuranFilm(o) {
   const inVoice = cuts.filter((/** @type {number} */ c) => spans.some((sp) => c > sp.start + 0.02 && c < sp.end - 0.02));
   const ayahEnds = scenes.slice(0, -1).map((/** @type {any} */ s) => s.end);
   const atAyahEnd = cuts.filter((/** @type {number} */ c) => ayahEnds.some((/** @type {number} */ e) => Math.abs(e - c) < 0.05)).length;
+  // The picture itself, measured: empty (dark, plain) and frozen stretches, with their times.
+  const { auditFilm } = await import("./visual-audit.mjs");
+  const visual = await auditFilm(out);
+  // The sound itself, against the voice: length, sync, added silence, loudness, peaks, balance.
+  const { auditAudio } = await import("./audio-audit.mjs");
+  const audio = await auditAudio(out, o.audio);
+  const cards = direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id) && s.kind !== "title").map((/** @type {any} */ s) => ({ shot: s.id, start: s.start, end: s.end }));
   const report = {
     file: out, format: o.format ?? "1080p", width: f.width, height: f.height, seconds: r3(seconds), voiceSeconds: r3(total), lengthMatches: Math.abs(seconds - total) < 0.1,
     shots: segs.length, clipsRendered: segs.length - reused, clipsReused: reused, withAsset: direction.shots.filter((/** @type {any} */ s) => assets.has(s.id)).length, cards: direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id)).length,
     integratedLufs: master.integratedLufs, truePeakDbtp: master.truePeakDbtp, black: master.black.filter((b) => b.start > 2.5 && b.end < total - 3.5), frozen: frozenStretches,
+    cards, visual: { ok: visual.ok, coverage: visual.coverage, empty: visual.empty, frozen: visual.frozen },
+    audio,
     cuts: cuts.length, cutsAtAyahEnds: atAyahEnd, cutsAtInnerPauses: cuts.length - atAyahEnd - inVoice.length, cutsInsideTheVoice: inVoice.length, voiceChecked: spans.length > 0,
   };
   await writeFile(join(dir, `render-report-${(o.format ?? "1080p").replace(":", "x")}.json`), JSON.stringify(report, null, 1));
@@ -267,7 +278,9 @@ async function main() {
   const format = ["1080p", "4k", "9:16"].includes(String(args.format)) ? args.format : "1080p";
   const r = await renderQuranFilm({ run: args.run, audio: resolve(args.audio), format, reciter: typeof args.reciter === "string" ? args.reciter : undefined, showAyat: args["no-text"] !== true, out: typeof args.out === "string" ? args.out : undefined, log: (l) => console.error("  " + l) });
   console.log("QURAN-RENDER " + JSON.stringify(r));
-  const ok = r.lengthMatches && !r.black.length && !r.frozen.length && r.cutsInsideTheVoice === 0 && r.voiceChecked;
+  // A film with a placeholder card or an empty stretch is never passed: it is a preview at most (--preview).
+  const ok = r.lengthMatches && !r.black.length && !r.frozen.length && r.cutsInsideTheVoice === 0 && r.voiceChecked && r.visual.ok && r.audio.ok && (r.cards.length === 0 || args.preview === true);
+  if (r.cards.length) console.error(`${r.cards.length} shot(s) have no licensed picture (${r.cards.map((/** @type {any} */ c) => `${c.shot} ${c.start.toFixed(1)}-${c.end.toFixed(1)} s`).join(", ")}): not a finished film.`);
   if (!ok) process.exit(1);
 }
 

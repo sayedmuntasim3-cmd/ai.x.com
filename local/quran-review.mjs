@@ -33,7 +33,7 @@ export async function replaceScene(o) {
   const exclude = [...new Set([...media.shots.map((/** @type {any} */ s) => s.asset?.id).filter(Boolean), ...(media.refusedByReviewer ?? [])])];
   const wanted = o.query ? { ...shot, motif: o.query, look: [o.query] } : shot;
   const providers = mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || undefined });
-  const found = await findQuranMedia({ shots: [wanted], providers, adab: direction.adab, verify: verifyArchiveItem, inspect: o.detect ? detector(o.detect) : undefined, exclude });
+  const found = await findQuranMedia({ shots: [wanted], providers, adab: direction.adab, verify: verifyArchiveItem, inspect: o.detect ? detector(o.detect, { clip: true }) : undefined, exclude });
   const old = media.shots.find((/** @type {any} */ s) => s.shot === o.shot);
   const next = found.shots[0];
   media.refusedByReviewer = [...new Set([...(media.refusedByReviewer ?? []), ...(old?.asset ? [old.asset.id] : [])])];

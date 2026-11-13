@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MESSAGES } from "../src/messages.mjs";
-import { creditsText, findQuranMedia, mediaTable, rejectWhy, relevant } from "../src/quran-media.mjs";
+import { creditsText, findQuranMedia, mediaTable, rejectWhy, relevant, searchLadder } from "../src/quran-media.mjs";
 
 /** @param {Partial<import("../src/documentary-media-fetch.mjs").MediaResult> & { id: string }} r @returns {import("../src/documentary-media-fetch.mjs").MediaResult} */
 const result = (r) => ({ source: "pexels", mediaType: "video", title: "olive grove at sunrise", previewUrl: null, mediaUrl: "https://x/v.mp4", sourcePageUrl: "https://x/page", creator: "A. Filmer", license: "Pexels License", licenseUrl: null, durationSeconds: 20, width: 3840, height: 2160, attributionRequired: false, ...r });
@@ -22,7 +22,7 @@ test("a candidate is refused for its licence, its words, its size, its length or
   assert.match(String(await rejectWhy(result({ id: "p:4", title: "camels in the desert" }), o)), /level strict/);
   assert.equal(await rejectWhy(result({ id: "p:4", title: "camels in the desert" }), { ...o, level: "nature" }), null);
   assert.match(String(await rejectWhy(result({ id: "p:5", width: 1280 }), o)), /^quality: 1280 px/);
-  assert.match(String(await rejectWhy(result({ id: "p:6", durationSeconds: 4 }), o)), /^quality: video is 4 s, 8 s needed/);
+  assert.match(String(await rejectWhy(result({ id: "p:6", durationSeconds: 4 }), o)), /^quality: video is 4 s, 6.7 s needed/);
   assert.match(String(await rejectWhy(result({ id: "p:7", title: "AI generated landscape" }), o)), /^adab/);
   // An archive item whose page cannot be checked is not used.
   const nasa = result({ id: "nasa:1", source: "nasa", license: "NASA", title: "Earth from orbit" });
@@ -74,4 +74,21 @@ test("relevance: the title must name what the shot asks for", async () => {
   assert.match(String(await rejectWhy(result({ id: "p:10", title: "olive grove (1912) book page scan" }), o)), /^adab: "book"/);
   // A landscape painting whose title does not say so is refused by its categories (seen on the runner).
   assert.match(String(await rejectWhy(/** @type {any} */ ({ ...result({ id: "w:11", title: "Olive grove near Tivoli" }), tags: ["Landscape paintings in the Louvre", "Oil on canvas"] }), o)), /^adab: "paintings"/);
+});
+
+test("the search ladder: own picture, family, plain nouns, then reverent landscapes; a video must cover its shot", async () => {
+  const ladder = searchLadder({ motif: "calm sea at dawn", look: ["calm sea at dawn", "still lake at dusk"] }, "strict");
+  assert.deepEqual(ladder.slice(0, 5).map((x) => `${x.rung}:${x.q}`), ["own:calm sea at dawn", "family:still lake at dusk", "nouns:dawn", "nouns:lake", "nouns:dusk"]);
+  assert.ok(ladder.some((x) => x.rung === "landscape" && x.q === "mountains"));
+  assert.ok(searchLadder({ motif: "bees", look: ["bees"] }, "strict").every((x) => x.q !== "bees"), "a living thing is not searched for at the strict level");
+  assert.ok(searchLadder({ motif: "x", look: [], symbolic: true }, "strict").filter((x) => x.rung === "landscape").every((x) => ["sky", "clouds", "sunrise", "horizon", "lake", "sea"].includes(x.q)));
+  // A 40 s shot needs at least 26.7 s of video (slowed to two thirds at most); 14.5 s is refused.
+  const o = { seconds: 40, level: /** @type {const} */ ("strict"), used: new Set(), query: "forest" };
+  assert.match(String(await rejectWhy(result({ id: "p:20", title: "forest from the mountain", durationSeconds: 14.5 }), o)), /26\.7 s needed/);
+  // When the shot's own words find nothing, a landscape is found, and the rung says so.
+  const p = provider("pexels", { mountains: [result({ id: "pexels:m1", title: "mountains at sunrise" })] });
+  const m = await findQuranMedia({ shots: [shot("S001", "fig tree", ["fig tree"], 0, 9)], providers: [p] });
+  assert.equal(m.shots[0].status, "found");
+  assert.equal(m.shots[0].rung, "landscape");
+  assert.equal(m.shots[0].query, "mountains");
 });

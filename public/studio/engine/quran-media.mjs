@@ -26,7 +26,29 @@ import { msg } from "./messages.mjs";
 /** Providers that carry nature, sky, sea and landscape (art and history archives are left out: they show people and depictions). */
 export const QURAN_PROVIDERS = Object.freeze(["pexels", "pixabay", "wikimedia", "nasa", "openverse"]);
 
-export const MEDIA_RULES = Object.freeze({ minWidth: 1920, minVideoSeconds: 8, perQuery: 12 });
+export const MEDIA_RULES = Object.freeze({ minWidth: 1920, minVideoSeconds: 8, perQuery: 12, maxSlowdown: 1.5 });
+
+/** Reverent landscapes for the last rung: real nature, nothing living, nothing made. */
+export const LANDSCAPES = Object.freeze(["mountains", "sea", "clouds", "forest", "desert", "sky", "river", "waterfall", "lake", "valley", "sunrise", "sunset", "canyon", "glacier", "dunes"]);
+/** For the unseen: only the widest, quietest nature. */
+const SYMBOL_LANDSCAPES = Object.freeze(["sky", "clouds", "sunrise", "horizon", "lake", "sea"]);
+
+/**
+ * The phrases to search for one shot, in order: its own picture, its
+ * family, the plain nouns of both, then reverent landscapes.
+ * @param {{ motif: string, look: string[], symbolic?: boolean }} s @param {import("./quran-director.mjs").AdabLevel} level
+ * @returns {{ q: string, rung: "own" | "family" | "nouns" | "landscape" }[]}
+ */
+export function searchLadder(s, level) {
+  /** @type {{ q: string, rung: "own" | "family" | "nouns" | "landscape" }[]} */
+  const out = [];
+  const add = (/** @type {string} */ q, /** @type {"own" | "family" | "nouns" | "landscape"} */ rung) => { if (q && allowedAt(q, level) && !out.some((x) => x.q === q)) out.push({ q, rung }); };
+  add(s.motif, "own");
+  for (const l of s.look) add(l, "family");
+  for (const phrase of [s.motif, ...s.look]) for (const w of phrase.toLowerCase().split(/[^a-z]+/)) if (w.length > 3 && !DESCRIBING.has(w)) add(w, "nouns");
+  for (const l of s.symbolic ? SYMBOL_LANDSCAPES : LANDSCAPES) add(l, "landscape");
+  return out;
+}
 
 /** Words in a title or tags that rule a picture out under the Quran, whatever the level. */
 const NEVER = /\b(paintings?|painted|oil on canvas|artworks?|pd-art|engravings?|lithographs?|watercolou?rs?|museum|portraits?|people|men|women|illustration|drawing|mosaic|icon|fresco|statue|sculpture|idol|cartoon|anime|cgi|3d render|rendering|ai[- ]generated|generated|midjourney|dall-?e|stable diffusion|music|musician|concert|dance|dancing|guitar|church|cathedral|temple|cross|crucifix|christmas|halloween|logo|trademark|text overlay|watermark|alcohol|wine|beer|bikini|swimsuit|selfie|model posing|prophet|angel|jesus|god|book|page|scan|map|diagram|chart|poster|screenshot|album|band|song|music video|trailer|mars|rover|martian|coffee|cup|mug|food|meal|car|cars|truck|street|traffic|room|interior|indoor|window sill|office|kitchen|restaurant|shop|store|bedroom|laptop|phone)\b/i;
@@ -55,14 +77,14 @@ export function relevant(phrase, words) {
  * @typedef {import("./documentary-media-fetch.mjs").MediaResult} MediaResult
  * @typedef {import("./documentary-media-fetch.mjs").MediaProvider} MediaProvider
  * @typedef {{ id: string, why: string }} Rejection
- * @typedef {{ shot: string, ayah: string, start: number, end: number, status: "found" | "gap", kind: "video" | "image" | null, query: string | null, asset: Asset | null, rejected: Rejection[], tried: string[] }} ShotMedia
+ * @typedef {{ shot: string, ayah: string, start: number, end: number, status: "found" | "gap", kind: "video" | "image" | null, query: string | null, rung?: "own" | "family" | "nouns" | "landscape", asset: Asset | null, rejected: Rejection[], tried: string[] }} ShotMedia
  * @typedef {{ id: string, source: string, kind: "video" | "image", title: string, url: string, page: string, author: string | null, licence: string, licenceName: string, licenceUrl: string | null, attribution: boolean, width: number | null, height: number | null, seconds: number | null }} Asset
  */
 
 /**
  * Why a candidate may not be used for this shot, or null when it may.
  * @param {MediaResult} r @param {{ seconds: number, level: import("./quran-director.mjs").AdabLevel, used: Set<string>, query?: string }} o
- * @param {{ verify?: (c: any) => Promise<boolean> | boolean, inspect?: (r: MediaResult) => Promise<string | null> | string | null }} [checks]
+ * @param {{ verify?: (c: any) => Promise<boolean> | boolean, inspect?: (r: MediaResult, query?: string) => Promise<string | null> | string | null }} [checks]
  */
 export async function rejectWhy(r, o, checks = {}) {
   if (o.used.has(r.id)) return "already used in this film (no asset twice)";
@@ -78,7 +100,8 @@ export async function rejectWhy(r, o, checks = {}) {
   if (!r.mediaUrl) return "no file to download";
   if (!(Number(r.width) >= MEDIA_RULES.minWidth)) return `quality: ${r.width ?? "unknown"} px wide, ${MEDIA_RULES.minWidth} needed`;
   if (r.mediaType === "video") {
-    const need = Math.min(o.seconds, MEDIA_RULES.minVideoSeconds);
+    // A video must cover its whole shot (it may be slowed to two thirds of its speed, never held on a frame).
+    const need = Math.round(Math.max(MEDIA_RULES.minVideoSeconds / 2, o.seconds / MEDIA_RULES.maxSlowdown) * 10) / 10;
     if (!(Number(r.durationSeconds) >= need)) return `quality: video is ${r.durationSeconds ?? "of unknown length"} s, ${need} s needed`;
   }
   if (rights.needsPageCheck) {
@@ -86,7 +109,7 @@ export async function rejectWhy(r, o, checks = {}) {
     if (!ok) return "licence: the item page could not confirm it is free of restrictions";
   }
   // The second net: a frame check (faces, people), where the machine has a detector.
-  if (checks.inspect) { const seen = await checks.inspect(r); if (seen) return "detector: " + seen; }
+  if (checks.inspect) { const seen = await checks.inspect(r, o.query); if (seen) return seen.includes(":") ? seen : "detector: " + seen; }
   return null;
 }
 
@@ -100,7 +123,7 @@ function toAsset(r) {
  * Find media for every shot: each search phrase of the shot, video first
  * on every provider that has video, then images.
  * @param {{ shots: import("./quran-director.mjs").Shot[], providers: MediaProvider[], adab?: import("./quran-director.mjs").AdabLevel,
- *   verify?: (c: any) => Promise<boolean> | boolean, inspect?: (r: MediaResult) => Promise<string | null> | string | null, signal?: AbortSignal, log?: (line: string) => void,
+ *   verify?: (c: any) => Promise<boolean> | boolean, inspect?: (r: MediaResult, query?: string) => Promise<string | null> | string | null, signal?: AbortSignal, log?: (line: string) => void,
  *   exclude?: string[] }} o exclude: asset ids that may not be chosen (used elsewhere in the film, or refused by the reviewer)
  */
 export async function findQuranMedia(o) {
@@ -126,17 +149,23 @@ export async function findQuranMedia(o) {
     const seconds = s.end - s.start;
     /** @type {ShotMedia} */
     const sm = { shot: s.id, ayah: s.because.ayah, start: s.start, end: s.end, status: "gap", kind: null, query: null, asset: null, rejected: [], tried: [] };
-    const queries = [...new Set([s.motif, ...s.look])].filter((q) => allowedAt(q, level));
-    search: for (const kind of /** @type {const} */ (["video", "image"])) {
-      for (const q of queries) {
+    // The search ladder: the shot's own picture, its family, the plain nouns of both, then the wider
+    // family of reverent landscapes. Each rung is recorded, so the reason for the picture stays honest.
+    const ladder = searchLadder(s, level);
+    /** @param {MediaProvider} p @param {"video" | "image"} kind @param {string} q */
+    const variants = (p, kind, q) => (p.id === "wikimedia" && kind === "image" ? [`${q} incategory:Quality_images`, q] : [q]);
+    search: for (const { q, rung } of ladder) {
+      for (const kind of /** @type {const} */ (["video", "image"])) {
         for (const p of providers.filter((x) => x.kinds.includes(kind))) {
-          sm.tried.push(`${p.id}:${kind}:${q}`);
-          for (const r of await search(p, q, kind)) {
-            const why = await rejectWhy(r, { seconds, level, used, query: q }, { verify: o.verify, inspect: o.inspect });
-            if (why) { if (sm.rejected.length < 40 && !sm.rejected.some((x) => x.id === r.id)) sm.rejected.push({ id: r.id, why }); continue; }
-            used.add(r.id);
-            Object.assign(sm, { status: "found", kind, query: q, asset: toAsset(r) });
-            break search;
+          for (const v of variants(p, kind, q)) {
+            sm.tried.push(`${p.id}:${kind}:${v}`);
+            for (const r of await search(p, v, kind)) {
+              const why = await rejectWhy(r, { seconds, level, used, query: q }, { verify: o.verify, inspect: o.inspect });
+              if (why) { if (sm.rejected.length < 60 && !sm.rejected.some((x) => x.id === r.id)) sm.rejected.push({ id: r.id, why }); continue; }
+              used.add(r.id);
+              Object.assign(sm, { status: "found", kind, query: q, rung, asset: toAsset(r) });
+              break search;
+            }
           }
         }
       }

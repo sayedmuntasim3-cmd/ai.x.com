@@ -73,7 +73,9 @@ export function decide(review, d) {
  * May the film be published? Every scene approved (or rejected, which
  * shows a card), none waiting for a replacement, the render's checks
  * passed, and a named reviewer's sign-off on the pictures as they are.
- * @param {Review | null} review @param {{ lengthMatches: boolean, black: any[], frozen: any[], cutsInsideTheVoice: number, integratedLufs: number | null, truePeakDbtp: number | null } | null} render
+ * @param {Review | null} review @param {{ lengthMatches: boolean, black: any[], frozen: any[], cutsInsideTheVoice: number, integratedLufs: number | null, truePeakDbtp: number | null,
+ *   cards?: { start: number, end: number }[], visual?: { ok: boolean, empty: { start: number, end: number }[], frozen: { start: number, end: number }[] },
+ *   audio?: { ok: boolean, offsetSeconds: number, addedSilences: any[], clippedSamples: number } } | null} render
  */
 export function readyToPublish(review, render) {
   /** @type {any[]} */
@@ -87,6 +89,11 @@ export function readyToPublish(review, render) {
   if (!render) why.push(msg("quran.review.notRendered"));
   else {
     if (!render.lengthMatches || render.black.length || render.frozen.length || render.cutsInsideTheVoice > 0) why.push(msg("quran.review.renderFailed"));
+    // Every second must have a real picture: a placeholder card or an empty stretch blocks publishing.
+    if (render.cards?.length) why.push(msg("quran.review.cards", { count: render.cards.length, at: render.cards.slice(0, 4).map((c) => `${Math.floor(c.start)}-${Math.ceil(c.end)} s`).join(", ") }));
+    if (render.visual && !render.visual.ok) why.push(msg("quran.review.visual", { empty: render.visual.empty.length, frozen: render.visual.frozen.length, at: [...render.visual.empty, ...render.visual.frozen].slice(0, 4).map((c) => `${Math.floor(c.start)}-${Math.ceil(c.end)} s`).join(", ") }));
+    if (!render.visual || !render.audio) why.push(msg("quran.review.noAudit"));
+    if (render.audio && !render.audio.ok) why.push(msg("quran.review.audio", { offset: render.audio.offsetSeconds, silences: render.audio.addedSilences.length, clipped: render.audio.clippedSamples }));
     if (render.integratedLufs !== null && Math.abs(render.integratedLufs + 14) > 1) why.push(msg("quran.review.loudness", { lufs: render.integratedLufs }));
     if (render.truePeakDbtp !== null && render.truePeakDbtp > -1) why.push(msg("quran.review.peak", { peak: render.truePeakDbtp }));
   }
