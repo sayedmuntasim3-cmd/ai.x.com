@@ -128,6 +128,28 @@ export const MESSAGES = Object.freeze({
   "voice.assetRefused": { en: (p) => `A picture from ${p.source} was refused: ${p.reason}`, bn: (p) => `${p.source} থেকে একটি ছবি বাদ দেওয়া হয়েছে: ${p.reason}` },
   "voice.noAsset": { en: (p) => `No free licensed picture was found for ${p.scene}.`, bn: (p) => `${p.scene}-এর জন্য বিনামূল্যের লাইসেন্সসহ কোনো ছবি পাওয়া যায়নি।` },
   "voice.meaningGap": { en: () => "No translation with a licence that allows its use is bundled, so meanings are not shown.", bn: () => "ব্যবহারের অনুমতিসহ কোনো অনুবাদ সাথে নেই, তাই অর্থ দেখানো হচ্ছে না।" },
+  // Voice mastering: what was measured
+  "vm.measured": { en: (p) => `Measured ${p.seconds} s: ${p.lufs} LUFS, true peak ${p.peak} dBTP, noise ${p.snr} dB under the voice, loudness range ${p.lra} LU.`, bn: (p) => `${p.seconds} সেকেন্ড মাপা হয়েছে: ${p.lufs} LUFS, ট্রু পিক ${p.peak} dBTP, নয়েজ কণ্ঠের ${p.snr} dB নিচে, লাউডনেস রেঞ্জ ${p.lra} LU।` },
+  "vm.tooShort": { en: () => "The recording is too short or too quiet to master.", bn: () => "রেকর্ডিংটি মাস্টার করার জন্য খুব ছোট বা খুব আস্তে।" },
+  "vm.noise.noPauses": { en: () => "There is no pause long enough to measure the background noise, so noise reduction stays off.", bn: () => "পেছনের নয়েজ মাপার মতো লম্বা বিরতি নেই, তাই নয়েজ কমানো বন্ধ থাকছে।" },
+  "vm.noise.low": { en: (p) => `The recording is clean (noise ${p.snr} dB under the voice).`, bn: (p) => `রেকর্ডিং পরিষ্কার (নয়েজ কণ্ঠের ${p.snr} dB নিচে)।` },
+  "vm.noise.some": { en: (p) => `Some background noise (${p.snr} dB under the voice); it is reduced lightly.`, bn: (p) => `কিছু পেছনের নয়েজ আছে (কণ্ঠের ${p.snr} dB নিচে); হালকাভাবে কমানো হবে।` },
+  "vm.noise.high": { en: (p) => `Background noise is high (only ${p.snr} dB under the voice). It is reduced as far as is safe for the letters; it cannot be removed completely.`, bn: (p) => `পেছনের নয়েজ বেশি (কণ্ঠের মাত্র ${p.snr} dB নিচে)। হরফ নষ্ট না করে যতটা নিরাপদ ততটা কমানো হবে; পুরোপুরি সরানো সম্ভব নয়।` },
+  "vm.hum": { en: (p) => `Mains hum at ${p.hz} Hz (${p.db} dB above the noise around it, ${p.count} harmonic(s)); it is notched out.`, bn: (p) => `বিদ্যুতের গুঞ্জন (hum) ${p.hz} Hz-এ আছে (আশপাশের নয়েজের ${p.db} dB উপরে, ${p.count}টি হারমোনিক); সরু ফিল্টারে সরানো হবে।` },
+  "vm.dc": { en: (p) => `The waveform is off-centre (DC ${p.offset}); it is centred.`, bn: (p) => `ওয়েভফর্ম কেন্দ্র থেকে সরে আছে (DC ${p.offset}); ঠিক করা হবে।` },
+  "vm.clipped": { en: (p) => `${p.runs} clipped peak(s). They are rounded off, but what was cut cannot be recovered; a new take with lower gain is better.`, bn: (p) => `${p.runs}টি পিক ক্লিপ করেছে। এগুলো মসৃণ করা হবে, কিন্তু কেটে যাওয়া অংশ ফেরানো যায় না; কম গেইনে নতুন রেকর্ড করা ভালো।` },
+  "vm.plosives": { en: (p) => `${p.count} breath pop(s) on the microphone; the low cut is made steeper.`, bn: (p) => `মাইকে ${p.count}টি নিঃশ্বাসের ধাক্কা (পপ) পাওয়া গেছে; নিচের ফ্রিকোয়েন্সি বেশি কাটা হবে।` },
+  "vm.sibilance": { en: (p) => `S sounds are sharp (${p.db} dB against the voice); they are softened a little, never dulled.`, bn: (p) => `স/শ ধ্বনি তীক্ষ্ণ (কণ্ঠের তুলনায় ${p.db} dB); সামান্য নরম করা হবে, ভোঁতা করা হবে না।` },
+  "vm.tone.ok": { en: () => "The tonal balance is close to the target; only small corrections.", bn: () => "সুরের ভারসাম্য লক্ষ্যের কাছাকাছি; সামান্য সংশোধন মাত্র।" },
+  "vm.tone.boomy": { en: (p) => `The low end is heavy (${p.db} dB over the target); it is thinned.`, bn: (p) => `নিচের অংশ ভারী (লক্ষ্যের ${p.db} dB উপরে); হালকা করা হবে।` },
+  "vm.tone.thin": { en: (p) => `The voice is thin (lows ${p.db} dB under the target); lows are never boosted, because that raises rumble.`, bn: (p) => `কণ্ঠ পাতলা (নিচের অংশ লক্ষ্যের ${p.db} dB নিচে); নিচের অংশ বাড়ানো হয় না, কারণ তাতে গুমগুম শব্দ বাড়ে।` },
+  "vm.tone.dull": { en: (p) => `The voice is dull (highs ${p.db} dB under the target); clarity is lifted gently.`, bn: (p) => `কণ্ঠ ভোঁতা (উপরের অংশ লক্ষ্যের ${p.db} dB নিচে); স্পষ্টতা আলতো করে বাড়ানো হবে।` },
+  "vm.tone.bright": { en: (p) => `The voice is bright or harsh (highs ${p.db} dB over the target); it is softened.`, bn: (p) => `কণ্ঠ বেশি উজ্জ্বল বা কর্কশ (উপরের অংশ লক্ষ্যের ${p.db} dB উপরে); নরম করা হবে।` },
+  "vm.room.unknown": { en: () => "Too few clear pauses to judge the room in the recording.", bn: () => "রেকর্ডিংয়ের ঘরের প্রতিধ্বনি বোঝার মতো যথেষ্ট পরিষ্কার বিরতি নেই।" },
+  "vm.room.dry": { en: (p) => `The recording is dry (decay about ${p.rt} s): a good base for added reverb.`, bn: (p) => `রেকর্ডিং শুকনো (রেশ প্রায় ${p.rt} সেকেন্ড): রিভার্ব যোগ করার জন্য ভালো ভিত্তি।` },
+  "vm.room.some": { en: (p) => `The recording carries some room (decay about ${p.rt} s); added reverb is lowered to match.`, bn: (p) => `রেকর্ডিংয়ে কিছুটা ঘরের রেশ আছে (প্রায় ${p.rt} সেকেন্ড); যোগ করা রিভার্ব সেই অনুযায়ী কমানো হবে।` },
+  "vm.room.heavy": { en: (p) => `The recording already has heavy room echo (decay about ${p.rt} s). This cannot be removed; added reverb is kept low.`, bn: (p) => `রেকর্ডিংয়ে আগে থেকেই ঘরের ভারী প্রতিধ্বনি আছে (রেশ প্রায় ${p.rt} সেকেন্ড)। এটা সরানো যায় না; যোগ করা রিভার্ব কম রাখা হবে।` },
+  "vm.shape": { en: (p) => `${p.pauses} pause(s) (median ${p.median} s), ${p.sustained} sustained note(s), crest ${p.crest} dB.`, bn: (p) => `${p.pauses}টি বিরতি (মাঝামাঝি ${p.median} সেকেন্ড), ${p.sustained}টি টানা স্বর, ক্রেস্ট ${p.crest} dB।` },
 });
 
 /** Names of gates and stages, in both languages. */
