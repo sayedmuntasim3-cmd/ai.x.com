@@ -288,4 +288,25 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
   the Worker and rendering from the page (that needs a deploy, which is the owner's decision).
 - Packaging gaps: titles in Urdu, Indonesian, Turkish, Malay and Persian need surah-name lists with a
   recorded source; chapters use estimated ayah times when the times are estimated.
-- Q7: not built.
+
+**Q7 (QA) built**: `local/quran-qa.mjs` (phone and mosque copies of a set, the table), tests in
+`local/quran-qa.test.mjs`, the runner workflow `.github/workflows/quran-qa.yml` (quiet room: Fatiha,
+Yusuf 1-40, al-Husary Yunus 1-30; phone; mosque; long: Yusuf 1-111, about 37 min; a repeat run), and
+`docs/QURAN_REVIEW_SHEET.md`, the person's religious and visual review, kept apart from the tests.
+
+Measured here (CPU), Yusuf 1-40, ayah ends against the known times:
+
+| Recording | Given surah only: ends within 0.2 s / cuts in the true gap / worst | Recognizer only: found / ends within 0.2 s / cuts in gap / worst |
+|---|---|---|
+| quiet room | 77/78, 39/39, 0.3 s | 12:1-40, 77/78, 39/39, 0.3 s (runner) |
+| phone (300-3400 Hz, 8 kHz, noise, 24 kbit/s) | 76/78, 39/39, 0.32 s | 12:1-40 (coverage 100%, quality 98%), 76/78, 39/39, 0.32 s |
+| mosque (echoes, long tail, hall noise) | 78/78, 39/39, 0.18 s | 12:1-40 (100%, 98%), 78/78, 39/39, 0.18 s |
+| the phone copy recognised twice | | the same times both runs |
+
+What failed (all runs so far): the real CC0 Ad-Duha (slow, melodic, breaths of 20-37 s) is not recognised
+by the Tarteel base model, so it is asked about; given the surah, 6 of its 10 ayah ends are in one breath
+and stay unsure, so the film cuts only at pauses and the pictures follow estimated ayat. The real CC0
+Al-Fatiha with a spoken translation is asked about (half the speech is not Quran). Given only, the second
+reciter (al-Husary, Yunus 1-45) placed 15 of 44 cuts in the true gap; the ends it called sure were right.
+The phone and mosque copies are made by code from a clean recording, not recorded in a real mosque or on a
+real phone; the owner's own recording is the real test.

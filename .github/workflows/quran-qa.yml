@@ -1,0 +1,88 @@
+name: Quran QA
+
+# Stage Q7: recognition and timing on several kinds of recording, measured
+# against known ayah times (sets joined from single-ayah files whose uploaders
+# put a public-domain mark on them):
+#  - quiet room: Fatiha (Sadaqat Ali), Yusuf 1-40 (Sadaqat Ali), Yunus 1-30 (al-Husary);
+#  - phone: Yusuf 1-40 through a phone line (300-3400 Hz, 8 kHz, noise, 24 kbit/s);
+#  - mosque: Yusuf 1-40 with echoes, a long tail and hall noise;
+#  - long: Yusuf 1-111, the whole surah (about 37 minutes);
+#  - consistency: the phone copy recognised twice gives the same times.
+# Each is located from the given surah alone and by the recognizer alone.
+# The table is printed between QURAN-QA-BEGIN/END. A person's review of the
+# religious and visual side is docs/QURAN_REVIEW_SHEET.md, not this.
+
+on:
+  push:
+    paths:
+      - "local/quran-qa.mjs"
+      - ".github/workflows/quran-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg and the recognizer
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -q faster-whisper==1.2.1 transformers
+      - name: Build the sets
+        run: |
+          set -e
+          L=local/quran-locate.mjs
+          node $L --fetch surah_1 --out audio/fatiha
+          node $L --fetch quran-audio-verse-by-verse-by-sadaqat-ali-surah-012 --out audio/yusuf
+          node $L --fetch 006099 --prefix 010 --count 30 --out audio/yunus
+          node $L --join audio/fatiha --surah 1 --gap 0.5 --out sets/fatiha
+          node $L --join audio/yusuf --surah 12 --ayat 1-40 --gap 0.5 --out sets/yusuf40
+          node $L --join audio/yusuf --surah 12 --gap 0.5 --out sets/yusuf-long
+          node $L --join audio/yunus --surah 10 --ayat 1-30 --gap 0.5 --out sets/yunus
+          node local/quran-qa.mjs --degrade phone --audio sets/yusuf40/joined.wav --out sets/yusuf40/phone.mp3
+          node local/quran-qa.mjs --degrade mosque --audio sets/yusuf40/joined.wav --out sets/yusuf40/mosque.wav
+      - name: Locate everything
+        run: |
+          L=local/quran-locate.mjs
+          go() { label=$1; shift; node $L "$@" --label "$label" --out "runs/$label" > "logs-$label.txt" 2>&1 || true; }
+          mkdir -p runs
+          while read -r label audio truth surah ayat opening; do
+            go "$label-given" --audio "$audio" --surah $surah --ayat $ayat --opening $opening --closing none --truth "$truth"
+            go "$label-heard" --audio "$audio" --stt faster-whisper --truth "$truth"
+          done <<'SETS'
+          quiet-fatiha sets/fatiha/joined.wav sets/fatiha/truth.json 1 1-7 none
+          quiet-yusuf40 sets/yusuf40/joined.wav sets/yusuf40/truth.json 12 1-40 basmala
+          quiet-yunus30-husary sets/yunus/joined.wav sets/yunus/truth.json 10 1-30 basmala
+          phone-yusuf40 sets/yusuf40/phone.mp3 sets/yusuf40/truth.json 12 1-40 basmala
+          mosque-yusuf40 sets/yusuf40/mosque.wav sets/yusuf40/truth.json 12 1-40 basmala
+          long-yusuf111 sets/yusuf-long/joined.wav sets/yusuf-long/truth.json 12 1-111 basmala
+          SETS
+          go "phone-yusuf40-heard-again" --audio sets/yusuf40/phone.mp3 --stt faster-whisper --truth sets/yusuf40/truth.json
+      - name: Print the table
+        if: always()
+        run: |
+          echo QURAN-QA-BEGIN
+          node local/quran-qa.mjs --table runs --out qa-table.md
+          node -e 'const f=(p)=>JSON.stringify(require(p).ayat.map(x=>[x.ayah,x.start,x.end])); try { console.log("consistency (phone, recognised twice):", f("./runs/phone-yusuf40-heard/quran-location.json")===f("./runs/phone-yusuf40-heard-again/quran-location.json") ? "same" : "different"); } catch (e) { console.log("consistency: not measured", e.message); }'
+          echo QURAN-QA-END
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quran-qa
+          path: |
+            qa-table.md
+            runs/**/quran-location.json
+            runs/**/heard.json
+            sets/**/truth.json
+          retention-days: 30
