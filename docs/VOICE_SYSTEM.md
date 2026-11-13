@@ -62,7 +62,7 @@ then `node render/render-film.mjs --run voice-runs/a --out film.mp4 --one-track 
 - One-track render: narration.wav is sample-identical to the recording (resampled to 48 kHz); the film can end up to one frame before the recording's last sample.
 - Not built: upload route, studio switch, brain in the CLI (Gemini key invalid; any `Model` works in `planVoiceVisuals`), picture judging, Quran STT, Uthmani text, licensed meanings.
 
-## Voice mastering engine (V0 design, 13 Nov 2026)
+## Voice mastering engine (design and state, 13 Nov 2026)
 
 Takes an ordinary recording and masters it. Priority 1 Quran recitation, 2 US English
 narration. All DSP is pure JS in `engine/src/` (deterministic, same result on the owner's
@@ -81,10 +81,10 @@ top documentaries use, so the narration profile adds a touch of room at most.
 | Analyze | noise floor, SNR, hum 50/60 Hz, DC, clipping, plosives, sibilance, tonal balance vs a target voice curve, existing room reverb, LRA, crest, LUFS, true peak, pauses, sustained notes, f0 track; coded en+bn messages | `voice-analyze.mjs` |
 | Clean | DC, high-pass placed under the lowest sung pitch, hum notches only on measured harmonics, spectral denoise with depth scaled to SNR (never deep), de-click, clipped peaks rounded | `voice-chain.mjs` |
 | Tone | corrective EQ toward the profile's target curve (bounded, half-strength), de-esser only as deep as measured | `voice-chain.mjs` |
-| Dynamics | slow leveller + soft-knee compressor; thresholds from the level histogram; recitation keeps more range than narration | `voice-chain.mjs` |
+| Dynamics | three gentle stages: slow leveller, soft-knee compressor (threshold from the level histogram), a peak stage that eases only what towers over the voice; recitation keeps more range than narration | `voice-chain.mjs`, `voice-master.mjs` |
 | Space | impulse responses synthesised in code (seeded noise, per-frequency decay, pre-delay, early reflections, high-cut), FFT convolution, send automation from pauses / phrase ends / sustained notes (ayah ends when known), ducking under the voice | `voice-reverb.mjs` |
 | Master | gain to -14 LUFS, look-ahead limiter, true peak <= -1 dBTP, measured again and corrected (two-pass); WAV 48 kHz 24-bit + AAC | `voice-master.mjs` |
-| Proof | same sample count (plus a reverb tail at the very end only), alignment lag by cross-correlation at start/middle/end, f0 contour correlation, before/after numbers, measured decay of the applied reverb, echo-free check of the impulse | `voice-proof.mjs` |
+| Proof | same sample count (plus a reverb tail at the very end only), alignment lag by cross-correlation in the 1-3 kHz band at start/middle/end, f0 contour of the mastered voice against the original (and of the finished mix), before/after numbers, measured decay of the applied reverb, echo-free check of the impulse | `voice-proof.mjs` |
 
 Profiles and presets: `quran` = `clean` (no added space), `mosque-hall`, `grand-hall`;
 `narration` = `dry`, `warm-room`. Presets set only the *space target* (decay, pre-delay,
@@ -99,4 +99,6 @@ variation exists only as a bounded hook (+-1.5 dB), OFF for the Quran until the 
 approves it by ear. Quality is shown by measurements and a listening pack; nothing here
 claims to be the best in the world.
 
-CLI: `node local/voice-master.mjs --audio <file> --profile quran|narration [--preset ...]`.
+CLI: `node local/voice-master.mjs --audio <file> --profile quran|narration [--preset <name>|all] [--from s --to s] [--source elevenlabs] [--lufs -14] [--understanding understanding.json] [--lang bn]`
+gives `<preset>.wav` (48 kHz 24-bit), `.m4a` (AAC 256k) and `.report.json`; `--preset all` adds the untouched original (the listening pack).
+In the film path: `node local/voice-film.mjs --audio a.mp3 --kind quran --master [space]` asks `planVoice` for profile and space, runs the engine, and names `master/<space>.wav` for `--one-track`.

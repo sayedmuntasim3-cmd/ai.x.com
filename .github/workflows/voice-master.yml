@@ -72,8 +72,14 @@ jobs:
           const fs = require("fs"), path = require("path");
           for (const dir of fs.existsSync("pack") ? fs.readdirSync("pack").sort().map((d) => "pack/" + d) : []) {
             for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".report.json")).sort()) {
-              const r = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-              console.log(JSON.stringify({ file: dir + "/" + f, ok: r.ok, before: { ...r.before, tone: r.before.tone.map((b) => b.deviationDb) }, after: { ...r.after, dryTone: r.after.dryTone.map((b) => b.deviationDb) }, chain: r.chain, space: r.space, master: r.master, proof: r.proof, aacTruePeakDb: r.aacTruePeakDb }));
+              const r = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")), b = r.before, a = r.after, d = r.chain.did, p = r.proof;
+              console.log(JSON.stringify({ file: dir + "/" + f, ok: r.ok,
+                before: { lufs: b.lufs, tp: b.truePeakDb, lra: b.lra, snr: b.snrDb, noise: b.noiseFloorDb, crest: b.crestDb, room: b.roomRt60, pause: b.medianPauseSeconds, pops: b.plosives, ess: b.sibilanceDb, f0: b.pitch && b.pitch.medianHz, tone: b.tone.map((t) => t.deviationDb) },
+                voiceAfter: { noise: a.dryNoiseFloorDb, snr: a.drySnrDb, lra: a.dryLra, crest: a.dryCrestDb, tone: a.dryTone.map((t) => t.deviationDb) },
+                did: { denoise: d.denoisedDb, clicks: d.clicks, eq: r.chain.plan.eq.map((e) => e.gainDb + "@" + e.hz), deess: d.deess, leveller: d.leveller, compressor: d.compressor, peaks: d.peaks },
+                space: r.space && { rt: r.space.rt60, rt500: r.space.rt60At500, rt4k: r.space.rt60At4000, wet: r.space.wetDb, lowered: r.space.loweredDb, echoFree: r.space.echoFree },
+                master: r.master, aacTp: r.aacTruePeakDb,
+                proof: { ok: p.ok, extra: p.duration.extraSeconds, lags: p.alignment.lagsSamples, voice: [p.pitch.medianCents, p.pitch.within20Cents, p.pitch.correlation], mix: [p.pitch.mix.medianCents, p.pitch.mix.within20Cents, p.pitch.mix.trackerSlips] } }));
             }
           }'
           echo VOICE-MASTER-END
