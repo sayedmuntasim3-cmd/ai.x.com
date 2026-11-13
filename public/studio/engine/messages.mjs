@@ -150,6 +150,16 @@ export const MESSAGES = Object.freeze({
   "vm.room.some": { en: (p) => `The recording carries some room (decay about ${p.rt} s); added reverb is lowered to match.`, bn: (p) => `রেকর্ডিংয়ে কিছুটা ঘরের রেশ আছে (প্রায় ${p.rt} সেকেন্ড); যোগ করা রিভার্ব সেই অনুযায়ী কমানো হবে।` },
   "vm.room.heavy": { en: (p) => `The recording already has heavy room echo (decay about ${p.rt} s). This cannot be removed; added reverb is kept low.`, bn: (p) => `রেকর্ডিংয়ে আগে থেকেই ঘরের ভারী প্রতিধ্বনি আছে (রেশ প্রায় ${p.rt} সেকেন্ড)। এটা সরানো যায় না; যোগ করা রিভার্ব কম রাখা হবে।` },
   "vm.shape": { en: (p) => `${p.pauses} pause(s) (median ${p.median} s), ${p.sustained} sustained note(s), crest ${p.crest} dB.`, bn: (p) => `${p.pauses}টি বিরতি (মাঝামাঝি ${p.median} সেকেন্ড), ${p.sustained}টি টানা স্বর, ক্রেস্ট ${p.crest} dB।` },
+  // Voice mastering: what was done
+  "vm.did.declip": { en: (p) => `${p.repaired} of ${p.found} clipped peaks were rounded off (long flat tops are left as they are).`, bn: (p) => `${p.found}টি ক্লিপ হওয়া পিকের মধ্যে ${p.repaired}টি মসৃণ করা হয়েছে (লম্বা সমতল অংশ যেমন ছিল তেমনই আছে)।` },
+  "vm.did.declick": { en: (p) => `${p.count} click(s) removed.`, bn: (p) => `${p.count}টি ক্লিক শব্দ সরানো হয়েছে।` },
+  "vm.did.highpass": { en: (p) => `Low cut at ${p.hz} Hz (${p.slope} dB per octave), placed under the lowest note of the voice.`, bn: (p) => `${p.hz} Hz-এর নিচে কাটা হয়েছে (প্রতি অক্টেভে ${p.slope} dB), কণ্ঠের সবচেয়ে নিচু সুরের নিচে।` },
+  "vm.did.hum": { en: (p) => `Hum notched at ${p.hz} Hz.`, bn: (p) => `${p.hz} Hz-এ গুঞ্জন (hum) সরানো হয়েছে।` },
+  "vm.did.denoise": { en: (p) => `Background noise lowered by up to ${p.db} dB (kept shallow on purpose, so no letter is smeared).`, bn: (p) => `পেছনের নয়েজ সর্বোচ্চ ${p.db} dB কমানো হয়েছে (ইচ্ছা করেই অল্প, যাতে কোনো হরফ ঝাপসা না হয়)।` },
+  "vm.did.eq": { en: (p) => `Tone corrected: ${p.moves}.`, bn: (p) => `টোন ঠিক করা হয়েছে: ${p.moves}।` },
+  "vm.did.eqNone": { en: () => "No tone correction was needed.", bn: () => "টোন ঠিক করার দরকার হয়নি।" },
+  "vm.did.deess": { en: (p) => `S sounds softened by at most ${p.db} dB.`, bn: (p) => `স/শ ধ্বনি সর্বোচ্চ ${p.db} dB নরম করা হয়েছে।` },
+  "vm.did.dynamics": { en: (p) => `Level evened gently: phrases moved by -${p.down} to +${p.up} dB, then ${p.ratio}:1 compression (mean ${p.mean} dB, at most ${p.max} dB).`, bn: (p) => `আওয়াজ আলতো করে সমান করা হয়েছে: বাক্যাংশ -${p.down} থেকে +${p.up} dB সরানো, তারপর ${p.ratio}:1 কম্প্রেশন (গড়ে ${p.mean} dB, সর্বোচ্চ ${p.max} dB)।` },
 });
 
 /** Names of gates and stages, in both languages. */

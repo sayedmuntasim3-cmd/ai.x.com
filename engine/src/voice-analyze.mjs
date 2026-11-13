@@ -174,11 +174,12 @@ function fillRuns(a, value, under, to) {
 /**
  * Mains hum: steady narrow peaks at 50 or 60 Hz and their harmonics, read
  * from the quiet 20% of long spectra (a voice moves, hum does not).
- * @param {ArrayLike<number>} x @param {number} sampleRate
+ * A line quieter than `minLevelDb` (dBFS) is not worth a filter.
+ * @param {ArrayLike<number>} x @param {number} sampleRate @param {number} [minLevelDb]
  */
-export function findHum(x, sampleRate) {
+export function findHum(x, sampleRate, minLevelDb = -95) {
   const size = 16384;
-  /** @type {{ hz: number | null, prominenceDb: number, harmonics: { hz: number, prominenceDb: number }[] }} */
+  /** @type {{ hz: number | null, prominenceDb: number, harmonics: { hz: number, prominenceDb: number, levelDb: number }[] }} */
   const none = { hz: null, prominenceDb: 0, harmonics: [] };
   if (x.length < size * 2) return none;
   const binHz = sampleRate / size;
@@ -197,12 +198,13 @@ export function findHum(x, sampleRate) {
     const peak = Math.max(quiet[at - 1], quiet[at], quiet[at + 1]);
     const around = [];
     for (let k = Math.max(2, Math.round((hz - 25) / binHz)); k <= Math.min(bins - 1, Math.round((hz + 25) / binHz)); k += 1) if (Math.abs(k - at) > 3) around.push(quiet[k]);
-    return peak - median(around);
+    // A sine of RMS level L reads L + 20 log10(size / (2 sqrt 2)) at the peak of a Hann-windowed FFT.
+    return { p: peak - median(around), levelDb: peak - 20 * Math.log10(size / (2 * Math.SQRT2)) };
   };
   let best = none;
   for (const base of [50, 60]) {
     const harmonics = [];
-    for (let h = 1; h * base <= 480; h += 1) { const p = prominence(h * base); if (p >= 8) harmonics.push({ hz: h * base, prominenceDb: round(p, 1) }); }
+    for (let h = 1; h * base <= 480; h += 1) { const { p, levelDb } = prominence(h * base); if (p >= 8 && levelDb >= minLevelDb) harmonics.push({ hz: h * base, prominenceDb: round(p, 1), levelDb: round(levelDb, 1) }); }
     const strongest = harmonics.slice(0, 3).reduce((m, h) => Math.max(m, h.hz <= base * 3 ? h.prominenceDb : 0), 0);
     if (strongest >= 12 && strongest > best.prominenceDb) best = { hz: base, prominenceDb: strongest, harmonics };
   }
@@ -347,7 +349,7 @@ export function measureVoice(x, sampleRate, options = {}) {
   }
 
   const room = estimateRoom(levels, speechDb, noiseFloorDb);
-  const hum = findHum(x, sampleRate);
+  const hum = findHum(x, sampleRate, speechDb - 65);
   const loud = measureLoudness([x], sampleRate);
   const lra = loudnessRange(x, sampleRate);
   const inner = pauses.filter((p) => p.start > 0.05 && p.end < seconds - 0.05);
