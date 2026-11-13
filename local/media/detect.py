@@ -167,6 +167,25 @@ def sideways(paths):
     return n > 0 and votes * 2 > n
 
 
+def exposure(paths):
+    """Mean brightness (0-255) and normalised luma entropy (0-1) of the frames: a dark, plain picture reads as an empty screen."""
+    import cv2
+    import numpy as np
+
+    vals = []
+    for p in paths:
+        img = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            continue
+        img = cv2.resize(img, (320, max(1, int(320 * img.shape[0] / img.shape[1]))))
+        hist = np.bincount(img.flatten(), minlength=256).astype(float)
+        prob = hist[hist > 0] / hist.sum()
+        vals.append((float(img.mean()), float(-(prob * np.log2(prob)).sum() / 8)))
+    if not vals:
+        return None
+    return {"brightness": round(sum(v[0] for v in vals) / len(vals), 1), "entropy": round(sum(v[1] for v in vals) / len(vals), 3)}
+
+
 def dhash(path):
     import cv2
 
@@ -202,19 +221,20 @@ def main():
                         f.write(r.read())
                 except Exception as e:
                     sys.stderr.write(f"{source}: {e}\n")
-            seen, hashes, turned = None, [], False
+            seen, hashes, turned, light = None, [], False, None
             try:
                 images = frames_of(path, a.frames, folder)
                 faces, people, read = detect(images)
                 hashes = [h for h in (dhash(i) for i in images if os.path.exists(i)) if h]
                 turned = sideways([i for i in images if os.path.exists(i)])
+                light = exposure([i for i in images if os.path.exists(i)])
                 if a.clip and read:
                     seen = look([i for i in images if os.path.exists(i)], a.query)
             except Exception as e:  # one unreadable item is reported, not fatal
                 faces, people, read = 0, 0, 0
                 sys.stderr.write(f"{source}: {e}\n")
             # Nothing that could not be looked at is passed as clean.
-            items.append({"source": source, "frames": read, "faces": faces, "people": people, "flag": faces > 0 or people > 0 or read == 0, "look": seen, "dhash": hashes, "sideways": turned})
+            items.append({"source": source, "frames": read, "faces": faces, "people": people, "flag": faces > 0 or people > 0 or read == 0, "look": seen, "dhash": hashes, "sideways": turned, "exposure": light})
     result = {"detector": f"OpenCV {cv2.__version__}: Haar frontal and profile face cascades, HOG person detector" + (f"; {CLIP_MODEL}" if a.clip else ""), "items": items}
     text = json.dumps(result, indent=1)
     if a.out:

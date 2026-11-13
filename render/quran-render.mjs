@@ -94,7 +94,9 @@ export function clipArgs(seg, shot, asset, f, out) {
     slow = available < seg.length ? Math.min(1.5, (seg.length + 0.1) / available) : 1;
     input = ["-ss", String(r3(start)), "-t", String(r3(seg.length / slow + 1)), "-i", asset.url];
   }
-  const filter = `[0:v]${slow > 1 ? `setpts=${r3(slow)}*PTS,` : ""}fps=${f.fps},${cover},${moveFilter(shot.move, seg.length, f)},${GRADE},format=yuv420p,trim=end_frame=${frames},setpts=PTS-STARTPTS[v]`;
+  // Under the title the picture is a little darker, so the name reads clearly.
+  const dim = /** @type {any} */ (shot).kind === "title" ? ",eq=brightness=-0.08" : "";
+  const filter = `[0:v]${slow > 1 ? `setpts=${r3(slow)}*PTS,` : ""}fps=${f.fps},${cover},${moveFilter(shot.move, seg.length, f)},${GRADE}${dim},format=yuv420p,trim=end_frame=${frames},setpts=PTS-STARTPTS[v]`;
   return ["-hide_banner", "-loglevel", "error", "-y", ...input, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-r", String(f.fps), out];
 }
 
@@ -263,7 +265,7 @@ export async function renderQuranFilm(o) {
   // The sound itself, against the voice: length, sync, added silence, loudness, peaks, balance.
   const { auditAudio } = await import("./audio-audit.mjs");
   const audio = await auditAudio(out, o.audio);
-  const cards = direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id) && s.kind !== "title").map((/** @type {any} */ s) => ({ shot: s.id, start: s.start, end: s.end }));
+  const cards = direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id)).map((/** @type {any} */ s) => ({ shot: s.id, start: s.start, end: s.end }));
   const report = {
     file: out, format: o.format ?? "1080p", width: f.width, height: f.height, seconds: r3(seconds), voiceSeconds: r3(total), lengthMatches: Math.abs(seconds - total) < 0.1,
     shots: segs.length, clipsRendered: segs.length - reused, clipsReused: reused, withAsset: direction.shots.filter((/** @type {any} */ s) => assets.has(s.id)).length, cards: direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id)).length,

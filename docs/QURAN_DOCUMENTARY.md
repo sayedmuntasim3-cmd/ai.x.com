@@ -399,3 +399,12 @@ Alignment alone on Yusuf 1-40: 37 of 39 cuts in the gap (a bug that drifted 20 m
 and fixed first). The Jawad Farogi Ad-Duha: the alignment scores are low (0.2-0.3), only 1 end could be placed,
 none is sure: still UNRESOLVED; Whisper large-v3-turbo (MIT) also failed and invented subtitle phrases
 ("subscribe to the channel"), which are now removed before matching. PARTIAL.
+
+**Runner films with the image-text checks (run 43479800011):** Ad-Duha 1080p and 4K (3840x2160): 6 of 6
+shots with a licensed picture, pixel coverage 100%, no empty or frozen stretch, sound offset 0 s, no added
+silence, -14 LUFS, LRA 7.9 LU, true peak -4 dBTP: PASS (4K tested for the first time). Yusuf 1-12 at 9:16:
+15 of 15 ayah shots with a picture, sound PASS, but the pixel audit found two empty stretches: 2-3.5 s (the
+title was still a dark card) and 129.5-142 s (a NASA night-lights map of the Earth, brightness 10.5, detail
+0.44): FAIL, caught by the audit as designed. Fixed: the title now has its own picture (dimmed under the
+name), and media selection refuses pictures too dark and plain to read (the same rule as the audit). The
+workflow's print step failed on an empty grep; fixed.

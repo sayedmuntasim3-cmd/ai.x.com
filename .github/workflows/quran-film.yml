@@ -25,6 +25,9 @@ jobs:
   film:
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    env:
+      # The given text is aligned letter by letter to the recitation (local/stt/align.py) with this Python.
+      ZUPONA_PYTHON: python
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,7 +72,8 @@ jobs:
           for r in duha yusuf; do
             echo "== $r"; grep -h "^QURAN-MEDIA " runs/$r/media.log 2>/dev/null | cut -c1-400
             grep -h "^QURAN-RENDER " runs/$r/render*.log 2>/dev/null || tail -n 5 runs/$r/render.log 2>/dev/null
-            grep -h "no licensed picture" runs/$r/render*.log 2>/dev/null
+            grep -h "no licensed picture" runs/$r/render*.log 2>/dev/null || true
+            grep -ho '"alignment":{[^}]*}' runs/$r/quran-location.json 2>/dev/null || true
           done
           echo QURAN-FILM-END
       - uses: actions/upload-artifact@v4

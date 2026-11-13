@@ -16,4 +16,6 @@ test("the frame check refuses faces, paintings, sideways pictures, near-copies a
   assert.match(String(frameVerdict({ ...clean, dhash: ["f0f0f0f0f0f0f0f1"] }, ["f0f0f0f0f0f0f0f0"])), /^duplicate/);
   assert.equal(frameVerdict({ ...clean, dhash: ["0f0f0f0f0f0f0f0f"] }, ["f0f0f0f0f0f0f0f0"]), null);
   assert.equal(hamming("ff", "0f"), 4);
+  assert.match(String(frameVerdict({ ...clean, exposure: { brightness: 10.5, entropy: 0.44 } })), /^quality: too dark and plain/);
+  assert.equal(frameVerdict({ ...clean, exposure: { brightness: 74, entropy: 0.89 } }), null);
 });

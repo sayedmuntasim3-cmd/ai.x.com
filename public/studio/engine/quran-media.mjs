@@ -145,7 +145,7 @@ export async function findQuranMedia(o) {
   /** @type {ShotMedia[]} */
   const out = [];
   for (const s of o.shots) {
-    if (s.kind === "title") continue;
+    // The title is written over a real picture too: no shot of the film is an empty card.
     const seconds = s.end - s.start;
     /** @type {ShotMedia} */
     const sm = { shot: s.id, ayah: s.because.ayah, start: s.start, end: s.end, status: "gap", kind: null, query: null, asset: null, rejected: [], tried: [] };

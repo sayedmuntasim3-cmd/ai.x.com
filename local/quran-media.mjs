@@ -29,14 +29,17 @@ export function hamming(a, b) {
 }
 
 /** The rules the frame check applies, measured on labelled sets (docs/QURAN_DOCUMENTARY.md). */
-export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5 });
+export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7 });
 
 /**
  * Reasons from one detect.py result, or null when the frames pass.
- * @param {{ frames: number, faces: number, people: number, look?: any, sideways?: boolean, dhash?: string[] }} item @param {string[]} usedHashes
+ * @param {{ frames: number, faces: number, people: number, look?: any, sideways?: boolean, dhash?: string[], exposure?: { brightness: number, entropy: number } | null }} item @param {string[]} usedHashes
  */
 export function frameVerdict(item, usedHashes = []) {
   if (!item.frames) return "detector: no frame could be read, so it was not checked";
+  // The same rule as the film's pixel audit: a dark, plain picture reads as an empty screen (the night-lights map
+  // that reached a test film measured brightness 10.5, detail 0.44; photographs here 74-146 and 0.89-0.96).
+  if (item.exposure && item.exposure.brightness < VISUAL_RULES.darkBrightness && item.exposure.entropy < VISUAL_RULES.plainEntropy) return `quality: too dark and plain to read on screen (brightness ${item.exposure.brightness}, detail ${item.exposure.entropy})`;
   if (item.faces || item.people) return `detector: ${item.faces} face(s), ${item.people} person(s) in ${item.frames} frame(s)`;
   if (item.look) {
     const art = item.look.painting + item.look.drawing + item.look.rendering;

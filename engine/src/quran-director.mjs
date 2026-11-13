@@ -211,7 +211,7 @@ export function directQuranFilm(o) {
   for (const g of groups) {
     const first = g.scenes[0];
     if (first.kind === "title") {
-      shots.push(shot({ scene: first.id, kind: "title", surah: first.surah, ayah: null, start: g.start, end: g.end, look: ["surah title card over dark sky"], motif: "title card", move: "locked-off hold", mood: "reverent", brightness: "dark", symbolic: false, refrain: null, because: { ayah: `${first.surah}`, from: "title", detail: first.label, source: "surah names (quran-meta), Tanzil text" } }));
+      shots.push(shot({ scene: first.id, kind: "title", surah: first.surah, ayah: null, start: g.start, end: g.end, look: ["sky at dawn", "clouds over mountains", "calm sea at dawn"], motif: "sky at dawn", move: "slow push in", mood: "reverent", brightness: "dim", symbolic: false, refrain: null, because: { ayah: `${first.surah}`, from: "title", detail: first.label, source: "surah names (quran-meta), Tanzil text" } }));
       previousLight = "dark";
       continue;
     }
