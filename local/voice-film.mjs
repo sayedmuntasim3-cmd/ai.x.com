@@ -31,6 +31,10 @@ import { buildQuranIndex } from "../engine/src/quran.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard } from "../engine/src/voice-visuals.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 
+import { planVoice } from "../engine/src/voice-plan.mjs";
+import { ayahEndsOf } from "../engine/src/voice-master.mjs";
+import { masterFile } from "./voice-master.mjs";
+
 const run = promisify(execFile);
 
 /** @param {string[]} argv */
@@ -218,10 +222,25 @@ export async function pictures(o) {
   return { ok: r.findings.length === 0, messages: r.messages, problems: r.findings.map((f) => f.detail), gaps: [] };
 }
 
+/**
+ * Master the voice with the real engine, as planVoice decides (profile,
+ * space, and the refusals: a recitation is never synthetic, a narration gets
+ * no hall). The film then uses mastered.wav; the original stays untouched.
+ * @param {{ audio: string, out: string, kind: "quran" | "narration", space?: string, ayahEnds?: number[], lang?: "en" | "bn", log?: (line: string) => void }} o
+ */
+export async function master(o) {
+  const quran = o.kind === "quran";
+  const plan = planVoice({ source: "own-recording", contentType: quran ? "quran_recitation" : "documentary", versionId: quran ? "ar" : "en-US", space: o.space ?? (quran ? "mosque-hall" : "dry") });
+  if (plan.blocked || !plan.mastering) return { ok: false, blocked: plan.blocked, plan, file: null, seconds: 0 };
+  const r = await masterFile({ audio: o.audio, out: join(o.out, "master"), profile: plan.mastering.profile, presets: [plan.mastering.preset], ayahEnds: o.ayahEnds, lang: o.lang, log: o.log });
+  const done = r.results[0];
+  return { ok: r.ok, blocked: null, plan, file: done.wav, seconds: done.seconds, report: done.report };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (typeof args.audio !== "string") {
-    console.error("Usage: node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>]");
+    console.error("Usage: node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>] [--master [clean|mosque-hall|grand-hall|dry|warm-room]]");
     process.exit(2);
   }
   const out = resolve(typeof args.out === "string" ? args.out : join("voice-runs", basename(args.audio).replace(/\.[^.]+$/, "")));
@@ -231,6 +250,8 @@ async function main() {
   if (!step1.ok || !step1.report) process.exit(1);
   /** @param {string | boolean | undefined} x */
   const str = (x) => (typeof x === "string" ? resolve(x) : undefined);
+  /** @type {string | null} */
+  let mastered = null;
   if (args.transcript || args.stt) {
     const step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : undefined, script: str(args.script) });
     for (const m of step2.messages) console.log("- " + m[lang]);
@@ -239,11 +260,27 @@ async function main() {
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);
     if (!step3.ok) process.exit(1);
-    const step4 = await pictures({ out, understanding: step3, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined });
+    let understanding = step3;
+    if (args.master) {
+      const kind = step3.kind === "quran" ? "quran" : "narration";
+      const m = await master({ audio: resolve(args.audio), out, kind, space: typeof args.master === "string" ? args.master : undefined, ayahEnds: kind === "quran" ? ayahEndsOf(/** @type {any} */ (step3).quranPlan) : undefined, lang, log: (line) => console.log(line) });
+      if (!m.ok) { console.error(m.blocked ?? "Mastering failed its own checks; see the report."); process.exit(1); }
+      mastered = m.file;
+      // Cut again on the mastered length, so the last picture holds through the reverb's tail. Word times do not move.
+      understanding = await understand({ out, transcript: step2, totalSeconds: m.seconds, kind: /** @type {any} */ (args.kind) });
+      if (!understanding.ok) process.exit(1);
+    }
+    const step4 = await pictures({ out, understanding, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined });
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
     if (!step4.ok) process.exit(1);
+  } else if (args.master) {
+    if (args.kind === "auto") { console.error("--master needs --kind quran or narration when there is no transcript to tell them apart."); process.exit(2); }
+    const m = await master({ audio: resolve(args.audio), out, kind: /** @type {any} */ (args.kind), space: typeof args.master === "string" ? args.master : undefined, lang, log: (line) => console.log(line) });
+    if (!m.ok) { console.error(m.blocked ?? "Mastering failed its own checks; see the report."); process.exit(1); }
+    mastered = m.file;
   }
+  if (mastered) console.log(`Mastered voice: ${mastered} (use it as --one-track for the film)`);
   console.log(`Saved in ${out}`);
 }
 

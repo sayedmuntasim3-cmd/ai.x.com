@@ -1,0 +1,79 @@
+name: Voice mastering check
+
+# Runs the voice mastering engine for real on two recordings and keeps the
+# listening packs (original + every space) as a run file for 30 days:
+#  - narration: the LibriVox reading of the Gettysburg Address (archive.org
+#    item gettysburg_johng_librivox, public domain);
+#  - recitation: an archive.org item its uploader marked CC0 (the mark is the
+#    uploader's statement; the audio is used for this test only and is never
+#    committed). Another item can be given when the run is started by hand.
+# The measurements and proofs are printed between VOICE-MASTER-BEGIN/END.
+# Free GitHub runner minutes only; no API key and no paid service is used.
+
+on:
+  push:
+    paths:
+      - "engine/src/voice-*.mjs"
+      - "engine/src/loudness.mjs"
+      - "local/voice-master.mjs"
+      - ".github/workflows/voice-master.yml"
+  workflow_dispatch:
+    inputs:
+      recitation:
+        description: "archive.org path of a recitation with a free licence (item/file)"
+        default: "001AlFaatihah_201305/001AlFaatihah.mp3"
+      from:
+        description: "start of the excerpt, seconds"
+        default: "0"
+      to:
+        description: "end of the excerpt, seconds"
+        default: "60"
+
+permissions:
+  contents: read
+
+jobs:
+  master:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Download the test recordings
+        env:
+          RECITATION: ${{ github.event.inputs.recitation || '001AlFaatihah_201305/001AlFaatihah.mp3' }}
+        run: |
+          curl -sSfL --retry 3 -o gettysburg.mp3 https://archive.org/download/gettysburg_johng_librivox/gettysburg_address_64kb.mp3
+          curl -sSfL --retry 3 -o recitation.mp3 "https://archive.org/download/$RECITATION" || echo "recitation not downloaded"
+      - name: Recitation pack (original, clean, mosque hall, grand hall)
+        if: hashFiles('recitation.mp3') != ''
+        env:
+          FROM: ${{ github.event.inputs.from || '0' }}
+          TO: ${{ github.event.inputs.to || '60' }}
+        run: node local/voice-master.mjs --audio recitation.mp3 --profile quran --preset all --from "$FROM" --to "$TO" --out pack/quran
+      - name: Narration pack (original, dry, warm room)
+        run: node local/voice-master.mjs --audio gettysburg.mp3 --profile narration --preset all --to 60 --out pack/narration
+      - name: Print the measurements and proofs
+        run: |
+          echo VOICE-MASTER-BEGIN
+          node -e '
+          const fs = require("fs"), path = require("path");
+          for (const dir of ["pack/quran", "pack/narration"]) {
+            if (!fs.existsSync(dir)) continue;
+            for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".report.json")).sort()) {
+              const r = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+              console.log(JSON.stringify({ file: dir + "/" + f, ok: r.ok, before: { ...r.before, tone: r.before.tone.map((b) => b.deviationDb) }, after: { ...r.after, dryTone: r.after.dryTone.map((b) => b.deviationDb) }, chain: r.chain, space: r.space, master: r.master, proof: r.proof, aacTruePeakDb: r.aacTruePeakDb }));
+            }
+          }'
+          echo VOICE-MASTER-END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-master-listening-pack
+          path: |
+            pack/**/*.m4a
+            pack/**/*.report.json
+          retention-days: 30

@@ -146,3 +146,31 @@ export function masterVoice(input) {
   };
   return { ok: master.ok && proof.ok, profile, preset, channels, sampleRate, before, after, chain: { plan: chain.plan, did: chain.did }, space: wet ? { ...space.space, ...wet.info, loweredDb: space.loweredDb, shortened: space.shortened } : null, master, proof, messages };
 }
+
+/**
+ * Where each recognised ayah ends in the recording (seconds), from the
+ * understanding layer's Quran plan; estimated times are left out, so only
+ * heard boundaries steer the reverb.
+ * @param {{ scenes?: { kind: string, spokenEnd: number | null, estimated: boolean }[] } | null | undefined} quranPlan
+ */
+export function ayahEndsOf(quranPlan) {
+  /** @type {number[]} */
+  const ends = [];
+  for (const s of quranPlan?.scenes ?? []) if (s.kind === "ayah" && typeof s.spokenEnd === "number" && !s.estimated) ends.push(s.spokenEnd);
+  return ends;
+}
+
+/**
+ * The report without the audio: what a file on disk and the studio page keep.
+ * @param {ReturnType<typeof masterVoice>} r
+ */
+export function masterReport(r) {
+  const b = r.before;
+  return {
+    ok: r.ok, profile: r.profile, preset: r.preset, sampleRate: r.sampleRate, channels: r.channels.length,
+    before: { seconds: b.seconds, lufs: b.loudness.integrated, truePeakDb: b.loudness.truePeakDb, lra: b.loudness.lra, noiseFloorDb: b.level.noiseFloorDb, snrDb: b.level.snrDb, crestDb: b.level.crestDb, hum: b.hum, clippedRuns: b.clipping.runs, plosives: b.plosives.count, sibilanceDb: b.sibilance.db, roomRt60: b.room.rt60, pauses: b.pauses.count, medianPauseSeconds: b.pauses.medianSeconds, sustainedNotes: b.sustained.count, pitch: b.pitch, tone: b.tone.bands },
+    after: r.after, chain: r.chain, space: r.space, master: r.master,
+    proof: r.proof ? { ok: r.proof.ok, duration: r.proof.duration, alignment: r.proof.alignment, pitch: r.proof.pitch } : null,
+    messages: r.messages,
+  };
+}

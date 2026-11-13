@@ -15,6 +15,7 @@
  * voice-master.mjs; this file keeps the rules and the plan.
  */
 import { getVersion } from "./versions.mjs";
+import { PROFILE_SPACES, SPACES } from "./voice-reverb.mjs";
 
 /**
  * @typedef {"quran_recitation" | "islamic" | "documentary" | "story"} ContentType
@@ -113,14 +114,23 @@ export function musicPlanFor({ contentType, versionId }) {
  * The processing plan for one voice track, built from its measured analysis.
  * Returns blocked (with the reason) instead of a plan when the request must
  * not be carried out, such as a synthetic voice for Quran recitation.
- * @param {{ source: VoiceSource, contentType: ContentType, versionId: string, analysis?: RecordingAnalysis | null, roomReverb?: boolean }} input
+ * `space` names the reverb of the real engine (voice-reverb.mjs SPACES); the
+ * returned `mastering` is what voice-master.mjs then runs, so this plan is
+ * carried out, not only described.
+ * @param {{ source: VoiceSource, contentType: ContentType, versionId: string, analysis?: RecordingAnalysis | null, roomReverb?: boolean, space?: string }} input
  */
-export function planVoice({ source, contentType, versionId, analysis = null, roomReverb = false }) {
+export function planVoice({ source, contentType, versionId, analysis = null, roomReverb = false, space }) {
   const music = musicPlanFor({ contentType, versionId });
   const quran = contentType === "quran_recitation";
   if (quran && source !== "own-recording") {
-    return { blocked: "Quran recitation is never synthesised or voice-cloned; upload a recitation recorded by a person.", chain: [], music, warnings: [] };
+    return { blocked: "Quran recitation is never synthesised or voice-cloned; upload a recitation recorded by a person.", chain: [], music, warnings: [], mastering: null };
   }
+  const profile = masterProfileFor(contentType);
+  const preset = space ?? (roomReverb && source === "own-recording" ? (quran ? "mosque-hall" : "warm-room") : quran ? "clean" : "dry");
+  if (!PROFILE_SPACES[profile].includes(preset)) {
+    return { blocked: "The " + profile + " profile does not use the space \"" + preset + "\"; it uses " + PROFILE_SPACES[profile].join(", ") + ".", chain: [], music, warnings: [], mastering: null };
+  }
+  const room = SPACES[preset];
   /** @type {string[]} */
   const warnings = [...(analysis?.problems ?? [])];
   /** @type {ChainStep[]} */
@@ -141,7 +151,7 @@ export function planVoice({ source, contentType, versionId, analysis = null, roo
       ? { step: "compressor", ratio: 1.5, thresholdDb: -20, attackMs: 20, releaseMs: 250, note: "gentle, so the reciter's dynamics and elongations stay intact" }
       : { step: "compressor", ratio: 3, thresholdDb: -22, attackMs: 10, releaseMs: 100, targetReductionDb: [3, 6] });
     chain.push({ step: "de-ess", rangeHz: [5000, 9000], maxReductionDb: 4 });
-    if (roomReverb) chain.push({ step: "reverb", preset: "natural-room", decaySeconds: 0.6, wetDb: -20, discreteEchoes: false });
+    if (room) chain.push({ step: "reverb", preset, decaySeconds: room.rt60, preDelayMs: room.preDelayMs, wetDb: room.wetDb, discreteEchoes: false, note: "a smooth tail made in code and checked to hold no repeat; shortened or lowered to fit the recording" });
   } else {
     const model = ELEVENLABS_MODELS[/** @type {keyof typeof ELEVENLABS_MODELS} */ (versionId)];
     chain.push({
@@ -165,6 +175,7 @@ export function planVoice({ source, contentType, versionId, analysis = null, roo
     versionId,
     never: NEVER_DONE_TO_A_VOICE,
     keepOriginal: true,
+    mastering: { engine: "voice-master.mjs", profile, preset },
     voiceIsolator: quran ? "never" : "opt-in only, with a before/after comparison",
     chain,
     music,
@@ -174,6 +185,15 @@ export function planVoice({ source, contentType, versionId, analysis = null, roo
       : { cutAt: "sentence ends and breaths", timing: "pauses between sentences are trimmed or extended; the voice is never sped up or slowed" },
     warnings,
   };
+}
+
+/**
+ * Which mastering profile a kind of content gets: a recitation its own,
+ * everything else the close, nearly dry narration profile.
+ * @param {ContentType} contentType @returns {"quran" | "narration"}
+ */
+export function masterProfileFor(contentType) {
+  return contentType === "quran_recitation" ? "quran" : "narration";
 }
 
 /**

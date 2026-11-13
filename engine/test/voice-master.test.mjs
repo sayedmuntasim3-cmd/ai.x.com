@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fromDb } from "../src/voice-dsp.mjs";
-import { LIMITER_MAX_DB, limit, masterLoudness, masterVoice } from "../src/voice-master.mjs";
+import { LIMITER_MAX_DB, ayahEndsOf, limit, masterLoudness, masterReport, masterVoice } from "../src/voice-master.mjs";
+import { planVoice } from "../src/voice-plan.mjs";
 import { comparePitch, lagAt, proveMaster } from "../src/voice-proof.mjs";
 import { trackPitch } from "../src/voice-analyze.mjs";
 import { measureLoudness, truePeak } from "../src/loudness.mjs";
@@ -87,4 +88,19 @@ test("output: 24-bit WAV round trip keeps the master to within one 24-bit step",
   let worst = 0;
   for (let i = 0; i < back.channels[1].length; i += 37) worst = Math.max(worst, Math.abs(back.channels[1][i] - hall.channels[1][i]));
   assert.ok(worst < 2 / 8388608, "worst " + worst);
+});
+
+test("planVoice decides what the engine runs: profile, space, and the refusals", () => {
+  const quran = planVoice({ source: "own-recording", contentType: "quran_recitation", versionId: "ar", space: "grand-hall" });
+  assert.deepEqual(quran.mastering, { engine: "voice-master.mjs", profile: "quran", preset: "grand-hall" });
+  const step = quran.chain.find((s) => s.step === "reverb");
+  assert.ok(step && step.discreteEchoes === false && step.decaySeconds === 3.8);
+  assert.equal(planVoice({ source: "own-recording", contentType: "quran_recitation", versionId: "ar" }).mastering?.preset, "clean");
+  assert.equal(planVoice({ source: "own-recording", contentType: "documentary", versionId: "en-US", roomReverb: true }).mastering?.preset, "warm-room");
+  assert.match(String(planVoice({ source: "own-recording", contentType: "documentary", versionId: "en-US", space: "mosque-hall" }).blocked), /does not use/);
+  assert.equal(planVoice({ source: "elevenlabs", contentType: "quran_recitation", versionId: "ar" }).mastering, null);
+  assert.deepEqual(planVoice({ source: "elevenlabs", contentType: "documentary", versionId: "en-US" }).mastering, { engine: "voice-master.mjs", profile: "narration", preset: "dry" });
+  assert.deepEqual(ayahEndsOf({ scenes: [{ kind: "title", spokenEnd: null, estimated: false }, { kind: "ayah", spokenEnd: 4.2, estimated: false }, { kind: "ayah", spokenEnd: 9, estimated: true }] }), [4.2]);
+  const report = masterReport(hall);
+  assert.ok(report.ok && report.proof && report.before.lufs !== null && !("samples" in report) && JSON.stringify(report).length < 20000);
 });
