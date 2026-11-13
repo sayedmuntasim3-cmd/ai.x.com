@@ -29,7 +29,7 @@ export function hamming(a, b) {
 }
 
 /** The rules the frame check applies, measured on labelled sets (docs/QURAN_DOCUMENTARY.md). */
-export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6 });
+export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5 });
 
 /**
  * Reasons from one detect.py result, or null when the frames pass.
@@ -42,6 +42,9 @@ export function frameVerdict(item, usedHashes = []) {
     const art = item.look.painting + item.look.drawing + item.look.rendering;
     if (art >= VISUAL_RULES.notPhotograph) return `visual: looks like a painting, drawing or rendering (${Math.round(art * 100)}%), not a photograph`;
   }
+  // Relevance: the searched thing against rooms, cities, people, text, vehicles, animals and objects.
+  // Measured: a city at dawn 0.40, a fogged-out "mountain" 0.18, a sea searched as mountains 0.11; seven right pictures 0.78-0.99.
+  if (item.look && typeof item.look.relevance === "number" && item.look.relevance < VISUAL_RULES.minRelevance) return `relevance: the frames do not show what was searched for (${Math.round(item.look.relevance * 100)}%)`;
   if (item.sideways) return "orientation: the picture seems to be stored on its side (its sky is at a side)";
   for (const h of item.dhash ?? []) for (const u of usedHashes) if (hamming(h, u) <= VISUAL_RULES.nearDuplicateBits) return "duplicate: nearly the same picture is already in the film";
   return null;

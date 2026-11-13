@@ -80,7 +80,7 @@ def detect(images):
 
 CLIP_MODEL = "laion/CLIP-ViT-B-32-laion2B-s34B-b79K"
 KINDS = ["a photograph", "a painting", "a drawing or an illustration", "a computer rendering or a video game"]
-OTHER = ["the inside of a building or a room", "people", "text, a document or a map", "a vehicle or a road", "an animal"]
+OTHER = ["the inside of a building or a room", "a city, a street or buildings", "people", "text, a document or a map", "a vehicle or a road", "an animal", "a man-made object"]
 _clip = None
 
 

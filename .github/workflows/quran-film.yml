@@ -24,7 +24,7 @@ permissions:
 jobs:
   film:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,7 +36,9 @@ jobs:
       - name: Install ffmpeg and OpenCV
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          pip install -q "opencv-python-headless==4.10.0.84"
+          pip install -q "opencv-python-headless==4.10.0.84" pillow
+          pip install -q --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -q transformers
       - name: Ad-Duha, 1080p
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -44,8 +46,11 @@ jobs:
         run: |
           curl -sSfL --retry 3 -o duha.mp3 https://archive.org/download/jawad-farogi/Az-Zuha.mp3
           node local/voice-film.mjs --audio duha.mp3 --surah 93 --master mosque-hall --out runs/duha > runs-duha.log 2>&1 || { tail -n 20 runs-duha.log; exit 1; }
-          node local/quran-media.mjs --run runs/duha --detect python > runs/duha/media.log 2>&1 || true
+          node local/quran-media.mjs --run runs/duha --detect python --clip > runs/duha/media.log 2>&1 || true
           node render/quran-render.mjs --run runs/duha --audio runs/duha/master/mosque-hall.wav --reciter "Qari Jawad Farogi" --out films/duha-1080p.mp4 > runs/duha/render.log 2>&1 || echo duha >> failed.txt
+      - name: Ad-Duha, 4K
+        if: always()
+        run: node render/quran-render.mjs --run runs/duha --audio runs/duha/master/mosque-hall.wav --format 4k --reciter "Qari Jawad Farogi" --out films/duha-4k.mp4 > runs/duha/render-4k.log 2>&1 || echo duha-4k >> failed.txt
       - name: Yusuf 1-12, 9:16
         if: always()
         env:
@@ -55,7 +60,7 @@ jobs:
           node local/quran-locate.mjs --fetch quran-audio-verse-by-verse-by-sadaqat-ali-surah-012 --count 12 --out audio/yusuf
           node local/quran-locate.mjs --join audio/yusuf --surah 12 --ayat 1-12 --gap 0.6 --out sets/yusuf
           node local/voice-film.mjs --audio sets/yusuf/joined.wav --surah 12 --ayat 1-12 --opening basmala --master clean --out runs/yusuf > runs-yusuf.log 2>&1 || { tail -n 20 runs-yusuf.log; exit 1; }
-          node local/quran-media.mjs --run runs/yusuf --detect python > runs/yusuf/media.log 2>&1 || true
+          node local/quran-media.mjs --run runs/yusuf --detect python --clip > runs/yusuf/media.log 2>&1 || true
           node render/quran-render.mjs --run runs/yusuf --audio runs/yusuf/master/clean.wav --format 9:16 --reciter "Syed Sadaqat Ali" --out films/yusuf-9x16.mp4 > runs/yusuf/render.log 2>&1 || echo yusuf >> failed.txt
       - name: Print what was measured
         if: always()
@@ -63,7 +68,8 @@ jobs:
           echo QURAN-FILM-BEGIN
           for r in duha yusuf; do
             echo "== $r"; grep -h "^QURAN-MEDIA " runs/$r/media.log 2>/dev/null | cut -c1-400
-            grep -h "^QURAN-RENDER " runs/$r/render.log 2>/dev/null || tail -n 5 runs/$r/render.log 2>/dev/null
+            grep -h "^QURAN-RENDER " runs/$r/render*.log 2>/dev/null || tail -n 5 runs/$r/render.log 2>/dev/null
+            grep -h "no licensed picture" runs/$r/render*.log 2>/dev/null
           done
           echo QURAN-FILM-END
       - uses: actions/upload-artifact@v4
@@ -71,7 +77,8 @@ jobs:
         with:
           name: quran-films
           path: |
-            films/*.mp4
+            films/duha-1080p.mp4
+            films/yusuf-9x16.mp4
             runs/**/shots.md
             runs/**/media.md
             runs/**/meaning.md
