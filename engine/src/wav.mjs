@@ -157,6 +157,54 @@ export function encodeWav16(channels, sampleRate) {
   return buffer;
 }
 
+/**
+ * The 44-byte header of a 24-bit PCM WAV file.
+ * @param {number} frames @param {number} channelCount @param {number} sampleRate
+ */
+export function wav24Header(frames, channelCount, sampleRate) {
+  const blockAlign = channelCount * 3;
+  const buffer = new ArrayBuffer(44);
+  const v = new DataView(buffer);
+  /** @param {number} at @param {string} s */
+  const write = (at, s) => { for (let i = 0; i < 4; i += 1) v.setUint8(at + i, s.charCodeAt(i)); };
+  write(0, "RIFF"); v.setUint32(4, 36 + frames * blockAlign, true); write(8, "WAVE");
+  write(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, channelCount, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 24, true);
+  write(36, "data"); v.setUint32(40, frames * blockAlign, true);
+  return new Uint8Array(buffer);
+}
+
+/**
+ * Frames [from, to) as interleaved 24-bit PCM, so a long master is written
+ * piece by piece instead of as one huge buffer.
+ * @param {Float32Array[]} channels @param {number} from @param {number} to
+ */
+export function pcm24(channels, from, to) {
+  const out = new Uint8Array((to - from) * channels.length * 3);
+  let at = 0;
+  for (let n = from; n < to; n += 1) {
+    for (let c = 0; c < channels.length; c += 1) {
+      const s = Math.max(-1, Math.min(1, channels[c][n]));
+      const v = s < 0 ? Math.round(s * 8388608) : Math.round(s * 8388607);
+      out[at] = v & 255; out[at + 1] = (v >> 8) & 255; out[at + 2] = (v >> 16) & 255;
+      at += 3;
+    }
+  }
+  return out;
+}
+
+/**
+ * A whole 24-bit PCM WAV file (short masters and tests).
+ * @param {Float32Array[]} channels @param {number} sampleRate
+ */
+export function encodeWav24(channels, sampleRate) {
+  const frames = channels[0].length;
+  const out = new Uint8Array(44 + frames * channels.length * 3);
+  out.set(wav24Header(frames, channels.length, sampleRate));
+  out.set(pcm24(channels, 0, frames), 44);
+  return out.buffer;
+}
+
 /** @param {DataView} v @param {number} at */
 function tag(v, at) {
   return String.fromCharCode(v.getUint8(at), v.getUint8(at + 1), v.getUint8(at + 2), v.getUint8(at + 3));
