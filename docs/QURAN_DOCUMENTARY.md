@@ -245,4 +245,30 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
   indoor and object words are now refused too), the rest stated gaps.
 - Not verified: relevance is judged from titles only; a person must look at every picture (Q6 review).
   Without Pexels / Pixabay keys most shots will be gaps or photographs; the owner can add free keys.
-- Q5 to Q7: not built.
+
+**Q5 (render) built** and tested (`render/quran-render.test.mjs`, 5 tests): `node render/quran-render.mjs
+--run <folder> --audio <mastered voice> [--format 1080p|4k|9:16] [--reciter name]`.
+- One clip per shot (the asset or a slowly moving dark card; one grade for the film; slow eased push,
+  pull or drift that grows with the shot's length, so a long shot never freezes), joined by dissolves
+  centred on the cut; fade from black, last shot held through the tail, 3 s fade out.
+- Arabic: Tanzil Uthmani verbatim, typeset in Amiri Quran by libass (HarfBuzz, FriBidi; base direction
+  automatic, which was needed for the ayah number ﴿٤﴾ to sit right). The basmala Tanzil writes before
+  ayah 1 is not shown as part of the ayah. Surah name in Arabic and Latin and the reciter at the start;
+  "Quran text: Tanzil.net" at the end. The recitation is the only sound (AAC 320k, stereo, as mastered).
+- Measured after every render: length against the voice, loudness, true peak, black and frozen
+  stretches, and every cut against the measured voice. The CC0 Ad-Duha (146 s, mastered mosque-hall):
+  length matches (146.67 s against 146.65 s), -14 LUFS, true peak -4 dBTP, no black, no frozen frame,
+  5 cuts, all in pauses (1 at an ayah end, 4 at pauses inside the estimated ayat), none in the voice.
+  Rendered in 3 min 20 s on this box. Al-Fatiha joined (48 s): -14 LUFS, -1.5 dBTP, 3 cuts all at ayah ends.
+- After the media fixes the same film has 4 of 6 shots on licensed Commons pictures (3 photos, 1 video)
+  and 2 cards. Looking at the frames: one Commons video is stored sideways by its uploader (no rotation
+  flag in the file), and "tree shelters" are plastic tubes in a forest. No automatic check catches these;
+  the per-scene review (Q6) must, before a film is marked ready.
+- Found and fixed while measuring: the first move filter (zoompan) stepped by whole pixels and long
+  shots read as frozen; the detector passed an unreadable video as clean (now refused); Commons refuses
+  thumbnail sizes it does not list, so the detector now looks at the file that will be used.
+- Not verified: 4K (written, not rendered yet); how it looks to the owner; the runner film
+  (`.github/workflows/quran-film.yml`, first run after this commit). Most shots are still cards: the
+  keyless archives give few relevant, licence-clean, face-free pictures; Pexels and Pixabay are used
+  when their keys are set as repository secrets.
+- Q6 and Q7: not built.

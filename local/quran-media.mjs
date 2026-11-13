@@ -29,11 +29,13 @@ const run = promisify(execFile);
 export function detector(python) {
   const script = new URL("./media/detect.py", import.meta.url).pathname;
   return async (r) => {
-    const target = r.mediaType === "video" ? r.mediaUrl : r.previewUrl ?? r.mediaUrl;
+    // The file that will be used (Commons refuses thumbnail sizes it does not list, so not the preview).
+    const target = r.mediaUrl ?? r.previewUrl;
     if (!target) return null;
     try {
       const { stdout } = await run(python, ["-I", script, target, "--frames", "5"], { maxBuffer: 1 << 22, timeout: 300_000 });
       const item = JSON.parse(stdout).items[0];
+      if (!item.frames) return "no frame could be read, so it was not checked";
       return item.flag ? `${item.faces} face(s), ${item.people} person(s) in ${item.frames} frame(s)` : null;
     } catch (e) {
       // A frame that cannot be read is not passed as clean.
