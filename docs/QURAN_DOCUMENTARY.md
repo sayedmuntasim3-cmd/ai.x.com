@@ -136,4 +136,45 @@ committed). The owner will send his own recitation; that is the real test.
 
 ## State
 
-13 Nov 2026: direction recorded, audit done. Q1 to Q7: not built.
+13 Nov 2026: direction recorded, audit done.
+
+**Q1 (recognition) built**, measured in the cloud box (CPU) on recordings with known ayah times made
+by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one real recitation.
+- Code: `engine/src/quran-locate.mjs` (`locateRecitation`: user-given passage `parsePassage` /
+  `findSurah`, the gate `judgeMatch`, pause-anchored alignment `alignByPauses` / `alignPassage`,
+  recognised times moved onto the pauses `snapToPauses`, repeats, fixed phrases, `boundaryErrors`),
+  `voiceSpans` in `voice-analyze.mjs`, CLI `local/quran-locate.mjs`, wired into `local/voice-film.mjs`
+  (`--surah`, `--ayat`, `--passage`, `--opening`, `--closing`; a question exits with code 3).
+  Tests: `engine/test/quran-locate.test.mjs` (16), `local/quran-locate.test.mjs` (1).
+- Recognizer: `tarteel-ai/whisper-base-ar-quran` (Apache-2.0 on its Hugging Face page, revision
+  5c3c53fd), converted to CTranslate2 by `local/stt/transcribe.py`, which reads and records each
+  model's licence and refuses one not on the open list. It listens to pause-cut clips (`--clips`).
+- Length model: `UNIT_WEIGHTS`, fitted on 184 single ayat of one reciter, checked on 44 of another:
+  ayah length predicted to about 11-12% (letters alone: 14-15%).
+- Test audio (never committed): archive.org items with a public-domain mark from the uploader:
+  `surah_1`, `quran-audio-verse-by-verse-by-sadaqat-ali-surah-012` and `-008` (Syed Sadaqat Ali),
+  `006099` (al-Husary, surah 10); CC0: `jawad-farogi/Az-Zuha.mp3`.
+
+| Recording | Mode | Result | Ayah-boundary error: median / 90% / worst | Ends within 0.2 s | Cuts in the true gap |
+|---|---|---|---|---|---|
+| Al-Fatiha joined (48 s) | recognizer | found 1:1-7 | 0.003 / 0.23 / 0.24 s | 10 / 12 | 5 / 6 |
+| Al-Fatiha joined | given only | 1:1-7 | 0.003 / 0.007 / 0.01 s | 12 / 12 | 6 / 6 |
+| Yusuf 1-40 joined (13 min) | recognizer | found 12:1-40 | 0.004 / 0.014 / 0.31 s | 76 / 78 | 38 / 39 |
+| Yusuf 1-40 joined | given only | 12:1-40 | 0.004 / 0.014 / 0.31 s | 76 / 78 | 38 / 39 |
+| Al-Anfal 1-75 joined (28 min) | recognizer | found 8:1-75 | 0.005 / 0.13 / 3.6 s | 139 / 148 | 71 / 74 |
+| Al-Anfal 1-75 joined | given only | 8:1-75 | 0.007 / 16.8 / 25 s | 107 / 148 | 55 / 74 |
+| each of the three, wrong surah given | recognizer + given | asked: "you gave 93, it sounds like ..." | | | |
+| Ad-Duha, Jawad Farogi (real, 146 s, slow melodic) | recognizer | asked for surah and ayat (the model heard no Quran text) | no truth | | |
+| Ad-Duha, same | given 93 | 11 ayat placed, estimated; 4 of 10 ends on a pause, 6 in one breath and marked unsure | no truth | | |
+
+- Given only, an end is marked `sure` only when it sits on a pause and the next best place costs
+  much more. On Al-Anfal 26 of 74 ends were called sure, and all 26 were on the right pause (within
+  0.2-0.4 s of the true end); every badly wrong end (the first ten ayat, shifted by a wrongly guessed
+  opening) was marked unsure. Saying `--opening basmala` fixed it in a parameter sweep (127 / 148).
+  Unsure ends are listed for review and `ayahEndsOf` does not use them for the mastering.
+- Not verified: a real continuous recitation with known times (the joined files have clean gaps);
+  phone and mosque recordings; Ar-Rahman's refrain on real audio; the runner workflow
+  `.github/workflows/quran-recognize.yml` (first run after this commit). The Tarteel base model fails
+  on slow melodic recitation (Ad-Duha above): the gate then asks, as designed. A larger Quran model is
+  the next thing to try on the runner.
+- Q2 to Q7: not built.

@@ -199,12 +199,12 @@ export function masterVoice(input) {
  * Where each recognised ayah ends in the recording (seconds), from the
  * understanding layer's Quran plan; estimated times are left out, so only
  * heard boundaries steer the reverb.
- * @param {{ scenes?: { kind: string, spokenEnd: number | null, estimated: boolean }[] } | null | undefined} quranPlan
+ * @param {{ scenes?: { kind: string, spokenEnd: number | null, estimated: boolean, endSure?: boolean }[] } | null | undefined} quranPlan
  */
 export function ayahEndsOf(quranPlan) {
   /** @type {number[]} */
   const ends = [];
-  for (const s of quranPlan?.scenes ?? []) if (s.kind === "ayah" && typeof s.spokenEnd === "number" && !s.estimated) ends.push(s.spokenEnd);
+  for (const s of quranPlan?.scenes ?? []) if (s.kind === "ayah" && typeof s.spokenEnd === "number" && !s.estimated && s.endSure !== false) ends.push(s.spokenEnd);
   return ends;
 }
 

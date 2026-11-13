@@ -12,6 +12,23 @@
 
 /** @typedef {(p: Params) => string} Render */
 
+const WHY = {
+  coverage: ["much of the speech is not Quran", "কথার অনেকটা কুরআন নয়"],
+  quality: ["too few words of the ayat were heard", "আয়াতের খুব কম শব্দ শোনা গেছে"],
+  weak: ["the match is weak", "মিল দুর্বল"],
+  ambiguous: ["these words occur in more than one place", "এই শব্দগুলো একাধিক জায়গায় আছে"],
+  slow: ["far too long for this passage", "এই অংশের তুলনায় রেকর্ডিং অনেক বেশি লম্বা"],
+  fast: ["far too short for this passage", "এই অংশের তুলনায় রেকর্ডিং অনেক বেশি ছোট"],
+  lengths: ["the phrase lengths do not follow the ayat", "বাক্যাংশের দৈর্ঘ্য আয়াতের সাথে মেলে না"],
+};
+/** @param {unknown} why @param {0 | 1} lang */
+const whyText = (why, lang) => String(why ?? "").split(",").filter(Boolean).map((w) => /** @type {Record<string, string[]>} */ (WHY)[w]?.[lang] ?? w).join("; ");
+const whyEn = (/** @type {unknown} */ why) => whyText(why, 0);
+const whyBn = (/** @type {unknown} */ why) => whyText(why, 1);
+const PHRASE = { istiadha: ["Isti'adha (a'udhu billah)", "আউযুবিল্লাহ"], basmala: ["Basmala", "বিসমিল্লাহ"], closing: ["Closing words (sadaqa Allahu al-'azim)", "সমাপ্তি বাক্য (সাদাকাল্লাহুল আযীম)"], takbir: ["Takbir", "তাকবীর"] };
+const phraseEn = (/** @type {unknown} */ k) => /** @type {Record<string, string[]>} */ (PHRASE)[String(k)]?.[0] ?? String(k);
+const phraseBn = (/** @type {unknown} */ k) => /** @type {Record<string, string[]>} */ (PHRASE)[String(k)]?.[1] ?? String(k);
+
 /** @type {Readonly<Record<string, { en: Render, bn: Render }>>} */
 export const MESSAGES = Object.freeze({
   // Jobs
@@ -121,6 +138,25 @@ export const MESSAGES = Object.freeze({
   "voice.kind": { en: (p) => `This voice is ${p.kind === "quran" ? "Quran recitation" : "narration"} (${p.language}).`, bn: (p) => `এই ভয়েসটি ${p.kind === "quran" ? "কুরআন তিলাওয়াত" : "বর্ণনা (narration)"} (${p.language})।` },
   "voice.quranFound": { en: (p) => `Recognised Surah ${p.surah}, ayat ${p.from}-${p.to} (${p.coverage}% of the words match Tanzil).`, bn: (p) => `চেনা গেছে সূরা ${p.surah}, আয়াত ${p.from}-${p.to} (${p.coverage}% শব্দ Tanzil-এর সাথে মেলে)।` },
   "voice.quranNotFound": { en: () => "Quran recitation was asked for, but no ayah was recognised; the transcript may be too weak.", bn: () => "কুরআন তিলাওয়াত বলা হয়েছে, কিন্তু কোনো আয়াত চেনা যায়নি; ট্রান্সক্রিপ্ট হয়তো দুর্বল।" },
+  // Quran: which surah and ayat, and when each is recited (quran-locate.mjs)
+  "quran.given": { en: (p) => `Using the passage you gave: ${p.passage}.`, bn: (p) => `আপনার দেওয়া অংশ ধরা হয়েছে: ${p.passage}।` },
+  "quran.badSurah": { en: (p) => `No surah matches "${p.value}". Give the surah's number (1 to 114) or its name.`, bn: (p) => `"${p.value}" নামে কোনো সূরা পাওয়া যায়নি। সূরার নম্বর (১ থেকে ১১৪) বা নাম দিন।` },
+  "quran.badAyat": { en: (p) => `Surah ${p.surah} has ${p.count} ayat; "${p.value}" is not a range inside it. Write it like 1-${p.count}.`, bn: (p) => `সূরা ${p.surah}-এ ${p.count}টি আয়াত আছে; "${p.value}" তার ভেতরের সীমা নয়। এভাবে লিখুন: 1-${p.count}।` },
+  "quran.heard": { en: (p) => `Heard: ${p.passage} (${p.coverage}% of the recognised words are Quran; ${p.quality}% of the words of these ayat were heard).`, bn: (p) => `শোনা গেছে: ${p.passage} (চেনা শব্দের ${p.coverage}% কুরআনের; এই আয়াতগুলোর ${p.quality}% শব্দ শোনা গেছে)।` },
+  "quran.confirmed": { en: () => "What was heard agrees with the passage you gave.", bn: () => "যা শোনা গেছে তা আপনার দেওয়া অংশের সাথে মেলে।" },
+  "quran.unconfirmed": { en: () => "The recognizer could not confirm the passage; your surah and ayat are used as given.", bn: () => "রিকগনাইজার অংশটি নিশ্চিত করতে পারেনি; আপনার দেওয়া সূরা ও আয়াতই ধরা হয়েছে।" },
+  "quran.estimated": { en: (p) => `No recognizer confirmed the times: ayah times are estimated from the measured pauses and the length of each ayah. ${p.sure} of ${p.total} ayah ends are sure; the others are marked unsure and must not be used as cut points until a recognizer or a person confirms them.`, bn: (p) => `সময়গুলো কোনো রিকগনাইজার নিশ্চিত করেনি: আয়াতের সময় মাপা বিরতি ও প্রতিটি আয়াতের দৈর্ঘ্য থেকে অনুমান করা। ${p.total}টি আয়াত-শেষের ${p.sure}টি নিশ্চিত; বাকিগুলো অনিশ্চিত চিহ্নিত, রিকগনাইজার বা কোনো মানুষ নিশ্চিত না করা পর্যন্ত সেখানে ছবি কাটা যাবে না।` },
+  "quran.timed": { en: (p) => `Ayah times come from the recognised words, moved onto the measured pauses: ${p.sure} of ${p.total} ayah ends are sure.`, bn: (p) => `আয়াতের সময় চেনা শব্দ থেকে নেওয়া, তারপর মাপা বিরতির ওপর বসানো: ${p.total}টি আয়াত-শেষের ${p.sure}টি নিশ্চিত।` },
+  "quran.ask.passage": { en: () => "The recitation could not be identified surely enough, so nothing is guessed. Which surah and ayat is it? (for example: surah 93, ayat 1-11)", bn: () => "তিলাওয়াতটি যথেষ্ট নিশ্চিতভাবে চেনা যায়নি, তাই কিছু অনুমান করা হয়নি। এটি কোন সূরা ও কোন আয়াত? (যেমন: সূরা 93, আয়াত 1-11)" },
+  "quran.ask.confirm": { en: (p) => `It sounds like ${p.passage}, but not surely enough (${whyEn(p.why)}). Give the surah and ayat to continue.`, bn: (p) => `শুনে মনে হচ্ছে ${p.passage}, কিন্তু যথেষ্ট নিশ্চিত নয় (${whyBn(p.why)})। এগোতে সূরা ও আয়াত দিন।` },
+  "quran.ask.mismatch": { en: (p) => `You gave ${p.given}, but the recording sounds like ${p.heard}. Which is right?`, bn: (p) => `আপনি দিয়েছেন ${p.given}, কিন্তু রেকর্ডিং শুনে মনে হচ্ছে ${p.heard}। কোনটি ঠিক?` },
+  "quran.ask.notFit": { en: (p) => `The recording does not fit ${p.passage} (${whyEn(p.why)}). Check the surah and ayat.`, bn: (p) => `রেকর্ডিংটি ${p.passage}-এর সাথে মেলে না (${whyBn(p.why)})। সূরা ও আয়াত আবার দেখুন।` },
+  "quran.ask.times": { en: () => "The passage was recognised but the recognizer gave no word times. Run it again with word times, or give the surah and ayat.", bn: () => "অংশটি চেনা গেছে, কিন্তু রিকগনাইজার শব্দের সময় দেয়নি। শব্দ-সময়সহ আবার চালান, অথবা সূরা ও আয়াত দিন।" },
+  "quran.fixed": { en: (p) => `${phraseEn(p.phrase)} at ${p.start}-${p.end} s: labelled, not an ayah.`, bn: (p) => `${phraseBn(p.phrase)} ${p.start}-${p.end} সেকেন্ডে: চিহ্নিত করা হয়েছে, এটি আয়াত নয়।` },
+  "quran.repeat": { en: (p) => `Ayah ${p.surah}:${p.ayah} is recited again at ${p.start} s: kept as recited.`, bn: (p) => `আয়াত ${p.surah}:${p.ayah} ${p.start} সেকেন্ডে আবার পড়া হয়েছে: যেমন পড়া হয়েছে তেমনই রাখা হয়েছে।` },
+  "quran.other": { en: (p) => `${p.words} recognised word(s) are not Quran text (from ${p.start} s): they get no ayah.`, bn: (p) => `${p.words}টি চেনা শব্দ কুরআনের পাঠ নয় (${p.start} সেকেন্ড থেকে): এগুলোর জন্য কোনো আয়াত ধরা হয়নি।` },
+  "quran.openingUnsure": { en: () => "The pauses do not settle whether the recording opens with the isti'adha or the basmala; say which (--opening) to be sure.", bn: () => "রেকর্ডিং আউযুবিল্লাহ বা বিসমিল্লাহ দিয়ে শুরু কি না, বিরতি দেখে নিশ্চিত হওয়া যায়নি; নিশ্চিত হতে নিজে বলে দিন (--opening)।" },
+  "quran.joined": { en: (p) => `${p.count} ayah end(s) have no pause: the reciter went on in one breath, so those cut points are approximate.`, bn: (p) => `${p.count}টি আয়াতের শেষে কোনো বিরতি নেই: কারী এক নিঃশ্বাসে পড়ে গেছেন, তাই ওই কাটার জায়গাগুলো আনুমানিক।` },
   "voice.scenes": { en: (p) => `${p.count} scenes cut on the voice's own word times.`, bn: (p) => `ভয়েসের নিজের শব্দ-সময় ধরে ${p.count}টি দৃশ্য কাটা হয়েছে।` },
   "voice.wordsKept": { en: () => "Every spoken word is in the plan, unchanged and in order.", bn: () => "প্রতিটি বলা শব্দ পরিকল্পনায় আছে, অপরিবর্তিত ও ক্রমমতো।" },
   "voice.wordsChanged": { en: (p) => `The picture plan changed the words of ${p.scenes}; they were put back from the voice.`, bn: (p) => `ছবির পরিকল্পনা ${p.scenes}-এর শব্দ বদলেছিল; ভয়েস থেকে আবার ঠিক করে বসানো হয়েছে।` },

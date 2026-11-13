@@ -5,6 +5,9 @@
  * all in code from the timed words. Nothing here changes a word.
  * - Quran: matchRecitation finds the exact ayat with per-ayah times, and
  *   planQuranFilm / checkQuranFilm make and check the ayah-by-ayah plan.
+ *   When a location is given (locateRecitation: the user's surah and ayat,
+ *   the gate, times on the measured pauses), the plan is built from it, and
+ *   its question, if it has one, is passed on instead of a plan.
  * - Narration: classifyInput says what kind of film it is, splitVoiceScenes
  *   cuts scenes on the word times, and the words of the scenes are proven to
  *   be the transcript's words, in order, none added or dropped.
@@ -13,6 +16,7 @@ import { classifyInput, detectLanguage } from "./content-intel.mjs";
 import { msg } from "./messages.mjs";
 import { matchRecitation } from "./quran.mjs";
 import { checkQuranFilm, planQuranFilm } from "./quran-film.mjs";
+import { locationToMatch } from "./quran-locate.mjs";
 import { splitVoiceScenes } from "./voice-scenes.mjs";
 
 /** @typedef {{ text: string, start: number, end: number, confidence?: number | null }} Word */
@@ -119,7 +123,29 @@ export function voiceStructure(scenes, o = {}) {
 }
 
 /**
- * @param {{ transcript: { language?: string | null, words: Word[] }, totalSeconds: number, kind?: "auto" | "narration" | "quran", quranIndex?: import("./quran.mjs").QuranIndex | null, surahNames?: any[], sceneOptions?: { minSeconds?: number, targetSeconds?: number, maxSeconds?: number } }} o
+ * The film plan of a located recitation. An ayah end that is not sure is
+ * marked on its scene and listed for review: nothing may be cut there.
+ * @param {ReturnType<typeof import("./quran-locate.mjs").locateRecitation>} location
+ * @param {import("./quran.mjs").QuranIndex} index @param {number} totalSeconds @param {any[]} surahNames
+ */
+export function planLocated(location, index, totalSeconds, surahNames) {
+  const match = locationToMatch(location, index);
+  const plan = planQuranFilm({ match, index, totalSeconds, surahNames });
+  plan.timing = location.timing ?? undefined;
+  plan.source = location.source ?? undefined;
+  const ayahScenes = plan.scenes.filter((s) => s.kind === "ayah");
+  location.ayat.forEach((a, k) => {
+    const scene = ayahScenes[k];
+    if (!scene || k === location.ayat.length - 1) return;
+    scene.endSure = a.sure;
+    if (!a.sure) { const note = a.joined ? "No pause at the end of this ayah: the cut point is approximate." : "The end of this ayah is not sure: confirm it before cutting here."; scene.needsReview.push(note); plan.review.push(`${scene.id} (${a.surah}:${a.ayah}): ${note}`); }
+  });
+  return { match, plan };
+}
+
+/**
+ * @param {{ transcript: { language?: string | null, words: Word[] }, totalSeconds: number, kind?: "auto" | "narration" | "quran", quranIndex?: import("./quran.mjs").QuranIndex | null, surahNames?: any[], sceneOptions?: { minSeconds?: number, targetSeconds?: number, maxSeconds?: number },
+ *   location?: ReturnType<typeof import("./quran-locate.mjs").locateRecitation> | null }} o
  */
 export function understandVoice(o) {
   const words = (o.transcript?.words ?? []).filter((w) => w && String(w.text).trim());
@@ -130,6 +156,16 @@ export function understandVoice(o) {
   const text = words.map((w) => w.text).join(" ");
   const detected = detectLanguage(text).language;
   const language = detected === "unknown" && o.transcript?.language ? String(o.transcript.language) : detected;
+  const location = o.location ?? null;
+  if (location && (location.ok || o.kind === "quran" || location.passages.length || location.heard.length)) {
+    if (!o.quranIndex) throw new Error("The Quran index is needed to plan a recitation.");
+    // A question (which surah? does it fit?) stops here: the caller asks it; nothing is planned on a guess.
+    if (!location.ok) return { ok: false, kind: "quran", language: language === "unknown" ? "ar" : language, location, question: location.question, messages: location.messages, problems: ["quran-question: " + (location.question?.code ?? "")] };
+    const { match, plan } = planLocated(location, o.quranIndex, total, o.surahNames ?? []);
+    problems.push(...checkQuranFilm(plan, o.quranIndex));
+    messages.push(msg("voice.kind", { kind: "quran", language: "ar" }), ...location.messages);
+    return { ok: plan.ok && !problems.length, kind: "quran", language: "ar", classification: classifyInput({ text, recitation: match }), match, location, quranPlan: plan, messages, problems };
+  }
   if (!words.length) return { ok: false, kind: null, language, messages: [msg("voice.noWords")], problems: ["no-words"] };
 
   const kind = o.kind ?? "auto";

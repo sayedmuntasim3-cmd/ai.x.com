@@ -2,6 +2,7 @@
  * Voice film, on the owner's machine:
  *   node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>]
  *        [--transcript <json|srt|vtt>] [--stt faster-whisper|pocketsphinx] [--model small.en]
+ *        [--surah 93] [--ayat 1-11] [--passage "93, 94:1-8"] [--opening auto|none|basmala|istiadha|both] [--closing auto|none|sadaqa]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media]
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
@@ -13,7 +14,11 @@
  * speech-to-text run here (--stt, local/stt/transcribe.py). With --script,
  * the words are the script's, exactly, timed by what was heard.
  * Step 3 (understanding): language, kind, scenes or ayat, structure
- * (understanding.json).
+ * (understanding.json). A recitation is located first (quran-location.json):
+ * the surah and ayat the user gave (--surah, --ayat) or the ones a recognizer
+ * heard, each ayah end on a measured pause. Given alone, the times are
+ * estimates; an unclear or contradictory recording ends in a question (exit
+ * code 3), never in a guess.
  * Step 4 (pictures): a plan per scene (pictures.json, pictures.md); with
  * --media, free licensed pictures from the keyless archives (network).
  * Quran: the adab guard's problems and gaps instead.
@@ -28,6 +33,9 @@ import { msg } from "../engine/src/messages.mjs";
 import { alignScript, checkTranscript, normalizeTranscript } from "../engine/src/transcript.mjs";
 import { understandVoice } from "../engine/src/voice-understand.mjs";
 import { buildQuranIndex } from "../engine/src/quran.mjs";
+import { locateRecitation } from "../engine/src/quran-locate.mjs";
+import { voiceSpans } from "../engine/src/voice-analyze.mjs";
+import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard } from "../engine/src/voice-visuals.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 
@@ -151,14 +159,15 @@ export async function intake(o) {
 /**
  * Run local/stt/transcribe.py on the 16 kHz copy. Python and the engine's
  * package must be installed on this machine (pip install faster-whisper).
- * @param {{ wav: string, out: string, engine: string, model?: string, language?: string, python?: string }} o
+ * @param {{ wav: string, out: string, engine: string, model?: string, language?: string, python?: string, clips?: number[] }} o
  */
 export async function speechToText(o) {
   const script = new URL("./stt/transcribe.py", import.meta.url).pathname;
   const args = ["-I", script, o.wav, "--engine", o.engine, "--out", o.out];
   if (o.model) args.push("--model", o.model);
   if (o.language) args.push("--language", o.language);
-  await run(o.python ?? "python3", args, { maxBuffer: 1 << 24, timeout: 6 * 3600 * 1000 });
+  if (o.clips?.length) args.push("--clips", o.clips.join(","));
+  await run(o.python ?? process.env.ZUPONA_PYTHON ?? "python3", args, { maxBuffer: 1 << 24, timeout: 6 * 3600 * 1000 });
   return normalizeTranscript(await readFile(o.out, "utf8"));
 }
 
@@ -188,15 +197,31 @@ export async function loadQuran() {
   return { index, surahNames };
 }
 
+/** The voiced stretches of a 16 kHz mono WAV (voice-16k.wav), to 10 ms. @param {string} wav */
+export async function readSpans(wav) {
+  const bytes = await readFile(wav);
+  const decoded = decodeWav(/** @type {ArrayBuffer} */ (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)), { maxChannels: 1 });
+  return { ...voiceSpans(decoded.channels[0], decoded.sampleRate), samples: decoded.channels[0], sampleRate: decoded.sampleRate };
+}
+
 /**
- * Step 3: understand the voice and save understanding.json.
- * @param {{ out: string, transcript: any, totalSeconds: number, kind: "auto" | "narration" | "quran" }} o
+ * Step 3: understand the voice and save understanding.json. With sttWav, a
+ * recitation is located first (given passage, gate, times on the pauses).
+ * @param {{ out: string, transcript: any, totalSeconds: number, kind: "auto" | "narration" | "quran", sttWav?: string, given?: { surah?: unknown, ayat?: unknown, passage?: unknown } | null, opening?: any, closing?: any }} o
  */
 export async function understand(o) {
   const needQuran = o.kind !== "narration";
   const q = needQuran ? await loadQuran() : null;
-  const u = understandVoice({ transcript: o.transcript, totalSeconds: o.totalSeconds, kind: o.kind, quranIndex: q?.index ?? null, surahNames: q?.surahNames ?? [] });
-  await writeFile(join(o.out, "understanding.json"), JSON.stringify({ ...u, match: undefined }, null, 1));
+  const hasGiven = Boolean(o.given && [o.given.surah, o.given.passage].some((v) => typeof v === "string" || typeof v === "number"));
+  const arabic = /^ar/.test(String(o.transcript?.language ?? ""));
+  let location = null;
+  if (q && o.sttWav && (o.kind === "quran" || hasGiven || arabic)) {
+    const voice = await readSpans(o.sttWav);
+    location = locateRecitation({ index: q.index, surahNames: q.surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: hasGiven ? o.given : null, words: o.transcript?.words ?? null, opening: o.opening, closing: o.closing });
+    await writeFile(join(o.out, "quran-location.json"), JSON.stringify({ ...location, stretches: voice.spans.length, recognizer: o.transcript?.engine ? { engine: o.transcript.engine, model: o.transcript.model ?? null, modelSource: o.transcript.modelSource ?? null, modelRevision: o.transcript.modelRevision ?? null, modelLicense: o.transcript.modelLicense ?? null } : null }, null, 1));
+  }
+  const u = understandVoice({ transcript: o.transcript ?? { words: [] }, totalSeconds: o.totalSeconds, kind: o.kind, quranIndex: q?.index ?? null, surahNames: q?.surahNames ?? [], location });
+  await writeFile(join(o.out, "understanding.json"), JSON.stringify({ ...u, match: undefined, location: undefined }, null, 1));
   return u;
 }
 
@@ -254,14 +279,21 @@ async function main() {
   const str = (x) => (typeof x === "string" ? resolve(x) : undefined);
   /** @type {string | null} */
   let mastered = null;
-  if (args.transcript || args.stt) {
-    const step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : undefined, script: str(args.script) });
-    for (const m of step2.messages) console.log("- " + m[lang]);
-    if (!step2.check.ok) process.exit(1);
-    const step3 = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (args.kind) });
+  const given = { surah: args.surah, ayat: args.ayat, passage: args.passage };
+  const hasGiven = typeof args.surah === "string" || typeof args.passage === "string";
+  if (args.transcript || args.stt || hasGiven) {
+    /** @type {any} */
+    let step2 = { words: [], language: null };
+    if (args.transcript || args.stt) {
+      step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
+      for (const m of step2.messages) console.log("- " + m[lang]);
+      if (!step2.check.ok) process.exit(1);
+    }
+    const about = { sttWav: step1.sttWav, given: hasGiven ? given : null, opening: args.opening, closing: args.closing };
+    const step3 = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);
-    if (!step3.ok) process.exit(1);
+    if (!step3.ok) process.exit(/** @type {any} */ (step3).question ? 3 : 1);
     let understanding = step3;
     if (args.master) {
       const kind = step3.kind === "quran" ? "quran" : "narration";
@@ -269,7 +301,7 @@ async function main() {
       if (!m.ok) { console.error(m.blocked ?? "Mastering failed its own checks; see the report."); process.exit(1); }
       mastered = m.file;
       // Cut again on the mastered length, so the last picture holds through the reverb's tail. Word times do not move.
-      understanding = await understand({ out, transcript: step2, totalSeconds: m.seconds, kind: /** @type {any} */ (args.kind) });
+      understanding = await understand({ out, transcript: step2, totalSeconds: m.seconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
       if (!understanding.ok) process.exit(1);
     }
     const step4 = await pictures({ out, understanding, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined });

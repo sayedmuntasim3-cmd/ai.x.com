@@ -161,6 +161,27 @@ export function findActivity(levels) {
   return { active, speechDb, noiseFloorDb, measuredInPauses: noiseCount >= 5, threshold, pauses, phrases: merged };
 }
 
+/**
+ * Every unbroken stretch of voice in a recording, to 10 ms: a gap of 150 ms
+ * or more (a breath) separates two stretches. This is the same activity
+ * reading the analysis uses, without the rest of it, for placing ayat on
+ * the pauses of a long recitation.
+ * @param {Float32Array} x @param {number} sampleRate
+ */
+export function voiceSpans(x, sampleRate) {
+  const hop = Math.round(sampleRate * 0.01);
+  const act = findActivity(frameDb(filter(x, biquad("highpass", 60, sampleRate)), hop * 2, hop));
+  /** @type {Span[]} */
+  const spans = [];
+  for (let i = 0; i < act.active.length;) {
+    let j = i;
+    while (j < act.active.length && act.active[j] === act.active[i]) j += 1;
+    if (act.active[i]) spans.push({ start: i * 0.01, end: j * 0.01 });
+    i = j;
+  }
+  return { spans, pauses: act.pauses, speechDb: act.speechDb, noiseFloorDb: act.noiseFloorDb, seconds: x.length / sampleRate };
+}
+
 /** Turn runs of `value` shorter than `under` frames into `to`. @param {Uint8Array} a @param {number} value @param {number} under @param {number} to */
 function fillRuns(a, value, under, to) {
   for (let i = 0; i < a.length;) {
