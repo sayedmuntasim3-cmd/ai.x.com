@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { biquad, filter, frameDb, fromDb, percentile, powerDb } from "../src/voice-dsp.mjs";
 import { analyzeVoice } from "../src/voice-analyze.mjs";
-import { CHAIN_LIMITS, compress, declick, declip, deess, level, planChain, runChain } from "../src/voice-chain.mjs";
+import { CHAIN_LIMITS, compress, declick, declip, deess, easePauses, level, planChain, runChain } from "../src/voice-chain.mjs";
 import { testVoice, TEST_PHRASES } from "../src/voice-test-signal.mjs";
 
 const RATE = 48000;
@@ -118,4 +118,22 @@ test("dynamics: levels are evened gently, and a recitation keeps more of its ran
   const even = Float32Array.from(clean), flat = compress(even, RATE, planChain(analyzeVoice(clean, RATE)).compressor);
   assert.ok(flat.maxReductionDb <= 2.2, JSON.stringify(flat));
   assert.deepEqual(level(new Float32Array(RATE), RATE, null, { rangeDb: 3, strength: 0.4 }), { minDb: 0, maxDb: 0 });
+});
+
+test("narration only: pauses are dipped (never muted) with word edges untouched, and a thin voice gets a little warmth", () => {
+  const noisy = testVoice({ noiseDb: -55 });
+  const a = analyzeVoice(noisy, RATE, { profile: "narration" });
+  const plan = planChain(a, "narration");
+  assert.ok(plan.pauseEaseDb > 0 && plan.pauseEaseDb <= CHAIN_LIMITS.narration.pauseEaseMaxDb);
+  assert.equal(planChain(analyzeVoice(noisy, RATE, { profile: "quran" })).pauseEaseDb, 0);
+  assert.equal(planChain({ ...a, room: { rt60: 0.9, decays: 4, heavy: true, some: true } }, "narration").pauseEaseDb, 0);
+  const y = Float32Array.from(noisy);
+  assert.equal(easePauses(y, RATE, a.pauses.list, 6), a.pauses.list.length);
+  assert.ok(Math.abs(rms(noisy, 2.6, 2.9) - rms(y, 2.6, 2.9) - 6) < 0.7, "dip " + (rms(noisy, 2.6, 2.9) - rms(y, 2.6, 2.9)));
+  // Every sample of the phrases themselves is as it was.
+  for (const p of TEST_PHRASES) for (let i = Math.round(p.start * RATE); i < Math.round(p.end * RATE); i += 211) assert.ok(Math.abs(y[i] - noisy[i]) <= Math.abs(noisy[i]) * 0.02 + 1e-6);
+  const thin = filter(clean, biquad("peak", 250, RATE, 1, -10));
+  const warm = planChain(analyzeVoice(thin, RATE, { profile: "narration" }), "narration").eq.find((b) => b.hz === 250);
+  assert.ok(warm && warm.gainDb > 0 && warm.gainDb <= CHAIN_LIMITS.narration.warmthMaxDb, JSON.stringify(warm));
+  assert.ok(planChain(analyzeVoice(thin, RATE, { profile: "quran" })).eq.every((b) => b.hz > 400 || b.gainDb <= 0));
 });

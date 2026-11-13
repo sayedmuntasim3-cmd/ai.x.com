@@ -22,8 +22,8 @@ import { msg } from "./messages.mjs";
  * and Sad sounds tajweed depends on, and more of the reciter's own dynamics.
  */
 export const CHAIN_LIMITS = Object.freeze({
-  quran: Object.freeze({ denoiseMaxDb: 6, eqMaxDb: 3, deessMaxDb: 3, levelRangeDb: 2.5, levelStrength: 0.3, ratio: 1.5, peakReductionDb: 2, attackMs: 20, releaseMs: 250 }),
-  narration: Object.freeze({ denoiseMaxDb: 10, eqMaxDb: 4, deessMaxDb: 6, levelRangeDb: 5, levelStrength: 0.6, ratio: 2.5, peakReductionDb: 5, attackMs: 10, releaseMs: 120 }),
+  quran: Object.freeze({ denoiseMaxDb: 6, eqMaxDb: 3, warmthMaxDb: 0, pauseEaseMaxDb: 0, deessMaxDb: 3, levelRangeDb: 2.5, levelStrength: 0.3, ratio: 1.5, peakReductionDb: 2, attackMs: 20, releaseMs: 250 }),
+  narration: Object.freeze({ denoiseMaxDb: 10, eqMaxDb: 4, warmthMaxDb: 2, pauseEaseMaxDb: 6, deessMaxDb: 6, levelRangeDb: 5, levelStrength: 0.6, ratio: 2.5, peakReductionDb: 5, attackMs: 10, releaseMs: 120 }),
 });
 
 /**
@@ -56,7 +56,8 @@ export function planChain(a, profile = a.profile, o = {}) {
   /** @param {FilterType} type @param {number} hz @param {number} q @param {number} gainDb */
   const add = (type, hz, q, gainDb) => { if (gainDb !== 0) eq.push({ type, hz, q, gainDb }); };
   add("lowshelf", 160, 0.707, move(dev[0], 3, true));
-  add("peak", 250, 1.2, move(dev[1], 1.5, true));
+  // Warmth: a thin narration may be lifted a little around 250 Hz, above the low cut; a recitation's lows are only ever cut.
+  add("peak", 250, 1.2, Math.min(move(dev[1], 1.5, limit.warmthMaxDb === 0), limit.warmthMaxDb));
   add("peak", 500, 1.2, clamp(move(dev[2], 1.5, false), -2, 2));
   add("peak", 1000, 1.2, clamp(move(dev[3], 1.5, false), -2, 2));
   add("peak", 2000, 1.2, move(dev[4], 1.5, false));
@@ -69,9 +70,16 @@ export function planChain(a, profile = a.profile, o = {}) {
   const essOver = a.level.speechDb + a.sibilance.db - essLine;
   const deess = a.sibilance.db > -14 && essOver > 1 ? { thresholdDb: round(essLine, 1), maxDb: round(Math.min(limit.deessMaxDb, essOver * 0.6), 1), splitHz: 4500 } : null;
 
+  // Pauses: for a narration recorded in a dry room, the gaps between phrases are turned down a few dB (never
+  // muted), which hides what the compressor would otherwise lift. Off for a recitation: its soft letters at
+  // the edge of a pause come first, and its reverb covers the gaps anyway. Off where the room rings.
+  const dryRoom = a.room.rt60 === null || a.room.rt60 < 0.4;
+  const pauseEaseDb = repair && dryRoom && a.level.measuredInPauses ? round(clamp((45 - a.level.snrDb) * 0.5, 0, limit.pauseEaseMaxDb), 1) : 0;
+
   return {
     profile,
     repair,
+    pauseEaseDb,
     dc: Math.abs(a.dcOffset) > 0.0005,
     declip: repair && a.clipping.runs > 0,
     highpass,
@@ -308,6 +316,31 @@ function activityOf(levels) {
 }
 
 /**
+ * Turn the pauses down by `depthDb` (a dip, not a gate): the dip starts
+ * 80 ms after the voice stops and is over 60 ms before it starts again, with
+ * slopes of about 50 ms, so no word edge is touched.
+ * @param {Float32Array} x @param {number} sampleRate @param {{ start: number, end: number }[]} pauses @param {number} depthDb
+ */
+export function easePauses(x, sampleRate, pauses, depthDb) {
+  const hop = Math.round(sampleRate * 0.01), frames = Math.ceil(x.length / hop) + 1;
+  const dip = new Float32Array(frames);
+  let eased = 0;
+  for (const p of pauses) {
+    const from = Math.round((p.start + 0.08) * 100), to = Math.round((p.end - 0.06) * 100);
+    if (to - from < 10) continue;
+    // The slopes (50 ms each) lie inside the dip, so nothing outside it moves at all.
+    for (let f = Math.max(0, from); f < Math.min(frames, to); f += 1) dip[f] = depthDb * Math.min(1, (f - from + 1) / 5, (to - f) / 5);
+    eased += 1;
+  }
+  for (let i = 0; i < x.length; i += 1) {
+    const at = i / hop, f = Math.min(frames - 2, Math.floor(at));
+    const d = dip[f] + (dip[f + 1] - dip[f]) * (at - f);
+    if (d > 0.01) x[i] *= fromDb(-d);
+  }
+  return eased;
+}
+
+/**
  * Soft-knee compressor on an RMS detector. The threshold is placed from the
  * recording's own level histogram so that its loud frames (95th percentile)
  * come down by the profile's few dB; a recording that is already even is
@@ -377,6 +410,8 @@ export function runChain(input, sampleRate, analysis, plan = planChain(analysis)
   if (deessed) messages.push(msg("vm.did.deess", { db: deessed.maxReductionDb }));
   const levelled = level(x, sampleRate, null, plan.leveller);
   const compressed = compress(x, sampleRate, plan.compressor);
+  const eased = plan.pauseEaseDb > 0 ? easePauses(x, sampleRate, analysis.pauses.list, plan.pauseEaseDb) : 0;
   messages.push(msg("vm.did.dynamics", { down: -levelled.minDb, up: levelled.maxDb, ratio: plan.compressor.ratio, mean: compressed.meanReductionDb, max: compressed.maxReductionDb }));
-  return { samples: x, plan, did: { declipped, clicks, denoisedDb, deess: deessed, leveller: levelled, compressor: compressed }, messages };
+  if (eased > 0) messages.push(msg("vm.did.pauses", { db: plan.pauseEaseDb, count: eased }));
+  return { samples: x, plan, did: { declipped, clicks, denoisedDb, deess: deessed, leveller: levelled, compressor: compressed, pausesEased: eased }, messages };
 }
