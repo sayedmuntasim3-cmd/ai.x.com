@@ -3,7 +3,7 @@
  * under it. The owner's own recording is cleaned, never changed: no pitch or
  * formant shift, no auto-tune, no speed change, no re-synthesis, and the
  * untouched original is always kept. A cloned ElevenLabs voice is used as
- * delivered and only levelled. The Quran is never synthesised, and nothing
+ * delivered: its repair steps stay off, only tone, level and loudness are set. The Quran is never synthesised, and nothing
  * (music, nasheed, nature sounds) is ever laid under a recitation.
  *
  * OWNER DECISION, 13 Nov 2026: a recitation MAY get a smooth hall / mosque

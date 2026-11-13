@@ -105,6 +105,7 @@ export function masterLoudness(channels, sampleRate, o = {}) {
  * Master one recording.
  * @param {{
  *   samples: Float32Array, sampleRate: number, profile?: VoiceProfile, preset?: string,
+ *   source?: "own-recording" | "elevenlabs", targetLufs?: number,
  *   ayahEnds?: number[], meaningAware?: boolean, feeling?: { start: number, end: number, amount: number }[],
  * }} input
  */
@@ -113,20 +114,22 @@ export function masterVoice(input) {
   const profile = input.profile ?? "quran";
   const preset = input.preset ?? PROFILE_SPACES[profile][0];
   const before = analyzeVoice(samples, sampleRate, { profile });
-  const plan = planChain(before, profile);
+  const plan = planChain(before, profile, { source: input.source });
   const space = planSpace(before, preset);
   const messages = [...before.messages];
   if (before.seconds < 1 || before.loudness.integrated === null) return { ok: false, profile, preset, channels: /** @type {Float32Array[]} */ ([]), sampleRate, before, after: null, chain: null, space: null, master: null, proof: null, messages };
 
   const chain = runChain(samples, sampleRate, before, plan);
   messages.push(...chain.messages, ...space.messages);
+  if (profile === "narration") messages.push(msg("vm.space.narration"));
   // Feeling-aware variation is never on for a recitation unless it is asked for by name.
   const meaningAware = input.meaningAware === true;
   const wet = space.space ? applyReverb(chain.samples, sampleRate, before, space.space, { ayahEnds: input.ayahEnds, meaningAware, feeling: input.feeling }) : null;
   let channels = wet ? [wet.left, wet.right] : [chain.samples];
-  const master = masterLoudness(channels, sampleRate, { maxLimitDb: LIMITER_MAX_DB[profile] });
+  const targetLufs = input.targetLufs ?? MASTER.targetLufs;
+  const master = masterLoudness(channels, sampleRate, { targetLufs, maxLimitDb: LIMITER_MAX_DB[profile] });
   messages.push(msg("vm.master.done", { lufs: round(master.lufs ?? 0, 1), peak: round(master.truePeakDb, 1), limit: master.limiterMaxDb }));
-  if (master.shortDb > 0.5) messages.push(msg("vm.master.short", { lufs: round(master.lufs ?? 0, 1), target: MASTER.targetLufs, limit: LIMITER_MAX_DB[profile] }));
+  if (master.shortDb > 0.5) messages.push(msg("vm.master.short", { lufs: round(master.lufs ?? 0, 1), target: targetLufs, limit: LIMITER_MAX_DB[profile] }));
 
   // The tail is kept until it has faded to silence, then the file ends.
   const n = samples.length, quiet = fromDb(-75);
@@ -134,7 +137,7 @@ export function masterVoice(input) {
   while (end > n && channels.every((c) => Math.abs(c[end - 1]) < quiet)) end -= 1;
   channels = channels.map((c) => c.subarray(0, end));
 
-  const proof = proveMaster(samples, channels, sampleRate, { tailAllowedSeconds: wet ? wet.info.tailSeconds : 0, phrases: before.phrases });
+  const proof = proveMaster(samples, channels, sampleRate, { tailAllowedSeconds: wet ? wet.info.tailSeconds : 0, phrases: before.phrases, voice: wet ? chain.samples : undefined });
   messages.push(...proof.messages);
   if (wet) messages.push(msg("vm.proof.echoFree", { rt: wet.info.rt60At500 ?? 0, slice: wet.info.strongestSliceDb, rise: wet.info.worstRiseDb }));
   // The cleaned voice before space and gain, measured the same way as the input, for a fair before/after.

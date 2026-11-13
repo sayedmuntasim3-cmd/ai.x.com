@@ -15,6 +15,8 @@ test("arguments: the profile decides which spaces may be asked for", () => {
   assert.deepEqual(parseArgs(["--profile", "narration"]).presets, ["dry"]);
   assert.throws(() => parseArgs(["--profile", "narration", "--preset", "grand-hall"]), /must be one of dry, warm-room/);
   assert.throws(() => parseArgs(["--profile", "song"]), /quran or narration/);
+  assert.throws(() => parseArgs(["--profile", "quran", "--source", "elevenlabs"]), /never synthesised/);
+  assert.deepEqual(parseArgs(["--profile", "narration", "--preset", "all", "--source", "elevenlabs"]).presets, ["dry", "warm-room"]);
 });
 
 test("a file is mastered to WAV 24-bit and AAC with a report; the original is untouched", async (t) => {

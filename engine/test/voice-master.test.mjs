@@ -104,3 +104,33 @@ test("planVoice decides what the engine runs: profile, space, and the refusals",
   const report = masterReport(hall);
   assert.ok(report.ok && report.proof && report.before.lufs !== null && !("samples" in report) && JSON.stringify(report).length < 20000);
 });
+
+test("narration profile: close and nearly dry, evener than a recitation, and honest about it", () => {
+  const uneven = Float32Array.from(raw, (v, i) => v * (i / RATE < 2.6 ? 1.8 : i / RATE > 5.4 ? 0.6 : 1));
+  const dry = masterVoice({ samples: uneven, sampleRate: RATE, profile: "narration" });
+  const room = masterVoice({ samples: uneven, sampleRate: RATE, profile: "narration", preset: "warm-room" });
+  const recital = masterVoice({ samples: uneven, sampleRate: RATE, profile: "quran", preset: "clean" });
+  assert.ok(dry.ok && room.ok && recital.ok);
+  assert.equal(dry.preset, "dry");
+  assert.equal(dry.channels.length, 1);
+  assert.equal(dry.channels[0].length, uneven.length);
+  assert.ok(codes(dry).includes("vm.space.narration") && codes(dry).includes("vm.space.none"));
+  // The room is a touch: under half a second, far under the voice, and the file grows by less than a second.
+  assert.ok(room.space && room.space.rt60At500 !== null && room.space.rt60At500 < 0.6 && room.space.wetDb <= -24 && room.space.echoFree);
+  assert.ok(room.proof && room.proof.duration.extraSeconds < 1);
+  // Same uneven voice: the narration ends evener (phrase 1 against phrase 3) than the recitation.
+  const gap = (/** @type {Float32Array} */ x) => { const e = (/** @type {number} */ a, /** @type {number} */ b) => { let s = 0; for (let i = Math.round(a * RATE); i < Math.round(b * RATE); i += 1) s += x[i] * x[i]; return 10 * Math.log10(s / ((b - a) * RATE)); }; return e(0.4, 2.2) - e(5.8, 7.4); };
+  assert.ok(gap(dry.channels[0]) < gap(recital.channels[0]) - 1, `narration ${gap(dry.channels[0])} recitation ${gap(recital.channels[0])}`);
+  assert.throws(() => masterVoice({ samples: uneven, sampleRate: RATE, profile: "narration", preset: "grand-hall" }), /does not use/);
+});
+
+test("narration: a generated voice gets no repair steps, and a voice for a music bed is mastered to the plan's own target", () => {
+  const made = masterVoice({ samples: raw, sampleRate: RATE, profile: "narration", source: "elevenlabs", targetLufs: -15 });
+  assert.ok(made.ok && made.chain && made.chain.plan.repair === false && made.chain.plan.denoiseDb === 0 && made.chain.did.clicks === 0);
+  assert.ok(codes(made).includes("vm.did.generated") && !codes(made).includes("vm.did.denoise"));
+  assert.ok(made.master && Math.abs(/** @type {number} */ (made.master.lufs) + 15) <= 0.3);
+  const own = masterVoice({ samples: raw, sampleRate: RATE, profile: "narration" });
+  assert.ok(own.chain && own.chain.plan.repair && own.chain.plan.denoiseDb > 0);
+  const plan = planVoice({ source: "own-recording", contentType: "documentary", versionId: "en-US" });
+  assert.equal(plan.chain.find((s) => s.step === "loudness")?.targetLufs, -15);
+});

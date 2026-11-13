@@ -296,15 +296,6 @@ export function measureVoice(x, sampleRate, options = {}) {
   let activeFrames = 0;
   for (let i = 0; i < active.length; i += 1) activeFrames += active[i];
 
-  // Breath pops: bursts under 70 Hz, far above that band's usual level.
-  const lp70 = biquad("lowpass", 70, sampleRate);
-  const low = frameDb(filter(x, [lp70, lp70]), hop * 2, hop);
-  const lowUsual = median(low);
-  let plosives = 0;
-  for (let i = 1, last = -100; i + 1 < low.length; i += 1) {
-    if (low[i] > lowUsual + 15 && low[i] > speechDb - 12 && low[i] >= low[i - 1] && low[i] >= low[i + 1] && i - last >= 15) { plosives += 1; last = i; }
-  }
-
   // Sibilance: how loud the 5-10 kHz band gets on S sounds, against the voice.
   const hp5 = biquad("highpass", 5000, sampleRate);
   const high = frameDb(filter(x, [hp5, hp5, biquad("lowpass", 10000, sampleRate)]), hop * 2, hop);
@@ -346,6 +337,20 @@ export function measureVoice(x, sampleRate, options = {}) {
     const start = i * pitch.hopSeconds + pitch.offsetSeconds, end = j * pitch.hopSeconds + pitch.offsetSeconds;
     if (end - start >= 0.6) sustained.push({ start: round(start, 2), end: round(end, 2), hz: round(median(run), 1) });
     i = j;
+  }
+
+  // Breath pops: short bursts below the voice's lowest note (so a deep note is never taken for a pop),
+  // far above that band's usual level and over within 150 ms.
+  const popHz = clamp(0.6 * (voiced.length ? percentile(voiced, 0.05) : 115), 30, 70);
+  const low = frameDb(filter(x, [biquad("lowpass", popHz, sampleRate, 0.541), biquad("lowpass", popHz, sampleRate, 1.307)]), hop * 2, hop);
+  const lowUsual = median(low);
+  let plosives = 0;
+  for (let i = 0; i < low.length;) {
+    if (!(low[i] > lowUsual + 15 && low[i] > speechDb - 12)) { i += 1; continue; }
+    let j = i;
+    while (j < low.length && low[j] > lowUsual + 15) j += 1;
+    if (j - i <= 15) plosives += 1;
+    i = j + 15;
   }
 
   const room = estimateRoom(levels, speechDb, noiseFloorDb);

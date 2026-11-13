@@ -5,6 +5,7 @@
  *   node local/voice-master.mjs --audio <file> --profile quran|narration
  *        [--preset clean|mosque-hall|grand-hall|dry|warm-room|all] [--out <dir>]
  *        [--from <s> --to <s>] [--understanding <understanding.json>] [--lang bn|en]
+ *        [--source own-recording|elevenlabs] [--lufs -14]
  *
  * ffmpeg only reads the file (to 48 kHz mono float) and writes the AAC copy;
  * all processing is the pure-JS engine in engine/src/voice-master.mjs. The
@@ -67,7 +68,7 @@ export async function writeAac(wav, m4a) {
 
 /**
  * Master one file with one or more presets.
- * @param {{ audio: string, out: string, profile: "quran" | "narration", presets: string[], from?: number, to?: number, ayahEnds?: number[], keepOriginal?: boolean, aac?: boolean, log?: (line: string) => void, lang?: "en" | "bn" }} o
+ * @param {{ audio: string, out: string, profile: "quran" | "narration", presets: string[], from?: number, to?: number, ayahEnds?: number[], source?: "own-recording" | "elevenlabs", targetLufs?: number, keepOriginal?: boolean, aac?: boolean, log?: (line: string) => void, lang?: "en" | "bn" }} o
  */
 export async function masterFile(o) {
   const log = o.log ?? (() => {}), lang = o.lang ?? "en";
@@ -85,7 +86,7 @@ export async function masterFile(o) {
     n += 1;
     const name = (o.presets.length > 1 ? n + "-" : "") + preset;
     const started = Date.now();
-    const r = masterVoice({ samples, sampleRate: MASTER_RATE, profile: o.profile, preset, ayahEnds: o.ayahEnds });
+    const r = masterVoice({ samples, sampleRate: MASTER_RATE, profile: o.profile, preset, ayahEnds: o.ayahEnds, source: o.source, targetLufs: o.targetLufs });
     const report = masterReport(r);
     log(`== ${preset} (${((Date.now() - started) / 1000).toFixed(1)} s) ==`);
     // The measurement is the same for every preset: print it once.
@@ -117,6 +118,8 @@ export function parseArgs(argv) {
   const profile = String(o.profile ?? "quran");
   if (profile !== "quran" && profile !== "narration") throw new Error(`--profile must be quran or narration, not ${profile}.`);
   const spaces = PROFILE_SPACES[profile];
+  if (o.source !== undefined && o.source !== "own-recording" && o.source !== "elevenlabs") throw new Error(`--source must be own-recording or elevenlabs, not ${o.source}.`);
+  if (profile === "quran" && o.source === "elevenlabs") throw new Error("Quran recitation is never synthesised or voice-cloned; only a recitation recorded by a person is mastered.");
   const preset = String(o.preset ?? spaces[0]);
   if (preset !== "all" && !spaces.includes(preset)) throw new Error(`--preset for ${profile} must be one of ${spaces.join(", ")} or all, not ${preset}.`);
   // The pack plays from the plainest to the largest space.
@@ -133,7 +136,7 @@ async function main() {
   const out = resolve(typeof args.out === "string" ? args.out : join("voice-masters", basename(args.audio).replace(/\.[^.]+$/, "")));
   const num = (/** @type {string | boolean | undefined} */ x) => (typeof x === "string" && Number.isFinite(Number(x)) ? Number(x) : undefined);
   const ayahEnds = typeof args.understanding === "string" ? ayahEndsOf(JSON.parse(await readFile(resolve(args.understanding), "utf8")).quranPlan) : undefined;
-  const r = await masterFile({ audio: resolve(args.audio), out, profile: args.profile, presets: args.presets, from: num(args.from), to: num(args.to), ayahEnds, keepOriginal: args.pack, lang: args.lang === "bn" ? "bn" : "en", log: (line) => console.log(line) });
+  const r = await masterFile({ audio: resolve(args.audio), out, profile: args.profile, presets: args.presets, from: num(args.from), to: num(args.to), ayahEnds, source: args.source === "elevenlabs" ? "elevenlabs" : "own-recording", targetLufs: num(args.lufs), keepOriginal: args.pack, lang: args.lang === "bn" ? "bn" : "en", log: (line) => console.log(line) });
   for (const x of r.results) console.log(`${x.ok ? "OK " : "FAILED "} ${x.preset}: ${x.lufs} LUFS, true peak ${x.truePeakDb} dBTP (AAC ${x.aacTruePeakDb} dBTP) -> ${x.wav}`);
   console.log(`Saved in ${out}`);
   if (!r.ok) process.exit(1);

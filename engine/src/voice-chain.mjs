@@ -27,16 +27,20 @@ export const CHAIN_LIMITS = Object.freeze({
 });
 
 /**
- * The settings for this recording, from its measurement.
- * @param {VoiceAnalysis} a @param {VoiceProfile} [profile]
+ * The settings for this recording, from its measurement. A generated voice
+ * (ElevenLabs) has no microphone, room or mains behind it, so the repair
+ * steps stay off for it: what looks like noise or a click there is part of
+ * what was delivered, and only tone, level and loudness are set.
+ * @param {VoiceAnalysis} a @param {VoiceProfile} [profile] @param {{ source?: "own-recording" | "elevenlabs" }} [o]
  */
-export function planChain(a, profile = a.profile) {
+export function planChain(a, profile = a.profile, o = {}) {
   const limit = CHAIN_LIMITS[profile];
+  const repair = o.source !== "elevenlabs";
   // The low cut sits under the lowest note the voice reaches, never inside it.
   const highpass = { hz: round(clamp(0.7 * (a.pitch?.lowHz ?? 115), 50, 100), 0), order: a.plosives.count > 0 ? 4 : 2 };
   // Narrow cuts only where hum was measured, deep enough to put each line 72 dB under the voice, never deeper than it stands out.
-  const hum = a.hum.harmonics.map((h) => ({ hz: h.hz, q: round(h.hz / 2.5, 1), gainDb: -round(clamp(Math.min(h.prominenceDb + 6, h.levelDb - a.level.speechDb + 72), 6, 40), 1) }));
-  const denoiseDb = a.level.measuredInPauses && a.level.snrDb < 50 ? round(clamp((50 - a.level.snrDb) * 0.4, 0, limit.denoiseMaxDb), 1) : 0;
+  const hum = !repair ? [] : a.hum.harmonics.map((h) => ({ hz: h.hz, q: round(h.hz / 2.5, 1), gainDb: -round(clamp(Math.min(h.prominenceDb + 6, h.levelDb - a.level.speechDb + 72), 6, 40), 1) }));
+  const denoiseDb = repair && a.level.measuredInPauses && a.level.snrDb < 50 ? round(clamp((50 - a.level.snrDb) * 0.4, 0, limit.denoiseMaxDb), 1) : 0;
 
   /** @type {EqBand[]} */
   const eq = [];
@@ -64,8 +68,9 @@ export function planChain(a, profile = a.profile) {
 
   return {
     profile,
+    repair,
     dc: Math.abs(a.dcOffset) > 0.0005,
-    declip: a.clipping.runs > 0,
+    declip: repair && a.clipping.runs > 0,
     highpass,
     hum,
     denoiseDb,
@@ -344,7 +349,8 @@ export function runChain(input, sampleRate, analysis, plan = planChain(analysis)
   if (plan.dc) { let sum = 0; for (let i = 0; i < x.length; i += 1) sum += x[i]; const mean = sum / Math.max(1, x.length); for (let i = 0; i < x.length; i += 1) x[i] -= mean; }
   const declipped = plan.declip ? declip(x, sampleRate) : 0;
   if (plan.declip) messages.push(msg("vm.did.declip", { repaired: declipped, found: analysis.clipping.runs }));
-  const clicks = declick(x, sampleRate);
+  if (!plan.repair) messages.push(msg("vm.did.generated"));
+  const clicks = plan.repair ? declick(x, sampleRate) : 0;
   if (clicks > 0) messages.push(msg("vm.did.declick", { count: clicks }));
 
   const hp = biquad("highpass", plan.highpass.hz, sampleRate);

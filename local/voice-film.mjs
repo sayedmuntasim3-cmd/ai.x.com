@@ -232,7 +232,9 @@ export async function master(o) {
   const quran = o.kind === "quran";
   const plan = planVoice({ source: "own-recording", contentType: quran ? "quran_recitation" : "documentary", versionId: quran ? "ar" : "en-US", space: o.space ?? (quran ? "mosque-hall" : "dry") });
   if (plan.blocked || !plan.mastering) return { ok: false, blocked: plan.blocked, plan, file: null, seconds: 0 };
-  const r = await masterFile({ audio: o.audio, out: join(o.out, "master"), profile: plan.mastering.profile, presets: [plan.mastering.preset], ayahEnds: o.ayahEnds, lang: o.lang, log: o.log });
+  // The plan's own loudness step sets the target (a narration that will sit over a music bed is mastered 1 LU lower).
+  const loud = plan.chain.find((c) => c.step === "loudness");
+  const r = await masterFile({ audio: o.audio, out: join(o.out, "master"), profile: plan.mastering.profile, presets: [plan.mastering.preset], ayahEnds: o.ayahEnds, targetLufs: typeof loud?.targetLufs === "number" ? loud.targetLufs : undefined, lang: o.lang, log: o.log });
   const done = r.results[0];
   return { ok: r.ok, blocked: null, plan, file: done.wav, seconds: done.seconds, report: done.report };
 }
