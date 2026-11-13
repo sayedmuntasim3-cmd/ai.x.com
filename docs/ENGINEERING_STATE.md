@@ -291,6 +291,19 @@ free tier verified on Google's official pages; arms A = model knowledge,
 B = research desk; 40-request cap; minimal context; copy check; gold sheet
 v1 from official sources; fairness rule). Blocked only on the Gemini key.
 
+## 4j. Voice mastering engine (13 Nov 2026)
+
+Map and state: `docs/VOICE_SYSTEM.md` (section "Voice mastering engine"). Pure JS in `engine/src/`:
+`voice-dsp.mjs` (filters, FFT, STFT), `voice-analyze.mjs`, `voice-chain.mjs` (cleanup, tone, dynamics),
+`voice-reverb.mjs` (impulse responses made in code, echo-free proof, send automation), `voice-master.mjs`
+(orchestration, peak stage, limiter, two-pass loudness), `voice-proof.mjs`, `voice-test-signal.mjs`.
+CLI `local/voice-master.mjs`; `local/voice-film.mjs --master` runs it through `planVoice`.
+Owner decision recorded in `voice-plan.mjs`: smooth hall reverb allowed for recitation, repeating echo never.
+Verified on the GitHub runner (run 43374825142) on three real recordings: -14 LUFS, true peak <= -1 dBTP,
+timing and pitch proofs passed. **Not verified by ear**; the owner's own recording is the real test.
+Next: tune by ear with the owner's recording; stereo in the renderer; chunked processing over 30 minutes;
+real ayah times into the send automation; studio page and upload.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`

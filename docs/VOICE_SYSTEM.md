@@ -102,3 +102,29 @@ claims to be the best in the world.
 CLI: `node local/voice-master.mjs --audio <file> --profile quran|narration [--preset <name>|all] [--from s --to s] [--source elevenlabs] [--lufs -14] [--understanding understanding.json] [--lang bn]`
 gives `<preset>.wav` (48 kHz 24-bit), `.m4a` (AAC 256k) and `.report.json`; `--preset all` adds the untouched original (the listening pack).
 In the film path: `node local/voice-film.mjs --audio a.mp3 --kind quran --master [space]` asks `planVoice` for profile and space, runs the engine, and names `master/<space>.wav` for `--one-track`.
+
+### Mastering state (13 Nov 2026, verified by running it)
+
+- Built and tested (V0-V6): analyzer, cleanup, tone, three-stage dynamics, synthesised reverb with automation,
+  two-pass loudness, proofs, CLI, `voice-film --master`, narration profile. 50 tests on synthetic signals
+  (`engine/test/voice-{analyze,chain,reverb,master}.test.mjs`, `local/voice-master.test.mjs`).
+- Real recordings, GitHub Actions run 43374825142 (`voice-master.yml`, runs on a push of the mastering code): 60 s
+  each of two archive.org recitations their uploaders marked CC0 (`jawad-farogi/Az-Zuha.mp3`,
+  `001AlFaatihah_201305`; used for the test only, never committed) and the public-domain LibriVox Gettysburg
+  reading. All 8 masters passed their own proofs: -14.0 LUFS; true peak -1.38 to -4.29 dBTP (AAC decoded again:
+  -1.39 to -4.30); voice within 0.021 ms of the original, no drift; voice pitch median difference 0.62-1.24
+  cents, contour correlation 0.9996-1.0; applied reverb measured 1.47-2.26 s at 500 Hz (shortened from 2.4 / 3.8 s
+  because those reciters pause for about 0.4-0.6 s), echo-free check passed.
+- What the numbers say honestly: both recitations were already loud, processed files (-7 and -9.5 LUFS, one
+  with true peak +4.7 dBTP), so the engine turned them *down* and they are not the "ordinary raw recording"
+  this is for. Noise fell 2.4 dB and 8 dB (floor), the narration's 5.1 dB with its pauses dipped; the
+  narration's tallest peaks stood 21.5 dB above the voice and were eased to 14 dB, leaving the limiter 0.25 dB.
+- Speed and memory (this box): 60 s in about 6 s; 10 minutes in 53 s with 1.1 GB. About ten float buffers are
+  held at once, so an hour needs roughly 7 GB: recordings over about 30 minutes need chunked processing (not built).
+- Not verified: how it sounds. No one has listened yet; targets (tone offsets, reverb level -14 / -12.5 dB,
+  thresholds) are engineering starting points to tune with the owner by ear. No test yet on a raw phone
+  recording, on ElevenLabs audio, or with real ayah times from the understanding layer (the hook is tested with
+  given times only).
+- Not built: stereo in the film renderer (it mixes mono, so a film gets the reverb in mono; the standalone
+  WAV / AAC are stereo), chunked processing for long files, de-reverb (a heavy room cannot be removed), breath
+  control, a feeling model (only the bounded hook exists, off), studio page and upload route.
