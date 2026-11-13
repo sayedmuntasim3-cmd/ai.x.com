@@ -21,8 +21,11 @@ function film(surah, o = {}) {
   /** @type {{ start: number, end: number }[]} */
   const spans = [];
   let at = 3;
+  /** @type {{ start: number, end: number }[]} */
+  const truth = [];
   units.forEach((u, k) => {
     const length = u.weight * 0.25;
+    const begin = at;
     const breaths = Math.max(1, Math.ceil(length / (o.breath ?? 8)));
     for (let b = 0; b < breaths; b += 1) {
       const last = spans[spans.length - 1];
@@ -30,10 +33,13 @@ function film(surah, o = {}) {
       at += length / breaths;
       if (b < breaths - 1) at += 0.45 + 0.2 * random.next();
     }
+    truth.push({ start: begin, end: at });
     if (!(o.joinAfter ?? []).includes(k)) at += 0.8 + 0.4 * random.next();
   });
+  // A second, independent method (the text aligned to the audio) agrees with the truth, as it does on clean recordings.
+  const aligned = truth.map((t, k) => ({ surah, ayah: k + 1, start: t.start + 0.05, end: t.end - 0.1, score: 0.9, lastWordScore: 0.9, words: [{ start: t.start, end: t.start + 0.4, score: 0.9 }] }));
   const total = at + 4;
-  const location = locateRecitation({ index, surahNames, spans, totalSeconds: total, given: { surah: String(surah) }, opening: "none", closing: "none" });
+  const location = locateRecitation({ index, surahNames, spans, totalSeconds: total, given: { surah: String(surah) }, opening: "none", closing: "none", aligned });
   assert.equal(location.ok, true);
   const { plan } = planLocated(location, index, total, surahNames);
   const ranges = [{ surah, fromAyah: 1, toAyah: AYAH_COUNTS[surah - 1] }];
