@@ -55,7 +55,7 @@ jobs:
       - name: Locate everything
         run: |
           L=local/quran-locate.mjs
-          go() { label=$1; shift; node $L "$@" --label "$label" --out "runs/$label" > "logs-$label.txt" 2>&1 || true; }
+          go() { local name=$1; shift; node $L "$@" --label "$name" --out "runs/$name" > "logs-$name.txt" 2>&1 || true; }
           mkdir -p runs
           while read -r label audio truth surah ayat opening; do
             go "$label-given" --audio "$audio" --surah $surah --ayat $ayat --opening $opening --closing none --truth "$truth"

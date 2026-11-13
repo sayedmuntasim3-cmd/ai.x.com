@@ -494,6 +494,19 @@ export function absorbRepeats(heard, tokens, index) {
   return repeats;
 }
 
+/**
+ * Fragments: a piece of an ayah (under 60% of its words, cut off) that is not
+ * next to an ayah of its own surah. Such words also occur elsewhere (the
+ * isti'adha ends 16:98; "wallahu sami'un 'alim" ends many ayat), so they are
+ * never taken as an ayah, and the gate judges the rest.
+ * @template {{ surah: number, complete: boolean, matchedWords: number, ayahWords: number }} T
+ * @param {T[]} all
+ */
+export function splitFragments(all) {
+  const fragments = all.filter((a, k) => !a.complete && a.matchedWords < 0.6 * a.ayahWords && all[k - 1]?.surah !== a.surah && all[k + 1]?.surah !== a.surah && all.length > 1);
+  return { kept: all.filter((a) => !fragments.includes(a)), fragments };
+}
+
 /** @param {{ surah: number, ayah: number }[]} ayat @returns {AyahRange[]} */
 export function toRanges(ayat) {
   /** @type {AyahRange[]} */
@@ -514,7 +527,7 @@ export function toRanges(ayat) {
  * @returns {{ verdict: "accept" | "confirmed" | "unconfirmed" | "candidate" | "mismatch" | "nothing", heard: AyahRange[], coverage: number, quality: number, why: string[] }}
  */
 export function judgeMatch(match, given = null) {
-  const heard = heardAyat(match);
+  const heard = splitFragments(heardAyat(match)).kept;
   const coverage = match?.coverage ?? 0;
   const matched = heard.reduce((n, a) => n + a.matchedWords, 0), expected = heard.reduce((n, a) => n + a.ayahWords, 0);
   const quality = expected ? r3(matched / expected) : 0;
@@ -668,7 +681,12 @@ export function locateRecitation(o) {
   out.heard = verdict?.heard ?? [];
 
   if (useHeard && match && verdict) {
-    const heard = heardAyat(match).filter((a) => a.start !== null && a.end !== null);
+    // A fragment of an ayah from another place (under 60% of its words, cut off, and not next to its own
+    // surah's ayat) is not taken as an ayah: words such as the isti'adha also end 16:98.
+    const { kept, fragments } = splitFragments(heardAyat(match));
+    const heard = kept.filter((a) => a.start !== null && a.end !== null);
+    for (const f of fragments) out.other.push({ type: "other", words: f.matchedWords, start: f.start, end: f.end });
+    if (fragments.length) messages.push(msg("quran.fragment", { count: fragments.length, places: fragments.map((f) => `${f.surah}:${f.ayah}`).join(", ") }));
     if (!heard.length) return ask(msg("quran.ask.times"), { recognition, heard: verdict.heard });
     for (const r of absorbRepeats(heard, timedTokens(words), o.index)) out.repeats.push({ surah: r.surah, ayah: r.ayah, start: r3(r.start) });
     const snapped = snapToPauses(heard, spans);
@@ -682,7 +700,7 @@ export function locateRecitation(o) {
       return { surah: a.surah, ayah: a.ayah, start: snapped[k].start, end: snapped[k].end, timing: /** @type {"recognized"} */ ("recognized"), onPause: snapped[k].onPause, joined: !snapped[k].onPause, confidence: r3(share * a.confidence), sure: snapped[k].onPause && share >= GATE.sureHeard, repeat, heardShare: r3(share) };
     });
     out.markers = match.markers.filter((m) => m.start !== null && m.end !== null).map((m) => ({ type: m.type, start: r3(/** @type {number} */ (m.start)), end: r3(/** @type {number} */ (m.end)), timing: /** @type {"recognized"} */ ("recognized") }));
-    out.other = otherSpeech(words, match);
+    out.other = [...out.other, ...otherSpeech(words, match)];
     for (const x of out.other) if (x.type === "takbir" && x.start !== null && x.end !== null) out.markers.push({ type: "takbir", start: r3(x.start), end: r3(x.end), timing: "recognized" });
     out.source = given ? "given+recognized" : "recognized";
     out.timing = "recognized";

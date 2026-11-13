@@ -172,6 +172,7 @@ export const MESSAGES = Object.freeze({
   "quran.review.loudness": { en: (p) => `The film is at ${p.lufs} LUFS, not -14.`, bn: (p) => `ফিল্মের লাউডনেস ${p.lufs} LUFS, -14 নয়।` },
   "quran.review.peak": { en: (p) => `The true peak is ${p.peak} dBTP, above -1.`, bn: (p) => `ট্রু পিক ${p.peak} dBTP, -1-এর বেশি।` },
   "quran.review.ready": { en: (p) => `Ready to publish: every scene approved, the film passed its checks, signed off by ${p.by}.`, bn: (p) => `প্রকাশের জন্য প্রস্তুত: সব দৃশ্য অনুমোদিত, ফিল্ম পরীক্ষায় পাস, স্বাক্ষর করেছেন ${p.by}।` },
+  "quran.fragment": { en: (p) => `${p.count} short fragment(s) matched another place (${p.places}) and were not taken as ayat; listen to that part.`, bn: (p) => `${p.count}টি ছোট টুকরো অন্য জায়গার (${p.places}) সাথে মিলেছে, সেগুলোকে আয়াত ধরা হয়নি; ওই অংশটা শুনে নিন।` },
   "voice.scenes": { en: (p) => `${p.count} scenes cut on the voice's own word times.`, bn: (p) => `ভয়েসের নিজের শব্দ-সময় ধরে ${p.count}টি দৃশ্য কাটা হয়েছে।` },
   "voice.wordsKept": { en: () => "Every spoken word is in the plan, unchanged and in order.", bn: () => "প্রতিটি বলা শব্দ পরিকল্পনায় আছে, অপরিবর্তিত ও ক্রমমতো।" },
   "voice.wordsChanged": { en: (p) => `The picture plan changed the words of ${p.scenes}; they were put back from the voice.`, bn: (p) => `ছবির পরিকল্পনা ${p.scenes}-এর শব্দ বদলেছিল; ভয়েস থেকে আবার ঠিক করে বসানো হয়েছে।` },

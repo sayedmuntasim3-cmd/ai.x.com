@@ -355,3 +355,24 @@ test("one ayah heard in two pieces, with a word heard twice, is one recitation, 
   const again = { ...match, segments: [seg([piece(24, 43, 906.5, 1019, true, true)]), seg([piece(24, 43, 1100, 1200, true, true)])] };
   assert.equal(heardAyat(/** @type {any} */ (again)).length, 2);
 });
+
+test("a misheard isti'adha is still the isti'adha, never 16:98 (found on the runner: 'wa-a'udu billahi ...')", () => {
+  const units = passageUnits(index, [{ surah: 1, fromAyah: 1, toAyah: 7 }]);
+  const voice = recite([{ weight: 20 }, ...units], { seed: 3, breath: 1000 });
+  const opening = ["وَأَعُدُ", "بِاللَّهِ", "مِنَ", "الشَّيْطَانِ", "الرَّجِيمِ"].map((text, i) => ({ text, start: voice.truth[0].start + i * 0.5, end: voice.truth[0].start + i * 0.5 + 0.45 }));
+  const words = [...opening, ...heardWords(1, 1, 7, voice.truth.slice(1))];
+  const loc = locateRecitation({ index, surahNames, spans: voice.spans, totalSeconds: voice.seconds, words });
+  assert.equal(loc.decision, "accept");
+  assert.deepEqual(loc.ayat.map((a) => `${a.surah}:${a.ayah}`), ["1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7"]);
+  assert.deepEqual(loc.markers.map((m) => m.type), ["istiadha"]);
+});
+
+test("a short fragment of another surah is not taken as an ayah, and is reported", () => {
+  const units = passageUnits(index, [{ surah: 93, fromAyah: 1, toAyah: 11 }]);
+  const voice = recite([{ weight: 15 }, ...units], { seed: 5, breath: 1000 });
+  // Four words that end 2:255's neighbour 2:256 ("... wallahu sami'un 'alim"), said before Ad-Duha.
+  const stray = ["والله", "سميع", "عليم"].map((text, i) => ({ text, start: voice.truth[0].start + i * 0.6, end: voice.truth[0].start + i * 0.6 + 0.5 }));
+  const loc = locateRecitation({ index, surahNames, spans: voice.spans, totalSeconds: voice.seconds, words: [...stray, ...heardWords(93, 1, 11, voice.truth.slice(1))] });
+  assert.ok(loc.ayat.every((a) => a.surah === 93), loc.ayat.map((a) => `${a.surah}:${a.ayah}`).join(" "));
+  assert.equal(loc.ayat.length, 11);
+});

@@ -308,6 +308,32 @@ Measured here (CPU), Yusuf 1-40, ayah ends against the known times:
 | mosque (echoes, long tail, hall noise) | 78/78, 39/39, 0.18 s | 12:1-40 (100%, 98%), 78/78, 39/39, 0.18 s |
 | the phone copy recognised twice | | the same times both runs |
 
+On the GitHub runner (run 43468852665, 13 Nov, artifact `quran-qa`), every row measured against known ayah
+times. "Given" = the surah and ayat given, timed by pauses; "recognizer" = nothing given.
+
+| Recording | Mode | Found | Ends within 0.2 s | Cuts in the true gap | Median / worst error |
+|---|---|---|---|---|---|
+| quiet, Al-Fatiha (49 s) | given | 1:1-7 | 10/12 | 5/6 | 0.03 / 2.38 s |
+| quiet, Al-Fatiha | recognizer | **1:1-7 plus 16:98 (wrong)** | 12/12 | 6/6 | 0.03 / 0.05 s |
+| quiet, Yusuf 1-40 (13 min) | given | 12:1-40 | 77/78 | 39/39 | 0.005 / 0.3 s |
+| quiet, Yusuf 1-40 | recognizer | 12:1-40 | 77/78 | 39/39 | 0.005 / 0.3 s |
+| quiet, al-Husary Yunus 1-30 (20 min) | given | 10:1-30 | 38/58 | 19/29 | 0 / 33.6 s |
+| quiet, al-Husary Yunus 1-30 | recognizer | 10:1-30 | 58/58 | 29/29 | 0 / 0.11 s |
+| phone, Yusuf 1-40 | given | 12:1-40 | 76/78 | 39/39 | 0.01 / 0.32 s |
+| phone, Yusuf 1-40 | recognizer | 12:1-40 (99%, 99%) | 76/78 | 39/39 | 0.01 / 0.32 s |
+| phone, Yusuf 1-40, second run | recognizer | the same | 76/78 | 39/39 | 0.01 / 0.32 s |
+| mosque, Yusuf 1-40 | given | 12:1-40 | 78/78 | 39/39 | 0.01 / 0.18 s |
+| mosque, Yusuf 1-40 | recognizer | 12:1-40 (100%, 98%) | 78/78 | 39/39 | 0.01 / 0.18 s |
+| long, Yusuf 1-111 (37 min) | given | 12:1-111 | 215/220 | 110/110 | 0.01 / 0.41 s |
+| long, Yusuf 1-111 | recognizer | 12:1-111 (100%, 99%) | 215/220 | 110/110 | 0.01 / 0.41 s |
+
+FAIL found by this run, fixed the same day: on Al-Fatiha the recognizer heard the isti'adha as "wa-a'udu
+billahi ...", so it was not recognised as the isti'adha and its last words were taken as ayah 16:98, which
+ends with them. Two fixes: the isti'adha is now found from "billahi mina sh-shaytani r-rajim" after a word
+close to "a'udhu"; and a cut-off fragment of an ayah that is not next to its own surah's ayat is never taken
+as an ayah (it is reported for listening). Re-located from the runner's own transcripts: Al-Fatiha 1:1-7
+with the isti'adha labelled, 12/12; Yusuf 39/39; Yunus 29/29.
+
 What failed (all runs so far): the real CC0 Ad-Duha (slow, melodic, breaths of 20-37 s) is not recognised
 by the Tarteel base model, so it is asked about; given the surah, 6 of its 10 ayah ends are in one breath
 and stay unsure, so the film cuts only at pauses and the pictures follow estimated ayat. The real CC0
