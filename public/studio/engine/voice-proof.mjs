@@ -54,12 +54,17 @@ export function comparePitch(a, b) {
 }
 
 /**
- * Pass or fail for one pitch comparison. @param {ReturnType<typeof comparePitch>} c @param {number} share the least share of frames within 20 cents
+ * Pass or fail for one pitch comparison. Strict for a voice on its own. In a
+ * mix with reverb the tail carries the previous note under the next one, so
+ * single frames wander; there the median (which a real shift of even 1%,
+ * 17 cents, would move) and the contour of the agreeing frames carry the proof.
+ * @param {ReturnType<typeof comparePitch>} c @param {boolean} withReverb
  * @returns {boolean | null}
  */
-function pitchKept(c, share) {
+function pitchKept(c, withReverb) {
   if (c.medianCents === null) return null;
-  return c.medianCents <= 5 && (c.within20Cents ?? 0) >= share && (c.correlation === null || c.correlation >= 0.98);
+  const contour = c.correlation === null || c.correlation >= 0.98;
+  return withReverb ? c.medianCents <= 10 && (c.trackerSlips ?? 0) <= 0.25 && contour : c.medianCents <= 5 && (c.within20Cents ?? 0) >= 0.9 && contour;
 }
 
 /**
@@ -101,7 +106,7 @@ export function proveMaster(original, mastered, sampleRate, o = {}) {
   const f0 = trackPitch(original, sampleRate).f0;
   const mix = comparePitch(f0, trackPitch(mid, sampleRate).f0);
   const voice = o.voice ? comparePitch(f0, trackPitch(o.voice, sampleRate).f0) : null;
-  const mixOk = pitchKept(mix, voice ? 0.8 : 0.9), voiceOk = voice ? pitchKept(voice, 0.9) : null;
+  const mixOk = pitchKept(mix, voice !== null), voiceOk = voice ? pitchKept(voice, false) : null;
   const shown = voice ?? mix;
   const pitch = { ...shown, mix, ok: mixOk === null && voiceOk === null ? null : mixOk !== false && voiceOk !== false };
 

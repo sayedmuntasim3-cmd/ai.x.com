@@ -303,6 +303,8 @@ export function measureVoice(x, sampleRate, options = {}) {
   const highActive = [];
   for (let i = 0; i < high.length; i += 1) if (active[i]) highActive.push(high[i]);
   const sibilanceDb = highActive.length ? round(percentile(highActive, 0.98) - speechDb, 1) : -60;
+  // What that band usually holds while the voice sounds: a de-esser must sit above this, or it dulls everything.
+  const sibilanceUsualDb = highActive.length ? round(percentile(highActive, 0.85), 1) : -120;
 
   // Tonal balance of the voiced frames in octave bands.
   const size = 4096;
@@ -370,7 +372,7 @@ export function measureVoice(x, sampleRate, options = {}) {
     clipping: { runs: clippedRuns, samples: clippedSamples },
     hum,
     plosives: { count: plosives, perMinute: round(plosives / Math.max(seconds / 60, 1 / 60), 1) },
-    sibilance: { db: sibilanceDb, sharp: sibilanceDb > -10 },
+    sibilance: { db: sibilanceDb, sharp: sibilanceDb > -10, usualDb: sibilanceUsualDb },
     tone: { bands },
     room: { ...room, heavy: room.rt60 !== null && room.rt60 >= 0.8, some: room.rt60 !== null && room.rt60 >= 0.4 },
     pauses: { list: pauses, count: inner.length, medianSeconds: inner.length ? round(median(inner.map((p) => p.end - p.start)), 2) : null, share: round(pauseSeconds / Math.max(seconds, 1e-9), 3) },

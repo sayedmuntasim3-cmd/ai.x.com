@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fromDb } from "../src/voice-dsp.mjs";
-import { LIMITER_MAX_DB, ayahEndsOf, limit, masterLoudness, masterReport, masterVoice } from "../src/voice-master.mjs";
+import { LIMITER_MAX_DB, PEAK_OVER_VOICE_DB, ayahEndsOf, limit, masterLoudness, masterReport, masterVoice, tamePeaks } from "../src/voice-master.mjs";
+import { analyzeVoice } from "../src/voice-analyze.mjs";
+import { planChain } from "../src/voice-chain.mjs";
 import { planVoice } from "../src/voice-plan.mjs";
 import { comparePitch, lagAt, proveMaster } from "../src/voice-proof.mjs";
 import { trackPitch } from "../src/voice-analyze.mjs";
@@ -133,4 +135,30 @@ test("narration: a generated voice gets no repair steps, and a voice for a music
   assert.ok(own.chain && own.chain.plan.repair && own.chain.plan.denoiseDb > 0);
   const plan = planVoice({ source: "own-recording", contentType: "documentary", versionId: "en-US" });
   assert.equal(plan.chain.find((s) => s.step === "loudness")?.targetLufs, -15);
+});
+
+test("dynamics in stages: tall peaks are eased before the limiter, a modest voice is left alone, a bright voice is not de-essed all the time", () => {
+  // Hard-consonant style spikes 24 dB above the voice.
+  const spiky = Float32Array.from(raw);
+  for (let i = 30000; i < spiky.length; i += 19000) for (let k = 0; k < 40; k += 1) spiky[i + k] += 0.9 * Math.sin(k * 0.9) * Math.exp(-k / 12);
+  const copy = Float32Array.from(spiky);
+  const eased = tamePeaks(spiky, RATE, PEAK_OVER_VOICE_DB.narration);
+  assert.ok(eased.crestBeforeDb > 20 && eased.crestAfterDb <= PEAK_OVER_VOICE_DB.narration + 1.5 && eased.maxReductionDb > 4, JSON.stringify(eased));
+  // A third of a second after a spike the gain has let go: the held note is the same to within a tenth of a dB.
+  for (let i = Math.round(3.7 * RATE); i < Math.round(3.78 * RATE); i += 7) if (Math.abs(copy[i]) > 0.01) assert.ok(Math.abs(spiky[i] / copy[i] - 1) < 0.012);
+  const modest = Float32Array.from(raw);
+  assert.equal(tamePeaks(modest, RATE, PEAK_OVER_VOICE_DB.quran).maxReductionDb, 0);
+  assert.deepEqual(modest, raw);
+  // With a ratio, what passes the line is turned down, not stopped: 12 dB over at 4:1 comes out 3 dB over.
+  const tone = Float32Array.from({ length: RATE / 2 }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 300 * i) / RATE));
+  limit([tone], RATE, 20 * Math.log10(0.5) - 12, { ratio: 4, kneeDb: 0.01, lookaheadMs: 1, releaseMs: 50 });
+  const peak = tone.subarray(RATE / 4).reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  assert.ok(Math.abs(20 * Math.log10(peak / 0.5) + 9) < 0.5, "peak moved by " + 20 * Math.log10(peak / 0.5));
+  // The de-esser's line sits above what the top of this voice usually holds.
+  const a = analyzeVoice(raw, RATE, { profile: "narration" });
+  const bright = planChain({ ...a, sibilance: { db: -5, sharp: true, usualDb: a.level.speechDb - 8 } }, "narration");
+  assert.ok(bright.deess && bright.deess.thresholdDb === Math.round((a.level.speechDb - 8) * 10) / 10 && Math.abs(bright.deess.maxDb - 1.8) < 0.11, JSON.stringify(bright.deess));
+  assert.equal(planChain({ ...a, sibilance: { db: -5, sharp: true, usualDb: a.level.speechDb - 5.5 } }, "narration").deess, null);
+  // The before/after numbers of the voice are read before loudness gain, with or without a space.
+  assert.ok(clean.after && hall.after && Math.abs(clean.after.dryNoiseFloorDb - hall.after.dryNoiseFloorDb) < 0.01 && clean.after.dryNoiseFloorDb < clean.before.level.noiseFloorDb - 2);
 });

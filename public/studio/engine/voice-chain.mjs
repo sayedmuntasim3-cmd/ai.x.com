@@ -22,7 +22,7 @@ import { msg } from "./messages.mjs";
  * and Sad sounds tajweed depends on, and more of the reciter's own dynamics.
  */
 export const CHAIN_LIMITS = Object.freeze({
-  quran: Object.freeze({ denoiseMaxDb: 6, eqMaxDb: 3, deessMaxDb: 3, levelRangeDb: 3, levelStrength: 0.4, ratio: 1.5, peakReductionDb: 2, attackMs: 20, releaseMs: 250 }),
+  quran: Object.freeze({ denoiseMaxDb: 6, eqMaxDb: 3, deessMaxDb: 3, levelRangeDb: 2.5, levelStrength: 0.3, ratio: 1.5, peakReductionDb: 2, attackMs: 20, releaseMs: 250 }),
   narration: Object.freeze({ denoiseMaxDb: 10, eqMaxDb: 4, deessMaxDb: 6, levelRangeDb: 5, levelStrength: 0.6, ratio: 2.5, peakReductionDb: 5, attackMs: 10, releaseMs: 120 }),
 });
 
@@ -63,8 +63,11 @@ export function planChain(a, profile = a.profile, o = {}) {
   add("peak", 4000, 1.2, move(dev[5], 1.5, false));
   add("highshelf", 6500, 0.707, move(dev[6], 1.5, false));
 
-  // The de-esser works only on S sounds that pass 14 dB under the voice, and only as far as they pass it.
-  const deess = a.sibilance.db > -14 ? { thresholdDb: round(a.level.speechDb - 14, 1), maxDb: round(Math.min(limit.deessMaxDb, (a.sibilance.db + 14) * 0.6), 1), splitHz: 4500 } : null;
+  // The de-esser works only on S sounds that pass 14 dB under the voice and stand above what the top of the
+  // voice usually holds (so a bright voice is not dulled all the time), and only as far as they pass that line.
+  const essLine = Math.max(a.level.speechDb - 14, a.sibilance.usualDb);
+  const essOver = a.level.speechDb + a.sibilance.db - essLine;
+  const deess = a.sibilance.db > -14 && essOver > 1 ? { thresholdDb: round(essLine, 1), maxDb: round(Math.min(limit.deessMaxDb, essOver * 0.6), 1), splitHz: 4500 } : null;
 
   return {
     profile,

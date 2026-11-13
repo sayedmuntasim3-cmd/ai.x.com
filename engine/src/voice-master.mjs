@@ -9,7 +9,7 @@
  * trimmed, so the file is at -14 LUFS with true peak at or under -1 dBTP by
  * measurement, not by assumption.
  */
-import { clamp, db, fromDb, round } from "./voice-dsp.mjs";
+import { clamp, db, fromDb, powerDb, round } from "./voice-dsp.mjs";
 import { analyzeVoice } from "./voice-analyze.mjs";
 import { planChain, runChain } from "./voice-chain.mjs";
 import { PROFILE_SPACES, applyReverb, planSpace } from "./voice-reverb.mjs";
@@ -20,27 +20,40 @@ import { msg } from "./messages.mjs";
 
 /** @typedef {import("./voice-analyze.mjs").VoiceProfile} VoiceProfile */
 
-/** The most a limiter may take off a peak before loudness gives way instead. */
-export const LIMITER_MAX_DB = Object.freeze({ quran: 6, narration: 8 });
+/** The most the final limiter may take off a peak before loudness gives way instead. */
+export const LIMITER_MAX_DB = Object.freeze({ quran: 4, narration: 5 });
+
+/**
+ * How far the loudest peak may stand above the voice's own level (dB) before
+ * the peak stage acts. A recitation keeps taller peaks than a narration.
+ */
+export const PEAK_OVER_VOICE_DB = Object.freeze({ quran: 16, narration: 14 });
 
 /**
  * Look-ahead peak limiter, in place, all channels moved together. The gain
- * is the smallest needed over the next 5 ms, released smoothly and averaged
- * over the same 5 ms, so it is already down when a peak arrives and no
- * sample passes the ceiling. Nothing is delayed.
+ * is the smallest needed over the next few ms, released smoothly and averaged
+ * over the same time, so it is already down when a peak arrives and no
+ * sample passes the ceiling. Nothing is delayed. With a `ratio` it is a
+ * gentle peak compressor instead: what passes the line is turned down by
+ * that ratio, with a soft knee, rather than stopped.
  * @param {Float32Array[]} channels @param {number} sampleRate @param {number} ceilingDb
- * @param {{ lookaheadMs?: number, releaseMs?: number }} [o]
+ * @param {{ lookaheadMs?: number, releaseMs?: number, ratio?: number, kneeDb?: number }} [o]
  */
 export function limit(channels, sampleRate, ceilingDb, o = {}) {
   const n = channels[0].length, ceiling = fromDb(ceilingDb);
   const ahead = Math.max(1, Math.round(((o.lookaheadMs ?? 5) / 1000) * sampleRate));
+  const soft = o.ratio !== undefined && Number.isFinite(o.ratio), slope = soft ? 1 - 1 / /** @type {number} */ (o.ratio) : 1;
+  const knee = soft ? (o.kneeDb ?? 6) : 0, start = soft ? fromDb(ceilingDb - knee / 2) : ceiling;
   const need = new Float32Array(n);
   let touched = false;
   for (let i = 0; i < n; i += 1) {
     let peak = 0;
     for (const c of channels) { const a = Math.abs(c[i]); if (a > peak) peak = a; }
-    need[i] = peak > ceiling ? ceiling / peak : 1;
-    if (peak > ceiling) touched = true;
+    if (peak <= start) { need[i] = 1; continue; }
+    touched = true;
+    if (!soft) { need[i] = ceiling / peak; continue; }
+    const over = db(peak) - ceilingDb;
+    need[i] = fromDb(-(over >= knee / 2 ? over * slope : (slope * (over + knee / 2) * (over + knee / 2)) / (2 * knee)));
   }
   if (!touched) return { maxReductionDb: 0, limitedShare: 0 };
   // Smallest needed gain over [i, i + ahead], by a monotonic queue.
@@ -68,6 +81,35 @@ export function limit(channels, sampleRate, ceilingDb, o = {}) {
     for (const c of channels) c[i] *= gain;
   }
   return { maxReductionDb: round(-db(deepest), 2), limitedShare: round(limited / n, 4) };
+}
+
+/**
+ * The peak stage between the compressor and the limiter: when the loudest
+ * peaks stand further above the voice than the profile allows (hard
+ * consonants, pops), what towers over the voice is turned down with a soft
+ * knee, 1 ms ahead, so the final limiter is left with little to do. The line
+ * and the ratio come from this recording's own level and peak; a voice whose
+ * peaks are already modest is not touched.
+ * @param {Float32Array} x @param {number} sampleRate @param {number} allowedDb
+ */
+export function tamePeaks(x, sampleRate, allowedDb) {
+  const hop = Math.round(sampleRate * 0.01);
+  let peak = 0, top = -200, sum = 0, count = 0;
+  for (let i = 0; i < x.length; i += 1) { const a = Math.abs(x[i]); if (a > peak) peak = a; }
+  /** @type {number[]} */
+  const powers = [];
+  for (let s = 0; s + hop <= x.length; s += hop) { let p = 0; for (let i = s; i < s + hop; i += 1) p += x[i] * x[i]; powers.push(p / hop); top = Math.max(top, powerDb(p / hop)); }
+  for (const p of powers) if (powerDb(p) > top - 30) { sum += p; count += 1; }
+  if (!count || peak <= 0) return { crestBeforeDb: 0, crestAfterDb: 0, lineDb: 0, maxReductionDb: 0 };
+  const voice = powerDb(sum / count), crest = db(peak) - voice;
+  if (crest <= allowedDb + 0.5) return { crestBeforeDb: round(crest, 1), crestAfterDb: round(crest, 1), lineDb: 0, maxReductionDb: 0 };
+  // The line sits 2 dB under the allowed height, well above the vowels' own peaks, so only what towers over the
+  // voice is touched; the ratio is the one that brings the tallest peak down to the allowed height.
+  const line = voice + allowedDb - 2, ratio = clamp((crest - allowedDb + 2) / 2, 2, 10);
+  const did = limit([x], sampleRate, line, { ratio, kneeDb: 3, lookaheadMs: 1, releaseMs: 50 });
+  let after = 0;
+  for (let i = 0; i < x.length; i += 1) { const a = Math.abs(x[i]); if (a > after) after = a; }
+  return { crestBeforeDb: round(crest, 1), crestAfterDb: round(db(after) - voice, 1), lineDb: round(line, 1), maxReductionDb: did.maxReductionDb };
 }
 
 /**
@@ -120,7 +162,12 @@ export function masterVoice(input) {
   if (before.seconds < 1 || before.loudness.integrated === null) return { ok: false, profile, preset, channels: /** @type {Float32Array[]} */ ([]), sampleRate, before, after: null, chain: null, space: null, master: null, proof: null, messages };
 
   const chain = runChain(samples, sampleRate, before, plan);
-  messages.push(...chain.messages, ...space.messages);
+  const peaks = tamePeaks(chain.samples, sampleRate, PEAK_OVER_VOICE_DB[profile]);
+  messages.push(...chain.messages);
+  if (peaks.maxReductionDb > 0) messages.push(msg("vm.did.peaks", { before: peaks.crestBeforeDb, after: peaks.crestAfterDb, max: peaks.maxReductionDb }));
+  messages.push(...space.messages);
+  // The cleaned voice before space and gain, measured the same way as the input, for a fair before/after.
+  const dry = analyzeVoice(chain.samples, sampleRate, { profile });
   if (profile === "narration") messages.push(msg("vm.space.narration"));
   // Feeling-aware variation is never on for a recitation unless it is asked for by name.
   const meaningAware = input.meaningAware === true;
@@ -140,14 +187,12 @@ export function masterVoice(input) {
   const proof = proveMaster(samples, channels, sampleRate, { tailAllowedSeconds: wet ? wet.info.tailSeconds : 0, phrases: before.phrases, voice: wet ? chain.samples : undefined });
   messages.push(...proof.messages);
   if (wet) messages.push(msg("vm.proof.echoFree", { rt: wet.info.rt60At500 ?? 0, slice: wet.info.strongestSliceDb, rise: wet.info.worstRiseDb }));
-  // The cleaned voice before space and gain, measured the same way as the input, for a fair before/after.
-  const dry = analyzeVoice(chain.samples, sampleRate, { profile });
   const after = {
     lufs: master.lufs, truePeakDb: master.truePeakDb, seconds: round(end / sampleRate, 3),
     dryNoiseFloorDb: dry.level.noiseFloorDb, drySnrDb: dry.level.snrDb, dryLra: dry.loudness.lra, dryCrestDb: dry.level.crestDb,
     dryTone: dry.tone.bands, dryHum: dry.hum.hz, drySibilanceDb: dry.sibilance.db,
   };
-  return { ok: master.ok && proof.ok, profile, preset, channels, sampleRate, before, after, chain: { plan: chain.plan, did: chain.did }, space: wet ? { ...space.space, ...wet.info, loweredDb: space.loweredDb, shortened: space.shortened } : null, master, proof, messages };
+  return { ok: master.ok && proof.ok, profile, preset, channels, sampleRate, before, after, chain: { plan: chain.plan, did: { ...chain.did, peaks } }, space: wet ? { ...space.space, ...wet.info, loweredDb: space.loweredDb, shortened: space.shortened } : null, master, proof, messages };
 }
 
 /**
