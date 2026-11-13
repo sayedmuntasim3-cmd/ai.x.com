@@ -106,7 +106,7 @@ In the film path: `node local/voice-film.mjs --audio a.mp3 --kind quran --master
 ### Mastering state (13 Nov 2026, verified by running it)
 
 - Built and tested (V0-V6): analyzer, cleanup, tone, three-stage dynamics, synthesised reverb with automation,
-  two-pass loudness, proofs, CLI, `voice-film --master`, narration profile. 50 tests on synthetic signals
+  two-pass loudness, proofs, CLI, `voice-film --master`, narration profile. 36 tests on synthetic signals
   (`engine/test/voice-{analyze,chain,reverb,master}.test.mjs`, `local/voice-master.test.mjs`).
 - Real recordings, GitHub Actions run 43374825142 (`voice-master.yml`, runs on a push of the mastering code): 60 s
   each of two archive.org recitations their uploaders marked CC0 (`jawad-farogi/Az-Zuha.mp3`,
