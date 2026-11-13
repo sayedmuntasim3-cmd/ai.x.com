@@ -1,11 +1,12 @@
 {
   "name": "ai-x-com-site-tools",
   "private": true,
-  "description": "Regenerates the static site in ../public from ../page.tsx",
+  "description": "Regenerates the static site in ../public from ../page.tsx and ../src",
   "scripts": {
-    "build": "tsx render.tsx && tailwindcss -c tailwind.config.cjs -i input.css -o ../public/styles.css --minify"
+    "build": "tsx render.tsx && node build-client.mjs && tailwindcss -c tailwind.config.cjs -i input.css -o ../public/styles.css --minify"
   },
   "devDependencies": {
+    "esbuild": "^0.23.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tailwindcss": "3.4.17",

@@ -1,3 +1,171 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+  Zupona design tokens.
+  A warm, paper-like palette: ivory canvas, soft ink, and one clay accent used sparingly.
+  Values are space-separated RGB so Tailwind can apply opacity (e.g. bg-clay/10).
+*/
+@layer base {
+  :root {
+    color-scheme: light;
+    --canvas: 250 249 245;
+    --surface: 255 255 255;
+    --sunken: 244 242 236;
+    --sunken-strong: 236 233 224;
+    --line: 232 228 218;
+    --line-strong: 216 211 199;
+    --ink: 20 20 19;
+    --ink-2: 61 61 58;
+    --muted: 107 106 100;
+    --clay: 217 119 87;
+    --clay-deep: 184 85 50;
+    --clay-ink: 174 80 48;
+    --clay-btn: 184 85 50;
+    --clay-btn-hover: 163 73 42;
+    --shadow: 61 45 30;
+    --fox-muzzle: 250 249 245;
+    --fox-eye: 20 20 19;
+    --ridge-1: 240 233 222;
+    --ridge-2: 233 223 208;
+    --ridge-3: 244 239 230;
+    --ridge-snow: 252 250 246;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --canvas: 38 38 36;
+      --surface: 48 48 46;
+      --sunken: 31 30 29;
+      --sunken-strong: 26 25 24;
+      --line: 62 61 58;
+      --line-strong: 82 81 77;
+      --ink: 250 249 245;
+      --ink-2: 205 203 194;
+      --muted: 163 161 153;
+      --clay-ink: 232 145 116;
+      --clay-deep: 184 85 50;
+      --shadow: 0 0 0;
+      --fox-muzzle: 250 249 245;
+      --fox-eye: 31 30 29;
+      --ridge-1: 46 45 42;
+      --ridge-2: 51 49 46;
+      --ridge-3: 42 41 39;
+      --ridge-snow: 64 62 58;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --canvas: 38 38 36;
+    --surface: 48 48 46;
+    --sunken: 31 30 29;
+    --sunken-strong: 26 25 24;
+    --line: 62 61 58;
+    --line-strong: 82 81 77;
+    --ink: 250 249 245;
+    --ink-2: 205 203 194;
+    --muted: 163 161 153;
+    --clay-ink: 232 145 116;
+    --clay-deep: 184 85 50;
+    --shadow: 0 0 0;
+    --fox-muzzle: 250 249 245;
+    --fox-eye: 31 30 29;
+    --ridge-1: 46 45 42;
+    --ridge-2: 51 49 46;
+    --ridge-3: 42 41 39;
+    --ridge-snow: 64 62 58;
+  }
+
+  html {
+    background: rgb(var(--canvas));
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: rgb(var(--canvas));
+    color: rgb(var(--ink));
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  html:has(dialog[open]) {
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--clay) / 0.25);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--clay));
+    outline-offset: 2px;
+  }
+
+  textarea:focus-visible,
+  input:focus-visible {
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* Poster scenes move only while the preview is "playing". */
+@layer components {
+  .is-playing .scene-drift {
+    animation: scene-drift 12s ease-in-out both;
+  }
+  .is-playing .scene-drift-slow {
+    animation: scene-drift-slow 12s ease-in-out both;
+  }
+  .is-playing .scene-rise {
+    animation: scene-rise 12s ease-out both;
+  }
+  .is-playing .scene-shimmer {
+    animation: scene-shimmer 4s ease-in-out 3 both;
+  }
+  .is-playing .scene-twinkle {
+    animation: scene-shimmer 3s ease-in-out 4 both;
+  }
+  .is-playing .scene-sway {
+    transform-origin: 50% 0;
+    animation: scene-sway 4s ease-in-out 3 both;
+  }
+
+  @keyframes scene-drift {
+    from { transform: translateX(0); }
+    to { transform: translateX(-34px); }
+  }
+  @keyframes scene-drift-slow {
+    from { transform: translateX(0); }
+    to { transform: translateX(-14px); }
+  }
+  @keyframes scene-rise {
+    from { transform: translateY(0); }
+    to { transform: translateY(-10px); }
+  }
+  @keyframes scene-shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  @keyframes scene-sway {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(0.8deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-playing * {
+      animation: none !important;
+    }
+  }
+}
