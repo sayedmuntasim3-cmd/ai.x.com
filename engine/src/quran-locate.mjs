@@ -396,7 +396,9 @@ export function alignPassage({ index, ranges, spans, opening = "auto", closing =
   for (const o of openings) for (const c of closings) {
     const units = [...o.kinds.map(fixedUnit), ...body, ...c.kinds.map(fixedUnit)];
     const result = alignByPauses({ units, spans, costs });
-    if (result) tries.push({ units, result, score: result.cost + o.prior + c.prior });
+    // The closing words are said after the reciter has stopped: never in the same breath as the last ayah.
+    const closingJoined = Boolean(result && c.kinds.length && result.placed[units.length - 2]?.joined);
+    if (result) tries.push({ units, result, score: result.cost + o.prior + c.prior + (closingJoined ? 10 : 0) });
   }
   if (!tries.length) return null;
   tries.sort((a, b) => a.score - b.score);

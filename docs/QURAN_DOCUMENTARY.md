@@ -177,4 +177,29 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
   `.github/workflows/quran-recognize.yml` (first run after this commit). The Tarteel base model fails
   on slow melodic recitation (Ad-Duha above): the gate then asks, as designed. A larger Quran model is
   the next thing to try on the runner.
-- Q2 to Q7: not built.
+- A second reciter (al-Husary, Yunus 1-45, given only): 15 of 44 cuts in the true gap; the 11 ends
+  called sure were all right. Over all six known-truth sets the given-only path called 400 ends sure
+  and all 400 were within 0.5 s of the truth. A wrong `--opening` makes every end unsure (Fatiha: 0 of
+  6), and the closing words are never placed inside the last ayah's breath.
+
+**Q2 (verified text and meaning) built** and tested (`engine/test/quran-meaning.test.mjs`, 9 tests).
+- Text on screen: Tanzil Uthmani 1.1, verbatim with its notice (`engine/data/quran/tanzil-quran-uthmani-1.1.txt`,
+  CC BY 3.0, verbatim only; sha256 pinned in the test). Checked against the Simple text: 6,155 of 6,236
+  ayat have the same letter skeleton, the other 81 are known Uthmani spellings.
+- Font: Amiri Quran (Google Fonts, SIL OFL 1.1) in `render/assets/fonts/`, recorded in its README.
+  Not yet drawn by the renderer (Q5).
+- Translation: Pickthall 1930 from Project Gutenberg #16955 (public domain), `scripts/extract-pickthall.mjs`;
+  6,168 of 6,236 ayat identical to Tanzil's copy. Tanzil's translations are non-commercial only, so not used.
+- Tafsir: none. No tafsir with a recorded edition and a licence for this use was found; this is a gap.
+- `engine/src/quran-meaning.mjs`: the literal lexicon (52 things, from the Arabic; animals marked
+  `living`, gardens and fire `symbolic`), the unseen from the Arabic (angels, jinn, the Spirit, Throne,
+  Paradise, Hell, the Hereafter; al-jannah / al-jinnah flagged either way), 19 themes from fixed
+  keyword rules on the translation, each with `because` and its source. `node local/quran-meaning.mjs
+  --passage "95"` prints the table for a person to check; `voice-film` writes `meaning.md` and passes the
+  licensed meaning to the adab guard.
+- Test surahs 1, 55, 93-95, 97, 112-114 (132 ayat): every ayah has its text and translation; 29 name a
+  visible thing, 65 have a theme, 12 touch the unseen, 43 are listed as gaps (neutral motifs only).
+- Not verified: the lexicon and theme rules have not been reviewed by a scholar (they must be, before
+  publishing); a run of Paradise ayat without the word (55:70-76) is not flagged unseen by itself: the
+  director (Q3) must carry the flag through a passage.
+- Q3 to Q7: not built.

@@ -78,7 +78,7 @@ jobs:
             go "$name-both" --audio $a --transcript "runs/$name-heard/heard.json" --surah $surah --ayat $ayat --truth $t
             go "$name-wrong" --audio $a --transcript "runs/$name-heard/heard.json" --surah $wrong
           done <<'SETS'
-          fatiha 1 1-7 istiadha 93
+          fatiha 1 1-7 none 93
           yusuf 12 1-40 basmala 11
           anfal 8 1-40 basmala 9
           yunus 10 1-30 basmala 11

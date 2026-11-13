@@ -34,6 +34,7 @@ import { alignScript, checkTranscript, normalizeTranscript } from "../engine/src
 import { understandVoice } from "../engine/src/voice-understand.mjs";
 import { buildQuranIndex } from "../engine/src/quran.mjs";
 import { locateRecitation } from "../engine/src/quran-locate.mjs";
+import { meaningTable, parseTanzilText, passageMeaning, planMeanings } from "../engine/src/quran-meaning.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard } from "../engine/src/voice-visuals.mjs";
@@ -189,6 +190,15 @@ export async function words(o) {
   return result;
 }
 
+/** The texts the meaning layer reads: Uthmani (verbatim, with its notice), Simple, Pickthall. */
+export async function loadQuranTexts() {
+  const dir = new URL("../engine/data/quran/", import.meta.url);
+  const uthmani = parseTanzilText(await readFile(new URL("tanzil-quran-uthmani-1.1.txt", dir), "utf8"));
+  const simple = JSON.parse(await readFile(new URL("tanzil-quran-simple-1.0.2.json", dir), "utf8"));
+  const pickthall = JSON.parse(await readFile(new URL("pickthall-1930.json", dir), "utf8"));
+  return { uthmani: uthmani.ayat, notice: uthmani.notice, simple, pickthall: pickthall.ayat };
+}
+
 /** The Tanzil index and surah names, read once. */
 export async function loadQuran() {
   const dir = new URL("../engine/data/quran/", import.meta.url);
@@ -233,7 +243,13 @@ export async function understand(o) {
 export async function pictures(o) {
   const u = o.understanding;
   if (u.kind === "quran") {
-    const guard = quranVisualAdabGuard({ plan: u.quranPlan, index: o.quranIndex ?? (await loadQuran()).index });
+    // The meaning of each ayah from recorded sources (Tanzil Uthmani, Pickthall 1930, the literal lexicon), for the guard and for a person to check.
+    const texts = await loadQuranTexts();
+    const ranges = u.quranPlan.scenes.filter((/** @type {any} */ s) => s.kind === "ayah").map((/** @type {any} */ s) => ({ surah: s.surah, fromAyah: s.ayah, toAyah: s.ayah }));
+    const meaning = passageMeaning(texts, ranges);
+    await writeFile(join(o.out, "meaning.json"), JSON.stringify(meaning, null, 1));
+    await writeFile(join(o.out, "meaning.md"), meaningTable(meaning) + "\n\n" + meaning.tafsir + "\n");
+    const guard = quranVisualAdabGuard({ plan: u.quranPlan, index: o.quranIndex ?? (await loadQuran()).index, meanings: planMeanings(u.quranPlan, texts) });
     await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard }, null, 1));
     return { ok: guard.ok, messages: guard.messages, problems: guard.problems, gaps: guard.gaps };
   }
