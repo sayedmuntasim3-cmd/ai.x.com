@@ -271,4 +271,21 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
   (`.github/workflows/quran-film.yml`, first run after this commit). Most shots are still cards: the
   keyless archives give few relevant, licence-clean, face-free pictures; Pexels and Pixabay are used
   when their keys are set as repository secrets.
-- Q6 and Q7: not built.
+
+**Q6 (review and UX) built** and tested (`engine/test/quran-review.test.mjs`, 3 tests):
+`engine/src/quran-review.mjs` (`reviewSheet`, `decide`, `readyToPublish`, `packaging`), CLI
+`local/quran-review.mjs` (`--status`, `--approve`, `--reject`, `--replace S003 [--query]`, `--signoff --by`,
+`--ready`), the renderer keeps unchanged clips, and the studio page has two tabs (Idea, Voiceover).
+- Run on the real Ad-Duha film: S003 ("tree shelters") replaced by search, the film rendered again in
+  2 min: 1 clip rendered, 5 reused, no frozen frame, no cut in the voice. `--ready` refused while S003 was
+  pending and while unsigned (exit 1); after approval and a sign-off it wrote publish.json (title, chapters
+  from ayah times, tags, Arabic / English / Bangla titles, credits) and exited 0. The sign-off in this test
+  was given by the assistant as a test name: it is not a religious review, and this film is not ready.
+- Every decision needs a name and is kept with its time; any change of a picture undoes the sign-off.
+- Voiceover tab: drop zone (existing analysis in the browser), Quran options (surah, ayat, adab level,
+  format, space, reciter, Arabic text on/off, translation subtitles off) and the exact commands for the
+  owner's computer. Checked in a browser at 1280 px and 390 px (no sideways scroll). Not built: upload to
+  the Worker and rendering from the page (that needs a deploy, which is the owner's decision).
+- Packaging gaps: titles in Urdu, Indonesian, Turkish, Malay and Persian need surah-name lists with a
+  recorded source; chapters use estimated ayah times when the times are estimated.
+- Q7: not built.

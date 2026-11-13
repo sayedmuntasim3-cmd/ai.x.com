@@ -211,17 +211,22 @@ export async function renderQuranFilm(o) {
   await mkdir(work, { recursive: true });
   /** @type {string[]} */
   const clips = [];
+  let reused = 0;
   for (const seg of segs) {
     const shot = direction.shots[seg.index];
     const clip = join(work, `${shot.id}.mp4`);
     const asset = assets.get(shot.id) ?? null;
-    try { await run("ffmpeg", clipArgs(seg, shot, asset, f, clip)); }
+    // A clip whose shot, asset and move are unchanged is kept: replacing one scene re-renders that scene only.
+    const key = JSON.stringify({ from: seg.from, length: seg.length, move: shot.move, asset: asset?.url ?? null, format: o.format ?? "1080p", grade: GRADE });
+    if (await readFile(clip + ".key", "utf8").then((k) => k === key, () => false)) { clips.push(clip); reused += 1; continue; }
+    try { await run("ffmpeg", clipArgs(seg, shot, asset, f, clip)); await writeFile(clip + ".key", key); }
     catch (e) {
       // An asset that cannot be read becomes a card, and the report says so.
       log(`${shot.id}: ${asset ? "the asset could not be read, a card is used" : "card failed"}: ${/** @type {Error} */ (e).message.split("\n")[0]}`);
       if (!asset) throw e;
       assets.delete(shot.id);
       await run("ffmpeg", clipArgs(seg, shot, null, f, clip));
+      await writeFile(clip + ".key", "card");
     }
     clips.push(clip);
     log(`${shot.id} ${seg.length.toFixed(2)} s ${asset ? asset.kind : "card"}`);
@@ -247,7 +252,7 @@ export async function renderQuranFilm(o) {
   const atAyahEnd = cuts.filter((/** @type {number} */ c) => ayahEnds.some((/** @type {number} */ e) => Math.abs(e - c) < 0.05)).length;
   const report = {
     file: out, format: o.format ?? "1080p", width: f.width, height: f.height, seconds: r3(seconds), voiceSeconds: r3(total), lengthMatches: Math.abs(seconds - total) < 0.1,
-    shots: segs.length, withAsset: direction.shots.filter((/** @type {any} */ s) => assets.has(s.id)).length, cards: direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id)).length,
+    shots: segs.length, clipsRendered: segs.length - reused, clipsReused: reused, withAsset: direction.shots.filter((/** @type {any} */ s) => assets.has(s.id)).length, cards: direction.shots.filter((/** @type {any} */ s) => !assets.has(s.id)).length,
     integratedLufs: master.integratedLufs, truePeakDbtp: master.truePeakDbtp, black: master.black.filter((b) => b.start > 2.5 && b.end < total - 3.5), frozen: frozenStretches,
     cuts: cuts.length, cutsAtAyahEnds: atAyahEnd, cutsAtInnerPauses: cuts.length - atAyahEnd - inVoice.length, cutsInsideTheVoice: inVoice.length, voiceChecked: spans.length > 0,
   };

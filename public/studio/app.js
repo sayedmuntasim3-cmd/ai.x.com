@@ -118,6 +118,26 @@ const T = {
     nativeRate: (r, b) => `ফাইলের নিজের ${r / 1000} kHz${b ? ", " + b + "-bit" : ""}-এ মাপা হয়েছে।`,
     resampled: (r) => `ব্রাউজার অডিওটা ${r / 1000} kHz-এ খুলেছে; আসল sample rate দেখতে WAV দিন।`,
     quranLang: "কুরআন তিলাওয়াত সবসময় আরবি; ভাষা আরবি করা হলো।",
+    tabIdea: "আইডিয়া",
+    tabVoice: "ভয়েসওভার",
+    qTitle: "কুরআন তিলাওয়াতের ফিল্ম",
+    qSurah: "সূরা",
+    qAyat: "আয়াত",
+    qSurahHint: "সূরা ও আয়াত দিলে সবচেয়ে নিশ্চিত হয়। না দিলে রেকর্ডিং শুনে খোঁজা হবে; নিশ্চিত না হলে আপনাকে জিজ্ঞেস করা হবে, অনুমান করা হবে না।",
+    qAdab: "ছবিতে কী দেখানো যাবে",
+    adabStrict: "শুধু প্রকৃতি ও স্থাপত্য, কোনো প্রাণী নয়",
+    adabNature: "প্রাণী ও পাখি চলবে, মানুষ নয়",
+    adabPeople: "দূর থেকে মানুষ (মুখ নয়)",
+    qFormat: "ফরম্যাট",
+    qSpace: "কণ্ঠের পরিবেশ",
+    spaceMosque: "মসজিদের হল",
+    spaceClean: "শুকনো, পরিষ্কার",
+    spaceGrand: "বড় হল",
+    qReciter: "কারীর নাম",
+    qArabic: "পর্দায় আরবি আয়াত (Tanzil-এর যাচাই করা লেখা)",
+    qTranslation: "অনুবাদের সাবটাইটেল (এখন বন্ধ; পরে ইউটিউবের আলাদা ক্যাপশন হিসেবে)",
+    qCommands: "আপনার কম্পিউটারে ফিল্ম বানানোর ধাপ",
+    qCommandsHint: "এই কমান্ডগুলো রিপোজিটরির ফোল্ডারে চালান (Node, ffmpeg লাগবে)। শেষ ধাপে একজন রিভিউয়ারের নাম ছাড়া ফিল্ম প্রকাশযোগ্য হবে না।",
     items: {
       duration: "দৈর্ঘ্য",
       loudness: "লাউডনেস (integrated)",
@@ -265,6 +285,26 @@ const T = {
     nativeRate: (r, b) => `Measured at the file's own ${r / 1000} kHz${b ? ", " + b + "-bit" : ""}.`,
     resampled: (r) => `The browser opened the audio at ${r / 1000} kHz; upload WAV to check the original sample rate.`,
     quranLang: "Quran recitation is always Arabic; the language is set to Arabic.",
+    tabIdea: "Idea",
+    tabVoice: "Voiceover",
+    qTitle: "Quran recitation film",
+    qSurah: "Surah",
+    qAyat: "Ayat",
+    qSurahHint: "Giving the surah and ayat is surest. Without them the recording is listened to; if that is not sure, you are asked, nothing is guessed.",
+    qAdab: "What the pictures may show",
+    adabStrict: "Nature and architecture only, no living beings",
+    adabNature: "Animals and birds allowed, no people",
+    adabPeople: "People from afar (no faces)",
+    qFormat: "Format",
+    qSpace: "Space for the voice",
+    spaceMosque: "Mosque hall",
+    spaceClean: "Dry and clean",
+    spaceGrand: "Grand hall",
+    qReciter: "Reciter's name",
+    qArabic: "Arabic ayah text on screen (Tanzil's verified text)",
+    qTranslation: "Translation subtitles (off for now; later as separate YouTube captions)",
+    qCommands: "Steps to make the film on your computer",
+    qCommandsHint: "Run these in the repository folder (Node and ffmpeg needed). At the last step the film cannot be marked ready without a reviewer's name.",
     items: {
       duration: "Length",
       loudness: "Loudness (integrated)",
@@ -754,8 +794,54 @@ function init() {
     if (state.analysis) renderVoice();
   });
 
+  for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => showTab(b.dataset.tab));
+  for (const id of ["#q-surah", "#q-ayat", "#q-adab", "#q-format", "#q-space", "#q-reciter", "#q-arabic"]) $(id).addEventListener("input", quranSteps);
+  $("#ctype").addEventListener("change", quranSteps);
+  file.addEventListener("change", quranSteps);
+
   const saved = storedLang();
   applyLang(saved === "en" || saved === "bn" ? saved : "bn");
+  showTab(location.hash === "#voice" ? "voice" : "idea");
+  quranSteps();
+}
+
+// ---------- Tabs: Idea and Voiceover ----------
+
+function showTab(name) {
+  for (const b of document.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
+  $("#panel-idea").hidden = name !== "idea";
+  $("#panel-voice").hidden = name !== "voice";
+  // The full English film (System A) belongs to the Idea tab.
+  const film = $("#film");
+  if (film) film.hidden = name !== "idea";
+  document.querySelector(".grid").classList.add("one-tab");
+}
+
+/** A value for a shell command line, quoted. */
+const shq = (v) => "'" + String(v).replace(/'/g, "'\\''") + "'";
+
+/** The steps that make the film from the recording, built from the choices on the page. */
+function quranSteps() {
+  const quran = $("#ctype").value === "quran_recitation";
+  $("#quran-opts").hidden = !quran;
+  if (!quran) return;
+  const f = $("#file").files[0];
+  const audio = f ? f.name : "recitation.mp3";
+  const name = audio.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "-") || "recitation";
+  const out = `voice-runs/${name}`;
+  const given = [$("#q-surah").value.trim() ? `--surah ${shq($("#q-surah").value.trim())}` : "", $("#q-ayat").value.trim() ? `--ayat ${shq($("#q-ayat").value.trim())}` : ""].filter(Boolean).join(" ");
+  const reciter = $("#q-reciter").value.trim();
+  const space = $("#q-space").value;
+  const lines = [
+    `node local/voice-film.mjs --audio ${shq(audio)} ${given || "--kind quran --stt faster-whisper --model tarteel-ai/whisper-base-ar-quran"} --master ${space} --adab ${$("#q-adab").value} --out ${out}`,
+    `node local/quran-media.mjs --run ${out} --detect python3`,
+    `node render/quran-render.mjs --run ${out} --audio ${out}/master/${space}.wav --format ${$("#q-format").value}${reciter ? ` --reciter ${shq(reciter)}` : ""}${$("#q-arabic").checked ? "" : " --no-text"}`,
+    `node local/quran-review.mjs --run ${out} --status`,
+    `node local/quran-review.mjs --run ${out} --approve all --by ${shq("REVIEWER NAME")}`,
+    `node local/quran-review.mjs --run ${out} --signoff --by ${shq("REVIEWER NAME")}`,
+    `node local/quran-review.mjs --run ${out} --ready${reciter ? ` --reciter ${shq(reciter)}` : ""}`,
+  ];
+  $("#q-commands").textContent = lines.join("\n");
 }
 
 init();

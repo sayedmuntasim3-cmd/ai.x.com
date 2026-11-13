@@ -1,0 +1,71 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { MESSAGES } from "../src/messages.mjs";
+import { decide, packaging, readyToPublish, reviewSheet } from "../src/quran-review.mjs";
+
+const surahNames = JSON.parse(readFileSync(new URL("../data/quran/surah-names.json", import.meta.url), "utf8"));
+/** @param {string} id @param {number} ayah @param {number} start @param {number} end */
+const shot = (id, ayah, start, end) => ({ id, surah: 93, ayah, start, end, motif: "dawn", because: { detail: "x", source: "y" } });
+const direction = /** @type {any} */ ({ shots: [shot("S001", 1, 0, 8), shot("S002", 3, 8, 20), shot("S003", 5, 20, 30)] });
+const media = { shots: [{ shot: "S001", asset: { id: "w:1", title: "Dawn", page: "p", licenceName: "CC0" } }, { shot: "S002", asset: { id: "w:2", title: "Valley", page: "p", licenceName: "CC BY 4.0" } }, { shot: "S003", asset: null }] };
+const goodRender = { lengthMatches: true, black: [], frozen: [], cutsInsideTheVoice: 0, integratedLufs: -14, truePeakDbtp: -1.5 };
+
+test("Q6 exit: a film cannot be marked ready without every scene approved and a reviewer's name", () => {
+  let review = reviewSheet(direction, media);
+  assert.deepEqual(review.scenes.map((s) => s.status), ["pending", "pending", "pending"]);
+  assert.equal(readyToPublish(review, goodRender).ok, false);
+  // No anonymous decision.
+  assert.equal(decide(review, { shot: "S001", action: "approve", by: " " }).ok, false);
+  review = decide(review, { action: "approve-all", by: "Reviewer A" }).review;
+  // Approved but not signed: still not ready.
+  const unsigned = readyToPublish(review, goodRender);
+  assert.equal(unsigned.ok, false);
+  assert.deepEqual(unsigned.why.map((m) => m.code), ["quran.review.unsigned"]);
+  // A sign-off without a name is refused.
+  assert.equal(decide(review, { action: "signoff", by: "" }).ok, false);
+  review = decide(review, { action: "signoff", by: "Reviewer A" }).review;
+  const ready = readyToPublish(review, goodRender);
+  assert.equal(ready.ok, true);
+  assert.equal(ready.by, "Reviewer A");
+  // The render's own checks still count.
+  assert.deepEqual(readyToPublish(review, { ...goodRender, frozen: [{ start: 3, end: 7 }] }).why.map((m) => m.code), ["quran.review.renderFailed"]);
+  assert.deepEqual(readyToPublish(review, { ...goodRender, integratedLufs: -10 }).why.map((m) => m.code), ["quran.review.loudness"]);
+  assert.deepEqual(readyToPublish(review, null).why.map((m) => m.code), ["quran.review.notRendered"]);
+  for (const m of [...unsigned.why, ...readyToPublish(null, null).why]) assert.ok(m.code in MESSAGES && m.bn !== m.en);
+});
+
+test("replacing a scene keeps the other decisions, sets that scene pending and undoes the sign-off", () => {
+  let review = decide(reviewSheet(direction, media), { action: "approve-all", by: "R" }).review;
+  review = decide(review, { action: "signoff", by: "R" }).review;
+  assert.ok(review.signoff);
+  const replaced = decide(review, { shot: "S002", action: "replace", by: "R", note: "search: olive grove" });
+  assert.equal(replaced.review.signoff, null);
+  // The new asset arrives: the sheet is rebuilt from the new media and the old review.
+  const newMedia = { shots: media.shots.map((s) => (s.shot === "S002" ? { shot: "S002", asset: { id: "w:9", title: "Olive grove", page: "p", licenceName: "CC0" } } : s)) };
+  const again = reviewSheet(direction, newMedia, replaced.review);
+  assert.deepEqual(again.scenes.map((s) => s.status), ["approved", "pending", "approved"]);
+  assert.equal(again.signoff, null);
+  assert.equal(again.decisions.length, 3, "every decision is kept with its name");
+  // Signing with a scene still open is refused, and says which.
+  const early = decide(again, { action: "signoff", by: "R" });
+  assert.equal(early.ok, false);
+  assert.match(early.message.en, /S002/);
+});
+
+test("packaging: title, chapters from ayah times, tags and localized titles from the surah-name list", () => {
+  const plan = { scenes: [{ kind: "title", surah: 93, ayah: null, start: 0 }, ...Array.from({ length: 11 }, (_, k) => ({ kind: "ayah", surah: 93, ayah: k + 1, start: 3 + k * 13 }))] };
+  const p = packaging({ plan, surahNames, reciter: "Qari X", totalSeconds: 150, credits: "Quran text: Tanzil.net" });
+  assert.match(p.title, /^سورة الضحى \| Surah Ad-Dhuhaa \(The Morning Hours\) \| Qari X$/);
+  assert.ok(p.title.length <= 100);
+  assert.equal(p.chapters[0].at, 0);
+  assert.ok(p.chapters.length >= 3 && p.chapters.every((c, i) => i === 0 || c.at - p.chapters[i - 1].at >= 10));
+  assert.match(p.description, /\n0:00 Ad-Dhuhaa 93:1\n/);
+  assert.match(p.description, /Quran text: Tanzil\.net/);
+  assert.match(p.localized.bn, /^সূরা Ad-Dhuhaa/);
+  assert.ok(p.tags.includes("Surah Ad-Dhuhaa"));
+  assert.deepEqual(p.missingLanguages, ["ur", "id", "tr", "ms", "fa"]);
+  // Part of a surah: the ayah range is in the title.
+  const part = packaging({ plan: { scenes: plan.scenes.slice(0, 6) }, surahNames, totalSeconds: 70 });
+  assert.match(part.title, /سورة الضحى \(1-5\) \| Surah Ad-Dhuhaa \(The Morning Hours\), Ayat 1-5/);
+});

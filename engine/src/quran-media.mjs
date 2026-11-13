@@ -98,12 +98,13 @@ function toAsset(r) {
  * Find media for every shot: each search phrase of the shot, video first
  * on every provider that has video, then images.
  * @param {{ shots: import("./quran-director.mjs").Shot[], providers: MediaProvider[], adab?: import("./quran-director.mjs").AdabLevel,
- *   verify?: (c: any) => Promise<boolean> | boolean, inspect?: (r: MediaResult) => Promise<string | null> | string | null, signal?: AbortSignal, log?: (line: string) => void }} o
+ *   verify?: (c: any) => Promise<boolean> | boolean, inspect?: (r: MediaResult) => Promise<string | null> | string | null, signal?: AbortSignal, log?: (line: string) => void,
+ *   exclude?: string[] }} o exclude: asset ids that may not be chosen (used elsewhere in the film, or refused by the reviewer)
  */
 export async function findQuranMedia(o) {
   const level = o.adab ?? "strict";
   const providers = o.providers.filter((p) => QURAN_PROVIDERS.includes(p.id));
-  const used = new Set();
+  const used = new Set(o.exclude ?? []);
   const signal = o.signal ?? new AbortController().signal;
   /** @type {Map<string, MediaResult[]>} */
   const cache = new Map();
