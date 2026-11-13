@@ -160,6 +160,10 @@ export const MESSAGES = Object.freeze({
   "vm.did.eqNone": { en: () => "No tone correction was needed.", bn: () => "টোন ঠিক করার দরকার হয়নি।" },
   "vm.did.deess": { en: (p) => `S sounds softened by at most ${p.db} dB.`, bn: (p) => `স/শ ধ্বনি সর্বোচ্চ ${p.db} dB নরম করা হয়েছে।` },
   "vm.did.dynamics": { en: (p) => `Level evened gently: phrases moved by -${p.down} to +${p.up} dB, then ${p.ratio}:1 compression (mean ${p.mean} dB, at most ${p.max} dB).`, bn: (p) => `আওয়াজ আলতো করে সমান করা হয়েছে: বাক্যাংশ -${p.down} থেকে +${p.up} dB সরানো, তারপর ${p.ratio}:1 কম্প্রেশন (গড়ে ${p.mean} dB, সর্বোচ্চ ${p.max} dB)।` },
+  "vm.space.none": { en: () => "No reverb added: the voice stays as close as it was recorded.", bn: () => "কোনো রিভার্ব যোগ করা হয়নি: কণ্ঠ যেমন কাছ থেকে রেকর্ড হয়েছে তেমনই আছে।" },
+  "vm.space.reverb": { en: (p) => `Reverb "${p.preset}": decay ${p.rt} s, pre-delay ${p.pre} ms, tail ${p.wet} dB against the voice. A smooth tail only; no repeating echo.`, bn: (p) => `রিভার্ব "${p.preset}": রেশ ${p.rt} সেকেন্ড, প্রি-ডিলে ${p.pre} মিলিসেকেন্ড, রেশের মাত্রা কণ্ঠের তুলনায় ${p.wet} dB। শুধু মসৃণ রেশ; শব্দ ফিরে আসা ইকো নয়।` },
+  "vm.space.lowered": { en: (p) => `The recording already has a room (about ${p.rt} s), so the added reverb was lowered by ${p.db} dB.`, bn: (p) => `রেকর্ডিংয়ে আগে থেকেই ঘরের রেশ আছে (প্রায় ${p.rt} সেকেন্ড), তাই যোগ করা রিভার্ব ${p.db} dB কমানো হয়েছে।` },
+  "vm.space.shortened": { en: (p) => `Pauses are short (median ${p.pause} s), so the decay was shortened from ${p.wanted} s to ${p.rt} s to keep the next words clear.`, bn: (p) => `বিরতিগুলো ছোট (মাঝামাঝি ${p.pause} সেকেন্ড), তাই পরের শব্দ পরিষ্কার রাখতে রেশ ${p.wanted} থেকে কমিয়ে ${p.rt} সেকেন্ড করা হয়েছে।` },
 });
 
 /** Names of gates and stages, in both languages. */
