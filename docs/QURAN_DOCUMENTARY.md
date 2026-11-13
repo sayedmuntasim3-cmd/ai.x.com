@@ -225,4 +225,24 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
   breaths are 20-37 s long) and the joined Yusuf 1-40 (67 shots).
 - Not verified: how the shot lists look to a person (the owner or a reviewer should read one `shots.md`);
   the motif families are written by hand and not yet reviewed.
-- Q4 to Q7: not built.
+
+**Q4 (media) built** and tested (`engine/test/quran-media.test.mjs`, 4 tests): `engine/src/quran-media.mjs`
+`findQuranMedia`, `rejectWhy`, `mediaManifest`, `creditsText`; `node local/quran-media.mjs --run <folder>
+[--detect python]` writes media.md, media.json, manifest.json, credits.txt.
+- Providers for a recitation: Pexels and Pixabay (only with their free keys, none set), Wikimedia Commons,
+  NASA, Openverse; the art and history archives are not searched (people and depictions). Video first.
+- Each refusal says why: licence (share-alike, non-commercial, no-derivatives, unconfirmed item page),
+  adab (people, animals by level, paintings, statues, icons, music, generated pictures, book scans),
+  relevance (the title must name what the shot asks for), quality (under 1920 px wide, video too short),
+  used before (no asset twice), detector.
+- Detector net: `local/media/detect.py`, OpenCV 4.10 Haar face cascades and HOG people detector
+  (Apache 2.0). Measured here on 8 NASA astronaut portraits and 8 NASA Earth photographs: all 8 portraits
+  flagged, 1 of 8 Earth photos falsely flagged (a false flag only drops a picture). A small sample; the
+  runner measures 12 + 12 (`.github/workflows/quran-media.yml`).
+- Run here on the real Ad-Duha shot list (Commons and NASA only, no keys): before the relevance rule 4 of 6
+  shots had an asset, but three were wrong (a Mars rover, a 1912 book scan, a snow video); with it, 3 of 6
+  (morning light over a town, a mountain valley, and a coffee cup "in soft morning light", which is why
+  indoor and object words are now refused too), the rest stated gaps.
+- Not verified: relevance is judged from titles only; a person must look at every picture (Q6 review).
+  Without Pexels / Pixabay keys most shots will be gaps or photographs; the owner can add free keys.
+- Q5 to Q7: not built.
