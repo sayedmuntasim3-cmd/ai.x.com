@@ -4,7 +4,15 @@
  * formant shift, no auto-tune, no speed change, no re-synthesis, and the
  * untouched original is always kept. A cloned ElevenLabs voice is used as
  * delivered and only levelled. The Quran is never synthesised, and nothing
- * (music, nasheed, nature sounds, echo) is ever laid under a recitation.
+ * (music, nasheed, nature sounds) is ever laid under a recitation.
+ *
+ * OWNER DECISION, 13 Nov 2026: a recitation MAY get a smooth hall / mosque
+ * style reverb, like the best recitation videos (what the owner calls
+ * "echo"). It is a reverb only: a dense, decaying tail made in code
+ * (voice-reverb.mjs), checked to hold no discrete repeat. An echo or delay
+ * that repeats syllables stays forbidden. English documentary narration stays
+ * close, warm and nearly dry (a touch of room at most). The real chain is
+ * voice-master.mjs; this file keeps the rules and the plan.
  */
 import { getVersion } from "./versions.mjs";
 
@@ -30,6 +38,17 @@ export const NEVER_DONE_TO_A_VOICE = Object.freeze([
   "voice conversion or re-synthesis (speech-to-speech, dubbing, generative enhancers)",
   "echo or delay that repeats syllables",
 ]);
+
+/**
+ * What a recitation may get since the owner's decision of 13 Nov 2026: a
+ * smooth reverb tail, never a repeat. voice-reverb.mjs `echoFree` proves it
+ * on every impulse response before it is used.
+ */
+export const ALLOWED_SPACE = Object.freeze({
+  quran: "smooth hall or mosque reverb (dense decaying tail, pre-delay, no discrete echo); nothing else is added",
+  narration: "close and nearly dry; a short warm room at most",
+  decidedOn: "2026-11-13",
+});
 
 /** YouTube turns uploads louder than this down; -1 dBTP leaves room for its encoder. */
 export const MASTER = Object.freeze({ targetLufs: -14, ceilingDbtp: -1, lowBitrateCeilingDbtp: -2 });

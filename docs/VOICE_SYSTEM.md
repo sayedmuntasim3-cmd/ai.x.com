@@ -61,3 +61,42 @@ then `node render/render-film.mjs --run voice-runs/a --out film.mp4 --one-track 
 - Live Commons search (`--media`) returned public-domain Gettysburg pictures with licences; files could not be downloaded here (upload.wikimedia.org blocked), so the test render used text cards.
 - One-track render: narration.wav is sample-identical to the recording (resampled to 48 kHz); the film can end up to one frame before the recording's last sample.
 - Not built: upload route, studio switch, brain in the CLI (Gemini key invalid; any `Model` works in `planVoiceVisuals`), picture judging, Quran STT, Uthmani text, licensed meanings.
+
+## Voice mastering engine (V0 design, 13 Nov 2026)
+
+Takes an ordinary recording and masters it. Priority 1 Quran recitation, 2 US English
+narration. All DSP is pure JS in `engine/src/` (deterministic, same result on the owner's
+PC, a GitHub runner and in tests; no model download). ffmpeg only decodes the input to
+48 kHz mono float and encodes AAC. The voice is treated as mono; the reverb is stereo.
+
+**Rule update (owner, 13 Nov 2026).** A recitation may get a beautiful, smooth hall /
+mosque style *reverb* (what the owner calls "echo"). Discrete echoes or delays that repeat
+syllables stay forbidden, as does everything else in `NEVER_DONE_TO_A_VOICE` (no pitch,
+formant, speed, auto-tune, re-synthesis, generative enhancer). Nothing is laid under a
+recitation. English documentary narration stays close, warm and nearly dry: that is what
+top documentaries use, so the narration profile adds a touch of room at most.
+
+| Stage | What it does (every setting comes from the measurement) | Module |
+|---|---|---|
+| Analyze | noise floor, SNR, hum 50/60 Hz, DC, clipping, plosives, sibilance, tonal balance vs a target voice curve, existing room reverb, LRA, crest, LUFS, true peak, pauses, sustained notes, f0 track; coded en+bn messages | `voice-analyze.mjs` |
+| Clean | DC, high-pass placed under the lowest sung pitch, hum notches only on measured harmonics, spectral denoise with depth scaled to SNR (never deep), de-click, clipped peaks rounded | `voice-chain.mjs` |
+| Tone | corrective EQ toward the profile's target curve (bounded, half-strength), de-esser only as deep as measured | `voice-chain.mjs` |
+| Dynamics | slow leveller + soft-knee compressor; thresholds from the level histogram; recitation keeps more range than narration | `voice-chain.mjs` |
+| Space | impulse responses synthesised in code (seeded noise, per-frequency decay, pre-delay, early reflections, high-cut), FFT convolution, send automation from pauses / phrase ends / sustained notes (ayah ends when known), ducking under the voice | `voice-reverb.mjs` |
+| Master | gain to -14 LUFS, look-ahead limiter, true peak <= -1 dBTP, measured again and corrected (two-pass); WAV 48 kHz 24-bit + AAC | `voice-master.mjs` |
+| Proof | same sample count (plus a reverb tail at the very end only), alignment lag by cross-correlation at start/middle/end, f0 contour correlation, before/after numbers, measured decay of the applied reverb, echo-free check of the impulse | `voice-proof.mjs` |
+
+Profiles and presets: `quran` = `clean` (no added space), `mosque-hall`, `grand-hall`;
+`narration` = `dry`, `warm-room`. Presets set only the *space target* (decay, pre-delay,
+level); cleanup, tone and dynamics are always derived from the file. The reverb level is
+lowered when the recording already carries a room, and the decay is shortened when the
+reciter's pauses are short.
+
+Limits said plainly in the report: heavy room echo already in a recording cannot be
+removed; clipped peaks are rounded, not recovered; denoise is capped (6 dB recitation,
+10 dB narration) because deeper reduction smears letters; meaning-aware ("feeling") send
+variation exists only as a bounded hook (+-1.5 dB), OFF for the Quran until the owner
+approves it by ear. Quality is shown by measurements and a listening pack; nothing here
+claims to be the best in the world.
+
+CLI: `node local/voice-master.mjs --audio <file> --profile quran|narration [--preset ...]`.
