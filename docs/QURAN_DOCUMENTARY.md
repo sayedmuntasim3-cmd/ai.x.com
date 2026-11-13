@@ -267,6 +267,11 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
 - Found and fixed while measuring: the first move filter (zoompan) stepped by whole pixels and long
   shots read as frozen; the detector passed an unreadable video as clean (now refused); Commons refuses
   thumbnail sizes it does not list, so the detector now looks at the file that will be used.
+- On the runner (run 43464533679): Ad-Duha 1080p and Yusuf 1-12 at 9:16 (182 s): both the voice's
+  length, -14 LUFS, true peak -4 and -1.4 dBTP, no black, no frozen frame, no cut in the voice (Yusuf: 15
+  cuts, 11 at ayah ends). Looking at the 9:16 frames: one Commons picture was an old landscape painting
+  with small figures, whose title did not say so; Commons categories are now read too ("Artworks",
+  "Landscape paintings", "PD-Art" are refused). The Arabic in 9:16 is small for long ayat.
 - Not verified: 4K (written, not rendered yet); how it looks to the owner; the runner film
   (`.github/workflows/quran-film.yml`, first run after this commit). Most shots are still cards: the
   keyless archives give few relevant, licence-clean, face-free pictures; Pexels and Pixabay are used

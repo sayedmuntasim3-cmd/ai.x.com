@@ -29,7 +29,7 @@ export const QURAN_PROVIDERS = Object.freeze(["pexels", "pixabay", "wikimedia", 
 export const MEDIA_RULES = Object.freeze({ minWidth: 1920, minVideoSeconds: 8, perQuery: 12 });
 
 /** Words in a title or tags that rule a picture out under the Quran, whatever the level. */
-const NEVER = /\b(painting|painted|illustration|drawing|mosaic|icon|fresco|statue|sculpture|idol|cartoon|anime|cgi|3d render|rendering|ai[- ]generated|generated|midjourney|dall-?e|stable diffusion|music|musician|concert|dance|dancing|guitar|church|cathedral|temple|cross|crucifix|christmas|halloween|logo|trademark|text overlay|watermark|alcohol|wine|beer|bikini|swimsuit|selfie|model posing|prophet|angel|jesus|god|book|page|scan|map|diagram|chart|poster|screenshot|album|band|song|music video|trailer|mars|rover|martian|coffee|cup|mug|food|meal|car|cars|truck|street|traffic|room|interior|indoor|window sill|office|kitchen|restaurant|shop|store|bedroom|laptop|phone)\b/i;
+const NEVER = /\b(paintings?|painted|oil on canvas|artworks?|pd-art|engravings?|lithographs?|watercolou?rs?|museum|portraits?|people|men|women|illustration|drawing|mosaic|icon|fresco|statue|sculpture|idol|cartoon|anime|cgi|3d render|rendering|ai[- ]generated|generated|midjourney|dall-?e|stable diffusion|music|musician|concert|dance|dancing|guitar|church|cathedral|temple|cross|crucifix|christmas|halloween|logo|trademark|text overlay|watermark|alcohol|wine|beer|bikini|swimsuit|selfie|model posing|prophet|angel|jesus|god|book|page|scan|map|diagram|chart|poster|screenshot|album|band|song|music video|trailer|mars|rover|martian|coffee|cup|mug|food|meal|car|cars|truck|street|traffic|room|interior|indoor|window sill|office|kitchen|restaurant|shop|store|bedroom|laptop|phone)\b/i;
 
 /** Describing words in a search phrase: the picture must show the rest. */
 const DESCRIBING = new Set(["a", "an", "the", "of", "in", "on", "at", "over", "with", "and", "by", "from", "through", "into", "after", "soft", "calm", "vast", "gentle", "still", "bright", "golden", "old", "green", "dark", "deep", "first", "ancient", "empty", "endless", "balanced", "abandoned", "rough", "bare", "clear", "open", "flowing", "sheltering", "symbol", "aerial", "breaking", "drifting", "reflecting", "spring", "stone"]);
@@ -69,10 +69,12 @@ export async function rejectWhy(r, o, checks = {}) {
   const rights = classifyLicense(r);
   if (!rights.allowed) return "licence: " + rights.reason;
   const words = [r.title ?? "", /** @type {any} */ (r).tags?.join?.(" ") ?? "", /** @type {any} */ (r).description ?? ""].join(" ");
+  // Relevance is judged on the title and description; categories only refuse (they name every place and date).
+  const named = [r.title ?? "", /** @type {any} */ (r).description ?? ""].join(" ");
   const never = NEVER.exec(words);
   if (never) return `adab: "${never[0]}" in its title or tags`;
   if (!allowedAt(words, o.level)) return `adab: shows people or animals, not allowed at level ${o.level}`;
-  if (o.query && !relevant(o.query, words)) return `relevance: the title does not name "${o.query}"`;
+  if (o.query && !relevant(o.query, named)) return `relevance: the title does not name "${o.query}"`;
   if (!r.mediaUrl) return "no file to download";
   if (!(Number(r.width) >= MEDIA_RULES.minWidth)) return `quality: ${r.width ?? "unknown"} px wide, ${MEDIA_RULES.minWidth} needed`;
   if (r.mediaType === "video") {

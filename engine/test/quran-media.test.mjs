@@ -72,4 +72,6 @@ test("relevance: the title must name what the shot asks for", async () => {
   const o = { seconds: 10, level: /** @type {const} */ ("strict"), used: new Set(), query: "olive grove" };
   assert.match(String(await rejectWhy(result({ id: "p:9", title: "Pure white snow" }), o)), /^relevance/);
   assert.match(String(await rejectWhy(result({ id: "p:10", title: "olive grove (1912) book page scan" }), o)), /^adab: "book"/);
+  // A landscape painting whose title does not say so is refused by its categories (seen on the runner).
+  assert.match(String(await rejectWhy(/** @type {any} */ ({ ...result({ id: "w:11", title: "Olive grove near Tivoli" }), tags: ["Landscape paintings in the Louvre", "Oil on canvas"] }), o)), /^adab: "paintings"/);
 });

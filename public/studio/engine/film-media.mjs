@@ -389,7 +389,7 @@ export function wikimediaProvider(o = {}) {
         action: "query", format: "json", formatversion: "2", generator: "search", gsrnamespace: "6", gsrlimit: String(perPage),
         gsrsearch: `${query.slice(0, 200)} filetype:${kind === "video" ? "video" : "bitmap"}`,
         prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "1920",
-        iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName",
+        iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName|Categories",
       });
       const res = await get(`https://commons.wikimedia.org/w/api.php?${params}`, { headers: { "user-agent": COMMONS_UA, "api-user-agent": COMMONS_UA }, signal });
       if (!res.ok) throw httpError(res);
@@ -415,6 +415,8 @@ export function wikimediaProvider(o = {}) {
           restrictions: plain(meta.Restrictions?.value) || null,
           durationSeconds: isVideo && Number.isFinite(Number(info.duration)) ? Number(info.duration) : null,
           width: info.width ?? null, height: info.height ?? null,
+          // The file's categories ("Landscape paintings", "People in ...") tell what a title may not.
+          tags: plain(meta.Categories?.value).split("|").map((c) => c.trim()).filter(Boolean),
         }];
       });
     },
