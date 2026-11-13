@@ -376,3 +376,33 @@ test("a short fragment of another surah is not taken as an ayah, and is reported
   assert.ok(loc.ayat.every((a) => a.surah === 93), loc.ayat.map((a) => `${a.surah}:${a.ayah}`).join(" "));
   assert.equal(loc.ayat.length, 11);
 });
+
+test("from the pauses alone no ayah end is sure; with the text aligned, ends that agree are sure and others follow the alignment", () => {
+  const units = passageUnits(index, [{ surah: 93, fromAyah: 1, toAyah: 11 }]);
+  const voice = recite(units, { seed: 12, breath: 1000 });
+  const base = { index, surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: { surah: "93" }, opening: /** @type {const} */ ("none"), closing: /** @type {const} */ ("none") };
+  const alone = locateRecitation(base);
+  assert.equal(alone.ayat.filter((a) => a.sure).length, 0);
+  // The alignment agrees everywhere but at the end of 93:4, which it puts 3 s earlier (inside the voice).
+  const aligned = voice.truth.map((t, k) => ({ surah: 93, ayah: k + 1, start: t.start + 0.1, end: t.end - 0.15 - (k === 3 ? 3 : 0), score: 0.9, lastWordScore: 0.9, words: [{ start: t.start + 0.1, end: t.start + 0.5, score: 0.9 }] }));
+  const both = locateRecitation({ ...base, aligned });
+  assert.deepEqual(both.alignment, { ends: 10, agree: 9, moved: 1, low: 0 });
+  assert.equal(both.ayat.filter((a) => a.sure).length, 9);
+  assert.equal(both.ayat[3].sure, false);
+  assert.equal(both.ayat[3].timing, "aligned");
+  assert.ok(both.messages.some((m) => m.code === "quran.aligned"));
+  // A poorly fitting alignment moves nothing.
+  const weak = locateRecitation({ ...base, aligned: aligned.map((x) => ({ ...x, lastWordScore: 0.2, words: [{ ...x.words[0], score: 0.2 }] })) });
+  assert.equal(weak.alignment?.moved, 0);
+});
+
+test("a recitation with no pauses between ayat: the alignment's timeline is taken, and nothing is called sure", () => {
+  const units = passageUnits(index, [{ surah: 93, fromAyah: 1, toAyah: 11 }]);
+  // Every ayah in one breath with the next, but long ayat take breaths inside: the pauses mislead.
+  const voice = recite(units, { seed: 21, breath: 4, joinAfter: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] });
+  const aligned = voice.truth.map((t, k) => ({ surah: 93, ayah: k + 1, start: t.start + 0.05, end: t.end - 0.1, score: 0.8, lastWordScore: 0.8, words: [{ start: t.start, end: t.start + 0.4, score: 0.8 }] }));
+  const loc = locateRecitation({ index, surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: { surah: "93" }, opening: "none", closing: "none", aligned });
+  assert.equal(loc.ayat.filter((a) => a.sure).length, 0);
+  loc.ayat.slice(0, -1).forEach((a, k) => assert.ok(Math.abs(a.end - voice.truth[k].end) < 0.3, `93:${k + 1} ends at ${a.end}, truly ${voice.truth[k].end}`));
+  assert.ok(loc.ayat.every((a) => a.timing === "aligned"));
+});

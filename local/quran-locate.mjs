@@ -27,7 +27,7 @@ import { basename, join, resolve } from "node:path";
 import { boundaryErrors, listeningClips, locateRecitation, parsePassage } from "../engine/src/quran-locate.mjs";
 import { normalizeTranscript } from "../engine/src/transcript.mjs";
 import { encodeWav16 } from "../engine/src/wav.mjs";
-import { intake, loadQuran, parseArgs, readSpans, speechToText, toWav } from "./voice-film.mjs";
+import { alignText, intake, loadQuran, parseArgs, readSpans, speechToText, toWav } from "./voice-film.mjs";
 
 export { readSpans };
 
@@ -55,7 +55,7 @@ export const QURAN_MODEL = "tarteel-ai/whisper-base-ar-quran";
 
 /**
  * @param {{ audio: string, out: string, given?: { surah?: unknown, ayat?: unknown, passage?: unknown } | null, transcript?: string, stt?: string, model?: string,
- *   python?: string, opening?: any, closing?: any, truth?: string, sttWav?: string }} o
+ *   python?: string, opening?: any, closing?: any, truth?: string, sttWav?: string, align?: boolean }} o
  */
 export async function locate(o) {
   let sttWav = o.sttWav;
@@ -76,7 +76,9 @@ export async function locate(o) {
   /** @type {any} */
   let raw = {};
   try { raw = heardFile ? JSON.parse(await readFile(heardFile, "utf8")) : {}; } catch { raw = {}; }
-  const location = locateRecitation({ index, surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: o.given ?? null, words: heard?.words ?? null, opening: o.opening, closing: o.closing });
+  const hasGiven = Boolean(o.given && [o.given.surah, o.given.passage].some((v) => typeof v === "string" || typeof v === "number"));
+  const aligned = hasGiven && o.python && o.align !== false ? await alignText({ index, given: o.given, surahNames, wav: sttWav, out: o.out, python: o.python }) : null;
+  const location = locateRecitation({ index, surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: o.given ?? null, words: heard?.words ?? null, opening: o.opening, closing: o.closing, aligned });
   const truth = o.truth ? JSON.parse(await readFile(o.truth, "utf8")) : null;
   const errors = truth && location.ayat.length ? boundaryErrors(location.ayat, truth.ayat) : null;
   const saved = { ...location, seconds: voice.seconds, stretches: voice.spans.length, recognizer: heard ? { engine: raw.engine ?? heard.engine ?? null, model: raw.model ?? heard.model ?? null, modelSource: raw.modelSource ?? null, modelRevision: raw.modelRevision ?? null, modelLicense: raw.modelLicense ?? null, words: heard.words?.length ?? 0 } : null, truth: errors };
@@ -134,7 +136,7 @@ export function summaryLine(l, name) {
   const range = (/** @type {{ surah: number, fromAyah: number, toAyah: number }[]} */ rs) => rs.map((r) => `${r.surah}:${r.fromAyah}-${r.toAyah}`).join(",");
   return JSON.stringify({ label: name, seconds: Math.round(l.seconds), stretches: l.stretches, decision: l.decision, question: l.question?.code ?? null, source: l.source, timing: l.timing, passage: range(l.passages), heard: range(l.heard), ayat: l.ayat.length,
     onPause: l.ayat.slice(0, -1).filter((a) => a.onPause).length, markers: l.markers.map((m) => m.type), repeats: l.repeats.length, other: l.other.filter((x) => x.type === "other").reduce((n, x) => n + x.words, 0),
-    recognition: l.recognition, fit: l.fit, agreement: l.agreement, model: l.recognizer?.model ?? null, licence: l.recognizer?.modelLicense ?? null, truth: l.truth });
+    recognition: l.recognition, fit: l.fit, agreement: l.agreement, alignment: l.alignment ?? null, sure: l.ayat.slice(0, -1).filter((a) => a.sure).length, model: l.recognizer?.model ?? null, licence: l.recognizer?.modelLicense ?? null, truth: l.truth });
 }
 
 async function main() {
@@ -159,7 +161,7 @@ async function main() {
   }
   const out = resolve(str(args.out) ?? join("voice-runs", basename(args.audio).replace(/\.[^.]+$/, "")));
   const lang = args.lang === "bn" ? "bn" : "en";
-  const r = await locate({ audio: resolve(args.audio), out, given, transcript: str(args.transcript) && resolve(args.transcript), stt: str(args.stt), model: str(args.model), python: str(args.python), opening: str(args.opening), closing: str(args.closing), truth: str(args.truth) && resolve(args.truth) });
+  const r = await locate({ audio: resolve(args.audio), out, given, transcript: str(args.transcript) && resolve(args.transcript), stt: str(args.stt), model: str(args.model), python: str(args.python) ?? process.env.ZUPONA_PYTHON, align: args["no-align"] !== true, opening: str(args.opening), closing: str(args.closing), truth: str(args.truth) && resolve(args.truth) });
   for (const m of r.messages) console.log("- " + m[lang]);
   if (r.location) {
     for (const a of r.location.ayat) console.log(`  ${a.surah}:${a.ayah}  ${a.start.toFixed(2)} - ${a.end.toFixed(2)} s  ${a.timing}${a.onPause ? "" : ", no pause"}${a.repeat ? ", again" : ""}  (${a.confidence})`);

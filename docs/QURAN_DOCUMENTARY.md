@@ -381,3 +381,21 @@ range, it does not force anything).
 
 **Recognition:** the runner QA run found that a misheard isti'adha became 16:98; fixed (see Q7). The
 Jawad Farogi Ad-Duha is still not recognised by the base model (NOT FIXED).
+
+**Ayah timing, two independent methods (safety fix).** FAIL found: on Yusuf 1-40 joined without gaps
+between ayat (a recitation in one breath from ayah to ayah), the pause method placed 0 of 39 cuts in the true
+gap and still called 4 wrong ends "sure". Fix: from the pauses alone no end is sure. `local/stt/align.py`
+aligns the given text letter by letter (CTC forced alignment, jonatasgrosman/wav2vec2-large-xlsr-53-arabic,
+Apache-2.0; MMS was refused, CC BY-NC). An end is sure only where the pauses and the alignment agree
+(within 0.6 s); where most disagree and the alignment fits, its timeline is taken, unsure. The Arabic text
+is shown only for ayat whose both ends are sure; nothing is cut at an unsure end.
+
+| Recording (known times) | Before: sure / wrong sure / cuts in gap | Now: sure / wrong sure / cuts in gap |
+|---|---|---|
+| Yusuf 1-40 with gaps | 28 / 0 / 39 of 39 | 37 / 0 / 38 of 39 |
+| Yusuf 1-40 without gaps | 4 / 4 / 0 of 39 (worst 58.9 s) | 0 / 0 / 34 of 39 (median 0.05 s, worst 0.8 s) |
+
+Alignment alone on Yusuf 1-40: 37 of 39 cuts in the gap (a bug that drifted 20 ms per 15 s chunk was found
+and fixed first). The Jawad Farogi Ad-Duha: the alignment scores are low (0.2-0.3), only 1 end could be placed,
+none is sure: still UNRESOLVED; Whisper large-v3-turbo (MIT) also failed and invented subtitle phrases
+("subscribe to the channel"), which are now removed before matching. PARTIAL.

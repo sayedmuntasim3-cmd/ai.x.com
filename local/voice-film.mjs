@@ -217,9 +217,36 @@ export async function readSpans(wav) {
 }
 
 /**
+ * Place the given passage's text on the audio, letter by letter
+ * (local/stt/align.py; a CTC model with an open licence). Null when it
+ * cannot run here; the location then has no sure ayah end.
+ * @param {{ index: any, given: any, surahNames: any[], wav: string, out: string, python: string }} o
+ */
+export async function alignText(o) {
+  const { parsePassage } = await import("../engine/src/quran-locate.mjs");
+  const parsed = parsePassage(o.given, o.surahNames);
+  if (!parsed.ok) return null;
+  /** @type {{ surah: number, ayah: number, words: string[] }[]} */
+  const passage = [];
+  for (const r of parsed.ranges) for (let a = r.fromAyah; a <= r.toAyah; a += 1) {
+    const e = o.index.ayat.find((/** @type {any} */ x) => x.surah === r.surah && x.ayah === a);
+    passage.push({ surah: r.surah, ayah: a, words: o.index.words.slice(e.firstWord, e.firstWord + e.wordCount) });
+  }
+  const textFile = join(o.out, "passage-words.json"), outFile = join(o.out, "aligned.json");
+  await writeFile(textFile, JSON.stringify(passage));
+  try {
+    await run(o.python, ["-I", new URL("./stt/align.py", import.meta.url).pathname, o.wav, "--text", textFile, "--out", outFile], { maxBuffer: 1 << 24, timeout: 3 * 3600 * 1000 });
+    return JSON.parse(await readFile(outFile, "utf8")).ayat;
+  } catch (e) {
+    console.error("The text could not be aligned here: " + String(/** @type {Error} */ (e).message).split("\n").slice(-2).join(" ").slice(0, 200));
+    return null;
+  }
+}
+
+/**
  * Step 3: understand the voice and save understanding.json. With sttWav, a
  * recitation is located first (given passage, gate, times on the pauses).
- * @param {{ out: string, transcript: any, totalSeconds: number, kind: "auto" | "narration" | "quran", sttWav?: string, given?: { surah?: unknown, ayat?: unknown, passage?: unknown } | null, opening?: any, closing?: any }} o
+ * @param {{ out: string, transcript: any, totalSeconds: number, kind: "auto" | "narration" | "quran", sttWav?: string, given?: { surah?: unknown, ayat?: unknown, passage?: unknown } | null, opening?: any, closing?: any, python?: string }} o
  */
 export async function understand(o) {
   const needQuran = o.kind !== "narration";
@@ -229,7 +256,8 @@ export async function understand(o) {
   let location = null;
   if (q && o.sttWav && (o.kind === "quran" || hasGiven || arabic)) {
     const voice = await readSpans(o.sttWav);
-    location = locateRecitation({ index: q.index, surahNames: q.surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: hasGiven ? o.given : null, words: o.transcript?.words ?? null, opening: o.opening, closing: o.closing });
+    const aligned = hasGiven && o.python ? await alignText({ index: q.index, given: o.given, surahNames: q.surahNames, wav: o.sttWav, out: o.out, python: o.python }) : null;
+    location = locateRecitation({ index: q.index, surahNames: q.surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: hasGiven ? o.given : null, words: o.transcript?.words ?? null, opening: o.opening, closing: o.closing, aligned });
     await writeFile(join(o.out, "quran-location.json"), JSON.stringify({ ...location, stretches: voice.spans.length, recognizer: o.transcript?.engine ? { engine: o.transcript.engine, model: o.transcript.model ?? null, modelSource: o.transcript.modelSource ?? null, modelRevision: o.transcript.modelRevision ?? null, modelLicense: o.transcript.modelLicense ?? null } : null }, null, 1));
   }
   const u = understandVoice({ transcript: o.transcript ?? { words: [] }, totalSeconds: o.totalSeconds, kind: o.kind, quranIndex: q?.index ?? null, surahNames: q?.surahNames ?? [], location });
@@ -313,7 +341,9 @@ async function main() {
       for (const m of step2.messages) console.log("- " + m[lang]);
       if (!step2.check.ok) process.exit(1);
     }
-    const about = { sttWav: step1.sttWav, given: hasGiven ? given : null, opening: args.opening, closing: args.closing };
+    // With a given passage the text is aligned to the audio when Python can run it (--python, or ZUPONA_PYTHON).
+    const python = typeof args.python === "string" ? args.python : process.env.ZUPONA_PYTHON;
+    const about = { sttWav: step1.sttWav, given: hasGiven ? given : null, opening: args.opening, closing: args.closing, python };
     const step3 = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);

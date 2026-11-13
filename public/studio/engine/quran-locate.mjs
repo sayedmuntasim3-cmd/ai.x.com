@@ -26,7 +26,7 @@ import { msg } from "./messages.mjs";
  * @typedef {"istiadha" | "basmala" | "closing" | "takbir"} FixedKind
  * @typedef {{ kind: "ayah" | FixedKind, surah: number | null, ayah: number | null, weight: number }} Unit
  * @typedef {{ start: number, end: number, from: number, to: number, speechSeconds: number, expectedSeconds: number, joined: boolean, onPause: boolean, pauseAfter: number | null, confidence: number }} Placed
- * @typedef {{ surah: number, ayah: number, start: number, end: number, timing: "recognized" | "estimated", onPause: boolean, joined: boolean, confidence: number, sure: boolean, repeat: boolean, heardShare: number | null }} LocatedAyah
+ * @typedef {{ surah: number, ayah: number, start: number, end: number, timing: "recognized" | "estimated" | "aligned", onPause: boolean, joined: boolean, confidence: number, sure: boolean, repeat: boolean, heardShare: number | null }} LocatedAyah
  * @typedef {{ type: FixedKind, start: number, end: number, timing: "recognized" | "estimated" }} LocatedMarker
  * @typedef {import("./messages.mjs").Message} Message
  */
@@ -637,10 +637,93 @@ export function otherSpeech(words, match) {
 }
 
 /**
+ * @typedef {{ surah: number, ayah: number, start: number | null, end: number | null, score: number, lastWordScore?: number, words: { start: number, end: number, score: number }[] }} AlignedAyah
+ */
+
+/** How far two methods may place one ayah end and still agree (seconds), and the least alignment score trusted. */
+export const AGREE = Object.freeze({ seconds: 0.6, minScore: 0.5 });
+
+/**
+ * Two independent methods for every ayah end: the pauses (already in `ayat`)
+ * and the text aligned letter by letter to the audio. Where they agree the
+ * end is sure and keeps the pause (an exact gap). Where they do not, and the
+ * alignment fits well (both words around the end), the alignment's end is
+ * used, moved onto a gap within 0.4 s if there is one, and stays unsure.
+ * Measured on Yusuf 1-40 (13 min, known times): 26 ends agreed, all 26 right;
+ * on the same joined without gaps, none agreed and the alignment placed 34 of
+ * 39 cuts in the true gap.
+ * @param {LocatedAyah[]} ayat (changed in place) @param {AlignedAyah[]} aligned @param {Span[]} spans
+ */
+export function confirmWithAlignment(ayat, aligned, spans) {
+  const find = (/** @type {LocatedAyah} */ a) => aligned.find((x) => x.surah === a.surah && x.ayah === a.ayah);
+  /** @type {Span[]} */
+  const gaps = [];
+  for (let j = 1; j < spans.length; j += 1) if (spans[j].start > spans[j - 1].end) gaps.push({ start: spans[j - 1].end, end: spans[j].start });
+  let agree = 0, moved = 0, low = 0;
+  // When the pauses and the alignment disagree on most ends and the alignment fits the audio well, the
+  // pauses are the weaker method (a recitation without pauses between ayat): the alignment's timeline is
+  // taken whole, every end still unsure. Measured on Yusuf 1-40 joined without gaps: pauses 0 of 39 cuts
+  // in the true gap, alignment 34 of 39.
+  const cuts = ayat.slice(0, -1).map((a, k) => { const x = find(a), y = find(ayat[k + 1]); return x && y && x.end !== null && y.start !== null ? { cut: (x.end + y.start) / 2, fits: (x.lastWordScore ?? x.score) >= AGREE.minScore && (y.words[0]?.score ?? y.score) >= AGREE.minScore } : null; });
+  const agreeing = cuts.filter((c, k) => c && Math.abs(c.cut - (ayat[k].end + ayat[k + 1].start) / 2) <= AGREE.seconds).length;
+  const scores = aligned.map((x) => x.score).sort((p, q) => p - q);
+  const medianScore = scores.length ? scores[Math.floor(scores.length / 2)] : 0;
+  const ordered = cuts.every((c, k) => c && (k === 0 || !cuts[k - 1] || c.cut > /** @type {any} */ (cuts[k - 1]).cut)) && cuts.length > 0;
+  if (agreeing * 2 < cuts.length && medianScore >= AGREE.minScore && ordered) {
+    const first = ayat[0].start, last = ayat[ayat.length - 1].end;
+    cuts.forEach((c, k) => {
+      const a = ayat[k], b = ayat[k + 1];
+      const gap = gaps.find((g) => g.end >= /** @type {any} */ (c).cut - 0.4 && g.start <= /** @type {any} */ (c).cut + 0.4);
+      a.end = r3(gap ? gap.start : /** @type {any} */ (c).cut); b.start = r3(gap ? gap.end : /** @type {any} */ (c).cut);
+      a.timing = "aligned"; a.onPause = Boolean(gap); a.joined = !gap; a.sure = false;
+      if (/** @type {any} */ (c).fits) moved += 1; else low += 1;
+    });
+    ayat[0].start = first; ayat[ayat.length - 1].end = last; ayat[ayat.length - 1].timing = "aligned";
+    return { summary: { ends: cuts.length, agree: 0, moved, low } };
+  }
+  for (let k = 0; k + 1 < ayat.length; k += 1) {
+    const a = ayat[k], b = ayat[k + 1], x = find(a), y = find(b);
+    if (!x || !y || x.end === null || y.start === null) { low += 1; continue; }
+    const alignCut = (x.end + y.start) / 2, ourCut = (a.end + b.start) / 2;
+    const fits = (x.lastWordScore ?? x.score) >= AGREE.minScore && (y.words[0]?.score ?? y.score) >= AGREE.minScore;
+    if (Math.abs(alignCut - ourCut) <= AGREE.seconds) { a.sure = a.onPause; agree += a.onPause ? 1 : 0; continue; }
+    if (!fits) { low += 1; continue; }
+    const gap = gaps.find((g) => g.end >= alignCut - 0.4 && g.start <= alignCut + 0.4);
+    const end = gap ? gap.start : alignCut, start = gap ? gap.end : alignCut;
+    if (end <= a.start || start >= b.end) { low += 1; continue; }
+    a.end = r3(end); b.start = r3(start); a.timing = "aligned"; a.onPause = Boolean(gap); a.joined = !gap; a.sure = false;
+    moved += 1;
+  }
+  return { summary: { ends: Math.max(0, ayat.length - 1), agree, moved, low } };
+}
+
+/**
+ * Phrases speech recognizers are known to invent on music-like or melodic audio (they come from video
+ * subtitles: "subscribe to the channel", "thanks for watching", "music", subtitle credits). They are
+ * never Quran; they are removed before matching and counted.
+ */
+export const RECOGNIZER_INVENTIONS = Object.freeze(["اشتركوا في القناه", "شكرا للمشاهده", "موسيقي", "ترجمه نانسي قنقر", "لا تنسوا الاشتراك في القناه", "شكرا لكم على المشاهده"]);
+
+/**
+ * The words without invented phrases, and how many words were removed.
+ * @param {{ text: string, start?: number, end?: number }[]} words
+ */
+export function withoutInventions(words) {
+  const norm = words.map((w) => tokenizeArabic(w?.text ?? "").join(" "));
+  const drop = new Uint8Array(words.length);
+  for (const phrase of RECOGNIZER_INVENTIONS) {
+    const p = phrase.split(" ");
+    for (let i = 0; i + p.length <= words.length; i += 1) if (p.every((t, k) => norm[i + k] === t)) drop.fill(1, i, i + p.length);
+  }
+  return { words: words.filter((_, i) => !drop[i]), removed: drop.reduce((n, d) => n + d, 0) };
+}
+
+/**
  * Find the passage and the time of every ayah.
  * @param {{ index: import("./quran.mjs").QuranIndex, spans: Span[], totalSeconds: number, given?: { surah?: unknown, ayat?: unknown, passage?: unknown } | null,
  *   words?: { text: string, start?: number, end?: number }[] | null, surahNames?: { number?: number, arabic?: string, transliteration?: string }[],
- *   opening?: "auto" | "none" | "basmala" | "istiadha" | "both", closing?: "auto" | "none" | "sadaqa" }} o
+ *   opening?: "auto" | "none" | "basmala" | "istiadha" | "both", closing?: "auto" | "none" | "sadaqa",
+ *   aligned?: AlignedAyah[] | null }} o aligned: the given text placed on the audio by local/stt/align.py
  */
 export function locateRecitation(o) {
   const spans = (o.spans ?? []).filter((s) => s.end > s.start);
@@ -648,7 +731,7 @@ export function locateRecitation(o) {
   const messages = [];
   /** @param {Message} question @param {Partial<ReturnType<typeof result>>} [more] */
   const ask = (question, more = {}) => ({ ...result(), ...more, ok: false, decision: /** @type {"ask"} */ ("ask"), question, messages: [...messages, question] });
-  const result = () => ({ ok: true, decision: /** @type {"accept" | "ask"} */ ("accept"), source: /** @type {"given" | "recognized" | "given+recognized" | null} */ (null), timing: /** @type {"recognized" | "estimated" | null} */ (null), passages: /** @type {AyahRange[]} */ ([]), heard: /** @type {AyahRange[]} */ ([]), ayat: /** @type {LocatedAyah[]} */ ([]), markers: /** @type {LocatedMarker[]} */ ([]), other: /** @type {ReturnType<typeof otherSpeech>} */ ([]), repeats: /** @type {{ surah: number, ayah: number, start: number }[]} */ ([]), fit: /** @type {{ unitsPerSecond: number, median: number, worst: number, onPause: number, ends: number, joined: number, openingUnsure: boolean } | null} */ (null), agreement: /** @type {{ ayat: number, medianSeconds: number, worstSeconds: number } | null} */ (null), recognition: /** @type {{ coverage: number, quality: number, why: string[] } | null} */ (null), question: /** @type {Message | null} */ (null), messages });
+  const result = () => ({ ok: true, decision: /** @type {"accept" | "ask"} */ ("accept"), source: /** @type {"given" | "recognized" | "given+recognized" | null} */ (null), timing: /** @type {"recognized" | "estimated" | null} */ (null), passages: /** @type {AyahRange[]} */ ([]), heard: /** @type {AyahRange[]} */ ([]), ayat: /** @type {LocatedAyah[]} */ ([]), markers: /** @type {LocatedMarker[]} */ ([]), other: /** @type {ReturnType<typeof otherSpeech>} */ ([]), repeats: /** @type {{ surah: number, ayah: number, start: number }[]} */ ([]), fit: /** @type {{ unitsPerSecond: number, median: number, worst: number, onPause: number, ends: number, joined: number, openingUnsure: boolean } | null} */ (null), agreement: /** @type {{ ayat: number, medianSeconds: number, worstSeconds: number } | null} */ (null), alignment: /** @type {{ ends: number, agree: number, moved: number, low: number } | null} */ (null), recognition: /** @type {{ coverage: number, quality: number, why: string[] } | null} */ (null), question: /** @type {Message | null} */ (null), messages });
 
   const hasGiven = Boolean(o.given && [o.given.surah, o.given.passage].some((v) => v !== undefined && v !== null && v !== false && String(v).trim() !== ""));
   /** @type {AyahRange[] | null} */
@@ -659,7 +742,9 @@ export function locateRecitation(o) {
     given = parsed.ranges;
     messages.push(msg("quran.given", { passage: rangesText(given) }));
   }
-  const words = (o.words ?? []).filter((w) => w && String(w.text ?? "").trim());
+  const cleaned = withoutInventions((o.words ?? []).filter((w) => w && String(w.text ?? "").trim()));
+  const words = cleaned.words;
+  if (cleaned.removed) messages.push(msg("quran.inventions", { count: cleaned.removed }));
   const match = words.length ? matchRecitation(words, o.index) : null;
   const verdict = match ? judgeMatch(match, given) : null;
   const recognition = verdict ? { coverage: verdict.coverage, quality: verdict.quality, why: verdict.why } : null;
@@ -727,12 +812,20 @@ export function locateRecitation(o) {
     if (why) return ask(msg("quran.ask.notFit", { passage: rangesText(given), why }), { recognition, passages: given, fit: out.fit, heard: out.heard });
     estimate.units.forEach((u, k) => {
       const p = estimate.placed[k];
-      if (u.kind === "ayah") out.ayat.push({ surah: /** @type {number} */ (u.surah), ayah: /** @type {number} */ (u.ayah), start: p.start, end: p.end, timing: "estimated", onPause: p.onPause, joined: p.joined, confidence: p.confidence, sure: p.onPause && p.confidence >= GATE.sure, repeat: false, heardShare: null });
+      // From the pauses alone an end is never sure: on a recitation without pauses between ayat the pauses
+      // inside ayat were taken for ayah ends with high confidence (Yusuf 1-40 joined without gaps: 4 wrong "sure"
+      // ends). It becomes sure only when an independent method agrees (alignment of the text, below).
+      if (u.kind === "ayah") out.ayat.push({ surah: /** @type {number} */ (u.surah), ayah: /** @type {number} */ (u.ayah), start: p.start, end: p.end, timing: "estimated", onPause: p.onPause, joined: p.joined, confidence: p.confidence, sure: false, repeat: false, heardShare: null });
       else out.markers.push({ type: u.kind, start: p.start, end: p.end, timing: "estimated" });
     });
     out.source = "given";
     out.timing = "estimated";
     out.passages = given;
+    if (o.aligned?.length) {
+      const c = confirmWithAlignment(out.ayat, o.aligned, spans);
+      out.alignment = c.summary;
+      messages.push(msg("quran.aligned", c.summary));
+    }
     if (match) messages.push(msg("quran.unconfirmed"));
     const ayahEnds = out.ayat.slice(0, -1);
     messages.push(msg("quran.estimated", { sure: ayahEnds.filter((a) => a.sure).length, total: ayahEnds.length }));

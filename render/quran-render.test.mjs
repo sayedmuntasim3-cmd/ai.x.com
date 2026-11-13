@@ -59,6 +59,11 @@ test("the Arabic on screen is the verified text; the basmala written before ayah
   assert.match(ass, /Quran text: Tanzil\.net/);
   assert.match(ass, /Dialogue: 0,0:00:00\.50,0:00:04\.90,Ayah/);
   assert.doesNotMatch(filmText(plan, uthmani, surahNames, { format: FORMATS["1080p"], total: 10, showAyat: false }), /,Ayah,/);
+  // An ayah whose end (or the end before it) is not confirmed is not written on screen.
+  const unsure = { scenes: [{ ...plan.scenes[0], endSure: false }, plan.scenes[1]] };
+  const t = filmText(unsure, uthmani, surahNames, { format: FORMATS["1080p"], total: 10 });
+  assert.equal((t.match(/,Ayah,/g) ?? []).length, 0);
+  assert.match(t, /2 ayah text\(s\) not shown/);
 });
 
 test("the final pass: one xfade per cut, fade in and out, the recitation as the only sound", () => {

@@ -115,7 +115,7 @@ const assText = (s) => s.replace(/[{}]/g, "").replace(/\n/g, "\\N");
  * The text of the film as an ASS file: the Arabic of each ayah while it is
  * recited (Tanzil Uthmani, verbatim), the title card (surah name in Arabic
  * and Latin letters, the reciter), and the closing credit line.
- * @param {{ scenes: { kind: string, surah: number, ayah: number | null, start: number, end: number, spokenStart: number | null, spokenEnd: number | null }[] }} plan
+ * @param {{ scenes: { kind: string, surah: number, ayah: number | null, start: number, end: number, spokenStart: number | null, spokenEnd: number | null, endSure?: boolean }[] }} plan
  * @param {string[]} uthmani @param {{ number?: number, arabic?: string, transliteration?: string }[]} surahNames
  * @param {{ format: Format, total: number, reciter?: string, showAyat?: boolean }} o
  */
@@ -132,6 +132,7 @@ export function filmText(plan, uthmani, surahNames, o) {
   const first = plan.scenes[0];
   /** @type {any[]} */
   const scenes = first && first.kind !== "title" ? [{ kind: "title", surah: first.surah, ayah: null, start: 0, end: Math.min(7, Math.max(4, (first.spokenEnd ?? 7) - 0.2)), spokenStart: null, spokenEnd: null, overlay: true }, ...plan.scenes] : plan.scenes;
+  let hidden = 0;
   for (const s of scenes) {
     if (s.kind === "title") {
       const n = surahNames.find((x) => x.number === s.surah) ?? surahNames[s.surah - 1] ?? {};
@@ -141,10 +142,14 @@ export function filmText(plan, uthmani, surahNames, o) {
       continue;
     }
     if (o.showAyat === false || s.ayah === null || s.spokenStart === null || s.spokenEnd === null) continue;
+    // The Arabic is shown only while that ayah is surely being recited: both of its ends confirmed.
+    const k = plan.scenes.indexOf(s), before = plan.scenes.slice(0, k).reverse().find((x) => x.kind === "ayah");
+    if (s.endSure === false || before?.endSure === false) { hidden += 1; continue; }
     const text = ayahOnScreen(uthmani[offsetOf(s.surah) + s.ayah - 1] ?? "", s.surah, s.ayah);
     // A long ayah is shown whole: libass wraps it on word boundaries.
     lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6}${assText(text)} \uFD3F${arabicNumber(s.ayah)}\uFD3E`);
   }
+  if (hidden) lines.push(`; ${hidden} ayah text(s) not shown: their timing is not confirmed by two methods`);
   lines.push(`Dialogue: 0,${assTime(Math.max(0, o.total - 6))},${assTime(o.total - 0.5)},Small,,0,0,0,,{\\fad(800,1200)\\fnDejaVu Sans}Quran text: Tanzil.net`);
   return lines.join("\n") + "\n";
 }
