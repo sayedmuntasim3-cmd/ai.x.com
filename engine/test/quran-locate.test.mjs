@@ -6,7 +6,7 @@ import { MESSAGES } from "../src/messages.mjs";
 import { ayahText, buildQuranIndex } from "../src/quran.mjs";
 import { planQuranFilm, checkQuranFilm } from "../src/quran-film.mjs";
 import {
-  FIXED_PHRASES, alignByPauses, alignPassage, boundaryErrors, findSurah, judgeMatch, listeningClips, locateRecitation, locationToMatch,
+  FIXED_PHRASES, alignByPauses, alignPassage, boundaryErrors, findSurah, heardAyat, judgeMatch, listeningClips, locateRecitation, locationToMatch,
   parsePassage, passageUnits, recitationUnits, snapToPauses,
 } from "../src/quran-locate.mjs";
 import { matchRecitation } from "../src/quran.mjs";
@@ -342,4 +342,16 @@ test("voice stretches from a signal: the phrases of a test voice come back withi
   assert.equal(v.spans.length, phrases.length);
   v.spans.forEach((s, k) => assert.ok(Math.abs(s.start - phrases[k].start) < 0.06 && Math.abs(s.end - phrases[k].end) < 0.06, `${s.start}-${s.end}`));
   assert.ok(Math.abs(v.seconds - 12) < 0.001);
+});
+
+test("one ayah heard in two pieces, with a word heard twice, is one recitation, not a repeat (al-Husary, 10:24, on the runner)", () => {
+  const piece = (/** @type {number} */ ayah, /** @type {number} */ words, /** @type {number} */ start, /** @type {number} */ end, /** @type {boolean} */ first, /** @type {boolean} */ last) => ({ surah: 10, ayah, start, end, matchedWords: words, ayahWords: ayah === 24 ? 43 : 11, hasFirstWord: first, hasLastWord: last, complete: first && last });
+  const seg = (/** @type {any[]} */ ayat) => ({ surah: 10, fromAyah: ayat[0].ayah, toAyah: ayat[ayat.length - 1].ayah, matchedWords: 0, confidence: 0.9, from: 0, to: 0, start: null, end: null, ayat, ambiguous: false, alternatives: [] });
+  const match = { isQuran: true, coverage: 1, words: 0, markers: [], segments: [seg([piece(23, 11, 853, 906, true, true), piece(24, 19, 906.5, 947, true, false)]), seg([piece(24, 26, 955.7, 1019, false, true), piece(25, 11, 1019.8, 1039, true, true)])] };
+  const heard = heardAyat(/** @type {any} */ (match));
+  assert.deepEqual(heard.map((a) => a.ayah), [23, 24, 25]);
+  assert.deepEqual([heard[1].start, heard[1].end, heard[1].matchedWords], [906.5, 1019, 45]);
+  // The same ayah recited again later, from its first word, stays a repeat.
+  const again = { ...match, segments: [seg([piece(24, 43, 906.5, 1019, true, true)]), seg([piece(24, 43, 1100, 1200, true, true)])] };
+  assert.equal(heardAyat(/** @type {any} */ (again)).length, 2);
 });

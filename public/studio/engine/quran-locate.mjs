@@ -418,7 +418,10 @@ export function heardAyat(match) {
   for (const seg of match?.segments ?? []) {
     for (const a of seg.ayat) {
       const last = out[out.length - 1];
-      if (last && last.surah === a.surah && last.ayah === a.ayah && !last.hasLastWord && !a.hasFirstWord && last.matchedWords + a.matchedWords <= a.ayahWords) {
+      // A recognizer may hear a few words twice or add one, so the two pieces may hold a little more than the ayah.
+      const continues = last && last.surah === a.surah && last.ayah === a.ayah && !last.hasLastWord && !a.hasFirstWord
+        && last.matchedWords + a.matchedWords <= Math.ceil(a.ayahWords * 1.2) + 2 && (last.end === null || a.start === null || a.start >= last.end - 0.5);
+      if (last && continues) {
         last.end = a.end ?? last.end;
         last.matchedWords += a.matchedWords;
         last.hasLastWord = a.hasLastWord;

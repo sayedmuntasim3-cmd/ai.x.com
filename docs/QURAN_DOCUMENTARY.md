@@ -177,6 +177,12 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
   `.github/workflows/quran-recognize.yml` (first run after this commit). The Tarteel base model fails
   on slow melodic recitation (Ad-Duha above): the gate then asks, as designed. A larger Quran model is
   the next thing to try on the runner.
+- On the GitHub runner (run 43454062608, the same code, sets built there): recognizer path, cuts in the
+  true gap: Fatiha 6/6, Yusuf 1-40 39/39, Anfal 1-40 38/39, al-Husary Yunus 1-30 28/29; every wrong
+  surah was answered with a question; the CC0 Ad-Duha was asked about (the model heard no Quran); the
+  CC0 Al-Fatiha with a spoken translation was asked about too ("sounds like 1:2-7", half the speech is
+  not Quran). The two misses were one long ayah heard in two pieces and taken as a repeat; fixed after
+  the run (re-located from the runner's own transcripts: Yunus 29/29, worst 0.11 s; Anfal 39/39).
 - A second reciter (al-Husary, Yunus 1-45, given only): 15 of 44 cuts in the true gap; the 11 ends
   called sure were all right. Over all six known-truth sets the given-only path called 400 ends sure
   and all 400 were within 0.5 s of the truth. A wrong `--opening` makes every end unsure (Fatiha: 0 of
