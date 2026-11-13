@@ -208,4 +208,21 @@ by joining single-ayah files (`node local/quran-locate.mjs --join`), and on one 
 - Not verified: the lexicon and theme rules have not been reviewed by a scholar (they must be, before
   publishing); a run of Paradise ayat without the word (55:70-76) is not flagged unseen by itself: the
   director (Q3) must carry the flag through a passage.
-- Q3 to Q7: not built.
+
+**Q3 (Quran director) built** and tested (`engine/test/quran-director.test.mjs`, 7 tests):
+`engine/src/quran-director.mjs` `directQuranFilm({ plan, meaning, spans, adab })` gives the shot list;
+`voice-film` writes `shots.md` (for a person to check) and `shots.json`; `--adab strict|nature|people-distant`.
+- Cuts only at ayah ends and in measured pauses (checked: no cut inside a voiced stretch); long ayat
+  split at pauses into 5-12 s shots; a stretch with no pause is held, never cut.
+- An unsure ayah end is never a cut; the shot at each pause follows the ayah estimated at that time and
+  says so in its reason.
+- Picture order of authority: a thing the Arabic names, then the theme, then neutral motifs; every shot
+  has `because` (ayah, word or theme, source). The refrain of Ar-Rahman (31 times) returns to one picture.
+  The Hereafter is a symbol only, and the flag carries through a description (55:35-76) until another
+  subject comes. Bees (16:68) are named but not shown at `strict`; shown at `nature`. No picture twice in a row.
+- Fade from black, dissolves centred on the pauses, the last shot held through the tail with a 3 s fade.
+- Run on real audio: the CC0 Ad-Duha (all ends unsure: 6 shots, the longest 41 s because the reciter's
+  breaths are 20-37 s long) and the joined Yusuf 1-40 (67 shots).
+- Not verified: how the shot lists look to a person (the owner or a reviewer should read one `shots.md`);
+  the motif families are written by hand and not yet reviewed.
+- Q4 to Q7: not built.

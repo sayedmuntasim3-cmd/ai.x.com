@@ -3,6 +3,7 @@
  *   node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>]
  *        [--transcript <json|srt|vtt>] [--stt faster-whisper|pocketsphinx] [--model small.en]
  *        [--surah 93] [--ayat 1-11] [--passage "93, 94:1-8"] [--opening auto|none|basmala|istiadha|both] [--closing auto|none|sadaqa]
+ *        [--adab strict|nature|people-distant]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media]
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
@@ -35,6 +36,7 @@ import { understandVoice } from "../engine/src/voice-understand.mjs";
 import { buildQuranIndex } from "../engine/src/quran.mjs";
 import { locateRecitation } from "../engine/src/quran-locate.mjs";
 import { meaningTable, parseTanzilText, passageMeaning, planMeanings } from "../engine/src/quran-meaning.mjs";
+import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard } from "../engine/src/voice-visuals.mjs";
@@ -238,7 +240,7 @@ export async function understand(o) {
 /**
  * Step 4. No writer model is called from here yet: the plan comes from each
  * scene's own words (planVoiceVisuals takes any brain when one is given).
- * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any }} o
+ * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant" }} o
  */
 export async function pictures(o) {
   const u = o.understanding;
@@ -250,8 +252,14 @@ export async function pictures(o) {
     await writeFile(join(o.out, "meaning.json"), JSON.stringify(meaning, null, 1));
     await writeFile(join(o.out, "meaning.md"), meaningTable(meaning) + "\n\n" + meaning.tafsir + "\n");
     const guard = quranVisualAdabGuard({ plan: u.quranPlan, index: o.quranIndex ?? (await loadQuran()).index, meanings: planMeanings(u.quranPlan, texts) });
-    await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard }, null, 1));
-    return { ok: guard.ok, messages: guard.messages, problems: guard.problems, gaps: guard.gaps };
+    // The shot list: pictures from the meaning, cut only at ayah ends and measured pauses (shots.md is for a person to check).
+    let spans = [];
+    try { spans = (await readSpans(join(o.out, "voice-16k.wav"))).spans; } catch { spans = []; }
+    const direction = directQuranFilm({ plan: u.quranPlan, meaning, spans, adab: o.adab ?? "strict" });
+    await writeFile(join(o.out, "shots.json"), JSON.stringify(direction, null, 1));
+    await writeFile(join(o.out, "shots.md"), shotTable(direction) + "\n");
+    await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard, direction: { ok: direction.ok, shots: direction.shots.length, problems: direction.problems } }, null, 1));
+    return { ok: guard.ok && direction.ok, messages: [...guard.messages, ...direction.messages], problems: [...guard.problems, ...direction.problems], gaps: guard.gaps };
   }
   const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({}) : [] });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
@@ -320,7 +328,8 @@ async function main() {
       understanding = await understand({ out, transcript: step2, totalSeconds: m.seconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
       if (!understanding.ok) process.exit(1);
     }
-    const step4 = await pictures({ out, understanding, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined });
+    const adab = ["strict", "nature", "people-distant"].includes(String(args.adab)) ? /** @type {any} */ (args.adab) : "strict";
+    const step4 = await pictures({ out, understanding, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
     if (!step4.ok) process.exit(1);
