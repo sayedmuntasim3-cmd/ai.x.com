@@ -408,3 +408,17 @@ title was still a dark card) and 129.5-142 s (a NASA night-lights map of the Ear
 0.44): FAIL, caught by the audit as designed. Fixed: the title now has its own picture (dimmed under the
 name), and media selection refuses pictures too dark and plain to read (the same rule as the audit). The
 workflow's print step failed on an empty grep; fixed.
+
+**Shorts and Reels** (`engine/src/quran-short.mjs`, `local/quran-short.mjs`): a passage of 20-60 s cut only
+at sure ayah ends, in the middle of the pause (or at the recording's start and end); the long film's shots,
+pictures and plan moved to zero. Run on Yusuf 1-40 (joined, public-domain mark) with the text aligned:
+37 of 39 ends sure, 80 possible shorts; 12:3-4 (34.8 s) taken, 3 of 3 shots with a licensed picture
+(2 videos), rendered at 9:16: length = voice, coverage 100%, no empty or frozen stretch, sound offset 0, no
+added silence, -13.9 LUFS, true peak -1.6 dBTP, the Arabic of all three ayat shown (font raised to 80 for
+9:16 after looking at it). PASS (automated); a person's review not done.
+
+**Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);
+the review sheet lists the automated reports to read first and the known gaps of the automatic checks.
+
+**Not tested:** real phone and real mosque recordings (only code-made copies); generating a film from the
+website (needs a deploy, which is the owner's decision); the owner's own recitation.

@@ -1,11 +1,25 @@
 # Recitation film: review sheet for a person
 
 This sheet is filled in by a person who knows the Quran (and, for the pictures, the owner or an editor)
-before a film is signed off with `node local/quran-review.mjs --run <folder> --signoff --by "Name"`.
+before a film is signed off with
+`node local/quran-review.mjs --run <folder> --signoff --by "Name" --qualification "..." --contact "..."`.
+The sign-off is refused without a qualification and a contact: it must be a real, reachable person.
 It is kept apart from the automated tests: no test can replace it. Keep one copy per film, with the
 film's folder name and date.
 
-Film folder: ______________________  Reviewer: ______________________  Date: __________
+Film folder: ______________________  Date: __________
+Reviewer (real name): ______________________  Qualification (hafiz, ijazah, teacher, scholar): ______________________
+Contact: ______________________
+
+## 0. The automated reports (read them; they are not a religious approval)
+
+| Report | Where | Must show |
+|---|---|---|
+| Ayah timing | `quran-location.json` | the passage; how many ayah ends are sure (two methods agree); any question asked |
+| Pictures, every second | `render-report-*.json` → `visual` | coverage 1, no empty or frozen stretch |
+| Sound | `render-report-*.json` → `audio` | offset 0, no added silence, no clipping |
+| Placeholder cards | `render-report-*.json` → `cards` | none |
+| Media refusals | `media.md` | why other pictures were refused |
 
 ## 1. The Quran text (religious accuracy)
 
@@ -27,7 +41,9 @@ Film folder: ______________________  Reviewer: ______________________  Date: ___
 | Paradise, Hell and the Hereafter appear only as symbols in real earthly nature, never as a scene | | |
 | No faces; people only if the film's adab level allows them, and only from afar | | |
 | No church, temple, idol, statue, painting, icon, music, alcohol or immodest picture | | |
-| No picture is upside down, sideways, blurred, watermarked or with text on it | | |
+| No picture is upside down, sideways, blurred, watermarked or with text on it (the orientation check catches only about half of sideways pictures) | | |
+| No painting, drawing or rendering (the automatic check missed one ink painting in ten) | | |
+| No map, diagram or night-lights composite presented as a landscape | | |
 | Each picture fits the meaning of its ayah, or is a neutral reverent motif (see `shots.md`, column "Why") | | |
 | The same picture does not come back, except the refrain's own picture | | |
 

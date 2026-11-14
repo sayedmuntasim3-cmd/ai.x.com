@@ -838,7 +838,7 @@ function quranSteps() {
     `node render/quran-render.mjs --run ${out} --audio ${out}/master/${space}.wav --format ${$("#q-format").value}${reciter ? ` --reciter ${shq(reciter)}` : ""}${$("#q-arabic").checked ? "" : " --no-text"}`,
     `node local/quran-review.mjs --run ${out} --status`,
     `node local/quran-review.mjs --run ${out} --approve all --by ${shq("REVIEWER NAME")}`,
-    `node local/quran-review.mjs --run ${out} --signoff --by ${shq("REVIEWER NAME")}`,
+    `node local/quran-review.mjs --run ${out} --signoff --by ${shq("REVIEWER NAME")} --qualification ${shq("hafiz / ijazah / teacher")} --contact ${shq("email or phone")}`,
     `node local/quran-review.mjs --run ${out} --ready${reciter ? ` --reciter ${shq(reciter)}` : ""}`,
   ];
   $("#q-commands").textContent = lines.join("\n");

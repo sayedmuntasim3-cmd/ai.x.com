@@ -16,7 +16,7 @@ import { msg } from "./messages.mjs";
  * @typedef {"pending" | "approved" | "replace" | "rejected"} SceneStatus
  * @typedef {{ shot: string, ayah: string, start: number, end: number, picture: string, because: string, asset: { id: string, title: string, page: string, licence: string } | null, status: SceneStatus, note: string }} ReviewScene
  * @typedef {{ at: string, by: string, shot: string | null, action: string, note: string }} ReviewDecision
- * @typedef {{ version: 1, scenes: ReviewScene[], decisions: ReviewDecision[], signoff: { by: string, at: string, statement: string } | null }} Review
+ * @typedef {{ version: 1, scenes: ReviewScene[], decisions: ReviewDecision[], signoff: { by: string, at: string, statement: string, qualification: string, contact: string } | null }} Review
  */
 
 /** What the reviewer signs. */
@@ -45,7 +45,8 @@ export function reviewSheet(direction, media, previous = null) {
 
 /**
  * Record one decision. `by` is required: no decision is anonymous.
- * @param {Review} review @param {{ shot?: string | null, action: "approve" | "replace" | "reject" | "approve-all" | "signoff", by: string, note?: string, at?: string }} d
+ * @param {Review} review @param {{ shot?: string | null, action: "approve" | "replace" | "reject" | "approve-all" | "signoff", by: string, note?: string, at?: string,
+ *   qualification?: string, contact?: string }} d the sign-off needs the reviewer's qualification (e.g. "hafiz, ijazah in Hafs") and a contact
  * @returns {{ ok: boolean, review: Review, message: any }}
  */
 export function decide(review, d) {
@@ -56,7 +57,10 @@ export function decide(review, d) {
   if (d.action === "signoff") {
     const open = next.scenes.filter((s) => s.status !== "approved" && s.status !== "rejected");
     if (open.length) return { ok: false, review, message: msg("quran.review.open", { count: open.length, shots: open.slice(0, 5).map((s) => s.shot).join(", ") }) };
-    next.signoff = { by, at, statement: SIGNOFF_STATEMENT };
+    // A religious sign-off is a real person's: their name, what qualifies them, and how to reach them.
+    const qualification = String(d.qualification ?? "").trim(), contact = String(d.contact ?? "").trim();
+    if (!qualification || !contact) return { ok: false, review, message: msg("quran.review.identity") };
+    next.signoff = { by, at, statement: SIGNOFF_STATEMENT, qualification, contact };
     return { ok: true, review: next, message: msg("quran.review.signed", { by }) };
   }
   if (d.action === "approve-all") { for (const s of next.scenes) if (s.status === "pending") s.status = "approved"; return { ok: true, review: next, message: msg("quran.review.decided", { action: "approve", count: next.scenes.length }) }; }

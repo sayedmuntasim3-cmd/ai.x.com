@@ -25,7 +25,7 @@ const FONTS = new URL("./assets/fonts/", import.meta.url).pathname;
 export const FORMATS = Object.freeze({
   "1080p": { width: 1920, height: 1080, fps: 30, fontSize: 70, titleSize: 150, margin: 70 },
   "4k": { width: 3840, height: 2160, fps: 30, fontSize: 140, titleSize: 300, margin: 140 },
-  "9:16": { width: 1080, height: 1920, fps: 30, fontSize: 62, titleSize: 130, margin: 300 },
+  "9:16": { width: 1080, height: 1920, fps: 30, fontSize: 80, titleSize: 140, margin: 340 },
 });
 
 /** One grade for the whole film: a little less colour, a little more depth, a soft vignette. */

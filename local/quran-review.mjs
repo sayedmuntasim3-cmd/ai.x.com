@@ -4,7 +4,7 @@
  *   node local/quran-review.mjs --run <folder> --approve S001,S002 | all --by "Name"
  *   node local/quran-review.mjs --run <folder> --reject S004 --by "Name" [--note "why"]     (a dark card instead)
  *   node local/quran-review.mjs --run <folder> --replace S003 --by "Name" [--query "olive grove"] [--detect python3]
- *   node local/quran-review.mjs --run <folder> --signoff --by "Name"
+ *   node local/quran-review.mjs --run <folder> --signoff --by "Name" --qualification "hafiz, ijazah in Hafs" --contact "email or phone"
  *   node local/quran-review.mjs --run <folder> --ready     (exit 0 only when it may be published; writes publish.json)
  * After a replacement, render again (render/quran-render.mjs): only the
  * changed scene is rendered anew. Every decision is kept in review.json
@@ -73,12 +73,12 @@ async function main() {
       review = reviewSheet(direction, await readJson(join(dir, "media.json")), review);
     }
   }
-  if (a.signoff === true) failed ||= !take(decide(review, { action: "signoff", by }));
+  if (a.signoff === true) failed ||= !take(decide(review, { action: "signoff", by, qualification: typeof a.qualification === "string" ? a.qualification : "", contact: typeof a.contact === "string" ? a.contact : "" }));
   await writeFile(join(dir, "review.json"), JSON.stringify(review, null, 1));
   for (const m of said) console.log("- " + m[lang]);
   if (a.status === true || (!a.approve && !a.reject && !a.replace && !a.signoff && !a.ready)) {
     for (const s of review.scenes) console.log(`${s.shot}  ${s.ayah.padEnd(7)} ${s.status.padEnd(9)} ${s.asset ? s.asset.title.slice(0, 50) : "card"}  [${s.because.slice(0, 60)}]`);
-    console.log(review.signoff ? `Signed off by ${review.signoff.by} at ${review.signoff.at}` : "Not signed off.");
+    console.log(review.signoff ? `Signed off by ${review.signoff.by} (${review.signoff.qualification}; ${review.signoff.contact}) at ${review.signoff.at}` : "Not signed off.");
   }
   if (a.ready === true) {
     const reports = ["1080p", "4k", "9x16"].map((f) => join(dir, `render-report-${f}.json`));

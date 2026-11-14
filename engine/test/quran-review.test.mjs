@@ -24,7 +24,10 @@ test("Q6 exit: a film cannot be marked ready without every scene approved and a 
   assert.deepEqual(unsigned.why.map((m) => m.code), ["quran.review.unsigned"]);
   // A sign-off without a name is refused.
   assert.equal(decide(review, { action: "signoff", by: "" }).ok, false);
-  review = decide(review, { action: "signoff", by: "Reviewer A" }).review;
+  // A name alone is not enough for a religious sign-off.
+  assert.equal(decide(review, { action: "signoff", by: "Reviewer A" }).message.code, "quran.review.identity");
+  review = decide(review, { action: "signoff", by: "Reviewer A", qualification: "hafiz, ijazah in Hafs", contact: "a@example.org" }).review;
+  assert.equal(review.signoff?.qualification, "hafiz, ijazah in Hafs");
   const ready = readyToPublish(review, goodRender);
   assert.equal(ready.ok, true);
   assert.equal(ready.by, "Reviewer A");
@@ -45,7 +48,7 @@ test("Q6 exit: a film cannot be marked ready without every scene approved and a 
 
 test("replacing a scene keeps the other decisions, sets that scene pending and undoes the sign-off", () => {
   let review = decide(reviewSheet(direction, media), { action: "approve-all", by: "R" }).review;
-  review = decide(review, { action: "signoff", by: "R" }).review;
+  review = decide(review, { action: "signoff", by: "R", qualification: "q", contact: "c" }).review;
   assert.ok(review.signoff);
   const replaced = decide(review, { shot: "S002", action: "replace", by: "R", note: "search: olive grove" });
   assert.equal(replaced.review.signoff, null);
