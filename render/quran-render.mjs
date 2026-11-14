@@ -14,8 +14,9 @@
  * Then the film is measured, not assumed: length against the voice,
  * loudness, true peak, black and frozen stretches, and where every cut is.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { dirname, extname, join, resolve } from "node:path";
 import { measureMaster, mediaDuration, run } from "./render-film.mjs";
 
 const FONTS = new URL("./assets/fonts/", import.meta.url).pathname;
@@ -201,6 +202,38 @@ async function frozen(file) {
  * Render and measure.
  * @param {{ run: string, audio: string, format?: keyof typeof FORMATS, reciter?: string, showAyat?: boolean, out?: string, log?: (l: string) => void }} o
  */
+/**
+ * An asset's file, fetched once into the run's folder: archives refuse bursts
+ * of requests (Commons answered 429 to ffmpeg mid-render and two scenes became
+ * cards), so the file is read with a named client, retried with waits on 429
+ * and server errors, and reused by every format. A local path is returned as is.
+ * @param {string} url @param {string} folder @param {{ tries?: number, wait?: (ms: number) => Promise<void>, log?: (l: string) => void }} [o]
+ * @returns {Promise<string>}
+ */
+export async function fetchAsset(url, folder, o = {}) {
+  if (!/^https?:\/\//.test(url)) return url;
+  const ext = (extname(new URL(url).pathname).toLowerCase().match(/^\.[a-z0-9]{2,5}$/) ?? [".bin"])[0];
+  const file = join(folder, createHash("sha1").update(url).digest("hex").slice(0, 16) + ext);
+  if (await stat(file).then((x) => x.size > 0, () => false)) return file;
+  await mkdir(folder, { recursive: true });
+  const wait = o.wait ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const tries = o.tries ?? 6;
+  for (let k = 0; ; k += 1) {
+    const res = await fetch(url, { headers: { "User-Agent": "ZuponaStudio/1.0 (Quran recitation film; media fetch)" } }).catch((e) => ({ ok: false, status: 0, error: e, headers: new Headers() }));
+    if (res.ok && "arrayBuffer" in res) {
+      await writeFile(file + ".part", Buffer.from(await res.arrayBuffer()));
+      await rename(file + ".part", file);
+      return file;
+    }
+    const again = res.status === 0 || res.status === 429 || res.status >= 500;
+    if (!again || k + 1 >= tries) throw new Error(`could not fetch ${url}: ${res.status || /** @type {any} */ (res).error?.message || "no answer"}`);
+    const after = Number(res.headers.get("retry-after"));
+    const ms = Number.isFinite(after) && after > 0 ? Math.min(after, 120) * 1000 : Math.min(5000 * 2 ** k, 60000);
+    o.log?.(`${url.slice(0, 80)}: ${res.status || "no answer"}, again in ${Math.round(ms / 1000)} s`);
+    await wait(ms);
+  }
+}
+
 export async function renderQuranFilm(o) {
   const f = FORMATS[o.format ?? "1080p"];
   const dir = resolve(o.run);
@@ -228,7 +261,10 @@ export async function renderQuranFilm(o) {
     // A clip whose shot, asset and move are unchanged is kept: replacing one scene re-renders that scene only.
     const key = JSON.stringify({ from: seg.from, length: seg.length, move: shot.move, asset: asset?.url ?? null, format: o.format ?? "1080p", grade: GRADE });
     if (await readFile(clip + ".key", "utf8").then((k) => k === key, () => false)) { clips.push(clip); reused += 1; continue; }
-    try { await run("ffmpeg", clipArgs(seg, shot, asset, f, clip)); await writeFile(clip + ".key", key); }
+    try {
+      const local = asset ? { ...asset, url: await fetchAsset(asset.url, join(dir, "assets"), { log }) } : null;
+      await run("ffmpeg", clipArgs(seg, shot, local, f, clip)); await writeFile(clip + ".key", key);
+    }
     catch (e) {
       // An asset that cannot be read becomes a card, and the report says so.
       log(`${shot.id}: ${asset ? "the asset could not be read, a card is used" : "card failed"}: ${/** @type {Error} */ (e).message.split("\n")[0]}`);

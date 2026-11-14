@@ -4,6 +4,28 @@ Status words: **PASS** built and verified by running it; **FAIL** tested and fai
 built or partly verified; **NOT TESTED**. An automated pass is never a religious approval. No film is ready
 to publish: none has had a qualified reviewer's sign-off. Details and numbers: `docs/QURAN_DOCUMENTARY.md`.
 
+## 0. Architecture assessment (after the owner's platform brief, 14 Nov)
+
+The pipeline already runs as separate stages: locate the recitation (Tanzil +
+recognizer + CTC alignment), master the voice, meaning, shot list (director),
+media search with checks, render (16:9, 4K, 9:16), automatic audits, review
+and sign-off. These stages stay; the weaknesses were in how decisions were made
+and what blocked a release. Ranked by severity:
+
+| # | Weakness | Severity | Done in this pass |
+|---|---|---|---|
+| 1 | Picture choice was yes/no on two weak signals (title words, a small image-text model); nothing went to a person, so three wrong pictures reached films | critical | Three answers (refuse / doubtful / clean); a doubtful picture is used only when no clean one exists and its scene is WARNING; a title word alone no longer refuses; frame scores for people, buildings, man-made things |
+| 2 | The visual thresholds rested on 33 pictures | critical | Runner job builds a larger scored pool; labels and precision/recall per category (see section 2) |
+| 3 | A finished render with passing audits could look "done" | critical | `readyToPublish` returns PASS / WARNING / FAIL; every format judged; verse timing with fewer than half the ends confirmed is FAIL (Ad-Duha) |
+| 4 | The recording's reciter and permission were never recorded | critical | Publishing needs reciter, source and permission written down |
+| 5 | Slow melodic recitation (Ad-Duha) cannot be timed | high | Unchanged: still asks; now blocks release instead of only hiding the Arabic |
+| 6 | Review only through a command line and JSON | high | `review.html`: real frames, ayah, picture, source, licence, checks, refusals, commands (en / bn) |
+| 7 | The adhan was answered with a generic question | medium | Recognised as not Quran; its own message |
+| 8 | Model loading per picture (~16 s each) made media search slow | medium | One detector process per film |
+| 9 | Only keyless archives (mostly Commons photos, few videos): films look like slideshows | high | Not changed: Pexels / Pixabay need the owner's free keys; a verified archival-footage source is still to be found |
+| 10 | No maps, manuscripts, calligraphy or explanatory graphics; no thumbnails | medium | Not started (P2) |
+| 11 | The narration-documentary pipeline (`film-run.mjs`) and the Quran pipeline share little (timeline, QA, review) | medium | Not changed; the review status and page are written so the narration side can use them |
+
 ## 1. What already worked before this pass
 
 | Part | Status | Evidence |

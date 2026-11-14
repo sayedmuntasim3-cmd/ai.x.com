@@ -42,3 +42,28 @@ test("scores in the uncertain band are doubts for a person, not refusals and not
   assert.match(frameDoubts({ look: { ...look, relevance: 0.55 } })[0], /^relevance: the frames only partly/);
   assert.deepEqual(frameDoubts({}), []);
 });
+
+test("the validation measure counts refusals and reviews per category against a person's labels", async () => {
+  const { evaluate } = await import("./media/visual-eval.mjs");
+  const look = (/** @type {object} */ x) => ({ painting: 0, drawing: 0, rendering: 0, walkers: 0, building: 0, manmade: 0, ...x });
+  const items = [
+    { n: 1, look: look({ walkers: 0.95 }) }, { n: 2, look: look({ walkers: 0.7 }) }, { n: 3, look: look({ walkers: 0.95 }) },
+    { n: 4, look: look({ building: 1 }) }, { n: 5, look: look({}) }, { n: 6, look: null },
+  ];
+  const r = evaluate(items, { 1: ["people"], 2: ["people"], 3: [], 4: ["building"], 5: [], 6: ["people"] });
+  assert.equal(r.pictures, 5);
+  assert.deepEqual([r.people.refused.tp, r.people.refused.fp, r.people.refused.fn], [1, 1, 1]);
+  assert.deepEqual([r.people.refusedOrReviewed.tp, r.people.refusedOrReviewed.fn], [2, 0]);
+  assert.deepEqual(r.people.refused.falsePositives, [3]);
+  assert.equal(r.building.refused.recall, 1);
+});
+
+test("the face and person detectors refuse only when the image-text model agrees; alone they send the picture to a person", () => {
+  const look = { ...clean.look, relevance: 0.9, walkers: 0.05, building: 0, manmade: 0 };
+  // Measured: "faces" in bark and rock on 13 of 68 clean landscapes, where the people score stayed low.
+  assert.equal(frameVerdict({ ...clean, faces: 1, look }), null);
+  assert.match(frameDoubts({ faces: 1, look })[0], /^adab: the face or person detector found 1 face/);
+  assert.match(String(frameVerdict({ ...clean, faces: 1, look: { ...look, walkers: 0.7 } })), /^detector: 1 face\(s\), 0 person\(s\) in 5 frame\(s\), people score 70%/);
+  // Without the image-text model the detectors decide alone, as before.
+  assert.match(String(frameVerdict({ ...clean, faces: 1 })), /^detector: 1 face/);
+});

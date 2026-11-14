@@ -41,7 +41,12 @@ export function frameVerdict(item, usedHashes = []) {
   // The same rule as the film's pixel audit: a dark, plain picture reads as an empty screen (the night-lights map
   // that reached a test film measured brightness 10.5, detail 0.44; photographs here 74-146 and 0.89-0.96).
   if (item.exposure && item.exposure.brightness < VISUAL_RULES.darkBrightness && item.exposure.entropy < VISUAL_RULES.plainEntropy) return `quality: too dark and plain to read on screen (brightness ${item.exposure.brightness}, detail ${item.exposure.entropy})`;
-  if (item.faces || item.people) return `detector: ${item.faces} face(s), ${item.people} person(s) in ${item.frames} frame(s)`;
+  // Faces and people: the OpenCV detectors alone are not an authority. On 68 clean landscape photos of the
+  // validation set they saw "faces" in 13 (bark, rock, foliage), and every real person they found the image-text
+  // model also scored at least 0.6. So they refuse only when the image-text model agrees (or there is no such
+  // model on this machine); alone they send the picture to a person.
+  const walkers = typeof item.look?.walkers === "number" ? item.look.walkers : null;
+  if ((item.faces || item.people) && (walkers === null || walkers >= DOUBT_RULES.walkers)) return `detector: ${item.faces} face(s), ${item.people} person(s) in ${item.frames} frame(s)${walkers === null ? "" : `, people score ${Math.round(walkers * 100)}%`}`;
   if (item.look) {
     const art = item.look.painting + item.look.drawing + item.look.rendering;
     if (art >= VISUAL_RULES.notPhotograph) return `visual: looks like a painting, drawing or rendering (${Math.round(art * 100)}%), not a photograph`;
@@ -64,7 +69,7 @@ export function frameVerdict(item, usedHashes = []) {
  * uncertain band. Measured: clean landscapes scored walkers up to 0.80 and
  * man-made up to 0.45 (a driftwood post), so those go to a person instead of
  * being refused or passed without a look.
- * @param {{ look?: any }} item @returns {string[]}
+ * @param {{ look?: any, faces?: number, people?: number }} item @returns {string[]}
  */
 export function frameDoubts(item) {
   const l = item.look;
@@ -72,6 +77,7 @@ export function frameDoubts(item) {
   /** @type {string[]} */
   const out = [];
   const pc = (/** @type {number} */ x) => Math.round(x * 100);
+  if (/** @type {any} */ (item).faces || /** @type {any} */ (item).people) out.push(`adab: the face or person detector found ${/** @type {any} */ (item).faces ?? 0} face(s), ${/** @type {any} */ (item).people ?? 0} person(s); the image-text model did not agree`);
   const art = (l.painting ?? 0) + (l.drawing ?? 0) + (l.rendering ?? 0);
   if (art >= DOUBT_RULES.art) out.push(`visual: maybe not a photograph (${pc(art)}%)`);
   if (typeof l.relevance === "number" && l.relevance < DOUBT_RULES.relevance) out.push(`relevance: the frames only partly show what was searched for (${pc(l.relevance)}%)`);

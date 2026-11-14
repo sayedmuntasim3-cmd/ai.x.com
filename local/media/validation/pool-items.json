@@ -1,0 +1,4893 @@
+{
+ "detector": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+ "items": [
+  {
+   "n": 1,
+   "group": "hikers",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1130 1348.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1130_1348.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4d/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1130_1348.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1130_1348.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.202,
+    "turned": 0.443,
+    "relevance": null,
+    "walkers": 0.005,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 183.6,
+    "entropy": 0.91
+   },
+   "sideways": false
+  },
+  {
+   "n": 2,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1140 1373.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1140_1373.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1140_1373.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1140_1373.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.231,
+    "turned": 0.469,
+    "relevance": null,
+    "walkers": 0.048,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 163.9,
+    "entropy": 0.909
+   },
+   "sideways": false
+  },
+  {
+   "n": 3,
+   "group": "hikers",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1130 1346.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1130_1346.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1130_1346.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1130_1346.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.286,
+    "turned": 0.375,
+    "relevance": null,
+    "walkers": 0.031,
+    "building": 0.004,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 169.3,
+    "entropy": 0.941
+   },
+   "sideways": false
+  },
+  {
+   "n": 4,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1137 1368.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1137_1368.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1137_1368.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1137_1368.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.146,
+    "turned": 0.58,
+    "relevance": null,
+    "walkers": 0.008,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 175.6,
+    "entropy": 0.886
+   },
+   "sideways": false
+  },
+  {
+   "n": 5,
+   "group": "hikers",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1131 1350.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1131_1350.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1131_1350.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1131_1350.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.481,
+    "turned": 0.359,
+    "relevance": null,
+    "walkers": 0.007,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 179.6,
+    "entropy": 0.846
+   },
+   "sideways": false
+  },
+  {
+   "n": 6,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1123 1327.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1123_1327.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1123_1327.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1123_1327.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.108,
+    "turned": 0.676,
+    "relevance": null,
+    "walkers": 0.057,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 163.6,
+    "entropy": 0.86
+   },
+   "sideways": false
+  },
+  {
+   "n": 7,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1139 1370.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1139_1370.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1139_1370.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1139_1370.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.212,
+    "turned": 0.632,
+    "relevance": null,
+    "walkers": 0.05,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 177.9,
+    "entropy": 0.889
+   },
+   "sideways": false
+  },
+  {
+   "n": 8,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1126 1334.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1126_1334.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1126_1334.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1126_1334.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.094,
+    "turned": 0.502,
+    "relevance": null,
+    "walkers": 0.118,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 162.5,
+    "entropy": 0.872
+   },
+   "sideways": false
+  },
+  {
+   "n": 9,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1124 1330.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1124_1330.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1124_1330.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1124_1330.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.15,
+    "turned": 0.458,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 160.4,
+    "entropy": 0.822
+   },
+   "sideways": false
+  },
+  {
+   "n": 10,
+   "group": "hikers",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1133 1353.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1133_1353.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1133_1353.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1133_1353.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.026,
+    "turned": 0.632,
+    "relevance": null,
+    "walkers": 0.026,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 177.7,
+    "entropy": 0.918
+   },
+   "sideways": false
+  },
+  {
+   "n": 11,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1126 1332.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1126_1332.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/db/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1126_1332.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1126_1332.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.086,
+    "turned": 0.572,
+    "relevance": null,
+    "walkers": 0.03,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 152.4,
+    "entropy": 0.947
+   },
+   "sideways": false
+  },
+  {
+   "n": 12,
+   "group": "hikers",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1134 1359.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1134_1359.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1134_1359.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1134_1359.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.164,
+    "turned": 0.501,
+    "relevance": null,
+    "walkers": 0.013,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 169.5,
+    "entropy": 0.927
+   },
+   "sideways": false
+  },
+  {
+   "n": 13,
+   "group": "shepherd",
+   "title": "File:Poplar Sunset Douar Chiker Morocco Nov25 A7CR 09360.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Poplar_Sunset_Douar_Chiker_Morocco_Nov25_A7CR_09360.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/Poplar_Sunset_Douar_Chiker_Morocco_Nov25_A7CR_09360.jpg/1280px-Poplar_Sunset_Douar_Chiker_Morocco_Nov25_A7CR_09360.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.067,
+    "turned": 0.583,
+    "relevance": null,
+    "walkers": 0.065,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 131.8,
+    "entropy": 0.931
+   },
+   "sideways": false
+  },
+  {
+   "n": 14,
+   "group": "tourists",
+   "title": "File:Tropea - Fotografi di fronte a Santa Maria dell'Isola.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Tropea_-_Fotografi_di_fronte_a_Santa_Maria_dell%27Isola.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b6/Tropea_-_Fotografi_di_fronte_a_Santa_Maria_dell%27Isola.jpg/1280px-Tropea_-_Fotografi_di_fronte_a_Santa_Maria_dell%27Isola.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 2,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.037,
+    "turned": 0.67,
+    "relevance": null,
+    "walkers": 0.999,
+    "building": 0.531,
+    "manmade": 0.199
+   },
+   "exposure": {
+    "brightness": 127.7,
+    "entropy": 0.934
+   },
+   "sideways": false
+  },
+  {
+   "n": 15,
+   "group": "tourists",
+   "title": "File:Steve Tshwete (ZA), Alzu Petroport -- 2024 -- 142958.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Steve_Tshwete_(ZA),_Alzu_Petroport_--_2024_--_142958.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/Steve_Tshwete_%28ZA%29%2C_Alzu_Petroport_--_2024_--_142958.jpg/1280px-Steve_Tshwete_%28ZA%29%2C_Alzu_Petroport_--_2024_--_142958.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.998,
+    "painting": 0.002,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.365,
+    "turned": 0.415,
+    "relevance": null,
+    "walkers": 0.017,
+    "building": 0.112,
+    "manmade": 0.01
+   },
+   "exposure": {
+    "brightness": 140.0,
+    "entropy": 0.934
+   },
+   "sideways": false
+  },
+  {
+   "n": 16,
+   "group": "tourists",
+   "title": "File:Talavar Gatta on Tungavhadra river.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Talavar_Gatta_on_Tungavhadra_river.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Talavar_Gatta_on_Tungavhadra_river.jpg/1280px-Talavar_Gatta_on_Tungavhadra_river.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.036,
+    "turned": 0.484,
+    "relevance": null,
+    "walkers": 0.917,
+    "building": 0.876,
+    "manmade": 0.027
+   },
+   "exposure": {
+    "brightness": 155.3,
+    "entropy": 0.948
+   },
+   "sideways": false
+  },
+  {
+   "n": 17,
+   "group": "hut",
+   "title": "File:Lukmanierpass, Passo del Lucomagno. 20-09-2022. (actm.) 26.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Lukmanierpass,_Passo_del_Lucomagno._20-09-2022._(actm.)_26.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Lukmanierpass%2C_Passo_del_Lucomagno._20-09-2022._%28actm.%29_26.jpg/1280px-Lukmanierpass%2C_Passo_del_Lucomagno._20-09-2022._%28actm.%29_26.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.058,
+    "turned": 0.527,
+    "relevance": null,
+    "walkers": 0.017,
+    "building": 0.014,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 138.4,
+    "entropy": 0.972
+   },
+   "sideways": false
+  },
+  {
+   "n": 18,
+   "group": "hut",
+   "title": "File:Glecksteinhütte front 20200121.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Glecksteinh%C3%BCtte_front_20200121.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Glecksteinh%C3%BCtte_front_20200121.jpg/1280px-Glecksteinh%C3%BCtte_front_20200121.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.984,
+    "painting": 0.016,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.014,
+    "turned": 0.781,
+    "relevance": null,
+    "walkers": 0.144,
+    "building": 0.001,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 82.8,
+    "entropy": 0.917
+   },
+   "sideways": false
+  },
+  {
+   "n": 19,
+   "group": "hut",
+   "title": "File:Water reflection of mountains and hut in a paddy field with blue sky in Vang Vieng, Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Water_reflection_of_mountains_and_hut_in_a_paddy_field_with_blue_sky_in_Vang_Vieng,_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/63/Water_reflection_of_mountains_and_hut_in_a_paddy_field_with_blue_sky_in_Vang_Vieng%2C_Laos.jpg/1280px-Water_reflection_of_mountains_and_hut_in_a_paddy_field_with_blue_sky_in_Vang_Vieng%2C_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.009,
+    "turned": 0.498,
+    "relevance": null,
+    "walkers": 0.131,
+    "building": 0.003,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 144.1,
+    "entropy": 0.96
+   },
+   "sideways": false
+  },
+  {
+   "n": 20,
+   "group": "hut",
+   "title": "File:Wooden hut fence mountains and blue sky in the green rice fields of Vang Vieng in Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Wooden_hut_fence_mountains_and_blue_sky_in_the_green_rice_fields_of_Vang_Vieng_in_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Wooden_hut_fence_mountains_and_blue_sky_in_the_green_rice_fields_of_Vang_Vieng_in_Laos.jpg/1280px-Wooden_hut_fence_mountains_and_blue_sky_in_the_green_rice_fields_of_Vang_Vieng_in_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.018,
+    "turned": 0.581,
+    "relevance": null,
+    "walkers": 0.13,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 124.3,
+    "entropy": 0.932
+   },
+   "sideways": false
+  },
+  {
+   "n": 21,
+   "group": "hut",
+   "title": "File:Water reflection of a wooden hut with colorful sky and karst mountains in a paddy field at sunset Vang Vieng Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Water_reflection_of_a_wooden_hut_with_colorful_sky_and_karst_mountains_in_a_paddy_field_at_sunset_Vang_Vieng_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2d/Water_reflection_of_a_wooden_hut_with_colorful_sky_and_karst_mountains_in_a_paddy_field_at_sunset_Vang_Vieng_Laos.jpg/1280px-Water_reflection_of_a_wooden_hut_with_colorful_sky_and_karst_mountains_in_a_paddy_field_at_sunset_Vang_Vieng_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.998,
+    "painting": 0.002,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.007,
+    "turned": 0.581,
+    "relevance": null,
+    "walkers": 0.142,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 107.5,
+    "entropy": 0.966
+   },
+   "sideways": false
+  },
+  {
+   "n": 22,
+   "group": "hut",
+   "title": "File:Felsenkammer hut 20200207 1.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Felsenkammer_hut_20200207_1.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Felsenkammer_hut_20200207_1.jpg/1280px-Felsenkammer_hut_20200207_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.099,
+    "turned": 0.642,
+    "relevance": null,
+    "walkers": 0.59,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 92.6,
+    "entropy": 0.924
+   },
+   "sideways": false
+  },
+  {
+   "n": 23,
+   "group": "hut",
+   "title": "File:Mountain hut Ciadinat Sëlva.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mountain_hut_Ciadinat_S%C3%ABlva.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/Mountain_hut_Ciadinat_S%C3%ABlva.jpg/1280px-Mountain_hut_Ciadinat_S%C3%ABlva.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.067,
+    "turned": 0.577,
+    "relevance": null,
+    "walkers": 0.624,
+    "building": 0.089,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 124.2,
+    "entropy": 0.94
+   },
+   "sideways": false
+  },
+  {
+   "n": 24,
+   "group": "hut",
+   "title": "File:Felsenkammer hut 20200207 2.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Felsenkammer_hut_20200207_2.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/39/Felsenkammer_hut_20200207_2.jpg/1280px-Felsenkammer_hut_20200207_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.095,
+    "turned": 0.702,
+    "relevance": null,
+    "walkers": 0.043,
+    "building": 0.016,
+    "manmade": 0.004
+   },
+   "exposure": {
+    "brightness": 76.8,
+    "entropy": 0.926
+   },
+   "sideways": false
+  },
+  {
+   "n": 25,
+   "group": "hut",
+   "title": "File:Alpine hut ruin pasture Alpe Cortaccio 1670m - Vigezzo Valley, Re, Piedmont, Italy 2022-01-06.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Alpine_hut_ruin_pasture_Alpe_Cortaccio_1670m_-_Vigezzo_Valley,_Re,_Piedmont,_Italy_2022-01-06.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/Alpine_hut_ruin_pasture_Alpe_Cortaccio_1670m_-_Vigezzo_Valley%2C_Re%2C_Piedmont%2C_Italy_2022-01-06.jpg/1280px-Alpine_hut_ruin_pasture_Alpe_Cortaccio_1670m_-_Vigezzo_Valley%2C_Re%2C_Piedmont%2C_Italy_2022-01-06.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.164,
+    "turned": 0.459,
+    "relevance": null,
+    "walkers": 0.157,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 128.9,
+    "entropy": 0.969
+   },
+   "sideways": false
+  },
+  {
+   "n": 26,
+   "group": "hut",
+   "title": "File:Wooden walkway leading to a hut with straw roof in front of karst mountains with mist, at sunrise, Vang Vieng, Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Wooden_walkway_leading_to_a_hut_with_straw_roof_in_front_of_karst_mountains_with_mist,_at_sunrise,_Vang_Vieng,_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d0/Wooden_walkway_leading_to_a_hut_with_straw_roof_in_front_of_karst_mountains_with_mist%2C_at_sunrise%2C_Vang_Vieng%2C_Laos.jpg/1280px-Wooden_walkway_leading_to_a_hut_with_straw_roof_in_front_of_karst_mountains_with_mist%2C_at_sunrise%2C_Vang_Vieng%2C_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.992,
+    "painting": 0.008,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.01,
+    "turned": 0.715,
+    "relevance": null,
+    "walkers": 0.222,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 110.6,
+    "entropy": 0.938
+   },
+   "sideways": false
+  },
+  {
+   "n": 27,
+   "group": "hut",
+   "title": "File:Wooden walkway leading to a hut with straw roof in front of karst mountains at sunset, Vang Vieng, Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Wooden_walkway_leading_to_a_hut_with_straw_roof_in_front_of_karst_mountains_at_sunset,_Vang_Vieng,_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Wooden_walkway_leading_to_a_hut_with_straw_roof_in_front_of_karst_mountains_at_sunset%2C_Vang_Vieng%2C_Laos.jpg/1280px-Wooden_walkway_leading_to_a_hut_with_straw_roof_in_front_of_karst_mountains_at_sunset%2C_Vang_Vieng%2C_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.994,
+    "painting": 0.006,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.006,
+    "turned": 0.572,
+    "relevance": null,
+    "walkers": 0.231,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 113.5,
+    "entropy": 0.924
+   },
+   "sideways": false
+  },
+  {
+   "n": 28,
+   "group": "hut",
+   "title": "File:Water reflection of mountains, hut, green rice sheaves scattered in a paddy field and clouds with blue sky in Vang Vieng, Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Water_reflection_of_mountains,_hut,_green_rice_sheaves_scattered_in_a_paddy_field_and_clouds_with_blue_sky_in_Vang_Vieng,_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e6/Water_reflection_of_mountains%2C_hut%2C_green_rice_sheaves_scattered_in_a_paddy_field_and_clouds_with_blue_sky_in_Vang_Vieng%2C_Laos.jpg/1280px-Water_reflection_of_mountains%2C_hut%2C_green_rice_sheaves_scattered_in_a_paddy_field_and_clouds_with_blue_sky_in_Vang_Vieng%2C_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.018,
+    "turned": 0.591,
+    "relevance": null,
+    "walkers": 0.344,
+    "building": 0.0,
+    "manmade": 0.006
+   },
+   "exposure": {
+    "brightness": 144.8,
+    "entropy": 0.966
+   },
+   "sideways": false
+  },
+  {
+   "n": 29,
+   "group": "ruins",
+   "title": "File:Amboy (California, USA) -- 2012 -- 4.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Amboy_(California,_USA)_--_2012_--_4.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Amboy_%28California%2C_USA%29_--_2012_--_4.jpg/1280px-Amboy_%28California%2C_USA%29_--_2012_--_4.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.048,
+    "turned": 0.622,
+    "relevance": null,
+    "walkers": 0.042,
+    "building": 0.373,
+    "manmade": 0.007
+   },
+   "exposure": {
+    "brightness": 103.5,
+    "entropy": 0.907
+   },
+   "sideways": false
+  },
+  {
+   "n": 30,
+   "group": "ruins",
+   "title": "File:ISR-2016-Makhtesh Ramon-Ein Saharonim 02 (ruins).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:ISR-2016-Makhtesh_Ramon-Ein_Saharonim_02_(ruins).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/ISR-2016-Makhtesh_Ramon-Ein_Saharonim_02_%28ruins%29.jpg/1280px-ISR-2016-Makhtesh_Ramon-Ein_Saharonim_02_%28ruins%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.003,
+    "turned": 0.563,
+    "relevance": null,
+    "walkers": 0.022,
+    "building": 0.093,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 158.1,
+    "entropy": 0.869
+   },
+   "sideways": false
+  },
+  {
+   "n": 31,
+   "group": "ruins",
+   "title": "File:ISR-2016-Makhtesh Ramon-Ein Saharonim 03 (ruins).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:ISR-2016-Makhtesh_Ramon-Ein_Saharonim_03_(ruins).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/ISR-2016-Makhtesh_Ramon-Ein_Saharonim_03_%28ruins%29.jpg/1280px-ISR-2016-Makhtesh_Ramon-Ein_Saharonim_03_%28ruins%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.017,
+    "turned": 0.625,
+    "relevance": null,
+    "walkers": 0.372,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 172.3,
+    "entropy": 0.881
+   },
+   "sideways": false
+  },
+  {
+   "n": 32,
+   "group": "ruins",
+   "title": "File:Nankendorf Burgstall-20210725-RM-170055.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Nankendorf_Burgstall-20210725-RM-170055.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Nankendorf_Burgstall-20210725-RM-170055.jpg/1280px-Nankendorf_Burgstall-20210725-RM-170055.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.109,
+    "turned": 0.563,
+    "relevance": null,
+    "walkers": 0.082,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 123.7,
+    "entropy": 0.976
+   },
+   "sideways": false
+  },
+  {
+   "n": 33,
+   "group": "ruins",
+   "title": "File:Niesten Burgstall-20210629-RM-172042.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Niesten_Burgstall-20210629-RM-172042.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Niesten_Burgstall-20210629-RM-172042.jpg/1280px-Niesten_Burgstall-20210629-RM-172042.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.145,
+    "turned": 0.496,
+    "relevance": null,
+    "walkers": 0.118,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 118.6,
+    "entropy": 0.985
+   },
+   "sideways": false
+  },
+  {
+   "n": 34,
+   "group": "ruins",
+   "title": "File:Tretzendorf Burgstall-20200530-RM-170714.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Tretzendorf_Burgstall-20200530-RM-170714.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c1/Tretzendorf_Burgstall-20200530-RM-170714.jpg/1280px-Tretzendorf_Burgstall-20200530-RM-170714.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.117,
+    "turned": 0.556,
+    "relevance": null,
+    "walkers": 0.089,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 106.3,
+    "entropy": 0.968
+   },
+   "sideways": false
+  },
+  {
+   "n": 35,
+   "group": "ruins",
+   "title": "File:Amboy (California, USA) -- 2012 -- 5703.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Amboy_(California,_USA)_--_2012_--_5703.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/94/Amboy_%28California%2C_USA%29_--_2012_--_5703.jpg/1280px-Amboy_%28California%2C_USA%29_--_2012_--_5703.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.014,
+    "turned": 0.582,
+    "relevance": null,
+    "walkers": 0.037,
+    "building": 0.265,
+    "manmade": 0.002
+   },
+   "exposure": {
+    "brightness": 146.8,
+    "entropy": 0.923
+   },
+   "sideways": false
+  },
+  {
+   "n": 36,
+   "group": "village",
+   "title": "File:Shila Tsarap Mountains Zanskar Oct22 A7C 04113.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Shila_Tsarap_Mountains_Zanskar_Oct22_A7C_04113.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Shila_Tsarap_Mountains_Zanskar_Oct22_A7C_04113.jpg/1280px-Shila_Tsarap_Mountains_Zanskar_Oct22_A7C_04113.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.998,
+    "painting": 0.002,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.239,
+    "turned": 0.488,
+    "relevance": null,
+    "walkers": 0.188,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 104.4,
+    "entropy": 0.942
+   },
+   "sideways": false
+  },
+  {
+   "n": 37,
+   "group": "village",
+   "title": "File:SW Hullathy Gram Panchayat Villages Nilgiris Nov24 A7CR 05293.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:SW_Hullathy_Gram_Panchayat_Villages_Nilgiris_Nov24_A7CR_05293.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/SW_Hullathy_Gram_Panchayat_Villages_Nilgiris_Nov24_A7CR_05293.jpg/1280px-SW_Hullathy_Gram_Panchayat_Villages_Nilgiris_Nov24_A7CR_05293.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.206,
+    "turned": 0.415,
+    "relevance": null,
+    "walkers": 0.785,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 119.1,
+    "entropy": 0.959
+   },
+   "sideways": false
+  },
+  {
+   "n": 38,
+   "group": "village",
+   "title": "File:Koaksar Village, D35 6995 01.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Koaksar_Village,_D35_6995_01.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9a/Koaksar_Village%2C_D35_6995_01.jpg/1280px-Koaksar_Village%2C_D35_6995_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.212,
+    "turned": 0.528,
+    "relevance": null,
+    "walkers": 0.457,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 107.3,
+    "entropy": 0.959
+   },
+   "sideways": false
+  },
+  {
+   "n": 39,
+   "group": "village",
+   "title": "File:Ingushetia, Russia, Armkhi, Ingush tower.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Ingushetia,_Russia,_Armkhi,_Ingush_tower.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d8/Ingushetia%2C_Russia%2C_Armkhi%2C_Ingush_tower.jpg/1280px-Ingushetia%2C_Russia%2C_Armkhi%2C_Ingush_tower.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.078,
+    "turned": 0.473,
+    "relevance": null,
+    "walkers": 0.637,
+    "building": 0.978,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 136.9,
+    "entropy": 0.965
+   },
+   "sideways": false
+  },
+  {
+   "n": 40,
+   "group": "village",
+   "title": "File:Fields Zangla Zanskar River Ladakh Jun24 A7CR 00981.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Fields_Zangla_Zanskar_River_Ladakh_Jun24_A7CR_00981.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/Fields_Zangla_Zanskar_River_Ladakh_Jun24_A7CR_00981.jpg/1280px-Fields_Zangla_Zanskar_River_Ladakh_Jun24_A7CR_00981.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.037,
+    "turned": 0.574,
+    "relevance": null,
+    "walkers": 0.155,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 128.7,
+    "entropy": 0.937
+   },
+   "sideways": false
+  },
+  {
+   "n": 41,
+   "group": "village",
+   "title": "File:Kardhang Biling Bhaga Dhauladhar Oct22 A7C 04645.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Kardhang_Biling_Bhaga_Dhauladhar_Oct22_A7C_04645.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/Kardhang_Biling_Bhaga_Dhauladhar_Oct22_A7C_04645.jpg/1280px-Kardhang_Biling_Bhaga_Dhauladhar_Oct22_A7C_04645.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.156,
+    "turned": 0.527,
+    "relevance": null,
+    "walkers": 0.812,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 88.5,
+    "entropy": 0.942
+   },
+   "sideways": false
+  },
+  {
+   "n": 42,
+   "group": "village",
+   "title": "File:Padum Zanskar View From Karsha Oct22 A7C 03984.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Padum_Zanskar_View_From_Karsha_Oct22_A7C_03984.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Padum_Zanskar_View_From_Karsha_Oct22_A7C_03984.jpg/1280px-Padum_Zanskar_View_From_Karsha_Oct22_A7C_03984.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.084,
+    "turned": 0.56,
+    "relevance": null,
+    "walkers": 0.083,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 119.0,
+    "entropy": 0.95
+   },
+   "sideways": false
+  },
+  {
+   "n": 43,
+   "group": "village",
+   "title": "File:NE View Stongdey Zanskar Jun24 A7CR 00966.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:NE_View_Stongdey_Zanskar_Jun24_A7CR_00966.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7e/NE_View_Stongdey_Zanskar_Jun24_A7CR_00966.jpg/1280px-NE_View_Stongdey_Zanskar_Jun24_A7CR_00966.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.206,
+    "turned": 0.586,
+    "relevance": null,
+    "walkers": 0.508,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 123.4,
+    "entropy": 0.934
+   },
+   "sideways": false
+  },
+  {
+   "n": 44,
+   "group": "village",
+   "title": "File:Kagbeni Mustang-WLV-0741.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Kagbeni_Mustang-WLV-0741.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Kagbeni_Mustang-WLV-0741.jpg/1280px-Kagbeni_Mustang-WLV-0741.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.097,
+    "turned": 0.525,
+    "relevance": null,
+    "walkers": 0.871,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 129.9,
+    "entropy": 0.945
+   },
+   "sideways": false
+  },
+  {
+   "n": 45,
+   "group": "village",
+   "title": "File:2025-09-20 D500-0784 Achim-Lammerts Rechtenbach-Protestantische-Pfarrkirche-Rheinebene.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:2025-09-20_D500-0784_Achim-Lammerts_Rechtenbach-Protestantische-Pfarrkirche-Rheinebene.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/2025-09-20_D500-0784_Achim-Lammerts_Rechtenbach-Protestantische-Pfarrkirche-Rheinebene.jpg/1280px-2025-09-20_D500-0784_Achim-Lammerts_Rechtenbach-Protestantische-Pfarrkirche-Rheinebene.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.013,
+    "turned": 0.738,
+    "relevance": null,
+    "walkers": 0.731,
+    "building": 0.087,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 121.6,
+    "entropy": 0.98
+   },
+   "sideways": false
+  },
+  {
+   "n": 46,
+   "group": "village",
+   "title": "File:Batal, Lahaul and Spiti Dist., HP, India. Elev. 4,000m, D35 7121 01.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Batal,_Lahaul_and_Spiti_Dist.,_HP,_India._Elev._4,000m,_D35_7121_01.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/Batal%2C_Lahaul_and_Spiti_Dist.%2C_HP%2C_India._Elev._4%2C000m%2C_D35_7121_01.jpg/1280px-Batal%2C_Lahaul_and_Spiti_Dist.%2C_HP%2C_India._Elev._4%2C000m%2C_D35_7121_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.196,
+    "turned": 0.454,
+    "relevance": null,
+    "walkers": 0.047,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 165.0,
+    "entropy": 0.939
+   },
+   "sideways": false
+  },
+  {
+   "n": 47,
+   "group": "village",
+   "title": "File:North Campus, IIT Mandi, HP, India, D35 6311 01.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:North_Campus,_IIT_Mandi,_HP,_India,_D35_6311_01.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/38/North_Campus%2C_IIT_Mandi%2C_HP%2C_India%2C_D35_6311_01.jpg/1280px-North_Campus%2C_IIT_Mandi%2C_HP%2C_India%2C_D35_6311_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.324,
+    "turned": 0.394,
+    "relevance": null,
+    "walkers": 0.631,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 96.6,
+    "entropy": 0.871
+   },
+   "sideways": false
+  },
+  {
+   "n": 48,
+   "group": "city",
+   "title": "File:Price Building illuminated at night in Quebec City.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Price_Building_illuminated_at_night_in_Quebec_City.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/Price_Building_illuminated_at_night_in_Quebec_City.jpg/1280px-Price_Building_illuminated_at_night_in_Quebec_City.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.145,
+    "turned": 0.485,
+    "relevance": null,
+    "walkers": 0.56,
+    "building": 1.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 75.6,
+    "entropy": 0.875
+   },
+   "sideways": false
+  },
+  {
+   "n": 49,
+   "group": "city",
+   "title": "File:Québec city at night, view from Lévis city.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Qu%C3%A9bec_city_at_night,_view_from_L%C3%A9vis_city.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/Qu%C3%A9bec_city_at_night%2C_view_from_L%C3%A9vis_city.jpg/1280px-Qu%C3%A9bec_city_at_night%2C_view_from_L%C3%A9vis_city.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.124,
+    "turned": 0.522,
+    "relevance": null,
+    "walkers": 0.508,
+    "building": 0.989,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 116.8,
+    "entropy": 0.887
+   },
+   "sideways": false
+  },
+  {
+   "n": 50,
+   "group": "city",
+   "title": "File:Chateau Frontenac illuminated at night in Quebec City.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Chateau_Frontenac_illuminated_at_night_in_Quebec_City.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/Chateau_Frontenac_illuminated_at_night_in_Quebec_City.jpg/1280px-Chateau_Frontenac_illuminated_at_night_in_Quebec_City.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.014,
+    "turned": 0.584,
+    "relevance": null,
+    "walkers": 0.207,
+    "building": 0.994,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 73.3,
+    "entropy": 0.906
+   },
+   "sideways": false
+  },
+  {
+   "n": 51,
+   "group": "city",
+   "title": "File:Château Frontenac city at night.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Ch%C3%A2teau_Frontenac_city_at_night.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Ch%C3%A2teau_Frontenac_city_at_night.jpg/1280px-Ch%C3%A2teau_Frontenac_city_at_night.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.012,
+    "turned": 0.495,
+    "relevance": null,
+    "walkers": 0.983,
+    "building": 0.88,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 104.3,
+    "entropy": 0.95
+   },
+   "sideways": false
+  },
+  {
+   "n": 52,
+   "group": "city",
+   "title": "File:Lower Manhattan from Jersey City September 2020 panorama.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Lower_Manhattan_from_Jersey_City_September_2020_panorama.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/ba/Lower_Manhattan_from_Jersey_City_September_2020_panorama.jpg/1280px-Lower_Manhattan_from_Jersey_City_September_2020_panorama.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.028,
+    "turned": 0.673,
+    "relevance": null,
+    "walkers": 0.014,
+    "building": 0.981,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 75.5,
+    "entropy": 0.748
+   },
+   "sideways": false
+  },
+  {
+   "n": 53,
+   "group": "city",
+   "title": "File:Lower Manhattan from Jersey City November 2014 panorama 3.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Lower_Manhattan_from_Jersey_City_November_2014_panorama_3.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b6/Lower_Manhattan_from_Jersey_City_November_2014_panorama_3.jpg/1280px-Lower_Manhattan_from_Jersey_City_November_2014_panorama_3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.031,
+    "turned": 0.663,
+    "relevance": null,
+    "walkers": 0.061,
+    "building": 0.998,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 85.1,
+    "entropy": 0.752
+   },
+   "sideways": false
+  },
+  {
+   "n": 54,
+   "group": "city",
+   "title": "File:At New York City 2025 001 - Hudson Yards skyline, New York, at night.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:At_New_York_City_2025_001_-_Hudson_Yards_skyline,_New_York,_at_night.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/At_New_York_City_2025_001_-_Hudson_Yards_skyline%2C_New_York%2C_at_night.jpg/1280px-At_New_York_City_2025_001_-_Hudson_Yards_skyline%2C_New_York%2C_at_night.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.139,
+    "turned": 0.523,
+    "relevance": null,
+    "walkers": 0.752,
+    "building": 0.992,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 59.3,
+    "entropy": 0.853
+   },
+   "sideways": false
+  },
+  {
+   "n": 55,
+   "group": "city",
+   "title": "File:Kansas City, MO skyline at night.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Kansas_City,_MO_skyline_at_night.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Kansas_City%2C_MO_skyline_at_night.jpg/1280px-Kansas_City%2C_MO_skyline_at_night.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.157,
+    "turned": 0.477,
+    "relevance": null,
+    "walkers": 0.202,
+    "building": 0.999,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 45.4,
+    "entropy": 0.779
+   },
+   "sideways": false
+  },
+  {
+   "n": 56,
+   "group": "city",
+   "title": "File:Jacksonville Skyline Night Panorama Digon3.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Jacksonville_Skyline_Night_Panorama_Digon3.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Jacksonville_Skyline_Night_Panorama_Digon3.jpg/1280px-Jacksonville_Skyline_Night_Panorama_Digon3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 4,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.002,
+    "turned": 0.513,
+    "relevance": null,
+    "walkers": 0.084,
+    "building": 1.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 18.7,
+    "entropy": 0.625
+   },
+   "sideways": false
+  },
+  {
+   "n": 57,
+   "group": "city",
+   "title": "File:Long Island City New York May 2015 panorama 3.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Long_Island_City_New_York_May_2015_panorama_3.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dd/Long_Island_City_New_York_May_2015_panorama_3.jpg/1280px-Long_Island_City_New_York_May_2015_panorama_3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.068,
+    "turned": 0.477,
+    "relevance": null,
+    "walkers": 0.935,
+    "building": 0.999,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 116.6,
+    "entropy": 0.909
+   },
+   "sideways": false
+  },
+  {
+   "n": 58,
+   "group": "city",
+   "title": "File:Midtown Manhattan from Jersey City September 2020 HDR.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Midtown_Manhattan_from_Jersey_City_September_2020_HDR.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Midtown_Manhattan_from_Jersey_City_September_2020_HDR.jpg/1280px-Midtown_Manhattan_from_Jersey_City_September_2020_HDR.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.185,
+    "turned": 0.491,
+    "relevance": null,
+    "walkers": 0.375,
+    "building": 0.997,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 81.3,
+    "entropy": 0.935
+   },
+   "sideways": false
+  },
+  {
+   "n": 59,
+   "group": "city",
+   "title": "File:Sydney skyline at dusk - Dec 2008.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sydney_skyline_at_dusk_-_Dec_2008.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Sydney_skyline_at_dusk_-_Dec_2008.jpg/1280px-Sydney_skyline_at_dusk_-_Dec_2008.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.034,
+    "turned": 0.651,
+    "relevance": null,
+    "walkers": 0.589,
+    "building": 0.991,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 127.8,
+    "entropy": 0.933
+   },
+   "sideways": false
+  },
+  {
+   "n": 60,
+   "group": "mountain",
+   "title": "File:Mountains in snow, Mountain lake, Chola Valley, Nepal, Himalayas.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mountains_in_snow,_Mountain_lake,_Chola_Valley,_Nepal,_Himalayas.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/Mountains_in_snow%2C_Mountain_lake%2C_Chola_Valley%2C_Nepal%2C_Himalayas.jpg/1280px-Mountains_in_snow%2C_Mountain_lake%2C_Chola_Valley%2C_Nepal%2C_Himalayas.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.33,
+    "turned": 0.476,
+    "relevance": null,
+    "walkers": 0.985,
+    "building": 0.0,
+    "manmade": 0.469
+   },
+   "exposure": {
+    "brightness": 146.3,
+    "entropy": 0.957
+   },
+   "sideways": false
+  },
+  {
+   "n": 61,
+   "group": "mountain",
+   "title": "File:Landscape Arnisee-region.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File:Landscape_Arnisee-region.JPG",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Landscape_Arnisee-region.JPG/1280px-Landscape_Arnisee-region.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.146,
+    "turned": 0.648,
+    "relevance": null,
+    "walkers": 0.956,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 106.6,
+    "entropy": 0.941
+   },
+   "sideways": false
+  },
+  {
+   "n": 62,
+   "group": "mountain",
+   "title": "File:Ergaki, Mountain lake Skazka, Rock formations, Sayan Mountains, Russia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Ergaki,_Mountain_lake_Skazka,_Rock_formations,_Sayan_Mountains,_Russia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Ergaki%2C_Mountain_lake_Skazka%2C_Rock_formations%2C_Sayan_Mountains%2C_Russia.jpg/1280px-Ergaki%2C_Mountain_lake_Skazka%2C_Rock_formations%2C_Sayan_Mountains%2C_Russia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.382,
+    "turned": 0.339,
+    "relevance": null,
+    "walkers": 0.318,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 155.8,
+    "entropy": 0.971
+   },
+   "sideways": false
+  },
+  {
+   "n": 63,
+   "group": "mountain",
+   "title": "File:Catoctin Mountain and farm MD1.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Catoctin_Mountain_and_farm_MD1.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Catoctin_Mountain_and_farm_MD1.jpg/1280px-Catoctin_Mountain_and_farm_MD1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.067,
+    "turned": 0.481,
+    "relevance": null,
+    "walkers": 0.013,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 74.9,
+    "entropy": 0.898
+   },
+   "sideways": false
+  },
+  {
+   "n": 64,
+   "group": "mountain",
+   "title": "File:Mountain landscape, Weathering and erosion in glacial valley, Ergaki, Sayan Mountains, Siberia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mountain_landscape,_Weathering_and_erosion_in_glacial_valley,_Ergaki,_Sayan_Mountains,_Siberia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Mountain_landscape%2C_Weathering_and_erosion_in_glacial_valley%2C_Ergaki%2C_Sayan_Mountains%2C_Siberia.jpg/1280px-Mountain_landscape%2C_Weathering_and_erosion_in_glacial_valley%2C_Ergaki%2C_Sayan_Mountains%2C_Siberia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.11,
+    "turned": 0.572,
+    "relevance": null,
+    "walkers": 0.128,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 114.3,
+    "entropy": 0.919
+   },
+   "sideways": false
+  },
+  {
+   "n": 65,
+   "group": "mountain",
+   "title": "File:Mountain Peak, Alaska (1999).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mountain_Peak,_Alaska_(1999).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e8/Mountain_Peak%2C_Alaska_%281999%29.jpg/1280px-Mountain_Peak%2C_Alaska_%281999%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.121,
+    "turned": 0.608,
+    "relevance": null,
+    "walkers": 0.034,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 120.2,
+    "entropy": 0.984
+   },
+   "sideways": false
+  },
+  {
+   "n": 66,
+   "group": "mountain",
+   "title": "File:Blue Mountains National Park (AU), Three Sisters -- 2019 -- 1987-9.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Blue_Mountains_National_Park_(AU),_Three_Sisters_--_2019_--_1987-9.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/Blue_Mountains_National_Park_%28AU%29%2C_Three_Sisters_--_2019_--_1987-9.jpg/1280px-Blue_Mountains_National_Park_%28AU%29%2C_Three_Sisters_--_2019_--_1987-9.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.1,
+    "turned": 0.615,
+    "relevance": null,
+    "walkers": 0.556,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 102.0,
+    "entropy": 0.963
+   },
+   "sideways": false
+  },
+  {
+   "n": 67,
+   "group": "mountain",
+   "title": "File:Frosty Raftsundet landscape with Trolltindan in morning, 2012 October.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File:Frosty_Raftsundet_landscape_with_Trolltindan_in_morning,_2012_October.JPG",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Frosty_Raftsundet_landscape_with_Trolltindan_in_morning%2C_2012_October.JPG/1280px-Frosty_Raftsundet_landscape_with_Trolltindan_in_morning%2C_2012_October.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.654,
+    "turned": 0.241,
+    "relevance": null,
+    "walkers": 0.008,
+    "building": 0.0,
+    "manmade": 0.076
+   },
+   "exposure": {
+    "brightness": 120.6,
+    "entropy": 0.97
+   },
+   "sideways": false
+  },
+  {
+   "n": 68,
+   "group": "mountain",
+   "title": "File:Cheops Mountain seen the Sir Donald Trail.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Cheops_Mountain_seen_the_Sir_Donald_Trail.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Cheops_Mountain_seen_the_Sir_Donald_Trail.jpg/1280px-Cheops_Mountain_seen_the_Sir_Donald_Trail.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.201,
+    "turned": 0.62,
+    "relevance": null,
+    "walkers": 0.07,
+    "building": 0.001,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 106.9,
+    "entropy": 0.918
+   },
+   "sideways": false
+  },
+  {
+   "n": 69,
+   "group": "mountain",
+   "title": "File:Landscape in Peyriac-de-Mer, february 2018 (05).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Landscape_in_Peyriac-de-Mer,_february_2018_(05).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/Landscape_in_Peyriac-de-Mer%2C_february_2018_%2805%29.jpg/1280px-Landscape_in_Peyriac-de-Mer%2C_february_2018_%2805%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.137,
+    "turned": 0.526,
+    "relevance": null,
+    "walkers": 0.011,
+    "building": 0.0,
+    "manmade": 0.01
+   },
+   "exposure": {
+    "brightness": 129.0,
+    "entropy": 0.972
+   },
+   "sideways": false
+  },
+  {
+   "n": 70,
+   "group": "mountain",
+   "title": "File:Vihren & Kutelo Pirin Mountains Bulgaria 2025.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Vihren_%26_Kutelo_Pirin_Mountains_Bulgaria_2025.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Vihren_%26_Kutelo_Pirin_Mountains_Bulgaria_2025.jpg/1280px-Vihren_%26_Kutelo_Pirin_Mountains_Bulgaria_2025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.093,
+    "turned": 0.532,
+    "relevance": null,
+    "walkers": 0.097,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 150.8,
+    "entropy": 0.93
+   },
+   "sideways": false
+  },
+  {
+   "n": 71,
+   "group": "mountain",
+   "title": "File:Zagedan Ridge, Zagedan Valley, Caucasus Mountains, Karachay-Cherkessia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Zagedan_Ridge,_Zagedan_Valley,_Caucasus_Mountains,_Karachay-Cherkessia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/Zagedan_Ridge%2C_Zagedan_Valley%2C_Caucasus_Mountains%2C_Karachay-Cherkessia.jpg/1280px-Zagedan_Ridge%2C_Zagedan_Valley%2C_Caucasus_Mountains%2C_Karachay-Cherkessia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.214,
+    "turned": 0.403,
+    "relevance": null,
+    "walkers": 0.444,
+    "building": 0.0,
+    "manmade": 0.008
+   },
+   "exposure": {
+    "brightness": 140.3,
+    "entropy": 0.954
+   },
+   "sideways": false
+  },
+  {
+   "n": 72,
+   "group": "desert",
+   "title": "File:006 Dune 45 in Sossusvlei at sunrise Photo by Giles Laurent.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:006_Dune_45_in_Sossusvlei_at_sunrise_Photo_by_Giles_Laurent.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/006_Dune_45_in_Sossusvlei_at_sunrise_Photo_by_Giles_Laurent.jpg/1280px-006_Dune_45_in_Sossusvlei_at_sunrise_Photo_by_Giles_Laurent.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.174,
+    "turned": 0.497,
+    "relevance": null,
+    "walkers": 0.399,
+    "building": 0.0,
+    "manmade": 0.003
+   },
+   "exposure": {
+    "brightness": 138.2,
+    "entropy": 0.799
+   },
+   "sideways": false
+  },
+  {
+   "n": 73,
+   "group": "desert",
+   "title": "File:Sossusvlei sand dunes.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sossusvlei_sand_dunes.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Sossusvlei_sand_dunes.jpg/1280px-Sossusvlei_sand_dunes.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.152,
+    "turned": 0.497,
+    "relevance": null,
+    "walkers": 0.128,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 164.1,
+    "entropy": 0.871
+   },
+   "sideways": false
+  },
+  {
+   "n": 74,
+   "group": "desert",
+   "title": "File:Un groupe de dromadaire dans le desert tunisien.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Un_groupe_de_dromadaire_dans_le_desert_tunisien.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/Un_groupe_de_dromadaire_dans_le_desert_tunisien.jpg/1280px-Un_groupe_de_dromadaire_dans_le_desert_tunisien.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.339,
+    "turned": 0.418,
+    "relevance": null,
+    "walkers": 1.0,
+    "building": 0.0,
+    "manmade": 0.574
+   },
+   "exposure": {
+    "brightness": 220.3,
+    "entropy": 0.705
+   },
+   "sideways": false
+  },
+  {
+   "n": 75,
+   "group": "desert",
+   "title": "File:Dune Namib Naukluft 2.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Dune_Namib_Naukluft_2.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f6/Dune_Namib_Naukluft_2.jpg/1280px-Dune_Namib_Naukluft_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.384,
+    "turned": 0.345,
+    "relevance": null,
+    "walkers": 0.006,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 147.9,
+    "entropy": 0.93
+   },
+   "sideways": false
+  },
+  {
+   "n": 76,
+   "group": "desert",
+   "title": "File:Sand Dunes sa.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sand_Dunes_sa.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Sand_Dunes_sa.jpg/1280px-Sand_Dunes_sa.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.29,
+    "turned": 0.424,
+    "relevance": null,
+    "walkers": 0.003,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 145.2,
+    "entropy": 0.959
+   },
+   "sideways": false
+  },
+  {
+   "n": 77,
+   "group": "desert",
+   "title": "File:Dune Namib Naukluft 1.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Dune_Namib_Naukluft_1.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e1/Dune_Namib_Naukluft_1.jpg/1280px-Dune_Namib_Naukluft_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.167,
+    "turned": 0.524,
+    "relevance": null,
+    "walkers": 0.109,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 127.7,
+    "entropy": 0.914
+   },
+   "sideways": false
+  },
+  {
+   "n": 78,
+   "group": "desert",
+   "title": "File:Hidden Vlei Dune and Wind.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hidden_Vlei_Dune_and_Wind.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/Hidden_Vlei_Dune_and_Wind.jpg/1280px-Hidden_Vlei_Dune_and_Wind.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.272,
+    "turned": 0.367,
+    "relevance": null,
+    "walkers": 0.051,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 154.7,
+    "entropy": 0.892
+   },
+   "sideways": false
+  },
+  {
+   "n": 79,
+   "group": "desert",
+   "title": "File:Libya 4985 Tadrart Acacus Luca Galuzzi 2007.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Libya_4985_Tadrart_Acacus_Luca_Galuzzi_2007.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Libya_4985_Tadrart_Acacus_Luca_Galuzzi_2007.jpg/1280px-Libya_4985_Tadrart_Acacus_Luca_Galuzzi_2007.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.06,
+    "turned": 0.583,
+    "relevance": null,
+    "walkers": 0.638,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 176.7,
+    "entropy": 0.894
+   },
+   "sideways": false
+  },
+  {
+   "n": 80,
+   "group": "desert",
+   "title": "File:Desert Exploration.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Desert_Exploration.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Desert_Exploration.jpg/1280px-Desert_Exploration.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.099,
+    "turned": 0.643,
+    "relevance": null,
+    "walkers": 0.926,
+    "building": 0.0,
+    "manmade": 0.389
+   },
+   "exposure": {
+    "brightness": 148.1,
+    "entropy": 0.897
+   },
+   "sideways": false
+  },
+  {
+   "n": 81,
+   "group": "desert",
+   "title": "File:Sossusvlei, Namibia, 2018-08-06, DD 040.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sossusvlei,_Namibia,_2018-08-06,_DD_040.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Sossusvlei%2C_Namibia%2C_2018-08-06%2C_DD_040.jpg/1280px-Sossusvlei%2C_Namibia%2C_2018-08-06%2C_DD_040.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.988,
+    "painting": 0.011,
+    "drawing": 0.0,
+    "rendering": 0.001,
+    "upright": 0.078,
+    "turned": 0.645,
+    "relevance": null,
+    "walkers": 0.001,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 137.5,
+    "entropy": 0.831
+   },
+   "sideways": false
+  },
+  {
+   "n": 82,
+   "group": "desert",
+   "title": "File:Düne S-Schlag Sossusvlei.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BCne_S-Schlag_Sossusvlei.JPG",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/D%C3%BCne_S-Schlag_Sossusvlei.JPG/1280px-D%C3%BCne_S-Schlag_Sossusvlei.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.234,
+    "turned": 0.485,
+    "relevance": null,
+    "walkers": 0.351,
+    "building": 0.001,
+    "manmade": 0.004
+   },
+   "exposure": {
+    "brightness": 143.8,
+    "entropy": 0.84
+   },
+   "sideways": false
+  },
+  {
+   "n": 83,
+   "group": "desert",
+   "title": "File:Duna en Sossusvlei, Namibia, 2018-08-06, DD 002.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Duna_en_Sossusvlei,_Namibia,_2018-08-06,_DD_002.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/Duna_en_Sossusvlei%2C_Namibia%2C_2018-08-06%2C_DD_002.jpg/1280px-Duna_en_Sossusvlei%2C_Namibia%2C_2018-08-06%2C_DD_002.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.997,
+    "painting": 0.003,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.031,
+    "turned": 0.687,
+    "relevance": null,
+    "walkers": 0.087,
+    "building": 0.015,
+    "manmade": 0.004
+   },
+   "exposure": {
+    "brightness": 139.8,
+    "entropy": 0.866
+   },
+   "sideways": false
+  },
+  {
+   "n": 84,
+   "group": "sea",
+   "title": "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3489.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sydney_(AU),_Coast,_Australian_Fur_Seals_--_2019_--_3489.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3489.jpg/1280px-Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3489.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.236,
+    "turned": 0.442,
+    "relevance": null,
+    "walkers": 0.31,
+    "building": 0.0,
+    "manmade": 0.471
+   },
+   "exposure": {
+    "brightness": 99.3,
+    "entropy": 0.977
+   },
+   "sideways": false
+  },
+  {
+   "n": 85,
+   "group": "sea",
+   "title": "File:Baltic Sea view from Schmiedeberg hill in Rerik, 2025-06-23.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Baltic_Sea_view_from_Schmiedeberg_hill_in_Rerik,_2025-06-23.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/Baltic_Sea_view_from_Schmiedeberg_hill_in_Rerik%2C_2025-06-23.jpg/1280px-Baltic_Sea_view_from_Schmiedeberg_hill_in_Rerik%2C_2025-06-23.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.106,
+    "turned": 0.555,
+    "relevance": null,
+    "walkers": 0.319,
+    "building": 0.0,
+    "manmade": 0.472
+   },
+   "exposure": {
+    "brightness": 126.7,
+    "entropy": 0.94
+   },
+   "sideways": false
+  },
+  {
+   "n": 86,
+   "group": "sea",
+   "title": "File:Waves at La Corniche.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Waves_at_La_Corniche.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Waves_at_La_Corniche.jpg/1280px-Waves_at_La_Corniche.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.678,
+    "turned": 0.216,
+    "relevance": null,
+    "walkers": 0.006,
+    "building": 0.0,
+    "manmade": 0.057
+   },
+   "exposure": {
+    "brightness": 113.3,
+    "entropy": 0.983
+   },
+   "sideways": false
+  },
+  {
+   "n": 87,
+   "group": "sea",
+   "title": "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3450.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sydney_(AU),_Coast,_Australian_Fur_Seals_--_2019_--_3450.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3450.jpg/1280px-Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3450.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.37,
+    "turned": 0.328,
+    "relevance": null,
+    "walkers": 0.513,
+    "building": 0.0,
+    "manmade": 0.044
+   },
+   "exposure": {
+    "brightness": 92.4,
+    "entropy": 0.926
+   },
+   "sideways": false
+  },
+  {
+   "n": 88,
+   "group": "sea",
+   "title": "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3484.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sydney_(AU),_Coast,_Australian_Fur_Seals_--_2019_--_3484.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3484.jpg/1280px-Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3484.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.212,
+    "turned": 0.479,
+    "relevance": null,
+    "walkers": 0.067,
+    "building": 0.0,
+    "manmade": 0.02
+   },
+   "exposure": {
+    "brightness": 106.9,
+    "entropy": 0.97
+   },
+   "sideways": false
+  },
+  {
+   "n": 89,
+   "group": "sea",
+   "title": "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3489 (bw).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sydney_(AU),_Coast,_Australian_Fur_Seals_--_2019_--_3489_(bw).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3489_%28bw%29.jpg/1280px-Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3489_%28bw%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.303,
+    "turned": 0.478,
+    "relevance": null,
+    "walkers": 0.153,
+    "building": 0.002,
+    "manmade": 0.366
+   },
+   "exposure": {
+    "brightness": 99.4,
+    "entropy": 0.979
+   },
+   "sideways": false
+  },
+  {
+   "n": 90,
+   "group": "sea",
+   "title": "File:Long Spit Sea of Azov2.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Long_Spit_Sea_of_Azov2.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Long_Spit_Sea_of_Azov2.jpg/1280px-Long_Spit_Sea_of_Azov2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.136,
+    "turned": 0.522,
+    "relevance": null,
+    "walkers": 0.636,
+    "building": 0.0,
+    "manmade": 0.019
+   },
+   "exposure": {
+    "brightness": 173.1,
+    "entropy": 0.928
+   },
+   "sideways": true
+  },
+  {
+   "n": 91,
+   "group": "sea",
+   "title": "File:The coast of Crete Sea near Chania. Crete, Greece.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_coast_of_Crete_Sea_near_Chania._Crete,_Greece.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/The_coast_of_Crete_Sea_near_Chania._Crete%2C_Greece.jpg/1280px-The_coast_of_Crete_Sea_near_Chania._Crete%2C_Greece.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.399,
+    "turned": 0.425,
+    "relevance": null,
+    "walkers": 0.016,
+    "building": 0.0,
+    "manmade": 0.827
+   },
+   "exposure": {
+    "brightness": 138.7,
+    "entropy": 0.947
+   },
+   "sideways": true
+  },
+  {
+   "n": 92,
+   "group": "sea",
+   "title": "File:Sea and cliffs near Lindos. Rhodes, Greece.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sea_and_cliffs_near_Lindos._Rhodes,_Greece.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Sea_and_cliffs_near_Lindos._Rhodes%2C_Greece.jpg/1280px-Sea_and_cliffs_near_Lindos._Rhodes%2C_Greece.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.161,
+    "turned": 0.48,
+    "relevance": null,
+    "walkers": 0.01,
+    "building": 0.0,
+    "manmade": 0.009
+   },
+   "exposure": {
+    "brightness": 107.4,
+    "entropy": 0.952
+   },
+   "sideways": false
+  },
+  {
+   "n": 93,
+   "group": "sea",
+   "title": "File:Peterborough (AU), Port Campbell National Park, Worm Bay -- 2019 -- 0863.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Peterborough_(AU),_Port_Campbell_National_Park,_Worm_Bay_--_2019_--_0863.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Peterborough_%28AU%29%2C_Port_Campbell_National_Park%2C_Worm_Bay_--_2019_--_0863.jpg/1280px-Peterborough_%28AU%29%2C_Port_Campbell_National_Park%2C_Worm_Bay_--_2019_--_0863.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.191,
+    "turned": 0.566,
+    "relevance": null,
+    "walkers": 0.086,
+    "building": 0.0,
+    "manmade": 0.004
+   },
+   "exposure": {
+    "brightness": 158.8,
+    "entropy": 0.956
+   },
+   "sideways": false
+  },
+  {
+   "n": 94,
+   "group": "sea",
+   "title": "File:Gaztelugache, Bermeo, País Vasco, España, 2019-08-13, DD 14.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Gaztelugache,_Bermeo,_Pa%C3%ADs_Vasco,_Espa%C3%B1a,_2019-08-13,_DD_14.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Gaztelugache%2C_Bermeo%2C_Pa%C3%ADs_Vasco%2C_Espa%C3%B1a%2C_2019-08-13%2C_DD_14.jpg/1280px-Gaztelugache%2C_Bermeo%2C_Pa%C3%ADs_Vasco%2C_Espa%C3%B1a%2C_2019-08-13%2C_DD_14.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.216,
+    "turned": 0.516,
+    "relevance": null,
+    "walkers": 0.996,
+    "building": 0.246,
+    "manmade": 0.012
+   },
+   "exposure": {
+    "brightness": 142.9,
+    "entropy": 0.943
+   },
+   "sideways": false
+  },
+  {
+   "n": 95,
+   "group": "sea",
+   "title": "File:Kuantan - waves breaking over rocks at Teluk Cempedak - May 2024.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Kuantan_-_waves_breaking_over_rocks_at_Teluk_Cempedak_-_May_2024.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Kuantan_-_waves_breaking_over_rocks_at_Teluk_Cempedak_-_May_2024.jpg/1280px-Kuantan_-_waves_breaking_over_rocks_at_Teluk_Cempedak_-_May_2024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.43,
+    "turned": 0.405,
+    "relevance": null,
+    "walkers": 0.125,
+    "building": 0.0,
+    "manmade": 0.987
+   },
+   "exposure": {
+    "brightness": 165.7,
+    "entropy": 0.925
+   },
+   "sideways": false
+  },
+  {
+   "n": 96,
+   "group": "forest",
+   "title": "File:Spring forest Yyteri 3.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Spring_forest_Yyteri_3.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/Spring_forest_Yyteri_3.jpg/1280px-Spring_forest_Yyteri_3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.061,
+    "turned": 0.517,
+    "relevance": null,
+    "walkers": 0.296,
+    "building": 0.0,
+    "manmade": 0.493
+   },
+   "exposure": {
+    "brightness": 103.1,
+    "entropy": 0.973
+   },
+   "sideways": false
+  },
+  {
+   "n": 97,
+   "group": "forest",
+   "title": "File:Beech forest Mátra in winter.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Beech_forest_M%C3%A1tra_in_winter.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/47/Beech_forest_M%C3%A1tra_in_winter.jpg/1280px-Beech_forest_M%C3%A1tra_in_winter.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 3,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.443,
+    "turned": 0.304,
+    "relevance": null,
+    "walkers": 0.006,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 103.1,
+    "entropy": 0.961
+   },
+   "sideways": false
+  },
+  {
+   "n": 98,
+   "group": "forest",
+   "title": "File:Forest road Slavne 2017 BW G9.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Forest_road_Slavne_2017_BW_G9.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Forest_road_Slavne_2017_BW_G9.jpg/1280px-Forest_road_Slavne_2017_BW_G9.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.189,
+    "turned": 0.429,
+    "relevance": null,
+    "walkers": 0.033,
+    "building": 0.0,
+    "manmade": 0.004
+   },
+   "exposure": {
+    "brightness": 129.4,
+    "entropy": 0.973
+   },
+   "sideways": false
+  },
+  {
+   "n": 99,
+   "group": "forest",
+   "title": "File:Forest road Slavne 2017 G8.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Forest_road_Slavne_2017_G8.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/75/Forest_road_Slavne_2017_G8.jpg/1280px-Forest_road_Slavne_2017_G8.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.134,
+    "turned": 0.654,
+    "relevance": null,
+    "walkers": 0.023,
+    "building": 0.0,
+    "manmade": 0.004
+   },
+   "exposure": {
+    "brightness": 150.6,
+    "entropy": 0.945
+   },
+   "sideways": true
+  },
+  {
+   "n": 100,
+   "group": "forest",
+   "title": "File:Two holes and green leaves on the bark of a tree trunk in the forest in Luang Prabang Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Two_holes_and_green_leaves_on_the_bark_of_a_tree_trunk_in_the_forest_in_Luang_Prabang_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Two_holes_and_green_leaves_on_the_bark_of_a_tree_trunk_in_the_forest_in_Luang_Prabang_Laos.jpg/1280px-Two_holes_and_green_leaves_on_the_bark_of_a_tree_trunk_in_the_forest_in_Luang_Prabang_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.281,
+    "turned": 0.367,
+    "relevance": null,
+    "walkers": 0.001,
+    "building": 0.0,
+    "manmade": 0.982
+   },
+   "exposure": {
+    "brightness": 109.3,
+    "entropy": 0.988
+   },
+   "sideways": false
+  },
+  {
+   "n": 101,
+   "group": "forest",
+   "title": "File:Mezmay, Forest, Trees, Russia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mezmay,_Forest,_Trees,_Russia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Mezmay%2C_Forest%2C_Trees%2C_Russia.jpg/1280px-Mezmay%2C_Forest%2C_Trees%2C_Russia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.25,
+    "turned": 0.384,
+    "relevance": null,
+    "walkers": 0.015,
+    "building": 0.0,
+    "manmade": 0.003
+   },
+   "exposure": {
+    "brightness": 109.6,
+    "entropy": 0.975
+   },
+   "sideways": false
+  },
+  {
+   "n": 102,
+   "group": "forest",
+   "title": "File:Møns Klint beech trees in gorge 2015-04-01-4864.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:M%C3%B8ns_Klint_beech_trees_in_gorge_2015-04-01-4864.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/M%C3%B8ns_Klint_beech_trees_in_gorge_2015-04-01-4864.jpg/1280px-M%C3%B8ns_Klint_beech_trees_in_gorge_2015-04-01-4864.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.342,
+    "turned": 0.394,
+    "relevance": null,
+    "walkers": 0.066,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 70.0,
+    "entropy": 0.87
+   },
+   "sideways": false
+  },
+  {
+   "n": 103,
+   "group": "forest",
+   "title": "File:Bali, Forest, Trees, East Bali, Indonesia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Bali,_Forest,_Trees,_East_Bali,_Indonesia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Bali%2C_Forest%2C_Trees%2C_East_Bali%2C_Indonesia.jpg/1280px-Bali%2C_Forest%2C_Trees%2C_East_Bali%2C_Indonesia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.14,
+    "turned": 0.433,
+    "relevance": null,
+    "walkers": 0.098,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 113.5,
+    "entropy": 0.961
+   },
+   "sideways": false
+  },
+  {
+   "n": 104,
+   "group": "forest",
+   "title": "File:Beech Forest (AU), Great Otway National Park, Beauchamp Falls -- 2019 -- 1271.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Beech_Forest_(AU),_Great_Otway_National_Park,_Beauchamp_Falls_--_2019_--_1271.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4e/Beech_Forest_%28AU%29%2C_Great_Otway_National_Park%2C_Beauchamp_Falls_--_2019_--_1271.jpg/1280px-Beech_Forest_%28AU%29%2C_Great_Otway_National_Park%2C_Beauchamp_Falls_--_2019_--_1271.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.083,
+    "turned": 0.536,
+    "relevance": null,
+    "walkers": 0.075,
+    "building": 0.0,
+    "manmade": 0.291
+   },
+   "exposure": {
+    "brightness": 86.0,
+    "entropy": 0.967
+   },
+   "sideways": false
+  },
+  {
+   "n": 105,
+   "group": "forest",
+   "title": "File:Spruce forest at Holma.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Spruce_forest_at_Holma.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/34/Spruce_forest_at_Holma.jpg/1280px-Spruce_forest_at_Holma.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.308,
+    "turned": 0.35,
+    "relevance": null,
+    "walkers": 0.001,
+    "building": 0.0,
+    "manmade": 0.007
+   },
+   "exposure": {
+    "brightness": 75.4,
+    "entropy": 0.895
+   },
+   "sideways": false
+  },
+  {
+   "n": 106,
+   "group": "forest",
+   "title": "File:Trees along the Hald Sø Viborg Commune Danemark.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Trees_along_the_Hald_S%C3%B8_Viborg_Commune_Danemark.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Trees_along_the_Hald_S%C3%B8_Viborg_Commune_Danemark.jpg/1280px-Trees_along_the_Hald_S%C3%B8_Viborg_Commune_Danemark.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.239,
+    "turned": 0.531,
+    "relevance": null,
+    "walkers": 0.126,
+    "building": 0.0,
+    "manmade": 0.008
+   },
+   "exposure": {
+    "brightness": 84.5,
+    "entropy": 0.932
+   },
+   "sideways": false
+  },
+  {
+   "n": 107,
+   "group": "forest",
+   "title": "File:Fanal (Madeira, Portugal), Lorbeerwald -- 2025 -- 1532.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Fanal_(Madeira,_Portugal),_Lorbeerwald_--_2025_--_1532.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Fanal_%28Madeira%2C_Portugal%29%2C_Lorbeerwald_--_2025_--_1532.jpg/1280px-Fanal_%28Madeira%2C_Portugal%29%2C_Lorbeerwald_--_2025_--_1532.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.093,
+    "turned": 0.459,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 168.7,
+    "entropy": 0.919
+   },
+   "sideways": false
+  },
+  {
+   "n": 108,
+   "group": "sky",
+   "title": "File:Pirogue running on the Mekong at sunset with pink clouds in Don Det Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Pirogue_running_on_the_Mekong_at_sunset_with_pink_clouds_in_Don_Det_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2d/Pirogue_running_on_the_Mekong_at_sunset_with_pink_clouds_in_Don_Det_Laos.jpg/1280px-Pirogue_running_on_the_Mekong_at_sunset_with_pink_clouds_in_Don_Det_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.055,
+    "turned": 0.533,
+    "relevance": null,
+    "walkers": 0.05,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 139.2,
+    "entropy": 0.97
+   },
+   "sideways": false
+  },
+  {
+   "n": 109,
+   "group": "sky",
+   "title": "File:Colorful sky with orange clouds reflecting in the water of a paddy field, at sunset, Vang Vieng, Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Colorful_sky_with_orange_clouds_reflecting_in_the_water_of_a_paddy_field,_at_sunset,_Vang_Vieng,_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Colorful_sky_with_orange_clouds_reflecting_in_the_water_of_a_paddy_field%2C_at_sunset%2C_Vang_Vieng%2C_Laos.jpg/1280px-Colorful_sky_with_orange_clouds_reflecting_in_the_water_of_a_paddy_field%2C_at_sunset%2C_Vang_Vieng%2C_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.039,
+    "turned": 0.548,
+    "relevance": null,
+    "walkers": 0.01,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 104.9,
+    "entropy": 0.959
+   },
+   "sideways": false
+  },
+  {
+   "n": 110,
+   "group": "sky",
+   "title": "File:Water reflection of sunset with gray and orange clouds and boats moored to the bank in Pakse Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Water_reflection_of_sunset_with_gray_and_orange_clouds_and_boats_moored_to_the_bank_in_Pakse_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Water_reflection_of_sunset_with_gray_and_orange_clouds_and_boats_moored_to_the_bank_in_Pakse_Laos.jpg/1280px-Water_reflection_of_sunset_with_gray_and_orange_clouds_and_boats_moored_to_the_bank_in_Pakse_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.229,
+    "turned": 0.401,
+    "relevance": null,
+    "walkers": 0.19,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 109.6,
+    "entropy": 0.944
+   },
+   "sideways": false
+  },
+  {
+   "n": 111,
+   "group": "sky",
+   "title": "File:Clouds over the Xe Don River with boats at sunset in Pakse Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Clouds_over_the_Xe_Don_River_with_boats_at_sunset_in_Pakse_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Clouds_over_the_Xe_Don_River_with_boats_at_sunset_in_Pakse_Laos.jpg/1280px-Clouds_over_the_Xe_Don_River_with_boats_at_sunset_in_Pakse_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.08,
+    "turned": 0.469,
+    "relevance": null,
+    "walkers": 0.93,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 132.7,
+    "entropy": 0.971
+   },
+   "sideways": false
+  },
+  {
+   "n": 112,
+   "group": "sky",
+   "title": "File:Blue and orange clouds over the Mekong with a pirogue running in the water at sunset in Don Det Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Blue_and_orange_clouds_over_the_Mekong_with_a_pirogue_running_in_the_water_at_sunset_in_Don_Det_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Blue_and_orange_clouds_over_the_Mekong_with_a_pirogue_running_in_the_water_at_sunset_in_Don_Det_Laos.jpg/1280px-Blue_and_orange_clouds_over_the_Mekong_with_a_pirogue_running_in_the_water_at_sunset_in_Don_Det_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.081,
+    "turned": 0.467,
+    "relevance": null,
+    "walkers": 0.007,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 110.0,
+    "entropy": 0.948
+   },
+   "sideways": false
+  },
+  {
+   "n": 113,
+   "group": "sky",
+   "title": "File:Cumulonimbus sunset panorama, Albury NSW Australia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Cumulonimbus_sunset_panorama,_Albury_NSW_Australia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Cumulonimbus_sunset_panorama%2C_Albury_NSW_Australia.jpg/1280px-Cumulonimbus_sunset_panorama%2C_Albury_NSW_Australia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.499,
+    "turned": 0.288,
+    "relevance": null,
+    "walkers": 0.032,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 113.3,
+    "entropy": 0.895
+   },
+   "sideways": false
+  },
+  {
+   "n": 114,
+   "group": "sky",
+   "title": "File:Blue stormy clouds at sunset with water reflection and a pirogue moored to the bank, in Don Det, Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Blue_stormy_clouds_at_sunset_with_water_reflection_and_a_pirogue_moored_to_the_bank,_in_Don_Det,_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Blue_stormy_clouds_at_sunset_with_water_reflection_and_a_pirogue_moored_to_the_bank%2C_in_Don_Det%2C_Laos.jpg/1280px-Blue_stormy_clouds_at_sunset_with_water_reflection_and_a_pirogue_moored_to_the_bank%2C_in_Don_Det%2C_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.063,
+    "turned": 0.474,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 97.6,
+    "entropy": 0.913
+   },
+   "sideways": false
+  },
+  {
+   "n": 115,
+   "group": "sky",
+   "title": "File:Walkway and hut in paddy fields with water reflection of colorful clouds at sunset in Vang Vieng Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg/1280px-Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.034,
+    "turned": 0.784,
+    "relevance": null,
+    "walkers": 0.014,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 94.5,
+    "entropy": 0.94
+   },
+   "sideways": false
+  },
+  {
+   "n": 116,
+   "group": "sky",
+   "title": "File:Water reflection of sunset with gray and orange clouds and pirogues moored to the bank in Don Det Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Water_reflection_of_sunset_with_gray_and_orange_clouds_and_pirogues_moored_to_the_bank_in_Don_Det_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Water_reflection_of_sunset_with_gray_and_orange_clouds_and_pirogues_moored_to_the_bank_in_Don_Det_Laos.jpg/1280px-Water_reflection_of_sunset_with_gray_and_orange_clouds_and_pirogues_moored_to_the_bank_in_Don_Det_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.216,
+    "turned": 0.626,
+    "relevance": null,
+    "walkers": 0.012,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 82.4,
+    "entropy": 0.93
+   },
+   "sideways": false
+  },
+  {
+   "n": 117,
+   "group": "sky",
+   "title": "File:Li Phi falls at dusk with colorful sky and clouds in Don Khon Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Li_Phi_falls_at_dusk_with_colorful_sky_and_clouds_in_Don_Khon_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Li_Phi_falls_at_dusk_with_colorful_sky_and_clouds_in_Don_Khon_Laos.jpg/1280px-Li_Phi_falls_at_dusk_with_colorful_sky_and_clouds_in_Don_Khon_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.428,
+    "turned": 0.366,
+    "relevance": null,
+    "walkers": 0.019,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 77.5,
+    "entropy": 0.933
+   },
+   "sideways": false
+  },
+  {
+   "n": 118,
+   "group": "sky",
+   "title": "File:Pirogue and boat on the Mekong with colorful sky at sunset in Luang Prabang Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Pirogue_and_boat_on_the_Mekong_with_colorful_sky_at_sunset_in_Luang_Prabang_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f8/Pirogue_and_boat_on_the_Mekong_with_colorful_sky_at_sunset_in_Luang_Prabang_Laos.jpg/1280px-Pirogue_and_boat_on_the_Mekong_with_colorful_sky_at_sunset_in_Luang_Prabang_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.011,
+    "turned": 0.509,
+    "relevance": null,
+    "walkers": 0.394,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 121.9,
+    "entropy": 0.937
+   },
+   "sideways": false
+  },
+  {
+   "n": 119,
+   "group": "sky",
+   "title": "File:Three golden statues of the Buddha at Wat Mai with colorful clouds at sunset in Luang Prabang Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Three_golden_statues_of_the_Buddha_at_Wat_Mai_with_colorful_clouds_at_sunset_in_Luang_Prabang_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Three_golden_statues_of_the_Buddha_at_Wat_Mai_with_colorful_clouds_at_sunset_in_Luang_Prabang_Laos.jpg/1280px-Three_golden_statues_of_the_Buddha_at_Wat_Mai_with_colorful_clouds_at_sunset_in_Luang_Prabang_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 2,
+   "people": 1,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.03,
+    "turned": 0.649,
+    "relevance": null,
+    "walkers": 0.836,
+    "building": 0.987,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 105.8,
+    "entropy": 0.972
+   },
+   "sideways": false
+  },
+  {
+   "n": 120,
+   "group": "painting",
+   "title": "File:Hendrik Voogd - Italian landscape with Umbrella Pines.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hendrik_Voogd_-_Italian_landscape_with_Umbrella_Pines.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/76/Hendrik_Voogd_-_Italian_landscape_with_Umbrella_Pines.jpg/1280px-Hendrik_Voogd_-_Italian_landscape_with_Umbrella_Pines.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.255,
+    "painting": 0.745,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.098,
+    "turned": 0.526,
+    "relevance": null,
+    "walkers": 0.241,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 109.1,
+    "entropy": 0.941
+   },
+   "sideways": false
+  },
+  {
+   "n": 121,
+   "group": "painting",
+   "title": "File:Edward Bailey painting of Wailuku and Iao Valley.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Edward_Bailey_painting_of_Wailuku_and_Iao_Valley.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d7/Edward_Bailey_painting_of_Wailuku_and_Iao_Valley.jpg/1280px-Edward_Bailey_painting_of_Wailuku_and_Iao_Valley.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.252,
+    "painting": 0.747,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.038,
+    "turned": 0.767,
+    "relevance": null,
+    "walkers": 0.428,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 118.2,
+    "entropy": 0.931
+   },
+   "sideways": false
+  },
+  {
+   "n": 122,
+   "group": "painting",
+   "title": "File:Winter Landscape with Brabrand Church.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Winter_Landscape_with_Brabrand_Church.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/75/Winter_Landscape_with_Brabrand_Church.jpg/1280px-Winter_Landscape_with_Brabrand_Church.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 1,
+   "look": {
+    "photograph": 0.347,
+    "painting": 0.653,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.228,
+    "turned": 0.426,
+    "relevance": null,
+    "walkers": 0.997,
+    "building": 0.014,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 138.6,
+    "entropy": 0.89
+   },
+   "sideways": false
+  },
+  {
+   "n": 123,
+   "group": "painting",
+   "title": "File:Wooded Landscape, an Oil Painting by Hudson Mindell Kitchell.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Wooded_Landscape,_an_Oil_Painting_by_Hudson_Mindell_Kitchell.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b4/Wooded_Landscape%2C_an_Oil_Painting_by_Hudson_Mindell_Kitchell.jpg/1280px-Wooded_Landscape%2C_an_Oil_Painting_by_Hudson_Mindell_Kitchell.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.063,
+    "painting": 0.937,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.057,
+    "turned": 0.661,
+    "relevance": null,
+    "walkers": 0.271,
+    "building": 0.0,
+    "manmade": 0.002
+   },
+   "exposure": {
+    "brightness": 97.8,
+    "entropy": 0.908
+   },
+   "sideways": false
+  },
+  {
+   "n": 124,
+   "group": "painting",
+   "title": "File:Landscape oil on canvas painting by Claude-Joseph Vernet.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Landscape_oil_on_canvas_painting_by_Claude-Joseph_Vernet.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/2/24/Landscape_oil_on_canvas_painting_by_Claude-Joseph_Vernet.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.126,
+    "painting": 0.873,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.248,
+    "turned": 0.492,
+    "relevance": null,
+    "walkers": 0.448,
+    "building": 0.015,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 74.9,
+    "entropy": 0.881
+   },
+   "sideways": false
+  },
+  {
+   "n": 125,
+   "group": "painting",
+   "title": "File:Winter on the Canal - Douai - Impressionist Landscape Oil Painting - Henri Duhem, 1904.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Winter_on_the_Canal_-_Douai_-_Impressionist_Landscape_Oil_Painting_-_Henri_Duhem,_1904.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/Winter_on_the_Canal_-_Douai_-_Impressionist_Landscape_Oil_Painting_-_Henri_Duhem%2C_1904.jpg/1280px-Winter_on_the_Canal_-_Douai_-_Impressionist_Landscape_Oil_Painting_-_Henri_Duhem%2C_1904.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.31,
+    "painting": 0.689,
+    "drawing": 0.001,
+    "rendering": 0.0,
+    "upright": 0.262,
+    "turned": 0.389,
+    "relevance": null,
+    "walkers": 0.916,
+    "building": 0.115,
+    "manmade": 0.005
+   },
+   "exposure": {
+    "brightness": 154.2,
+    "entropy": 0.861
+   },
+   "sideways": false
+  },
+  {
+   "n": 126,
+   "group": "painting",
+   "title": "File:'Pastoral Landscape', oil on canvas painting by Claude Lorrain.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:%27Pastoral_Landscape%27,_oil_on_canvas_painting_by_Claude_Lorrain.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/d/d4/%27Pastoral_Landscape%27%2C_oil_on_canvas_painting_by_Claude_Lorrain.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.043,
+    "painting": 0.957,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.337,
+    "turned": 0.357,
+    "relevance": null,
+    "walkers": 1.0,
+    "building": 0.249,
+    "manmade": 0.008
+   },
+   "exposure": {
+    "brightness": 97.0,
+    "entropy": 0.953
+   },
+   "sideways": false
+  },
+  {
+   "n": 127,
+   "group": "painting",
+   "title": "File:Landscape with the Good Samaritan - Rembrandt.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Landscape_with_the_Good_Samaritan_-_Rembrandt.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Landscape_with_the_Good_Samaritan_-_Rembrandt.jpg/1280px-Landscape_with_the_Good_Samaritan_-_Rembrandt.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.318,
+    "painting": 0.682,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.179,
+    "turned": 0.429,
+    "relevance": null,
+    "walkers": 0.614,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 62.8,
+    "entropy": 0.862
+   },
+   "sideways": true
+  },
+  {
+   "n": 128,
+   "group": "painting",
+   "title": "File:The Canal at Douai - Impressionist Landscape Oil Painting by Henri Duhem 1921.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_Canal_at_Douai_-_Impressionist_Landscape_Oil_Painting_by_Henri_Duhem_1921.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/The_Canal_at_Douai_-_Impressionist_Landscape_Oil_Painting_by_Henri_Duhem_1921.jpg/1280px-The_Canal_at_Douai_-_Impressionist_Landscape_Oil_Painting_by_Henri_Duhem_1921.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 0.119,
+    "painting": 0.88,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.181,
+    "turned": 0.41,
+    "relevance": null,
+    "walkers": 0.999,
+    "building": 0.723,
+    "manmade": 0.003
+   },
+   "exposure": {
+    "brightness": 131.6,
+    "entropy": 0.881
+   },
+   "sideways": false
+  },
+  {
+   "n": 129,
+   "group": "painting",
+   "title": "File:Landscape painting by Thomas Worthington Whittredge, oil on canvas.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Landscape_painting_by_Thomas_Worthington_Whittredge,_oil_on_canvas.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Landscape_painting_by_Thomas_Worthington_Whittredge%2C_oil_on_canvas.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 0.043,
+    "painting": 0.956,
+    "drawing": 0.001,
+    "rendering": 0.0,
+    "upright": 0.115,
+    "turned": 0.484,
+    "relevance": null,
+    "walkers": 0.15,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 131.4,
+    "entropy": 0.887
+   },
+   "sideways": false
+  },
+  {
+   "n": 130,
+   "group": "painting",
+   "title": "File:Evening Sunset - Douai - Impressionist Landscape Oil Painting by Henri Duhem 1909.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Evening_Sunset_-_Douai_-_Impressionist_Landscape_Oil_Painting_by_Henri_Duhem_1909.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Evening_Sunset_-_Douai_-_Impressionist_Landscape_Oil_Painting_by_Henri_Duhem_1909.jpg/1280px-Evening_Sunset_-_Douai_-_Impressionist_Landscape_Oil_Painting_by_Henri_Duhem_1909.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.463,
+    "painting": 0.534,
+    "drawing": 0.003,
+    "rendering": 0.0,
+    "upright": 0.096,
+    "turned": 0.455,
+    "relevance": null,
+    "walkers": 0.781,
+    "building": 0.991,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 121.5,
+    "entropy": 0.859
+   },
+   "sideways": false
+  },
+  {
+   "n": 131,
+   "group": "painting",
+   "title": "File:Scottish Landscape, oil on canvas painting by Princess Victoria Kaiulani, c. 1891, Bishop Museum.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File:Scottish_Landscape,_oil_on_canvas_painting_by_Princess_Victoria_Kaiulani,_c._1891,_Bishop_Museum.JPG",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Scottish_Landscape%2C_oil_on_canvas_painting_by_Princess_Victoria_Kaiulani%2C_c._1891%2C_Bishop_Museum.JPG/1280px-Scottish_Landscape%2C_oil_on_canvas_painting_by_Princess_Victoria_Kaiulani%2C_c._1891%2C_Bishop_Museum.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.152,
+    "painting": 0.846,
+    "drawing": 0.002,
+    "rendering": 0.0,
+    "upright": 0.067,
+    "turned": 0.75,
+    "relevance": null,
+    "walkers": 0.875,
+    "building": 0.104,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 109.9,
+    "entropy": 0.925
+   },
+   "sideways": false
+  },
+  {
+   "n": 132,
+   "group": "drawing",
+   "title": "File:Lauterbach, H. - Ljubljana iz Tivolija (jeklorez, ok. 1855).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Lauterbach,_H._-_Ljubljana_iz_Tivolija_(jeklorez,_ok._1855).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fd/Lauterbach%2C_H._-_Ljubljana_iz_Tivolija_%28jeklorez%2C_ok._1855%29.jpg/1280px-Lauterbach%2C_H._-_Ljubljana_iz_Tivolija_%28jeklorez%2C_ok._1855%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.986,
+    "painting": 0.004,
+    "drawing": 0.01,
+    "rendering": 0.0,
+    "upright": 0.032,
+    "turned": 0.574,
+    "relevance": null,
+    "walkers": 0.978,
+    "building": 0.995,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 129.4,
+    "entropy": 0.949
+   },
+   "sideways": false
+  },
+  {
+   "n": 133,
+   "group": "drawing",
+   "title": "File:Strehla (in Sachsen) by J. Umbach.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Strehla_(in_Sachsen)_by_J._Umbach.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Strehla_%28in_Sachsen%29_by_J._Umbach.jpg/1280px-Strehla_%28in_Sachsen%29_by_J._Umbach.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.876,
+    "painting": 0.081,
+    "drawing": 0.043,
+    "rendering": 0.0,
+    "upright": 0.054,
+    "turned": 0.505,
+    "relevance": null,
+    "walkers": 0.998,
+    "building": 0.78,
+    "manmade": 0.028
+   },
+   "exposure": {
+    "brightness": 150.6,
+    "entropy": 0.946
+   },
+   "sideways": false
+  },
+  {
+   "n": 134,
+   "group": "drawing",
+   "title": "File:The progressive drawing-book - containing a series of easy and comprehensive lessons for drawing landscape, architecture, the human figure, shipping, and animals, &c. without the aid of a master - (14597365620).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_progressive_drawing-book_-_containing_a_series_of_easy_and_comprehensive_lessons_for_drawing_landscape,_architecture,_the_human_figure,_shipping,_and_animals,_%26c._without_the_aid_of_a_master_-_(14597365620).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ce/The_progressive_drawing-book_-_containing_a_series_of_easy_and_comprehensive_lessons_for_drawing_landscape%2C_architecture%2C_the_human_figure%2C_shipping%2C_and_animals%2C_%26c._without_the_aid_of_a_master_-_%2814597365620%29.jpg/1280px-thumbnail.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 0.566,
+    "painting": 0.002,
+    "drawing": 0.432,
+    "rendering": 0.0,
+    "upright": 0.22,
+    "turned": 0.397,
+    "relevance": null,
+    "walkers": 0.938,
+    "building": 0.449,
+    "manmade": 0.394
+   },
+   "exposure": {
+    "brightness": 219.2,
+    "entropy": 0.654
+   },
+   "sideways": false
+  },
+  {
+   "n": 135,
+   "group": "drawing",
+   "title": "File:The American Landscape MET R49DD389R1.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_R49DD389R1.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/The_American_Landscape_MET_R49DD389R1.jpg/1280px-The_American_Landscape_MET_R49DD389R1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.997,
+    "painting": 0.001,
+    "drawing": 0.002,
+    "rendering": 0.0,
+    "upright": 0.064,
+    "turned": 0.805,
+    "relevance": null,
+    "walkers": 0.946,
+    "building": 0.086,
+    "manmade": 0.022
+   },
+   "exposure": {
+    "brightness": 205.9,
+    "entropy": 0.62
+   },
+   "sideways": false
+  },
+  {
+   "n": 136,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89536.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89536.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/The_American_Landscape_MET_MM89536.jpg/1280px-The_American_Landscape_MET_MM89536.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.991,
+    "painting": 0.007,
+    "drawing": 0.002,
+    "rendering": 0.0,
+    "upright": 0.139,
+    "turned": 0.656,
+    "relevance": null,
+    "walkers": 0.936,
+    "building": 0.093,
+    "manmade": 0.011
+   },
+   "exposure": {
+    "brightness": 148.4,
+    "entropy": 0.785
+   },
+   "sideways": false
+  },
+  {
+   "n": 137,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89530.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89530.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/The_American_Landscape_MET_MM89530.jpg/1280px-The_American_Landscape_MET_MM89530.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 0.853,
+    "painting": 0.052,
+    "drawing": 0.094,
+    "rendering": 0.0,
+    "upright": 0.365,
+    "turned": 0.383,
+    "relevance": null,
+    "walkers": 0.503,
+    "building": 0.974,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 126.8,
+    "entropy": 0.924
+   },
+   "sideways": false
+  },
+  {
+   "n": 138,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89531.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89531.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/The_American_Landscape_MET_MM89531.jpg/1280px-The_American_Landscape_MET_MM89531.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.981,
+    "painting": 0.011,
+    "drawing": 0.008,
+    "rendering": 0.0,
+    "upright": 0.069,
+    "turned": 0.467,
+    "relevance": null,
+    "walkers": 0.44,
+    "building": 0.686,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 158.3,
+    "entropy": 0.843
+   },
+   "sideways": false
+  },
+  {
+   "n": 139,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89532.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89532.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d7/The_American_Landscape_MET_MM89532.jpg/1280px-The_American_Landscape_MET_MM89532.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.99,
+    "painting": 0.009,
+    "drawing": 0.002,
+    "rendering": 0.0,
+    "upright": 0.063,
+    "turned": 0.583,
+    "relevance": null,
+    "walkers": 0.546,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 151.8,
+    "entropy": 0.852
+   },
+   "sideways": false
+  },
+  {
+   "n": 140,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89535.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89535.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/ba/The_American_Landscape_MET_MM89535.jpg/1280px-The_American_Landscape_MET_MM89535.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.97,
+    "painting": 0.023,
+    "drawing": 0.007,
+    "rendering": 0.0,
+    "upright": 0.099,
+    "turned": 0.595,
+    "relevance": null,
+    "walkers": 0.974,
+    "building": 0.035,
+    "manmade": 0.141
+   },
+   "exposure": {
+    "brightness": 141.0,
+    "entropy": 0.867
+   },
+   "sideways": false
+  },
+  {
+   "n": 141,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89533.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89533.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/The_American_Landscape_MET_MM89533.jpg/1280px-The_American_Landscape_MET_MM89533.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.985,
+    "painting": 0.011,
+    "drawing": 0.004,
+    "rendering": 0.0,
+    "upright": 0.065,
+    "turned": 0.477,
+    "relevance": null,
+    "walkers": 0.283,
+    "building": 0.049,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 133.6,
+    "entropy": 0.843
+   },
+   "sideways": false
+  },
+  {
+   "n": 142,
+   "group": "drawing",
+   "title": "File:The American Landscape MET MM89534.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_American_Landscape_MET_MM89534.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/The_American_Landscape_MET_MM89534.jpg/1280px-The_American_Landscape_MET_MM89534.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.995,
+    "painting": 0.003,
+    "drawing": 0.002,
+    "rendering": 0.0,
+    "upright": 0.071,
+    "turned": 0.602,
+    "relevance": null,
+    "walkers": 0.955,
+    "building": 0.005,
+    "manmade": 0.055
+   },
+   "exposure": {
+    "brightness": 135.3,
+    "entropy": 0.861
+   },
+   "sideways": false
+  },
+  {
+   "n": 143,
+   "group": "drawing",
+   "title": "File:The progressive drawing-book - containing a series of easy and comprehensive lessons for drawing landscape, architecture, the human figure, shipping, and animals, &c. without the aid of a master - (14761047886).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:The_progressive_drawing-book_-_containing_a_series_of_easy_and_comprehensive_lessons_for_drawing_landscape,_architecture,_the_human_figure,_shipping,_and_animals,_%26c._without_the_aid_of_a_master_-_(14761047886).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/The_progressive_drawing-book_-_containing_a_series_of_easy_and_comprehensive_lessons_for_drawing_landscape%2C_architecture%2C_the_human_figure%2C_shipping%2C_and_animals%2C_%26c._without_the_aid_of_a_master_-_%2814761047886%29.jpg/1280px-thumbnail.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.129,
+    "painting": 0.001,
+    "drawing": 0.871,
+    "rendering": 0.0,
+    "upright": 0.162,
+    "turned": 0.462,
+    "relevance": null,
+    "walkers": 0.988,
+    "building": 0.992,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 228.9,
+    "entropy": 0.568
+   },
+   "sideways": false
+  },
+  {
+   "n": 144,
+   "group": "sign",
+   "title": "File:Signpost along the Coast Trail, East Sooke Regional Park, British Columbia, Canada 19.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Signpost_along_the_Coast_Trail,_East_Sooke_Regional_Park,_British_Columbia,_Canada_19.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/Signpost_along_the_Coast_Trail%2C_East_Sooke_Regional_Park%2C_British_Columbia%2C_Canada_19.jpg/1280px-Signpost_along_the_Coast_Trail%2C_East_Sooke_Regional_Park%2C_British_Columbia%2C_Canada_19.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.038,
+    "turned": 0.636,
+    "relevance": null,
+    "walkers": 0.949,
+    "building": 0.0,
+    "manmade": 0.947
+   },
+   "exposure": {
+    "brightness": 75.6,
+    "entropy": 0.929
+   },
+   "sideways": false
+  },
+  {
+   "n": 145,
+   "group": "sign",
+   "title": "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9437.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Norderney,_D%C3%BCnenlandschaft,_Wegweiser_--_2025_--_9437.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9437.jpg/1280px-Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9437.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.067,
+    "turned": 0.546,
+    "relevance": null,
+    "walkers": 0.017,
+    "building": 0.0,
+    "manmade": 0.633
+   },
+   "exposure": {
+    "brightness": 140.1,
+    "entropy": 0.853
+   },
+   "sideways": false
+  },
+  {
+   "n": 146,
+   "group": "sign",
+   "title": "File:Schönwald im Schwarzwald, Wegweiser -- 2025 -- 7868.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sch%C3%B6nwald_im_Schwarzwald,_Wegweiser_--_2025_--_7868.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Sch%C3%B6nwald_im_Schwarzwald%2C_Wegweiser_--_2025_--_7868.jpg/1280px-Sch%C3%B6nwald_im_Schwarzwald%2C_Wegweiser_--_2025_--_7868.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.073,
+    "turned": 0.638,
+    "relevance": null,
+    "walkers": 0.338,
+    "building": 0.0,
+    "manmade": 0.999
+   },
+   "exposure": {
+    "brightness": 103.6,
+    "entropy": 0.972
+   },
+   "sideways": false
+  },
+  {
+   "n": 147,
+   "group": "sign",
+   "title": "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9435.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Norderney,_D%C3%BCnenlandschaft,_Wegweiser_--_2025_--_9435.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/01/Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9435.jpg/1280px-Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9435.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.204,
+    "turned": 0.449,
+    "relevance": null,
+    "walkers": 0.05,
+    "building": 0.0,
+    "manmade": 0.091
+   },
+   "exposure": {
+    "brightness": 139.7,
+    "entropy": 0.857
+   },
+   "sideways": false
+  },
+  {
+   "n": 148,
+   "group": "sign",
+   "title": "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9437 (bw).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Norderney,_D%C3%BCnenlandschaft,_Wegweiser_--_2025_--_9437_(bw).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9437_%28bw%29.jpg/1280px-Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9437_%28bw%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.042,
+    "turned": 0.522,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.0,
+    "manmade": 0.014
+   },
+   "exposure": {
+    "brightness": 89.3,
+    "entropy": 0.788
+   },
+   "sideways": false
+  },
+  {
+   "n": 149,
+   "group": "sign",
+   "title": "File:Detzem, Wegekreuz -- 2015 -- 7539.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Detzem,_Wegekreuz_--_2015_--_7539.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/Detzem%2C_Wegekreuz_--_2015_--_7539.jpg/1280px-Detzem%2C_Wegekreuz_--_2015_--_7539.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.128,
+    "turned": 0.498,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.988,
+    "manmade": 0.002
+   },
+   "exposure": {
+    "brightness": 110.3,
+    "entropy": 0.961
+   },
+   "sideways": false
+  },
+  {
+   "n": 150,
+   "group": "sign",
+   "title": "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9438.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Norderney,_D%C3%BCnenlandschaft,_Wegweiser_--_2025_--_9438.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3c/Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9438.jpg/1280px-Norderney%2C_D%C3%BCnenlandschaft%2C_Wegweiser_--_2025_--_9438.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.25,
+    "turned": 0.378,
+    "relevance": null,
+    "walkers": 0.001,
+    "building": 0.0,
+    "manmade": 0.008
+   },
+   "exposure": {
+    "brightness": 152.5,
+    "entropy": 0.846
+   },
+   "sideways": false
+  },
+  {
+   "n": 151,
+   "group": "sign",
+   "title": "File:Hainfeld Kirchberg Wegweiser 01.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File:Hainfeld_Kirchberg_Wegweiser_01.JPG",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Hainfeld_Kirchberg_Wegweiser_01.JPG/1280px-Hainfeld_Kirchberg_Wegweiser_01.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 3,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.304,
+    "turned": 0.441,
+    "relevance": null,
+    "walkers": 0.085,
+    "building": 0.001,
+    "manmade": 0.49
+   },
+   "exposure": {
+    "brightness": 87.2,
+    "entropy": 0.951
+   },
+   "sideways": false
+  },
+  {
+   "n": 152,
+   "group": "sign",
+   "title": "File:Vordere Tormäuer Wegweiser 01.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Vordere_Torm%C3%A4uer_Wegweiser_01.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/Vordere_Torm%C3%A4uer_Wegweiser_01.jpg/1280px-Vordere_Torm%C3%A4uer_Wegweiser_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.229,
+    "turned": 0.594,
+    "relevance": null,
+    "walkers": 0.197,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 111.7,
+    "entropy": 0.963
+   },
+   "sideways": false
+  },
+  {
+   "n": 153,
+   "group": "litter",
+   "title": "File:Plastic Pollution in Ghana.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Plastic_Pollution_in_Ghana.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9a/Plastic_Pollution_in_Ghana.jpg/1280px-Plastic_Pollution_in_Ghana.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.047,
+    "turned": 0.542,
+    "relevance": null,
+    "walkers": 0.162,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 130.8,
+    "entropy": 0.93
+   },
+   "sideways": false
+  },
+  {
+   "n": 154,
+   "group": "litter",
+   "title": "File:Plastic pollution north of Guihou Fishing Harbour.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Plastic_pollution_north_of_Guihou_Fishing_Harbour.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dd/Plastic_pollution_north_of_Guihou_Fishing_Harbour.jpg/1280px-Plastic_pollution_north_of_Guihou_Fishing_Harbour.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.15,
+    "turned": 0.49,
+    "relevance": null,
+    "walkers": 0.004,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 118.4,
+    "entropy": 0.929
+   },
+   "sideways": false
+  },
+  {
+   "n": 155,
+   "group": "litter",
+   "title": "File:004 Beach pollution in Tenerife - Atlantic Ocean beach plastic garbage debris.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:004_Beach_pollution_in_Tenerife_-_Atlantic_Ocean_beach_plastic_garbage_debris.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/004_Beach_pollution_in_Tenerife_-_Atlantic_Ocean_beach_plastic_garbage_debris.jpg/1280px-004_Beach_pollution_in_Tenerife_-_Atlantic_Ocean_beach_plastic_garbage_debris.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.444,
+    "turned": 0.333,
+    "relevance": null,
+    "walkers": 0.096,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 111.8,
+    "entropy": 0.988
+   },
+   "sideways": false
+  },
+  {
+   "n": 156,
+   "group": "litter",
+   "title": "File:Plastic Pollution in Santa Luzia, Cape Verde.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Plastic_Pollution_in_Santa_Luzia,_Cape_Verde.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Plastic_Pollution_in_Santa_Luzia%2C_Cape_Verde.jpg/1280px-Plastic_Pollution_in_Santa_Luzia%2C_Cape_Verde.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.377,
+    "turned": 0.317,
+    "relevance": null,
+    "walkers": 0.227,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 118.2,
+    "entropy": 0.956
+   },
+   "sideways": false
+  },
+  {
+   "n": 157,
+   "group": "litter",
+   "title": "File:Litter from plastic balage wrappings.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File:Litter_from_plastic_balage_wrappings.JPG",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Litter_from_plastic_balage_wrappings.JPG/1280px-Litter_from_plastic_balage_wrappings.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.057,
+    "turned": 0.475,
+    "relevance": null,
+    "walkers": 0.231,
+    "building": 0.0,
+    "manmade": 0.657
+   },
+   "exposure": {
+    "brightness": 133.5,
+    "entropy": 0.857
+   },
+   "sideways": false
+  },
+  {
+   "n": 158,
+   "group": "litter",
+   "title": "File:Plastic bag litter in Crocodile river, Pelindaba.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Plastic_bag_litter_in_Crocodile_river,_Pelindaba.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/Plastic_bag_litter_in_Crocodile_river%2C_Pelindaba.jpg/1280px-Plastic_bag_litter_in_Crocodile_river%2C_Pelindaba.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.044,
+    "turned": 0.61,
+    "relevance": null,
+    "walkers": 0.976,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 131.1,
+    "entropy": 0.932
+   },
+   "sideways": false
+  },
+  {
+   "n": 159,
+   "group": "litter",
+   "title": "File:Plastic bag-Litter-001.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Plastic_bag-Litter-001.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/57/Plastic_bag-Litter-001.jpg/1280px-Plastic_bag-Litter-001.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.248,
+    "turned": 0.441,
+    "relevance": null,
+    "walkers": 0.06,
+    "building": 0.0,
+    "manmade": 0.998
+   },
+   "exposure": {
+    "brightness": 113.0,
+    "entropy": 0.984
+   },
+   "sideways": false
+  },
+  {
+   "n": 160,
+   "group": "litter",
+   "title": "File:Litter in Sundarbans.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Litter_in_Sundarbans.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/7/70/Litter_in_Sundarbans.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.313,
+    "turned": 0.396,
+    "relevance": null,
+    "walkers": 0.049,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 116.7,
+    "entropy": 0.977
+   },
+   "sideways": false
+  },
+  {
+   "n": 161,
+   "group": "litter",
+   "title": "File:End Plastic Pollution.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:End_Plastic_Pollution.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/3/3f/End_Plastic_Pollution.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 2,
+   "people": 2,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.014,
+    "turned": 0.557,
+    "relevance": null,
+    "walkers": 1.0,
+    "building": 0.16,
+    "manmade": 0.685
+   },
+   "exposure": {
+    "brightness": 185.2,
+    "entropy": 0.9
+   },
+   "sideways": false
+  },
+  {
+   "n": 162,
+   "group": "litter",
+   "title": "File:Physical weathering clear plastic tub.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Physical_weathering_clear_plastic_tub.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/63/Physical_weathering_clear_plastic_tub.jpg/1280px-Physical_weathering_clear_plastic_tub.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.179,
+    "turned": 0.456,
+    "relevance": null,
+    "walkers": 0.003,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 110.5,
+    "entropy": 0.972
+   },
+   "sideways": false
+  },
+  {
+   "n": 163,
+   "group": "litter",
+   "title": "File:Beach litter - geograph.org.uk - 966946.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Beach_litter_-_geograph.org.uk_-_966946.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/0/01/Beach_litter_-_geograph.org.uk_-_966946.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.998,
+    "painting": 0.002,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.095,
+    "turned": 0.582,
+    "relevance": null,
+    "walkers": 0.004,
+    "building": 0.0,
+    "manmade": 1.0
+   },
+   "exposure": {
+    "brightness": 152.8,
+    "entropy": 0.897
+   },
+   "sideways": false
+  },
+  {
+   "n": 164,
+   "group": "litter",
+   "title": "File:Stages of marine plastic biodegradation.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Stages_of_marine_plastic_biodegradation.jpg",
+   "thumb": "https://upload.wikimedia.org/wikipedia/commons/c/c1/Stages_of_marine_plastic_biodegradation.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+   "faces": 0,
+   "people": 4,
+   "look": {
+    "photograph": 0.959,
+    "painting": 0.002,
+    "drawing": 0.037,
+    "rendering": 0.003,
+    "upright": 0.03,
+    "turned": 0.668,
+    "relevance": null,
+    "walkers": 0.854,
+    "building": 0.0,
+    "manmade": 0.999
+   },
+   "exposure": {
+    "brightness": 166.0,
+    "entropy": 0.932
+   },
+   "sideways": false
+  },
+  {
+   "n": 165,
+   "group": "road",
+   "title": "File:Road through paddy fields in rural Haryana, India.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Road_through_paddy_fields_in_rural_Haryana,_India.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/Road_through_paddy_fields_in_rural_Haryana%2C_India.jpg/1280px-Road_through_paddy_fields_in_rural_Haryana%2C_India.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.067,
+    "turned": 0.553,
+    "relevance": null,
+    "walkers": 0.025,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 103.5,
+    "entropy": 0.886
+   },
+   "sideways": false
+  },
+  {
+   "n": 166,
+   "group": "road",
+   "title": "File:Dülmen, Merfeld, Feldweg am Mühlenbach -- 2021 -- 4278-80.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Merfeld,_Feldweg_am_M%C3%BChlenbach_--_2021_--_4278-80.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/D%C3%BClmen%2C_Merfeld%2C_Feldweg_am_M%C3%BChlenbach_--_2021_--_4278-80.jpg/1280px-D%C3%BClmen%2C_Merfeld%2C_Feldweg_am_M%C3%BChlenbach_--_2021_--_4278-80.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.038,
+    "turned": 0.807,
+    "relevance": null,
+    "walkers": 0.009,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 142.1,
+    "entropy": 0.972
+   },
+   "sideways": false
+  },
+  {
+   "n": 167,
+   "group": "road",
+   "title": "File:Dülmen, Merfeld, Feldweg am Mühlenbach -- 2021 -- 4347-51.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Merfeld,_Feldweg_am_M%C3%BChlenbach_--_2021_--_4347-51.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/D%C3%BClmen%2C_Merfeld%2C_Feldweg_am_M%C3%BChlenbach_--_2021_--_4347-51.jpg/1280px-D%C3%BClmen%2C_Merfeld%2C_Feldweg_am_M%C3%BChlenbach_--_2021_--_4347-51.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.087,
+    "turned": 0.546,
+    "relevance": null,
+    "walkers": 0.144,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 135.9,
+    "entropy": 0.95
+   },
+   "sideways": false
+  },
+  {
+   "n": 168,
+   "group": "road",
+   "title": "File:Dülmen, Leuste, Bäume im Nebel -- 2020 -- 5042 (bw).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Leuste,_B%C3%A4ume_im_Nebel_--_2020_--_5042_(bw).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e8/D%C3%BClmen%2C_Leuste%2C_B%C3%A4ume_im_Nebel_--_2020_--_5042_%28bw%29.jpg/1280px-D%C3%BClmen%2C_Leuste%2C_B%C3%A4ume_im_Nebel_--_2020_--_5042_%28bw%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.0,
+    "drawing": 0.001,
+    "rendering": 0.0,
+    "upright": 0.074,
+    "turned": 0.583,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 185.6,
+    "entropy": 0.87
+   },
+   "sideways": false
+  },
+  {
+   "n": 169,
+   "group": "road",
+   "title": "File:Dülmen, Umland, Sonnenaufgang -- 2012 -- 8069.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Umland,_Sonnenaufgang_--_2012_--_8069.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/D%C3%BClmen%2C_Umland%2C_Sonnenaufgang_--_2012_--_8069.jpg/1280px-D%C3%BClmen%2C_Umland%2C_Sonnenaufgang_--_2012_--_8069.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.285,
+    "turned": 0.499,
+    "relevance": null,
+    "walkers": 0.026,
+    "building": 0.0,
+    "manmade": 0.008
+   },
+   "exposure": {
+    "brightness": 74.9,
+    "entropy": 0.933
+   },
+   "sideways": false
+  },
+  {
+   "n": 170,
+   "group": "road",
+   "title": "File:Schönwald im Schwarzwald, Escheckstraße -- 2025 -- 0150.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Sch%C3%B6nwald_im_Schwarzwald,_Escheckstra%C3%9Fe_--_2025_--_0150.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Sch%C3%B6nwald_im_Schwarzwald%2C_Escheckstra%C3%9Fe_--_2025_--_0150.jpg/1280px-Sch%C3%B6nwald_im_Schwarzwald%2C_Escheckstra%C3%9Fe_--_2025_--_0150.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.279,
+    "turned": 0.376,
+    "relevance": null,
+    "walkers": 0.741,
+    "building": 0.0,
+    "manmade": 0.034
+   },
+   "exposure": {
+    "brightness": 111.8,
+    "entropy": 0.923
+   },
+   "sideways": false
+  },
+  {
+   "n": 171,
+   "group": "road",
+   "title": "File:Dülmen, Hausdülmen, Kettbach -- 2015 -- 8499-503.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Hausd%C3%BClmen,_Kettbach_--_2015_--_8499-503.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/D%C3%BClmen%2C_Hausd%C3%BClmen%2C_Kettbach_--_2015_--_8499-503.jpg/1280px-D%C3%BClmen%2C_Hausd%C3%BClmen%2C_Kettbach_--_2015_--_8499-503.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.177,
+    "turned": 0.458,
+    "relevance": null,
+    "walkers": 0.01,
+    "building": 0.0,
+    "manmade": 0.002
+   },
+   "exposure": {
+    "brightness": 119.6,
+    "entropy": 0.973
+   },
+   "sideways": false
+  },
+  {
+   "n": 172,
+   "group": "road",
+   "title": "File:Lüdinghausen, Berenbrock, Dortmund-Ems-Kanal (an der Kreisstraße 23) -- 2015 -- 4668-70.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:L%C3%BCdinghausen,_Berenbrock,_Dortmund-Ems-Kanal_(an_der_Kreisstra%C3%9Fe_23)_--_2015_--_4668-70.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/L%C3%BCdinghausen%2C_Berenbrock%2C_Dortmund-Ems-Kanal_%28an_der_Kreisstra%C3%9Fe_23%29_--_2015_--_4668-70.jpg/1280px-L%C3%BCdinghausen%2C_Berenbrock%2C_Dortmund-Ems-Kanal_%28an_der_Kreisstra%C3%9Fe_23%29_--_2015_--_4668-70.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.164,
+    "turned": 0.438,
+    "relevance": null,
+    "walkers": 0.01,
+    "building": 0.0,
+    "manmade": 0.001
+   },
+   "exposure": {
+    "brightness": 112.3,
+    "entropy": 0.952
+   },
+   "sideways": false
+  },
+  {
+   "n": 173,
+   "group": "road",
+   "title": "File:Haltern am See, Westruper Heide -- 2021 -- 4714-8.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Haltern_am_See,_Westruper_Heide_--_2021_--_4714-8.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Haltern_am_See%2C_Westruper_Heide_--_2021_--_4714-8.jpg/1280px-Haltern_am_See%2C_Westruper_Heide_--_2021_--_4714-8.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.06,
+    "turned": 0.474,
+    "relevance": null,
+    "walkers": 0.058,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 144.6,
+    "entropy": 0.926
+   },
+   "sideways": false
+  },
+  {
+   "n": 174,
+   "group": "road",
+   "title": "File:Dülmen, Börnste, Waldweg -- 2015 -- 4649.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_B%C3%B6rnste,_Waldweg_--_2015_--_4649.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/D%C3%BClmen%2C_B%C3%B6rnste%2C_Waldweg_--_2015_--_4649.jpg/1280px-D%C3%BClmen%2C_B%C3%B6rnste%2C_Waldweg_--_2015_--_4649.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.075,
+    "turned": 0.587,
+    "relevance": null,
+    "walkers": 0.073,
+    "building": 0.0,
+    "manmade": 0.009
+   },
+   "exposure": {
+    "brightness": 103.7,
+    "entropy": 0.976
+   },
+   "sideways": false
+  },
+  {
+   "n": 175,
+   "group": "road",
+   "title": "File:Haltern am See, Westruper Heide -- 2015 -- 8306-10.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Haltern_am_See,_Westruper_Heide_--_2015_--_8306-10.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/Haltern_am_See%2C_Westruper_Heide_--_2015_--_8306-10.jpg/1280px-Haltern_am_See%2C_Westruper_Heide_--_2015_--_8306-10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.315,
+    "turned": 0.344,
+    "relevance": null,
+    "walkers": 0.012,
+    "building": 0.0,
+    "manmade": 0.005
+   },
+   "exposure": {
+    "brightness": 118.7,
+    "entropy": 0.983
+   },
+   "sideways": false
+  },
+  {
+   "n": 176,
+   "group": "road",
+   "title": "File:Snowy trees on the GR-16 between Membre and Vresse-sur-Semois (DSCF4800).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Snowy_trees_on_the_GR-16_between_Membre_and_Vresse-sur-Semois_(DSCF4800).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Snowy_trees_on_the_GR-16_between_Membre_and_Vresse-sur-Semois_%28DSCF4800%29.jpg/1280px-Snowy_trees_on_the_GR-16_between_Membre_and_Vresse-sur-Semois_%28DSCF4800%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.106,
+    "turned": 0.541,
+    "relevance": null,
+    "walkers": 0.097,
+    "building": 0.0,
+    "manmade": 0.002
+   },
+   "exposure": {
+    "brightness": 125.7,
+    "entropy": 0.968
+   },
+   "sideways": false
+  },
+  {
+   "n": 177,
+   "group": "power",
+   "title": "File:Power lines during Blue Hour BW.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Power_lines_during_Blue_Hour_BW.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/Power_lines_during_Blue_Hour_BW.jpg/1280px-Power_lines_during_Blue_Hour_BW.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.433,
+    "turned": 0.289,
+    "relevance": null,
+    "walkers": 0.008,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 114.4,
+    "entropy": 0.967
+   },
+   "sideways": false
+  },
+  {
+   "n": 178,
+   "group": "power",
+   "title": "File:Power lines during Blue Hour LR.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Power_lines_during_Blue_Hour_LR.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Power_lines_during_Blue_Hour_LR.jpg/1280px-Power_lines_during_Blue_Hour_LR.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.318,
+    "turned": 0.356,
+    "relevance": null,
+    "walkers": 0.012,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 141.6,
+    "entropy": 0.924
+   },
+   "sideways": false
+  },
+  {
+   "n": 179,
+   "group": "power",
+   "title": "File:Mekong pirogue at sunset in the 4000 islands.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/Mekong_pirogue_at_sunset_in_the_4000_islands.jpg/1280px-Mekong_pirogue_at_sunset_in_the_4000_islands.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.018,
+    "turned": 0.556,
+    "relevance": null,
+    "walkers": 0.633,
+    "building": 0.0,
+    "manmade": 0.1
+   },
+   "exposure": {
+    "brightness": 149.0,
+    "entropy": 0.895
+   },
+   "sideways": false
+  },
+  {
+   "n": 180,
+   "group": "power",
+   "title": "File:Mekong pirogue at sunset in the 4000 islands (3).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands_(3).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Mekong_pirogue_at_sunset_in_the_4000_islands_%283%29.jpg/1280px-Mekong_pirogue_at_sunset_in_the_4000_islands_%283%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 2,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.026,
+    "turned": 0.504,
+    "relevance": null,
+    "walkers": 0.998,
+    "building": 0.001,
+    "manmade": 0.088
+   },
+   "exposure": {
+    "brightness": 125.2,
+    "entropy": 0.928
+   },
+   "sideways": false
+  },
+  {
+   "n": 181,
+   "group": "power",
+   "title": "File:Mekong pirogue at sunset in the 4000 islands (2).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands_(2).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c0/Mekong_pirogue_at_sunset_in_the_4000_islands_%282%29.jpg/1280px-Mekong_pirogue_at_sunset_in_the_4000_islands_%282%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.033,
+    "turned": 0.539,
+    "relevance": null,
+    "walkers": 0.826,
+    "building": 0.0,
+    "manmade": 0.019
+   },
+   "exposure": {
+    "brightness": 161.0,
+    "entropy": 0.899
+   },
+   "sideways": false
+  },
+  {
+   "n": 182,
+   "group": "power",
+   "title": "File:Felber Tauern und Alter Tauern.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Felber_Tauern_und_Alter_Tauern.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Felber_Tauern_und_Alter_Tauern.jpg/1280px-Felber_Tauern_und_Alter_Tauern.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 1,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.094,
+    "turned": 0.466,
+    "relevance": null,
+    "walkers": 0.295,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 134.6,
+    "entropy": 0.921
+   },
+   "sideways": false
+  },
+  {
+   "n": 183,
+   "group": "power",
+   "title": "File:Mekong pirogue at sunset in the 4000 islands (4).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands_(4).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Mekong_pirogue_at_sunset_in_the_4000_islands_%284%29.jpg/1280px-Mekong_pirogue_at_sunset_in_the_4000_islands_%284%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.045,
+    "turned": 0.543,
+    "relevance": null,
+    "walkers": 0.95,
+    "building": 0.0,
+    "manmade": 0.192
+   },
+   "exposure": {
+    "brightness": 137.5,
+    "entropy": 0.928
+   },
+   "sideways": false
+  },
+  {
+   "n": 184,
+   "group": "power",
+   "title": "File:Duisburg, Mündelheim, Rheinbogen, 2020-04 CN-01.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Duisburg,_M%C3%BCndelheim,_Rheinbogen,_2020-04_CN-01.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Duisburg%2C_M%C3%BCndelheim%2C_Rheinbogen%2C_2020-04_CN-01.jpg/1280px-Duisburg%2C_M%C3%BCndelheim%2C_Rheinbogen%2C_2020-04_CN-01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.098,
+    "turned": 0.459,
+    "relevance": null,
+    "walkers": 0.102,
+    "building": 0.0,
+    "manmade": 0.024
+   },
+   "exposure": {
+    "brightness": 175.1,
+    "entropy": 0.852
+   },
+   "sideways": true
+  },
+  {
+   "n": 185,
+   "group": "power",
+   "title": "File:Neckarsulm - Scheuerberg - Blick vom SW-Hang bei Sonnenuntergang mit Herbstlaub (2).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Neckarsulm_-_Scheuerberg_-_Blick_vom_SW-Hang_bei_Sonnenuntergang_mit_Herbstlaub_(2).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Neckarsulm_-_Scheuerberg_-_Blick_vom_SW-Hang_bei_Sonnenuntergang_mit_Herbstlaub_%282%29.jpg/1280px-Neckarsulm_-_Scheuerberg_-_Blick_vom_SW-Hang_bei_Sonnenuntergang_mit_Herbstlaub_%282%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.058,
+    "turned": 0.595,
+    "relevance": null,
+    "walkers": 0.072,
+    "building": 0.001,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 108.1,
+    "entropy": 0.952
+   },
+   "sideways": false
+  },
+  {
+   "n": 186,
+   "group": "power",
+   "title": "File:Neckarsulm - Scheuerberg - Blick vom SW-Hang bei Sonnenuntergang mit Herbstlaub (1).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Neckarsulm_-_Scheuerberg_-_Blick_vom_SW-Hang_bei_Sonnenuntergang_mit_Herbstlaub_(1).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/Neckarsulm_-_Scheuerberg_-_Blick_vom_SW-Hang_bei_Sonnenuntergang_mit_Herbstlaub_%281%29.jpg/1280px-Neckarsulm_-_Scheuerberg_-_Blick_vom_SW-Hang_bei_Sonnenuntergang_mit_Herbstlaub_%281%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.1,
+    "turned": 0.555,
+    "relevance": null,
+    "walkers": 0.071,
+    "building": 0.005,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 124.0,
+    "entropy": 0.962
+   },
+   "sideways": false
+  },
+  {
+   "n": 187,
+   "group": "power",
+   "title": "File:Lasarte - Campo 01.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Lasarte_-_Campo_01.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Lasarte_-_Campo_01.jpg/1280px-Lasarte_-_Campo_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.162,
+    "turned": 0.501,
+    "relevance": null,
+    "walkers": 0.0,
+    "building": 0.0,
+    "manmade": 0.0
+   },
+   "exposure": {
+    "brightness": 153.4,
+    "entropy": 0.875
+   },
+   "sideways": false
+  },
+  {
+   "n": 188,
+   "group": "power",
+   "title": "File:Dülmen, Hausdülmen, Hochzeitsallee -- 2020 -- 0348.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:D%C3%BClmen,_Hausd%C3%BClmen,_Hochzeitsallee_--_2020_--_0348.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c0/D%C3%BClmen%2C_Hausd%C3%BClmen%2C_Hochzeitsallee_--_2020_--_0348.jpg/1280px-D%C3%BClmen%2C_Hausd%C3%BClmen%2C_Hochzeitsallee_--_2020_--_0348.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.469,
+    "turned": 0.33,
+    "relevance": null,
+    "walkers": 0.259,
+    "building": 0.0,
+    "manmade": 0.804
+   },
+   "exposure": {
+    "brightness": 149.4,
+    "entropy": 0.975
+   },
+   "sideways": false
+  }
+ ]
+}

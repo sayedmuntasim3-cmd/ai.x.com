@@ -437,6 +437,27 @@ refused. Run through detect.py on the real files: the three bad pictures refused
 PARTIAL: the sets are small; a person must still look at every scene. The runner films are not yet
 re-made with this check.
 
+**The owner's five sample recordings (14 Nov, phone, AAC 48 kHz mono; not committed):** recognized
+with the Tarteel model, no surah given:
+
+| File | Heard | Length | Loudness / peak | SNR, noise floor | Result |
+|---|---|---|---|---|---|
+| 081507 | al-Mulk 67:1-7 | 128.5 s | -17.8 LUFS, -3.5 dBTP | 26.8 dB, -44.5 dB | accepted; 6 of 6 inner ends placed, 5 sure by pauses, 67:6 not (no pause before 67:7) |
+| 081836 | al-Mulk 67:4-9 | 122.6 s | -16.2, -3.5 | 17.8 dB, -34 dB | accepted (6 ayat); noisier |
+| 082545 | Ayat al-Kursi 2:255 | 71.8 s | -18.6, -6.8 | 17.7 dB, -35.7 dB | accepted, one ayah |
+| 083224 | Ayat al-Kursi 2:255 | 80.5 s | -16.2, -0.1 | 24.5 dB, -40.5 dB | accepted, one ayah; peak at full scale |
+| 083441 | the adhan | 191.7 s | -16.5, -1.4 | digital silence between phrases | asked (not Quran); now its own message (`quran.ask.adhan`) |
+
+The voice's own energy ends near 5 kHz in all five (5-9 kHz is ~35-40 dB below the 0-3 kHz band, while a
+9-17 kHz band without voice structure is ~20 dB above it), and the adhan has digital silence between its
+phrases: signs of a second-hand or band-limited source (a recording played through a speaker, or a
+streamed file), not a close microphone. Mastering cannot restore missing frequencies (nothing is
+generated: that would change the recitation). Who recites, and whether it may be published, is not
+known: `--rights` must be filled before any of these could be released. Tajweed and correctness can only
+be judged by a qualified person. For a top-class recording: a quiet, soft-furnished room; the phone or a
+microphone 20-30 cm from the mouth; the recorder's highest quality (WAV or lossless, 48 kHz); no
+loudspeaker in the chain; the reciter's written permission.
+
 **Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);
 the review sheet lists the automated reports to read first and the known gaps of the automatic checks.
 

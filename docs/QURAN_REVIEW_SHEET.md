@@ -7,6 +7,11 @@ The sign-off is refused without a qualification and a contact: it must be a real
 It is kept apart from the automated tests: no test can replace it. Keep one copy per film, with the
 film's folder name and date.
 
+Start from the film's review page: `node local/quran-review.mjs --run <folder> --html [--lang bn]` writes
+`review.html` with the real frame of every scene, the ayah, the picture with its source and licence, why it
+was chosen, what the checks said and what they refused. The publish decision is **PASS** (may be published),
+**WARNING** (a person must still look, listen or sign) or **FAIL** (blocked); only PASS publishes.
+
 Film folder: ______________________  Date: __________
 Reviewer (real name): ______________________  Qualification (hafiz, ijazah, teacher, scholar): ______________________
 Contact: ______________________
@@ -20,6 +25,17 @@ Contact: ______________________
 | Sound | `render-report-*.json` → `audio` | offset 0, no added silence, no clipping |
 | Placeholder cards | `render-report-*.json` → `cards` | none |
 | Media refusals | `media.md` | why other pictures were refused |
+| Doubtful pictures | `media.md` column "Check", `review.html` | every WARNING scene looked at and approved, replaced or rejected by a person |
+| Publish decision | `--ready` (per format) | PASS; any FAIL or WARNING says why |
+
+## 0b. The recording (owner or editor)
+
+| Check | Yes / No | Note |
+|---|---|---|
+| The reciter is named, and the recording's source is known | | |
+| Written permission to publish it, commercial use included (recorded with `--rights`) | | |
+| It is a direct recording, not one played through a speaker or taken from another video | | |
+| No translation, narration, music or effect in the sound; the recitation untouched | | |
 
 ## 1. The Quran text (religious accuracy)
 
@@ -29,7 +45,8 @@ Contact: ______________________
 | The Arabic on screen matches the mushaf letter by letter (it comes from Tanzil Uthmani 1.1) | | |
 | Each ayah's text appears while that ayah is recited, not before or after | | |
 | A repeated ayah (or repeated words) is shown correctly | | |
-| The isti'adha, basmala and closing words are not shown as ayat | | |
+| The isti'adha, basmala and closing words are not shown as ayat (the basmala Tanzil writes before ayah 1 is removed) | | |
+| Where an ayah end is not confirmed, its Arabic is not shown (fewer than half confirmed blocks the film) | | |
 | No cut, fade or picture change falls in the middle of a word or a held note | | |
 | The recitation is untouched: no word cut, no change of speed or pitch, no music or sound added | | |
 

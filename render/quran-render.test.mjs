@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { FORMATS, ayahOnScreen, clipArgs, filmText, finalArgs, joinPlan, moveFilter } from "./quran-render.mjs";
+import { FORMATS, ayahOnScreen, clipArgs, fetchAsset, filmText, finalArgs, joinPlan, moveFilter } from "./quran-render.mjs";
 import { ayahOffset, parseTanzilText } from "../engine/src/quran-meaning.mjs";
 
 const data = new URL("../engine/data/quran/", import.meta.url);
@@ -96,4 +96,39 @@ test("a short film renders: length of the voice, no frozen card, Arabic drawn (f
   assert.ok(Math.abs(seconds - 20) < 0.1, String(seconds));
   const frozen = String(spawnSync("ffmpeg", ["-nostats", "-hide_banner", "-i", out, "-vf", "freezedetect=n=-60dB:d=3", "-an", "-f", "null", "-"]).stderr);
   assert.doesNotMatch(frozen, /freeze_start/);
+});
+
+test("an asset is fetched once with a named client, retried after 429 and server errors, and reused; a refusal is not retried", async () => {
+  const { createServer } = await import("node:http");
+  let hits = 0;
+  /** @type {string[]} */
+  const agents = [];
+  const server = createServer((req, res) => {
+    hits += 1;
+    agents.push(String(req.headers["user-agent"]));
+    if (req.url === "/gone.jpg") { res.writeHead(404); res.end(); return; }
+    if (hits === 1) { res.writeHead(429, { "retry-after": "1" }); res.end(); return; }
+    if (hits === 2) { res.writeHead(503); res.end(); return; }
+    res.writeHead(200, { "content-type": "image/jpeg" }); res.end("JPEGDATA");
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", () => r(null)));
+  const port = /** @type {any} */ (server.address()).port;
+  const folder = mkdtempSync(join(tmpdir(), "assets-"));
+  /** @type {number[]} */
+  const waits = [];
+  const wait = async (/** @type {number} */ ms) => { waits.push(ms); };
+  try {
+    const file = await fetchAsset(`http://127.0.0.1:${port}/a/photo.jpg`, folder, { wait });
+    assert.equal(readFileSync(file, "utf8"), "JPEGDATA");
+    assert.match(file, /\.jpg$/);
+    assert.deepEqual(waits, [1000, 10000]);
+    assert.ok(agents.every((a) => a.startsWith("ZuponaStudio/")));
+    // Reused: no new request.
+    assert.equal(await fetchAsset(`http://127.0.0.1:${port}/a/photo.jpg`, folder, { wait }), file);
+    assert.equal(hits, 3);
+    await assert.rejects(fetchAsset(`http://127.0.0.1:${port}/gone.jpg`, folder, { wait }), /404/);
+    assert.equal(hits, 4);
+    // A local file is used as it is.
+    assert.equal(await fetchAsset("/tmp/x.jpg", folder), "/tmp/x.jpg");
+  } finally { server.close(); }
 });
