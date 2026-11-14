@@ -5,19 +5,24 @@
  *   node local/quran-review.mjs --run <folder> --reject S004 --by "Name" [--note "why"]     (a dark card instead)
  *   node local/quran-review.mjs --run <folder> --replace S003 --by "Name" [--query "olive grove"] [--detect python3]
  *   node local/quran-review.mjs --run <folder> --signoff --by "Name" --qualification "hafiz, ijazah in Hafs" --contact "email or phone"
+ *   node local/quran-review.mjs --run <folder> --rights --by "Name" --reciter "..." --source "..." --permission "..."   (the recording's rights)
+ *   node local/quran-review.mjs --run <folder> --html [--lang bn]   (review.html: real frames, ayah, picture, source, licence, checks, refusals)
  *   node local/quran-review.mjs --run <folder> --ready     (exit 0 only when it may be published; writes publish.json)
  * After a replacement, render again (render/quran-render.mjs): only the
  * changed scene is rendered anew. Every decision is kept in review.json
  * with the name and the time.
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { mediaProviders, verifyArchiveItem } from "../engine/src/film-media.mjs";
 import { findQuranMedia, mediaManifest, mediaTable, creditsText } from "../engine/src/quran-media.mjs";
-import { decide, packaging, readyToPublish, reviewSheet } from "../engine/src/quran-review.mjs";
+import { decide, packaging, readyToPublish, reviewPage, reviewSheet } from "../engine/src/quran-review.mjs";
 import { detector } from "./quran-media.mjs";
 import { parseArgs } from "./voice-film.mjs";
 
+const run = promisify(execFile);
 /** @param {string} f */
 const readJson = (f) => readFile(f, "utf8").then((t) => JSON.parse(t), () => null);
 
@@ -73,20 +78,16 @@ async function main() {
       review = reviewSheet(direction, await readJson(join(dir, "media.json")), review);
     }
   }
+  if (a.rights === true) failed ||= !take(decide(review, { action: "rights", by, reciter: typeof a.reciter === "string" ? a.reciter : "", source: typeof a.source === "string" ? a.source : "", permission: typeof a.permission === "string" ? a.permission : "" }));
   if (a.signoff === true) failed ||= !take(decide(review, { action: "signoff", by, qualification: typeof a.qualification === "string" ? a.qualification : "", contact: typeof a.contact === "string" ? a.contact : "" }));
   await writeFile(join(dir, "review.json"), JSON.stringify(review, null, 1));
   for (const m of said) console.log("- " + m[lang]);
-  if (a.status === true || (!a.approve && !a.reject && !a.replace && !a.signoff && !a.ready)) {
+  if (a.status === true || (!a.approve && !a.reject && !a.replace && !a.signoff && !a.ready && !a.rights && !a.html)) {
     for (const s of review.scenes) console.log(`${s.shot}  ${s.ayah.padEnd(7)} ${s.status.padEnd(9)} ${(s.check ?? "").padEnd(8)}${s.asset ? s.asset.title.slice(0, 50) : "card"}  [${s.because.slice(0, 60)}]${s.check === "WARNING" ? "  doubts: " + (s.doubts ?? []).join("; ") : ""}`);
     console.log(review.signoff ? `Signed off by ${review.signoff.by} (${review.signoff.qualification}; ${review.signoff.contact}) at ${review.signoff.at}` : "Not signed off.");
   }
   if (a.ready === true) {
-    // Every rendered format is judged; the worst decides (a 4K master with a flaw is not saved by a clean 1080p).
-    const location = await readJson(join(dir, "quran-location.json")).catch(() => null);
-    /** @type {{ format: string, report: any }[]} */
-    const reports = [];
-    for (const f of ["1080p", "4k", "9x16"]) { const report = await readJson(join(dir, `render-report-${f}.json`)).catch(() => null); if (report) reports.push({ format: f, report }); }
-    const verdicts = (reports.length ? reports : [{ format: "none", report: null }]).map((r) => ({ format: r.format, ...readyToPublish(review, r.report, location) }));
+    const { verdicts, reports } = await judge(dir, review);
     for (const v of verdicts) { console.log(`${v.format}: ${v.status}`); for (const m of v.fail) console.log("  FAIL " + m[lang]); for (const m of v.warn) console.log("  WARNING " + m[lang]); }
     const verdict = verdicts.find((v) => v.status === "FAIL") ?? verdicts.find((v) => v.status === "WARNING") ?? verdicts[0];
     const render = reports[0]?.report ?? null;
@@ -99,7 +100,38 @@ async function main() {
     const { msg } = await import("../engine/src/messages.mjs");
     console.log("- " + msg("quran.review.ready", { by: verdict.by })[lang]);
   }
+  if (a.html === true) {
+    const { verdicts, reports } = await judge(dir, review);
+    // The real frames: the middle of each scene, from the first rendered film found.
+    const film = reports.map((r) => r.report?.file).find((f) => typeof f === "string");
+    /** @type {Record<string, string>} */
+    const frames = {};
+    if (film) {
+      await mkdir(join(dir, "review"), { recursive: true });
+      for (const s of review.scenes) {
+        const out = join(dir, "review", `${s.shot}.jpg`);
+        try { await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String((s.start + s.end) / 2), "-i", film, "-frames:v", "1", "-vf", "scale=960:-2", "-q:v", "4", out]); frames[s.shot] = `review/${s.shot}.jpg`; } catch { /* no frame: the page says so */ }
+      }
+    }
+    const page = reviewPage({ run: a.run, review, verdicts, media: await readJson(join(dir, "media.json")), meaning: await readJson(join(dir, "meaning.json")), location: await readJson(join(dir, "quran-location.json")), frames, lang: lang === "bn" ? "bn" : "en" });
+    await writeFile(join(dir, "review.html"), page);
+    console.log(`Review page: ${join(dir, "review.html")} (${Object.keys(frames).length} of ${review.scenes.length} scenes with a rendered frame)`);
+  }
   if (failed) process.exit(1);
+}
+
+/**
+ * Every rendered format judged against the review and the ayah timing; the worst decides
+ * (a 4K master with a flaw is not saved by a clean 1080p).
+ * @param {string} dir @param {any} review
+ */
+async function judge(dir, review) {
+  const location = await readJson(join(dir, "quran-location.json"));
+  /** @type {{ format: string, report: any }[]} */
+  const reports = [];
+  for (const f of ["1080p", "4k", "9x16"]) { const report = await readJson(join(dir, `render-report-${f}.json`)); if (report) reports.push({ format: f, report }); }
+  const verdicts = (reports.length ? reports : [{ format: "none", report: null }]).map((r) => ({ format: r.format, ...readyToPublish(review, r.report, location) }));
+  return { verdicts, reports };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });

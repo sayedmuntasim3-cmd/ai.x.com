@@ -16,7 +16,8 @@ import { msg } from "./messages.mjs";
  * @typedef {"pending" | "approved" | "replace" | "rejected"} SceneStatus
  * @typedef {{ shot: string, ayah: string, start: number, end: number, picture: string, because: string, asset: { id: string, title: string, page: string, licence: string } | null, status: SceneStatus, note: string, check?: "PASS" | "WARNING", doubts?: string[] }} ReviewScene
  * @typedef {{ at: string, by: string, shot: string | null, action: string, note: string }} ReviewDecision
- * @typedef {{ version: 1, scenes: ReviewScene[], decisions: ReviewDecision[], signoff: { by: string, at: string, statement: string, qualification: string, contact: string } | null }} Review
+ * @typedef {{ reciter: string, source: string, permission: string, by: string, at: string }} RecordingRights who recites, where the recording comes from, and the permission to publish it (commercial use included)
+ * @typedef {{ version: 1, scenes: ReviewScene[], decisions: ReviewDecision[], signoff: { by: string, at: string, statement: string, qualification: string, contact: string } | null, recording?: RecordingRights | null }} Review
  */
 
 /** What the reviewer signs. */
@@ -42,13 +43,13 @@ export function reviewSheet(direction, media, previous = null) {
   });
   // A changed picture undoes the sign-off: it was signed for other pictures.
   const changed = previous ? scenes.some((s) => { const b = old.get(s.shot); return !b || (b.asset?.id ?? null) !== (s.asset?.id ?? null); }) : true;
-  return { version: 1, scenes, decisions: previous?.decisions ?? [], signoff: changed ? null : previous?.signoff ?? null };
+  return { version: 1, scenes, decisions: previous?.decisions ?? [], signoff: changed ? null : previous?.signoff ?? null, recording: previous?.recording ?? null };
 }
 
 /**
  * Record one decision. `by` is required: no decision is anonymous.
- * @param {Review} review @param {{ shot?: string | null, action: "approve" | "replace" | "reject" | "approve-all" | "signoff", by: string, note?: string, at?: string,
- *   qualification?: string, contact?: string }} d the sign-off needs the reviewer's qualification (e.g. "hafiz, ijazah in Hafs") and a contact
+ * @param {Review} review @param {{ shot?: string | null, action: "approve" | "replace" | "reject" | "approve-all" | "signoff" | "rights", by: string, note?: string, at?: string,
+ *   qualification?: string, contact?: string, reciter?: string, source?: string, permission?: string }} d the sign-off needs the reviewer's qualification (e.g. "hafiz, ijazah in Hafs") and a contact
  * @returns {{ ok: boolean, review: Review, message: any }}
  */
 export function decide(review, d) {
@@ -64,6 +65,13 @@ export function decide(review, d) {
     if (!qualification || !contact) return { ok: false, review, message: msg("quran.review.identity") };
     next.signoff = { by, at, statement: SIGNOFF_STATEMENT, qualification, contact };
     return { ok: true, review: next, message: msg("quran.review.signed", { by }) };
+  }
+  if (d.action === "rights") {
+    // The recording itself: who recites, where it comes from, and the permission to publish it. All three, written down.
+    const reciter = String(d.reciter ?? "").trim(), source = String(d.source ?? "").trim(), permission = String(d.permission ?? "").trim();
+    if (!reciter || !source || !permission) return { ok: false, review, message: msg("quran.review.rightsMissing") };
+    next.recording = { reciter, source, permission, by, at };
+    return { ok: true, review: next, message: msg("quran.review.rights", { reciter }) };
   }
   if (d.action === "approve-all") { for (const s of next.scenes) if (s.status === "pending") s.status = "approved"; return { ok: true, review: next, message: msg("quran.review.decided", { action: "approve", count: next.scenes.length }) }; }
   const scene = next.scenes.find((s) => s.shot === d.shot);
@@ -101,6 +109,7 @@ export function readyToPublish(review, render, location = null) {
     const flagged = review.scenes.filter((s) => s.check === "WARNING" && s.status !== "approved" && s.status !== "rejected");
     if (flagged.length) warn.push(msg("quran.review.flagged", { count: flagged.length, shots: flagged.slice(0, 5).map((s) => `${s.shot} (${(s.doubts ?? []).join("; ")})`).join(", ") }));
     if (!review.signoff?.by) warn.push(msg("quran.review.unsigned"));
+    if (!review.recording) warn.push(msg("quran.review.noRights"));
   }
   if (location?.ayat?.length) {
     // The ends between ayat; the last one is the end of the voice.
@@ -171,4 +180,74 @@ export function packaging(o) {
   const tags = ["Quran", "Quran recitation", "تلاوة", "القرآن الكريم", ...range.flatMap((r) => [`Surah ${name(r.surah).transliteration ?? r.surah}`, `سورة ${name(r.surah).arabic ?? ""}`])].filter((t, i, a) => t.trim() && a.indexOf(t) === i);
   const localized = { ar: range.map((r) => label(r, "arabic")).join(" · ") + by, en: range.map((r) => label(r, "latin")).join(" · ") + by, bn: range.map((r) => label(r, "bangla")).join(" · ") + by };
   return { title, description, chapters, tags, localized, missingLanguages: ["ur", "id", "tr", "ms", "fa"], note: "Titles in Urdu, Indonesian, Turkish, Malay and Persian need surah-name lists with a recorded source; not filled in." };
+}
+
+/**
+ * The ayah as recited: Tanzil writes the basmala before ayah 1 of every surah
+ * but al-Fatiha and at-Tawba; it is not part of that ayah (the renderer does the same).
+ * @param {string} text @param {number} surah @param {number} ayah
+ */
+export function withoutOpeningBasmala(text, surah, ayah) {
+  if (ayah !== 1 || surah === 1 || surah === 9) return text;
+  const words = text.split(/\s+/);
+  const bare = words.slice(0, 4).join(" ").replace(/[\u064B-\u0670\u065F\u06D6-\u06ED]/g, "").replace(/\u0671/g, "\u0627");
+  return bare === "بسم الله الرحمن الرحيم" ? words.slice(4).join(" ") : text;
+}
+
+/** @param {unknown} x */
+const esc = (x) => String(x ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+
+/**
+ * The review page: one self-contained HTML file a scholar and an editor can
+ * open without the studio. Each scene shows the real frame from the rendered
+ * film, what is recited (the Arabic, and the meaning for the reviewer only),
+ * the picture with its source and licence, why it was chosen, what the
+ * automatic checks said, what was refused and why, and the commands to decide.
+ * @param {{ run: string, review: Review, verdicts: { format: string, status: string, fail: any[], warn: any[] }[],
+ *   media: { shots: { shot: string, check?: string, doubts?: string[], rejected?: { id: string, why: string }[] }[] } | null,
+ *   meaning: { ayat: { surah: number, ayah: number, uthmani: string, translation?: { text: string } | null }[] } | null,
+ *   location: { ayat: { surah: number, ayah: number, sure?: boolean }[] } | null,
+ *   frames: Record<string, string>, lang?: "en" | "bn" }} o frames: shot id → image path relative to the page
+ * @returns {string}
+ */
+export function reviewPage(o) {
+  const lang = o.lang ?? "en";
+  const L = (/** @type {string} */ k) => esc(msg(`quran.page.${k}`)[lang]);
+  const said = (/** @type {any} */ m) => esc(m[lang]);
+  const mediaOf = new Map((o.media?.shots ?? []).map((s) => [s.shot, s]));
+  const ayahOf = new Map((o.meaning?.ayat ?? []).map((a) => [`${a.surah}:${a.ayah}`, a]));
+  const sureOf = new Map((o.location?.ayat ?? []).map((a, i, all) => [`${a.surah}:${a.ayah}`, i === all.length - 1 || a.sure !== false]));
+  const worst = o.verdicts.find((v) => v.status === "FAIL") ?? o.verdicts.find((v) => v.status === "WARNING") ?? o.verdicts[0];
+  const badge = (/** @type {string} */ s) => `<span class="b ${esc(s)}">${esc(s)}</span>`;
+  const cmd = (/** @type {string} */ args) => `<code>node local/quran-review.mjs --run ${esc(o.run)} ${esc(args)}</code>`;
+  const r = o.review;
+  const head = `<section class="sum"><h2>${L("decision")}: ${badge(worst?.status ?? "FAIL")}</h2>${o.verdicts.map((v) => `<p><b>${esc(v.format)}</b> ${badge(v.status)}</p><ul>${v.fail.map((m) => `<li class="FAIL">${said(m)}</li>`).join("")}${v.warn.map((m) => `<li class="WARNING">${said(m)}</li>`).join("")}</ul>`).join("")}
+<p><b>${L("recording")}:</b> ${r.recording ? `${esc(r.recording.reciter)}; ${esc(r.recording.source)}; ${esc(r.recording.permission)} (${esc(r.recording.by)}, ${esc(r.recording.at)})` : `<span class="WARNING">${L("none")}</span> ${cmd('--rights --by "Name" --reciter "..." --source "..." --permission "..."')}`}</p>
+<p><b>${L("signoff")}:</b> ${r.signoff ? `${esc(r.signoff.by)} (${esc(r.signoff.qualification)}; ${esc(r.signoff.contact)}) ${esc(r.signoff.at)}` : `<span class="WARNING">${L("none")}</span> ${cmd('--signoff --by "Name" --qualification "..." --contact "..."')}`}</p></section>`;
+  const rows = r.scenes.map((s) => {
+    const m = mediaOf.get(s.shot);
+    const a = ayahOf.get(s.ayah);
+    const text = a ? esc(withoutOpeningBasmala(a.uthmani, a.surah, a.ayah)) : "";
+    const refused = (m?.rejected ?? []).slice(0, 8).map((x) => `<li>${esc(x.id)}: ${esc(x.why)}</li>`).join("");
+    const check = s.check ?? m?.check ?? "";
+    return `<article id="${esc(s.shot)}"><div class="f">${o.frames[s.shot] ? `<img src="${esc(o.frames[s.shot])}" alt="${esc(s.shot)}" loading="lazy">` : `<p class="WARNING">${L("noFrame")}</p>`}</div>
+<div class="t"><h3>${esc(s.shot)} · ${esc(s.ayah)} · ${s.start.toFixed(1)}-${s.end.toFixed(1)} s ${check ? badge(check) : ""}</h3>
+${text ? `<p><b>${L("said")}:</b></p><p class="ar" dir="rtl" lang="ar">${text}</p>${sureOf.get(s.ayah) === false ? `<p class="WARNING">${L("unsure")}</p>` : ""}` : ""}
+${a?.translation?.text ? `<p class="mn"><b>${L("meaning")}:</b> ${esc(a.translation.text)}</p>` : ""}
+<p><b>${L("picture")}:</b> ${s.asset ? `<a href="${esc(s.asset.page)}">${esc(s.asset.title)}</a> (${esc(s.asset.licence)})` : `<span class="FAIL">card</span>`}</p>
+<p><b>${L("why")}:</b> ${esc(s.picture)} - ${esc(s.because)}</p>
+${s.doubts?.length ? `<p class="WARNING"><b>${L("check")}:</b> ${esc(s.doubts.join("; "))}</p>` : ""}
+${refused ? `<details><summary>${L("refused")} (${m?.rejected?.length ?? 0})</summary><ul>${refused}</ul></details>` : ""}
+<p><b>${L("status")}:</b> ${esc(s.status)}${s.note ? ` (${esc(s.note)})` : ""}</p>
+<p class="c">${cmd(`--approve ${s.shot} --by "Name"`)}<br>${cmd(`--reject ${s.shot} --by "Name" --note "why"`)}<br>${cmd(`--replace ${s.shot} --by "Name" --query "..."`)}</p></div></article>`;
+  }).join("\n");
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${L("title")}</title>
+<style>:root{--bg:#fbfaf7;--fg:#1d1d1b;--mut:#666;--line:#ddd;--pass:#1f7a3a;--warn:#9a6700;--fail:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--fg:#eceae4;--mut:#aaa;--line:#333;--pass:#5fc27e;--warn:#e3b341;--fail:#ff7b72}}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:1100px;padding:16px}
+article{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:16px;border-top:1px solid var(--line);padding:16px 0}
+@media (max-width:700px){article{grid-template-columns:1fr}}img{width:100%;border-radius:6px}.ar{font:26px/1.9 "Amiri Quran","Amiri",serif}
+.mn,.c{color:var(--mut)}code{font-size:12px;word-break:break-all}.b{padding:1px 8px;border-radius:9px;font-size:12px;border:1px solid}
+.PASS{color:var(--pass)}.WARNING{color:var(--warn)}.FAIL{color:var(--fail)}h3{margin:0 0 8px}</style></head>
+<body><h1>${L("title")}</h1><p>${L("intro")}</p>${head}\n${rows}</body></html>`;
 }

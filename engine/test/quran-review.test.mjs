@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { MESSAGES } from "../src/messages.mjs";
-import { decide, packaging, readyToPublish, reviewSheet } from "../src/quran-review.mjs";
+import { decide, packaging, readyToPublish, reviewPage, reviewSheet, withoutOpeningBasmala } from "../src/quran-review.mjs";
 
 const surahNames = JSON.parse(readFileSync(new URL("../data/quran/surah-names.json", import.meta.url), "utf8"));
 /** @param {string} id @param {number} ayah @param {number} start @param {number} end */
@@ -21,13 +21,14 @@ test("Q6 exit: a film cannot be marked ready without every scene approved and a 
   // Approved but not signed: still not ready.
   const unsigned = readyToPublish(review, goodRender);
   assert.equal(unsigned.ok, false);
-  assert.deepEqual(unsigned.why.map((m) => m.code), ["quran.review.unsigned"]);
+  assert.deepEqual(unsigned.why.map((m) => m.code), ["quran.review.unsigned", "quran.review.noRights"]);
   // A sign-off without a name is refused.
   assert.equal(decide(review, { action: "signoff", by: "" }).ok, false);
   // A name alone is not enough for a religious sign-off.
   assert.equal(decide(review, { action: "signoff", by: "Reviewer A" }).message.code, "quran.review.identity");
   review = decide(review, { action: "signoff", by: "Reviewer A", qualification: "hafiz, ijazah in Hafs", contact: "a@example.org" }).review;
   assert.equal(review.signoff?.qualification, "hafiz, ijazah in Hafs");
+  review = decide(review, { action: "rights", by: "Owner", reciter: "Qari X", source: "studio recording", permission: "written, commercial use included" }).review;
   const ready = readyToPublish(review, goodRender);
   assert.equal(ready.ok, true);
   assert.equal(ready.by, "Reviewer A");
@@ -99,6 +100,32 @@ test("the publish decision is PASS, WARNING or FAIL: doubtful pictures and uncon
   for (const shot of ["S001", "S002"]) review = decide(review, { shot, action: "approve", by: "Editor" }).review;
   review = decide(review, { action: "signoff", by: "Hafiz A", qualification: "hafiz, ijazah in Hafs", contact: "a@example.org" }).review;
   v = readyToPublish(review, goodRender, sureAll);
+  // Without the recording's rights written down it is still not publishable.
+  assert.deepEqual(v.warn.map((m) => m.code), ["quran.review.noRights"]);
+  assert.equal(decide(review, { action: "rights", by: "Owner", reciter: "Qari X" }).message.code, "quran.review.rightsMissing");
+  review = decide(review, { action: "rights", by: "Owner", reciter: "Qari X", source: "recorded by the owner, 14 Nov 2026", permission: "the reciter's written permission, commercial use included" }).review;
+  v = readyToPublish(review, goodRender, sureAll);
   assert.equal(v.status, "PASS");
   assert.equal(v.ok, true);
+});
+
+test("the review page shows each scene's frame, ayah (without the opening basmala), picture, licence, doubts and the decision; nothing is unescaped", () => {
+  assert.equal(withoutOpeningBasmala("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ تَبَٰرَكَ ٱلَّذِى", 67, 1), "تَبَٰرَكَ ٱلَّذِى");
+  assert.equal(withoutOpeningBasmala("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", 1, 1), "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ");
+  const direction = { shots: [{ id: "S001", surah: 67, ayah: 1, start: 0, end: 12, motif: "sky at dawn", because: { detail: "sovereignty", source: "theme rules" } }] };
+  const media = { shots: [{ shot: "S001", asset: { id: "w:1", title: "Dawn <sky>", page: "https://commons.wikimedia.org/wiki/File:X.jpg", licence: "CC BY 4.0" }, check: /** @type {const} */ ("WARNING"), doubts: ["adab: people may be in the picture (70%)"], rejected: [{ id: "w:2", why: 'adab: a building, a monument or a city (100%)' }] }] };
+  const review = reviewSheet(/** @type {any} */ (direction), media);
+  const meaning = { ayat: [{ surah: 67, ayah: 1, uthmani: "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ تَبَٰرَكَ ٱلَّذِى بِيَدِهِ ٱلْمُلْكُ", translation: { text: "Blessed is He" } }] };
+  const verdicts = [{ format: "1080p", ...readyToPublish(review, goodRender, { ayat: [{ surah: 67, ayah: 1, sure: true }] }) }];
+  for (const lang of /** @type {const} */ (["en", "bn"])) {
+    const html = reviewPage({ run: "runs/mulk", review, verdicts, media, meaning, location: { ayat: [{ surah: 67, ayah: 1, sure: true }] }, frames: { S001: "review/S001.jpg" }, lang });
+    assert.match(html, /<img src="review\/S001.jpg"/);
+    assert.match(html, /تَبَٰرَكَ ٱلَّذِى بِيَدِهِ ٱلْمُلْكُ<\/p>/);
+    assert.doesNotMatch(html, /بِسْمِ/);
+    assert.match(html, /Dawn &lt;sky&gt;/);
+    assert.match(html, /people may be in the picture/);
+    assert.match(html, /a building, a monument or a city/);
+    assert.match(html, /class="b WARNING">WARNING/);
+    assert.match(html, /--approve S001 --by/);
+  }
 });
