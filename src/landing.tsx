@@ -36,6 +36,7 @@ import {
   CopyIcon,
   FilmIcon,
   HomeIcon,
+  ImageIcon,
   LayersIcon,
   MicIcon,
   MinusIcon,
@@ -55,6 +56,7 @@ import {
   WaveformIcon,
 } from "./icons";
 import { FoxMark, HeroMountains, PosterArt } from "./art";
+import { Library, visualQuery } from "./library";
 import { Select } from "./select";
 
 const DRAFT_KEY = "zupona:studio-draft:v1";
@@ -137,6 +139,7 @@ export default function Landing() {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
+  const [libraryRequest, setLibraryRequest] = useState<{ query: string; n: number } | null>(null);
   const ideaRef = useRef<HTMLTextAreaElement>(null);
 
   const update = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
@@ -195,6 +198,15 @@ export default function Landing() {
     }
     setError("");
     setBriefOpen(true);
+  };
+
+  const findVisuals = () => {
+    const query = visualQuery(userText) || category.label;
+    setBriefOpen(false);
+    setLibraryRequest((r) => ({ query, n: (r?.n ?? 0) + 1 }));
+    window.setTimeout(() => {
+      document.getElementById("library")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    }, 60);
   };
 
   const brief = {
@@ -271,6 +283,7 @@ export default function Landing() {
           />
         </section>
 
+        <Library idea={userText} topic={draft.category} request={libraryRequest} />
         <Explore onPick={loadIdea} />
         <HowItWorks />
         <Closing />
@@ -278,7 +291,7 @@ export default function Landing() {
 
       <Footer />
       <MobileNav />
-      <BriefDialog open={briefOpen} onClose={() => setBriefOpen(false)} brief={brief} />
+      <BriefDialog open={briefOpen} onClose={() => setBriefOpen(false)} brief={brief} onFindVisuals={findVisuals} />
     </div>
   );
 }
@@ -297,6 +310,7 @@ function Header() {
       <nav aria-label="Primary" className="hidden items-center gap-1 rounded-full border border-line bg-surface/70 p-1 backdrop-blur md:flex">
         {[
           ["#studio", "Studio"],
+          ["#library", "Library"],
           ["#explore", "Explore"],
           ["#how", "How it works"],
         ].map(([href, label]) => (
@@ -1196,6 +1210,7 @@ function Footer() {
 const NAV = [
   { id: "top", label: "Home", Icon: HomeIcon },
   { id: "studio", label: "Create", Icon: SparkleIcon },
+  { id: "library", label: "Library", Icon: ImageIcon },
   { id: "explore", label: "Explore", Icon: CompassIcon },
   { id: "how", label: "Guide", Icon: LayersIcon },
 ] as const;
@@ -1225,7 +1240,7 @@ function MobileNav() {
       aria-label="Sections"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-4">
+      <ul className="mx-auto grid max-w-md grid-cols-5">
         {NAV.map(({ id, label, Icon }) => {
           const on = active === id;
           return (
@@ -1283,7 +1298,7 @@ function briefText(b: Brief) {
   ].join("\n");
 }
 
-function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => void; brief: Brief }) {
+function BriefDialog({ open, onClose, brief, onFindVisuals }: { open: boolean; onClose: () => void; brief: Brief; onFindVisuals: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -1375,7 +1390,15 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
           will be waiting for you.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={onFindVisuals}
+          className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand-gradient text-[15px] font-semibold text-white shadow-cta transition hover:brightness-110"
+        >
+          <ImageIcon size={18} /> Find visuals for this film
+        </button>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={copy}
