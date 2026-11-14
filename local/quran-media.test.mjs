@@ -62,7 +62,9 @@ test("the face and person detectors refuse only when the image-text model agrees
   const look = { ...clean.look, relevance: 0.9, walkers: 0.05, building: 0, manmade: 0 };
   // Measured: "faces" in bark and rock on 13 of 68 clean landscapes, where the people score stayed low.
   assert.equal(frameVerdict({ ...clean, faces: 1, look }), null);
-  assert.match(frameDoubts({ faces: 1, look })[0], /^adab: the face or person detector found 1 face/);
+  // With a people score this low the detectors' hit is ignored; from 0.3 it sends the picture to a person.
+  assert.deepEqual(frameDoubts({ faces: 1, look }), []);
+  assert.match(frameDoubts({ faces: 1, look: { ...look, walkers: 0.4 } })[0], /^adab: the face or person detector found 1 face/);
   assert.match(String(frameVerdict({ ...clean, faces: 1, look: { ...look, walkers: 0.7 } })), /^detector: 1 face\(s\), 0 person\(s\) in 5 frame\(s\), people score 70%/);
   // Without the image-text model the detectors decide alone, as before.
   assert.match(String(frameVerdict({ ...clean, faces: 1 })), /^detector: 1 face/);

@@ -493,11 +493,14 @@ A search that asks for ruins or a ship does not apply that check. On the whole s
 
 | Pictures | Refused | Sent to a person | Passed silently |
 |---|---|---|---|
-| 67 clean landscape photos | 3 | 13 | 51 |
-| 118 with people, buildings, man-made things or art | 87 | 18 | 13 |
+| 67 clean landscape photos | 3 | 2 | 62 |
+| 118 with people, buildings, man-made things or art | 87 | 17 | 14 |
 
-Still passing silently: a tiny shepherd, three distant huts, a far village, a fence, small plastic litter
-in grass or on pebbles, a distant power station, a drawing with animals. PARTIAL: the labels are the
+(The OpenCV face hits are ignored where the people score is below 0.3: 11 of their 13 false faces were
+there, and no real person; this sent 11 fewer clean photos to review and let one more sign pass. On the
+al-Mulk film the stricter rule had cost 5 of 8 videos: a video samples 5 frames, so one false face in any
+made it doubtful.) Still passing silently: a tiny shepherd, three distant huts, a far village, a fence, two
+signs, small plastic litter in grass or on pebbles, a distant power station, a drawing with animals. PARTIAL: the labels are the
 assistant's, not yet a person's; a fresh set should confirm the thresholds.
 
 **Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);

@@ -30,7 +30,7 @@ export function hamming(a, b) {
 export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7, walkers: 0.9, building: 0.7, manmade: 0.7 });
 
 /** The uncertain band under each refusal: such a picture may be right, so it goes to a person (WARNING), never in silently. */
-export const DOUBT_RULES = Object.freeze({ art: 0.1, relevance: 0.65, walkers: 0.6, building: 0.3, manmade: 0.35 });
+export const DOUBT_RULES = Object.freeze({ art: 0.1, relevance: 0.65, walkers: 0.6, building: 0.3, manmade: 0.35, detectorWalkers: 0.3 });
 
 /**
  * A search that asks for a building or a man-made thing (the ruins of past
@@ -87,7 +87,11 @@ export function frameDoubts(item, query = "") {
   /** @type {string[]} */
   const out = [];
   const pc = (/** @type {number} */ x) => Math.round(x * 100);
-  if (/** @type {any} */ (item).faces || /** @type {any} */ (item).people) out.push(`adab: the face or person detector found ${/** @type {any} */ (item).faces ?? 0} face(s), ${/** @type {any} */ (item).people ?? 0} person(s); the image-text model did not agree`);
+  // The OpenCV detectors' hits matter only where the image-text model sees some chance of people: on the
+  // validation set every real person they found scored >= 0.64, and 11 of their 13 false "faces" in clean
+  // landscapes scored < 0.3 (a video samples 5 frames, so one false face in any of them made most videos doubtful).
+  const w = typeof l.walkers === "number" ? l.walkers : 1;
+  if ((/** @type {any} */ (item).faces || /** @type {any} */ (item).people) && w >= DOUBT_RULES.detectorWalkers) out.push(`adab: the face or person detector found ${/** @type {any} */ (item).faces ?? 0} face(s), ${/** @type {any} */ (item).people ?? 0} person(s); the image-text model did not agree`);
   const art = (l.painting ?? 0) + (l.drawing ?? 0) + (l.rendering ?? 0);
   if (art >= DOUBT_RULES.art) out.push(`visual: maybe not a photograph (${pc(art)}%)`);
   if (typeof l.relevance === "number" && l.relevance < DOUBT_RULES.relevance) out.push(`relevance: the frames only partly show what was searched for (${pc(l.relevance)}%)`);
