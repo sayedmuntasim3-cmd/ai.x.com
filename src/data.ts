@@ -15,6 +15,8 @@ export type Category = Option<CategoryId> & {
   subtitle: string;
   /** Starter idea used by the Explore cards. */
   idea: string;
+  /** Running time shown on the sample poster. */
+  runtime: string;
 };
 
 export const CATEGORIES: Category[] = [
@@ -23,6 +25,7 @@ export const CATEGORIES: Category[] = [
     label: "Nature",
     hint: "Wild places and the life within them",
     title: "Where the Glaciers Sing",
+    runtime: "58m",
     subtitle: "A winter on the roof of the world",
     idea: "A snow leopard mother raising her cubs through one brutal Himalayan winter",
   },
@@ -31,6 +34,7 @@ export const CATEGORIES: Category[] = [
     label: "Ocean",
     hint: "Reefs, deep water and migrations",
     title: "The Last Ocean",
+    runtime: "1h 42m",
     subtitle: "Life beneath the surface",
     idea: "The secret 8,000 km migration of humpback whales across the Pacific",
   },
@@ -39,6 +43,7 @@ export const CATEGORIES: Category[] = [
     label: "Space",
     hint: "Stars, planets and the people who study them",
     title: "Light From Elsewhere",
+    runtime: "1h 12m",
     subtitle: "The search for a second Earth",
     idea: "How astronomers hunt for distant planets that could hold life",
   },
@@ -47,6 +52,7 @@ export const CATEGORIES: Category[] = [
     label: "History",
     hint: "Empires, ruins and turning points",
     title: "Roads of Silk and Dust",
+    runtime: "1h 36m",
     subtitle: "The cities that connected the world",
     idea: "The forgotten trading cities of the ancient Silk Road and the people who built them",
   },
@@ -55,6 +61,7 @@ export const CATEGORIES: Category[] = [
     label: "Science",
     hint: "Discoveries, from microbes to machines",
     title: "The Invisible Engine",
+    runtime: "46m",
     subtitle: "How microbes run the planet",
     idea: "The trillions of microbes that quietly keep our planet, and our bodies, alive",
   },
@@ -63,6 +70,7 @@ export const CATEGORIES: Category[] = [
     label: "Culture",
     hint: "People, places and traditions",
     title: "After Midnight",
+    runtime: "52m",
     subtitle: "Inside Asia's night markets",
     idea: "The night food markets of Dhaka, Bangkok and Taipei, from first fire to last light",
   },

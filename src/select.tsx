@@ -153,7 +153,7 @@ export function Select<T extends string>({
                 }`}
               >
                 {renderIcon && (
-                  <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-clay/15 text-clay-ink" : "bg-sunken text-ink-2"}`}>
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-brand/15 text-brand-ink" : "bg-sunken text-ink-2"}`}>
                     {renderIcon(option.id)}
                   </span>
                 )}
@@ -161,7 +161,7 @@ export function Select<T extends string>({
                   <span className="block text-[15px] font-medium text-ink">{option.label}</span>
                   {option.hint && <span className="block text-[13px] text-muted">{option.hint}</span>}
                 </span>
-                <CheckIcon size={18} className={`shrink-0 text-clay-ink ${selected ? "opacity-100" : "opacity-0"}`} />
+                <CheckIcon size={18} className={`shrink-0 text-brand-ink ${selected ? "opacity-100" : "opacity-0"}`} />
               </li>
             );
           })}

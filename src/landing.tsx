@@ -64,7 +64,7 @@ const MAX_AUDIO_BYTES = 200 * 1024 * 1024;
 const PREVIEW_SECONDS = 12;
 
 const container = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8";
-const eyebrow = "text-[12px] font-semibold uppercase tracking-[0.16em] text-clay-ink";
+const eyebrow = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brand-ink";
 
 type Voice = { name: string; size: number; seconds: number; url: string; source: "upload" | "record" };
 
@@ -220,7 +220,7 @@ export default function Landing() {
         Skip to the studio
       </a>
 
-      <div className="pointer-events-none absolute right-0 top-0 h-[340px] w-full max-w-[900px] opacity-90 [mask-image:radial-gradient(120%_100%_at_100%_0%,#000_45%,transparent_78%)] sm:h-[480px] sm:opacity-100">
+      <div className="pointer-events-none absolute right-0 top-0 h-[360px] w-full max-w-[960px] [mask-image:radial-gradient(120%_100%_at_100%_0%,#000_45%,transparent_80%)] sm:h-[520px]">
         <HeroMountains className="size-full" />
       </div>
 
@@ -230,9 +230,11 @@ export default function Landing() {
         <section className={`${container} relative z-10 pt-6 sm:pt-12 lg:pt-16`} aria-labelledby="hero-title">
           <h1
             id="hero-title"
-            className="max-w-[12ch] font-serif text-[46px] font-normal leading-[1] tracking-[-0.025em] text-ink motion-safe:animate-rise sm:text-[64px] lg:text-[80px]"
+            className="font-serif text-[clamp(38px,11.5vw,46px)] font-normal leading-[1] tracking-[-0.025em] text-ink motion-safe:animate-rise sm:text-[64px] lg:text-[80px]"
           >
-            Create your own <em className="font-normal italic text-clay-ink">documentary</em>
+            Create your own
+            <br />
+            <em className="font-normal italic">documentary</em>
           </h1>
           <p className="mt-5 max-w-[30rem] text-[17px] leading-[1.6] text-ink-2 motion-safe:animate-rise motion-safe:[animation-delay:90ms] sm:text-[19px]">
             Turn your ideas into stunning, cinematic documentaries — in minutes.
@@ -386,14 +388,14 @@ function Composer(props: ComposerProps) {
   return (
     <div
       className={`rounded-[28px] border border-line bg-surface p-4 shadow-card transition-shadow duration-500 motion-safe:animate-rise motion-safe:[animation-delay:160ms] sm:p-6 ${
-        flash ? "ring-4 ring-clay/25" : "ring-0 ring-transparent"
+        flash ? "ring-4 ring-brand/25" : "ring-0 ring-transparent"
       }`}
     >
       {/* Mode tabs */}
       <div role="tablist" aria-label="How do you want to start?" className="relative grid grid-cols-2 rounded-full bg-sunken p-1">
         <span
           aria-hidden="true"
-          className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-surface shadow-thumb transition-transform duration-300 ease-[cubic-bezier(.3,.7,.2,1)] ${
+          className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-brand-gradient shadow-cta transition-transform duration-300 ease-[cubic-bezier(.3,.7,.2,1)] ${
             draft.mode === "voice" ? "translate-x-full" : ""
           }`}
         />
@@ -417,11 +419,11 @@ function Composer(props: ComposerProps) {
                   document.getElementById(`tab-${next}`)?.focus();
                 }
               }}
-              className={`relative z-10 flex h-12 items-center justify-center gap-2.5 rounded-full text-[16px] font-medium transition-colors ${
-                selected ? "text-ink" : "text-muted hover:text-ink"
+              className={`relative z-10 flex h-12 items-center justify-center gap-2.5 rounded-full text-[16px] font-medium transition-colors duration-300 ${
+                selected ? "text-white" : "text-muted hover:text-ink"
               }`}
             >
-              <span className={selected ? "text-clay-ink" : ""}>{tab.icon}</span>
+              <span className={selected ? "text-white" : ""}>{tab.icon}</span>
               {tab.label}
             </button>
           );
@@ -488,9 +490,9 @@ function Composer(props: ComposerProps) {
             renderIcon={(id) => <CategoryIcon id={id} size={18} />}
             triggerClassName="mt-3 flex h-11 w-full items-center justify-between gap-1 rounded-full border border-line-strong py-1 pl-1 pr-2.5 transition hover:border-ink/40 sm:pr-3"
           >
-            <span className="inline-flex h-full min-w-0 items-center gap-1.5 rounded-full bg-clay/10 px-2.5 text-clay-ink sm:gap-2 sm:px-3">
+            <span className="inline-flex h-full min-w-0 items-center gap-1.5 rounded-full bg-brand-gradient px-2.5 font-semibold text-white sm:gap-2 sm:px-3">
               <CategoryIcon id={draft.category} size={17} className="shrink-0" />
-              <span className="truncate text-[15px] font-medium">{findOption(CATEGORIES, draft.category).label}</span>
+              <span className="truncate text-[15px]">{findOption(CATEGORIES, draft.category).label}</span>
             </span>
             <ChevronDownIcon size={18} className="shrink-0 text-muted" />
           </Select>
@@ -549,15 +551,14 @@ function Composer(props: ComposerProps) {
       <button
         type="button"
         onClick={onCreate}
-        className="group mt-5 flex h-[60px] w-full items-center justify-center rounded-2xl bg-clay-btn px-4 text-white shadow-cta transition hover:bg-clay-btn-hover active:scale-[0.992]"
+        className="group relative mt-5 flex h-[60px] w-full items-center justify-center overflow-hidden rounded-2xl bg-brand-gradient px-4 text-white shadow-cta transition hover:brightness-110 active:scale-[0.992]"
       >
         <span className="flex items-center gap-2.5 text-[16px] font-semibold sm:text-[17px]">
           <SparkleIcon size={20} className="transition-transform duration-300 group-hover:rotate-[20deg] group-hover:scale-110" />
           Create documentary
         </span>
-        <span aria-hidden="true" className="mx-3 hidden h-7 w-px bg-white/25 min-[360px]:block min-[400px]:mx-4 sm:mx-5" />
-        <span className="hidden items-center gap-1.5 whitespace-nowrap text-[14px] font-medium text-white/90 min-[360px]:flex">
-          <CoinsIcon size={18} />
+        <span className="ml-3 hidden h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-black/25 px-3 text-[13.5px] font-semibold text-white min-[360px]:flex sm:ml-5">
+          <CoinsIcon size={17} />
           <span>
             ~{credits} <span className="sr-only min-[400px]:not-sr-only">credits</span>
           </span>
@@ -641,8 +642,8 @@ function IdeaPanel({ draft, update, error, setError, ideaRef }: ComposerProps) {
         </span>
       </div>
       <div
-        className={`relative mt-3 rounded-2xl border bg-canvas/50 transition focus-within:border-clay focus-within:ring-4 focus-within:ring-clay/15 ${
-          error ? "border-clay" : "border-line-strong"
+        className={`relative mt-3 rounded-2xl border bg-canvas/50 transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/15 ${
+          error ? "border-brand" : "border-line-strong"
         }`}
       >
         <textarea
@@ -666,13 +667,13 @@ function IdeaPanel({ draft, update, error, setError, ideaRef }: ComposerProps) {
           onClick={inspire}
           aria-label="Inspire me with an idea"
           title="Inspire me"
-          className="absolute bottom-2.5 right-2.5 grid size-10 place-items-center rounded-xl text-ink-2 transition hover:bg-sunken hover:text-clay-ink active:scale-95"
+          className="absolute bottom-2.5 right-2.5 grid size-10 place-items-center rounded-xl text-ink-2 transition hover:bg-sunken hover:text-brand-ink active:scale-95"
         >
           <WandIcon size={22} />
         </button>
       </div>
       {error && (
-        <p id="studio-error" role="alert" className="mt-2 text-[14px] text-clay-ink">
+        <p id="studio-error" role="alert" className="mt-2 text-[14px] text-brand-ink">
           {error}
         </p>
       )}
@@ -839,10 +840,10 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
           </button>
         </div>
       ) : recording ? (
-        <div className="mt-3 flex items-center gap-4 rounded-2xl border border-clay/40 bg-clay/5 p-4" role="status">
+        <div className="mt-3 flex items-center gap-4 rounded-2xl border border-brand/40 bg-brand/5 p-4" role="status">
           <span className="relative flex size-3 shrink-0">
-            <span className="absolute inline-flex size-full rounded-full bg-clay opacity-60 motion-safe:animate-ping" />
-            <span className="relative inline-flex size-3 rounded-full bg-clay" />
+            <span className="absolute inline-flex size-full rounded-full bg-brand opacity-60 motion-safe:animate-ping" />
+            <span className="relative inline-flex size-3 rounded-full bg-brand" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-medium text-ink">Recording</p>
@@ -865,10 +866,10 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           className={`mt-3 rounded-2xl border border-dashed px-4 py-6 text-center transition ${
-            dragging ? "border-clay bg-clay/5" : error ? "border-clay" : "border-line-strong bg-canvas/50"
+            dragging ? "border-brand bg-brand/5" : error ? "border-brand" : "border-line-strong bg-canvas/50"
           }`}
         >
-          <span className="mx-auto grid size-12 place-items-center rounded-full bg-sunken text-clay-ink">
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-sunken text-brand-ink">
             <WaveformIcon size={22} />
           </span>
           <p className="mt-3 text-[15px] font-medium text-ink">Drop an audio file here</p>
@@ -878,7 +879,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
               <UploadIcon size={18} /> Choose file
             </button>
             <button type="button" onClick={startRecording} className={pillButton}>
-              <RecordIcon size={18} className="text-clay" /> Record
+              <RecordIcon size={18} className="text-brand" /> Record
             </button>
           </div>
           <input
@@ -896,7 +897,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
         </div>
       )}
       {error && (
-        <p id="studio-error" role="alert" className="mt-2 text-[14px] text-clay-ink">
+        <p id="studio-error" role="alert" className="mt-2 text-[14px] text-brand-ink">
           {error}
         </p>
       )}
@@ -910,7 +911,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
         maxLength={140}
         onChange={(e) => update("topic", e.target.value)}
         placeholder="e.g. My grandfather's village on the Padma river"
-        className="mt-2 h-12 w-full rounded-2xl border border-line-strong bg-canvas/50 px-4 text-[16px] text-ink outline-none transition placeholder:text-muted focus:border-clay focus:ring-4 focus:ring-clay/15"
+        className="mt-2 h-12 w-full rounded-2xl border border-line-strong bg-canvas/50 px-4 text-[16px] text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-4 focus:ring-brand/15"
       />
     </div>
   );
@@ -950,12 +951,12 @@ function Preview({ category, title, subtitle, runtime, age, chapters, totalSecon
         <h2 id="preview-title" className="font-serif text-[23px] font-normal leading-[1.1] tracking-[-0.01em] text-ink min-[400px]:text-[26px] sm:text-[32px]">
           Your documentary preview
         </h2>
-        <a href="#explore" className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[14px] text-ink-2 sm:gap-1.5 sm:text-[15px] transition-colors hover:text-clay-ink">
+        <a href="#explore" className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[14px] text-ink-2 sm:gap-1.5 sm:text-[15px] transition-colors hover:text-brand-ink">
           View all <ArrowRightIcon size={18} className="transition-transform group-hover:translate-x-0.5" />
         </a>
       </div>
 
-      <div className="relative isolate mt-5 aspect-[16/11] overflow-hidden rounded-[24px] bg-[#1F1E1D] shadow-poster">
+      <div className="relative isolate mt-5 aspect-[16/11] overflow-hidden rounded-[24px] bg-[#101018] shadow-poster">
         <div key={category} className={`absolute inset-0 motion-safe:animate-fade ${playing ? "is-playing" : ""}`}>
           <PosterArt category={category} className={`size-full ${playing ? "motion-safe:animate-kenburns" : ""}`} />
         </div>
@@ -988,7 +989,7 @@ function Preview({ category, title, subtitle, runtime, age, chapters, totalSecon
         >
           {playing ? <PauseIcon size={22} /> : <PlayIcon size={22} className="translate-x-px" />}
         </button>
-        {playing && <span key={run} className="absolute bottom-0 left-0 h-[3px] w-full origin-left bg-clay motion-safe:animate-progress" />}
+        {playing && <span key={run} className="absolute bottom-0 left-0 h-[3px] w-full origin-left bg-brand-gradient motion-safe:animate-progress" />}
       </div>
 
       <div className="mt-4 rounded-[24px] border border-line bg-surface p-5">
@@ -1001,7 +1002,7 @@ function Preview({ category, title, subtitle, runtime, age, chapters, totalSecon
         <Timeline chapters={chapters} totalSeconds={totalSeconds} />
       </div>
       <p className="mt-3 flex items-center gap-2 text-[13px] text-muted">
-        <span className="size-1.5 rounded-full bg-clay" /> Updates as you shape your film.
+        <span className="size-1.5 rounded-full bg-brand-gradient" /> Updates as you shape your film.
       </p>
     </aside>
   );
@@ -1010,14 +1011,12 @@ function Preview({ category, title, subtitle, runtime, age, chapters, totalSecon
 function Timeline({ chapters, totalSeconds }: { chapters: Chapter[]; totalSeconds: number }) {
   return (
     <>
-      <div className="mt-4 flex h-2 gap-1" aria-hidden="true">
-        {chapters.map((c, i) => (
+      <div className="relative mt-4 h-2 overflow-hidden rounded-full bg-brand-gradient" aria-hidden="true">
+        {chapters.slice(1).map((c) => (
           <span
             key={c.title}
-            style={{ flexGrow: Math.max(1, c.end - c.start) / Math.max(1, totalSeconds) }}
-            className={`basis-0 rounded-full transition-[flex-grow] duration-500 ${
-              i === 0 || i === chapters.length - 1 ? "bg-clay" : i % 2 ? "bg-clay/55" : "bg-clay/30"
-            }`}
+            style={{ left: `${(c.start / Math.max(1, totalSeconds)) * 100}%` }}
+            className="absolute inset-y-0 w-1 -translate-x-1/2 bg-surface transition-[left] duration-500"
           />
         ))}
       </div>
@@ -1057,19 +1056,23 @@ function Explore({ onPick }: { onPick: (id: CategoryId) => void }) {
             <button
               type="button"
               onClick={() => onPick(c.id)}
-              className="group block h-full w-full rounded-[26px] border border-line bg-surface p-2 text-left transition duration-300 hover:-translate-y-1 hover:shadow-card"
+              className="group relative isolate block aspect-[4/5] w-full overflow-hidden rounded-[24px] bg-[#101018] text-left shadow-poster transition duration-300 hover:-translate-y-1 sm:aspect-[5/6]"
             >
-              <span className="relative block aspect-[4/3] overflow-hidden rounded-[20px] bg-[#1F1E1D]">
-                <PosterArt category={c.id} className="size-full transition-transform duration-700 ease-out group-hover:scale-[1.04]" />
-                <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-black/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
-                  <CategoryIcon id={c.id} size={14} /> {c.label}
-                </span>
+              <PosterArt category={c.id} className="absolute inset-0 size-full transition-transform duration-700 ease-out group-hover:scale-[1.05]" />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/5" />
+              <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/35 bg-black/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-md">
+                <CategoryIcon id={c.id} size={14} /> {c.label}
               </span>
-              <span className="block px-3 pb-3 pt-4">
-                <span className="block font-serif text-[23px] leading-tight text-ink">{c.title}</span>
-                <span className="mt-2 line-clamp-2 block text-[14px] leading-relaxed text-muted">{c.idea}</span>
-                <span className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-medium text-clay-ink">
-                  Use this idea <ArrowRightIcon size={16} className="transition-transform group-hover:translate-x-1" />
+              <span className="absolute inset-x-0 bottom-0 p-5">
+                <span className="block text-balance font-serif text-[26px] leading-[1.05] text-white">{c.title}</span>
+                <span className="mt-2 line-clamp-2 block text-[13.5px] leading-relaxed text-white/80">{c.idea}</span>
+                <span className="mt-4 flex items-center justify-between text-[13px] text-white/85">
+                  <span className="inline-flex items-center gap-1.5 font-medium">
+                    Use this idea <ArrowRightIcon size={16} className="transition-transform group-hover:translate-x-1" />
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 tabular-nums">
+                    <ClockIcon size={15} /> {c.runtime}
+                  </span>
                 </span>
               </span>
             </button>
@@ -1113,7 +1116,7 @@ function HowItWorks() {
         {STEPS.map((s, i) => (
           <li key={s.title} className="rounded-[26px] border border-line bg-surface p-6 sm:p-7">
             <div className="flex items-center justify-between">
-              <span className="grid size-12 place-items-center rounded-2xl bg-clay/10 text-clay-ink">{s.icon}</span>
+              <span className="grid size-12 place-items-center rounded-2xl bg-brand/10 text-brand-ink">{s.icon}</span>
               <span className="font-serif text-[40px] italic leading-none text-line-strong">{i + 1}</span>
             </div>
             <h3 className="mt-10 font-serif text-[27px] font-normal leading-tight text-ink">{s.title}</h3>
@@ -1132,14 +1135,13 @@ function HowItWorks() {
 function Closing() {
   return (
     <section className={`${container} relative z-10 mt-24 sm:mt-32`} aria-labelledby="closing-title">
-      <div className="relative isolate overflow-hidden rounded-[32px] bg-[#1F1E1D] px-6 py-16 text-center text-[#FAF9F5] ring-1 ring-inset ring-white/5 sm:px-12 sm:py-24">
-        <svg viewBox="0 0 800 200" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 -z-10 h-40 w-full sm:h-48" aria-hidden="true">
-          <path d="M0 120 L120 70 L200 100 L320 40 L420 95 L520 55 L640 105 L720 75 L800 95 L800 200 L0 200Z" fill="#D97757" opacity="0.10" />
-          <path d="M0 160 C140 120 260 130 380 150 C500 170 600 120 800 140 L800 200 L0 200Z" fill="#D97757" opacity="0.14" />
-        </svg>
-        <FoxMark className="mx-auto size-12" />
+      <div className="relative isolate overflow-hidden rounded-[32px] bg-[#07070B] px-6 py-16 text-center text-[#FAF8F3] ring-1 ring-inset ring-white/5 sm:px-12 sm:py-24">
+        <span aria-hidden="true" className="absolute -left-24 top-1/4 -z-10 size-[26rem] rounded-full bg-[#2B63F6]/30 blur-[90px]" />
+        <span aria-hidden="true" className="absolute -right-24 bottom-0 -z-10 size-[28rem] rounded-full bg-[#B43CC8]/30 blur-[100px]" />
+        <span aria-hidden="true" className="absolute left-1/2 top-10 -z-10 size-40 -translate-x-1/2 rounded-full bg-[#EA3A8C]/25 blur-[60px]" />
+        <FoxMark glow className="mx-auto size-16 sm:size-20" />
         <h2 id="closing-title" className="mx-auto mt-7 max-w-2xl text-balance font-serif text-[38px] font-normal leading-[1.05] tracking-[-0.015em] sm:text-[60px]">
-          Every story deserves to be <em className="italic text-[#E89174]">seen.</em>
+          Every story deserves to be <em className="text-brand-gradient italic">seen.</em>
         </h2>
         <p className="mx-auto mt-5 max-w-md text-[16px] leading-relaxed text-[#C9C6BC] sm:text-[17px]">
           Bring an idea. Zupona will help you tell it beautifully.
@@ -1147,13 +1149,13 @@ function Closing() {
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <a
             href="#studio"
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-clay-btn px-6 text-[15px] font-semibold text-white shadow-cta transition hover:bg-clay-btn-hover"
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-brand-gradient px-6 text-[15px] font-semibold text-white shadow-cta transition hover:brightness-110"
           >
             <SparkleIcon size={18} /> Start creating
           </a>
           <a
             href="https://zupona.com"
-            className="inline-flex h-12 items-center gap-2 rounded-full border border-white/20 px-6 text-[15px] font-medium text-[#FAF9F5] transition hover:border-white/50"
+            className="inline-flex h-12 items-center gap-2 rounded-full border border-white/20 px-6 text-[15px] font-medium text-[#FAF8F3] transition hover:border-white/50"
           >
             Visit Zupona <ArrowUpRightIcon size={18} />
           </a>
@@ -1231,13 +1233,13 @@ function MobileNav() {
               <a
                 href={`#${id}`}
                 aria-current={on ? "location" : undefined}
-                className={`relative flex flex-col items-center gap-1 pb-3 pt-2.5 text-[12px] font-medium transition-colors ${on ? "text-clay-ink" : "text-muted"}`}
+                className={`relative flex flex-col items-center gap-1 pb-3 pt-2.5 text-[12px] font-medium transition-colors ${on ? "text-brand-ink" : "text-muted"}`}
               >
                 <Icon size={23} />
                 {label}
                 <span
                   aria-hidden="true"
-                  className={`absolute bottom-1 h-[3px] w-9 rounded-full bg-clay transition-opacity ${on ? "opacity-100" : "opacity-0"}`}
+                  className={`absolute bottom-1 h-[3px] w-9 rounded-full bg-brand-gradient transition-opacity ${on ? "opacity-100" : "opacity-0"}`}
                 />
               </a>
             </li>
@@ -1379,7 +1381,7 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
             onClick={copy}
             className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-line-strong text-[15px] font-medium text-ink transition hover:border-ink/40"
           >
-            {copied ? <CheckIcon size={18} className="text-clay-ink" /> : <CopyIcon size={18} />}
+            {copied ? <CheckIcon size={18} className="text-brand-ink" /> : <CopyIcon size={18} />}
             {copied ? "Copied" : "Copy brief"}
           </button>
           <button

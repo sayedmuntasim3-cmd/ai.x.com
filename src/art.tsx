@@ -1,4 +1,4 @@
-import { useId, type ReactElement } from "react";
+import { useId, type CSSProperties, type ReactElement } from "react";
 import type { CategoryId } from "./data";
 
 /** Deterministic pseudo-random numbers, so server and browser draw identical scenes. */
@@ -23,13 +23,46 @@ function useSvgId(prefix: string) {
 /* Brand                                                               */
 /* ------------------------------------------------------------------ */
 
-export function FoxMark({ className = "" }: { className?: string }) {
+const SPECTRUM = [
+  ["0", "#2B63F6"],
+  ["0.42", "#7A3BEE"],
+  ["0.72", "#EA3A8C"],
+  ["1", "#FF7A1E"],
+] as const;
+
+/** The Zupona fox: a geometric head drawn as one spectrum-coloured outline. */
+export function FoxMark({ className = "", glow = false }: { className?: string; glow?: boolean }) {
+  const id = useSvgId("fox");
+  const paint = `url(#${id}-g)`;
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true" focusable="false">
-      <path d="M3 3.2 12 10.2h8l9-7-1.6 13.4L16 28.6 4.6 16.6z" fill="rgb(var(--clay))" />
-      <path d="M3 3.2 12 10.2 8.2 13z M29 3.2 20 10.2 23.8 13z" fill="rgb(var(--clay-deep))" />
-      <path d="M8.6 17.4 16 21.2l7.4-3.8L16 28.6z" fill="rgb(var(--fox-muzzle))" />
-      <path d="M10.4 14.6l2.6 1.1-2.4.9zM21.6 14.6 19 15.7l2.4.9z" fill="rgb(var(--fox-eye))" />
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1">
+          {SPECTRUM.map(([o, c]) => (
+            <stop key={o} offset={o} stopColor={c} />
+          ))}
+        </linearGradient>
+        {glow && (
+          <filter id={`${id}-glow`} x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="2.4" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        )}
+      </defs>
+      <g filter={glow ? `url(#${id}-glow)` : undefined} fill="none" stroke={paint} strokeWidth="3.4" strokeLinejoin="miter" strokeMiterlimit="8">
+        {/* Head: ears, cheek points, chin */}
+        <path d="M7 4 L23 21 L32 19 L41 21 L57 4 L54 28 L61 35 L49 44 L32 60 L15 44 L3 35 L10 28 Z" />
+        {/* Inner ear lines */}
+        <path d="M13 13 L21 25 M51 13 L43 25" strokeWidth="2" />
+      </g>
+      <g fill={paint} filter={glow ? `url(#${id}-glow)` : undefined}>
+        <path d="M16 35 L27 38.5 L26 41.5 L17 38 Z M48 35 L37 38.5 L38 41.5 L47 38 Z" />
+        <path d="M27 46 L37 46 L32 52 Z" />
+      </g>
     </svg>
   );
 }
@@ -43,19 +76,35 @@ export function HeroMountains({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 900 460" preserveAspectRatio="xMaxYMin slice" className={className} aria-hidden="true" focusable="false">
       <defs>
-        <radialGradient id={`${id}-sun`} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="rgb(var(--clay))" stopOpacity="0.28" />
-          <stop offset="1" stopColor="rgb(var(--clay))" stopOpacity="0" />
+        <radialGradient id={`${id}-a1`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#2B63F6" stopOpacity="0.32" />
+          <stop offset="1" stopColor="#2B63F6" stopOpacity="0" />
         </radialGradient>
+        <radialGradient id={`${id}-a2`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#B43CC8" stopOpacity="0.3" />
+          <stop offset="1" stopColor="#B43CC8" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${id}-a3`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#FF7A1E" stopOpacity="0.28" />
+          <stop offset="1" stopColor="#FF7A1E" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`${id}-mist`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="rgb(var(--canvas))" stopOpacity="0" />
+          <stop offset="1" stopColor="rgb(var(--canvas))" stopOpacity="0.9" />
+        </linearGradient>
       </defs>
-      <circle cx="640" cy="150" r="190" fill={`url(#${id}-sun)`} />
-      <circle cx="640" cy="150" r="46" fill="rgb(var(--clay))" opacity="0.16" />
+      {/* Aurora: the spectrum, softened, behind the peaks */}
+      <g style={{ opacity: "var(--aurora)" } as CSSProperties}>
+        <ellipse cx="470" cy="150" rx="230" ry="150" fill={`url(#${id}-a1)`} />
+        <ellipse cx="680" cy="110" rx="240" ry="150" fill={`url(#${id}-a2)`} />
+        <ellipse cx="860" cy="190" rx="200" ry="130" fill={`url(#${id}-a3)`} />
+      </g>
       <path
         d="M120 300 L250 210 L310 240 L420 130 L480 175 L560 95 L640 160 L700 120 L790 190 L860 150 L900 170 L900 460 L120 460Z"
         fill="rgb(var(--ridge-1))"
       />
       <path
-        d="M560 95 L540 116 L556 112 L566 124 L578 110 L590 114Z M420 130 L404 146 L418 143 L428 152 L438 142Z"
+        d="M560 95 L538 117 L546 110 L554 122 L562 112 L572 120 L580 111Z M420 130 L404 146 L410 141 L416 150 L423 140 L432 148 L439 144Z M700 120 L679 134 L686 129 L693 138 L701 130 L710 137 L717 133Z M860 150 L844 165 L851 160 L857 169 L864 159 L872 166 L878 161Z"
         fill="rgb(var(--ridge-snow))"
       />
       <path
@@ -66,6 +115,7 @@ export function HeroMountains({ className = "" }: { className?: string }) {
         d="M0 410 C120 360 220 350 330 372 C440 394 520 330 640 340 C760 350 820 380 900 370 L900 460 L0 460Z"
         fill="rgb(var(--ridge-3))"
       />
+      <rect y="300" width="900" height="160" fill={`url(#${id}-mist)`} />
     </svg>
   );
 }
@@ -81,34 +131,35 @@ function NatureScene({ id }: SceneProps) {
     <>
       <defs>
         <linearGradient id={`${id}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#F4DECA" />
-          <stop offset="0.55" stopColor="#EDBE9C" />
-          <stop offset="1" stopColor="#DD9874" />
+          <stop offset="0" stopColor="#1B2150" />
+          <stop offset="0.5" stopColor="#5B3E86" />
+          <stop offset="0.78" stopColor="#D9708F" />
+          <stop offset="1" stopColor="#F7B98A" />
         </linearGradient>
         <radialGradient id={`${id}-glow`} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#FFF4E6" stopOpacity="0.9" />
-          <stop offset="1" stopColor="#FFF4E6" stopOpacity="0" />
+          <stop offset="0" stopColor="#FFE2C4" stopOpacity="0.95" />
+          <stop offset="1" stopColor="#FFB184" stopOpacity="0" />
         </radialGradient>
         <linearGradient id={`${id}-mist`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FBEBDD" stopOpacity="0" />
-          <stop offset="1" stopColor="#FBEBDD" stopOpacity="0.55" />
+          <stop offset="0" stopColor="#F3C2C7" stopOpacity="0" />
+          <stop offset="1" stopColor="#F3C2C7" stopOpacity="0.5" />
         </linearGradient>
       </defs>
       <rect width="400" height="250" fill={`url(#${id}-sky)`} />
       <g className="scene-rise">
-        <circle cx="286" cy="112" r="70" fill={`url(#${id}-glow)`} />
-        <circle cx="286" cy="112" r="28" fill="#FFF3E4" opacity="0.92" />
+        <circle cx="282" cy="150" r="76" fill={`url(#${id}-glow)`} />
+        <circle cx="282" cy="150" r="24" fill="#FFF1DE" opacity="0.95" />
       </g>
-      <g className="scene-drift-slow">
-        <path d="M232 64 q4 -4 8 0 q4 -4 8 0 M256 52 q3 -3 6 0 q3 -3 6 0 M214 80 q3 -3 6 0 q3 -3 6 0" stroke="#8A5442" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+      <g fill="#FFF8F0" opacity="0.8">
+        <circle cx="48" cy="34" r="1.4" /><circle cx="96" cy="22" r="1" /><circle cx="140" cy="48" r="1.2" /><circle cx="210" cy="28" r="1" /><circle cx="330" cy="40" r="1.3" /><circle cx="372" cy="18" r="1" /><circle cx="250" cy="60" r="0.9" />
       </g>
-      <path d="M0 150 L40 128 L78 140 L120 102 L150 122 L190 88 L232 126 L270 110 L310 132 L350 98 L400 124 L400 250 L0 250Z" fill="#D9A98C" opacity="0.85" />
-      <path d="M190 88 L178 101 L186 99 L192 106 L198 98 L204 101Z M120 102 L110 113 L117 111 L122 117 L127 110Z M350 98 L339 110 L346 108 L352 114 L357 107 L362 109Z" fill="#FCF0E3" opacity="0.9" />
-      <rect y="120" width="400" height="70" fill={`url(#${id}-mist)`} />
-      <path d="M0 178 L30 160 L64 170 L104 140 L140 162 L176 150 L214 170 L252 144 L292 168 L336 150 L372 166 L400 156 L400 250 L0 250Z" fill="#B87458" />
-      <path d="M0 200 C40 188 70 184 110 192 C150 200 180 178 220 182 C260 186 300 204 340 196 C370 190 390 186 400 188 L400 250 L0 250Z" fill="#7F4B3A" />
-      <path d="M0 226 C60 214 120 218 170 224 C230 232 290 214 340 218 C370 220 390 226 400 228 L400 250 L0 250Z" fill="#4A2D24" />
-      <path d="M24 226 l6 -20 l6 20z M36 228 l7 -26 l7 26z M50 227 l5 -16 l5 16z M352 222 l6 -22 l6 22z M366 224 l5 -15 l5 15z" fill="#3A221B" />
+      <path d="M0 150 L40 128 L78 140 L120 102 L150 122 L190 88 L232 126 L270 110 L310 132 L350 98 L400 124 L400 250 L0 250Z" fill="#8D7BB5" opacity="0.9" />
+      <path d="M190 88 L176 102 L183 98 L189 108 L195 99 L203 106 L209 101Z M120 102 L108 114 L114 111 L119 119 L125 110 L131 116 L136 112Z M350 98 L338 110 L344 107 L349 116 L355 107 L362 113 L367 109Z" fill="#FFF4F4" />
+      <rect y="118" width="400" height="72" fill={`url(#${id}-mist)`} />
+      <path d="M0 178 L30 160 L64 170 L104 140 L140 162 L176 150 L214 170 L252 144 L292 168 L336 150 L372 166 L400 156 L400 250 L0 250Z" fill="#4A3D7C" />
+      <path d="M0 200 C40 188 70 184 110 192 C150 200 180 178 220 182 C260 186 300 204 340 196 C370 190 390 186 400 188 L400 250 L0 250Z" fill="#2B2756" />
+      <path d="M0 226 C60 214 120 218 170 224 C230 232 290 214 340 218 C370 220 390 226 400 228 L400 250 L0 250Z" fill="#171637" />
+      <path d="M24 226 l6 -20 l6 20z M36 228 l7 -26 l7 26z M50 227 l5 -16 l5 16z M352 222 l6 -22 l6 22z M366 224 l5 -15 l5 15z" fill="#0F0F28" />
     </>
   );
 }

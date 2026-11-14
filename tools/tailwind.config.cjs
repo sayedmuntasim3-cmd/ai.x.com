@@ -25,10 +25,8 @@ module.exports = {
         ink: token("ink"),
         "ink-2": token("ink-2"),
         muted: token("muted"),
-        clay: token("clay"),
-        "clay-ink": token("clay-ink"),
-        "clay-btn": token("clay-btn"),
-        "clay-btn-hover": token("clay-btn-hover"),
+        brand: token("brand"),
+        "brand-ink": token("brand-ink"),
       },
       fontFamily: {
         sans: ['"DM Sans"', "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
@@ -38,8 +36,8 @@ module.exports = {
         card: "0 1px 2px rgb(var(--shadow) / 0.05), 0 18px 48px -18px rgb(var(--shadow) / 0.18)",
         pop: "0 1px 2px rgb(var(--shadow) / 0.06), 0 24px 60px -16px rgb(var(--shadow) / 0.28)",
         thumb: "0 1px 2px rgb(var(--shadow) / 0.08), 0 2px 8px -2px rgb(var(--shadow) / 0.10)",
-        cta: "inset 0 1px 0 rgb(255 255 255 / 0.18), 0 10px 24px -10px rgb(184 85 50 / 0.65)",
-        poster: "0 30px 60px -28px rgb(20 20 19 / 0.55)",
+        cta: "inset 0 1px 0 rgb(255 255 255 / 0.22), 0 12px 28px -12px rgb(122 59 238 / 0.55), 0 4px 12px -6px rgb(234 58 140 / 0.35)",
+        poster: "0 30px 60px -28px rgb(var(--shadow) / 0.55)",
       },
       keyframes: {
         rise: { from: { opacity: "0", transform: "translateY(14px)" }, to: { opacity: "1", transform: "none" } },

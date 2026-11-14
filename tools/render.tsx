@@ -15,12 +15,12 @@ const description = escape(String(metadata.description));
 const canonical = escape(String(metadata.alternates?.canonical ?? ""));
 
 // Runs before first paint so a saved light/dark choice never flashes the wrong theme.
-const themeScript = `(function(){try{var t=localStorage.getItem("zupona:theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#262624":"#FAF9F5";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}})();`;
+const themeScript = `(function(){try{var t=localStorage.getItem("zupona:theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var c=t==="dark"?"#0C0C12":"#FAF8F3";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}})();`;
 
 const fonts =
   "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,400..500&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&display=swap";
 
-const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M3 3.2 12 10.2h8l9-7-1.6 13.4L16 28.6 4.6 16.6z" fill="#D97757"/><path d="M3 3.2 12 10.2 8.2 13z M29 3.2 20 10.2 23.8 13z" fill="#B85532"/><path d="M8.6 17.4 16 21.2l7.4-3.8L16 28.6z" fill="#FAF9F5"/><path d="M10.4 14.6l2.6 1.1-2.4.9zM21.6 14.6 19 15.7l2.4.9z" fill="#141413"/></svg>`;
+const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2B63F6"/><stop offset=".42" stop-color="#7A3BEE"/><stop offset=".72" stop-color="#EA3A8C"/><stop offset="1" stop-color="#FF7A1E"/></linearGradient></defs><path d="M7 4l16 17 9-2 9 2L57 4l-3 24 7 7-12 9-17 16-17-16L3 35l7-7z" fill="url(#g)"/><path d="M16 35l11 3.5-1 3-9-3.5zM48 35l-11 3.5 1 3 9-3.5zM27 46h10l-5 6z" fill="#0C0C12"/></svg>`;
 
 const html = `<!doctype html>
 <html lang="en">
@@ -34,8 +34,8 @@ ${canonical ? `<link rel="canonical" href="${canonical}">\n` : ""}<meta property
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${description}">
 ${canonical ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#FAF9F5" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FAF8F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C0C12" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script>${themeScript}</script>
