@@ -19,3 +19,16 @@ test("the frame check refuses faces, paintings, sideways pictures, near-copies a
   assert.match(String(frameVerdict({ ...clean, exposure: { brightness: 10.5, entropy: 0.44 } })), /^quality: too dark and plain/);
   assert.equal(frameVerdict({ ...clean, exposure: { brightness: 74, entropy: 0.89 } }), null);
 });
+
+test("the frame check refuses small walking figures, buildings and man-made things the face detector misses", () => {
+  // The values measured on the pictures that reached the runner films (docs/QURAN_DOCUMENTARY.md).
+  const seen = (/** @type {object} */ x) => frameVerdict({ ...clean, look: { ...clean.look, relevance: 0.9, walkers: 0.1, building: 0, manmade: 0, ...x } });
+  assert.equal(seen({}), null);
+  assert.match(String(seen({ walkers: 0.99 })), /^adab: people seem to be in the picture/);
+  assert.equal(seen({ walkers: 0.8 }), null);
+  assert.match(String(seen({ building: 1 })), /^adab: a building/);
+  assert.match(String(seen({ manmade: 1 })), /^relevance: man-made things/);
+  assert.equal(seen({ manmade: 0.45 }), null);
+  // Results from before this check (no such fields) are judged as before.
+  assert.equal(frameVerdict(clean), null);
+});

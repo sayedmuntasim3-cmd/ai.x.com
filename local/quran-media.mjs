@@ -29,7 +29,7 @@ export function hamming(a, b) {
 }
 
 /** The rules the frame check applies, measured on labelled sets (docs/QURAN_DOCUMENTARY.md). */
-export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7 });
+export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7, walkers: 0.9, building: 0.5, manmade: 0.6 });
 
 /**
  * Reasons from one detect.py result, or null when the frames pass.
@@ -44,6 +44,11 @@ export function frameVerdict(item, usedHashes = []) {
   if (item.look) {
     const art = item.look.painting + item.look.drawing + item.look.rendering;
     if (art >= VISUAL_RULES.notPhotograph) return `visual: looks like a painting, drawing or rendering (${Math.round(art * 100)}%), not a photograph`;
+    // Measured on 33 pictures: hikers 0.92-0.99 (3 of 3; the face and person detectors missed them), clean landscapes at most 0.80;
+    // the Louvre at night 1.00 as a building, every landscape 0.00; plastic tree shelters 1.00, a driftwood post 0.45.
+    if (typeof item.look.walkers === "number" && item.look.walkers >= VISUAL_RULES.walkers) return `adab: people seem to be in the picture (${Math.round(item.look.walkers * 100)}%), even small or far away`;
+    if (typeof item.look.building === "number" && item.look.building >= VISUAL_RULES.building) return `adab: a building, a monument or a city (${Math.round(item.look.building * 100)}%)`;
+    if (typeof item.look.manmade === "number" && item.look.manmade >= VISUAL_RULES.manmade) return `relevance: man-made things in the picture (${Math.round(item.look.manmade * 100)}%)`;
   }
   // Relevance: the searched thing against rooms, cities, people, text, vehicles, animals and objects.
   // Measured: a city at dawn 0.40, a fogged-out "mountain" 0.18, a sea searched as mountains 0.11; seven right pictures 0.78-0.99.

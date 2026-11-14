@@ -39,8 +39,8 @@ Contact: ______________________
 |---|---|---|
 | Nothing depicts Allah, a prophet or messenger, a Companion or an angel | | |
 | Paradise, Hell and the Hereafter appear only as symbols in real earthly nature, never as a scene | | |
-| No faces; people only if the film's adab level allows them, and only from afar | | |
-| No church, temple, idol, statue, painting, icon, music, alcohol or immodest picture | | |
+| No faces; people only if the film's adab level allows them, and only from afar (look for small walking figures: the automatic check caught 3 of 3 in a small test, the face detector none) | | |
+| No church, temple, idol, statue, painting, icon, music, alcohol or immodest picture; no building, monument or city (the automatic check missed a mountain hut) | | |
 | No picture is upside down, sideways, blurred, watermarked or with text on it (the orientation check catches only about half of sideways pictures) | | |
 | No painting, drawing or rendering (the automatic check missed one ink painting in ten) | | |
 | No map, diagram or night-lights composite presented as a landscape | | |

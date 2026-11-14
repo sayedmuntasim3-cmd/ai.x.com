@@ -81,6 +81,10 @@ def detect(images):
 CLIP_MODEL = "laion/CLIP-ViT-B-32-laion2B-s34B-b79K"
 KINDS = ["a photograph", "a painting", "a drawing or an illustration", "a computer rendering or a video game"]
 OTHER = ["the inside of a building or a room", "a city, a street or buildings", "people", "text, a document or a map", "a vehicle or a road", "an animal", "a man-made object"]
+# What adab refuses even when the searched thing is there too (measured in docs/QURAN_DOCUMENTARY.md):
+# small walking figures in a landscape, a building or a city, man-made things left in nature.
+PEOPLE = ["a photo of an empty landscape", "a photo of people walking in a landscape"]
+SCENE = ["a natural landscape with no people and no buildings", "a building, a monument or a city", "man-made objects, plastic or litter in nature"]
 _clip = None
 
 
@@ -107,7 +111,7 @@ def look(images, query):
     from PIL import Image
 
     kind = [0.0] * len(KINDS)
-    turned = upright = rel = 0.0
+    turned = upright = rel = walkers = building = manmade = 0.0
     n = 0
     for path in images:
         try:
@@ -129,10 +133,15 @@ def look(images, query):
         turned += max(sims[1], sims[2])
         if query:
             rel += probs(img, [f"a photograph of {query}"] + OTHER)[0]
+        walkers += probs(img, PEOPLE)[1]
+        scene = probs(img, SCENE)
+        building += scene[1]
+        manmade += scene[2]
     if not n:
         return None
     return {"photograph": round(kind[0] / n, 3), "painting": round(kind[1] / n, 3), "drawing": round(kind[2] / n, 3), "rendering": round(kind[3] / n, 3),
-            "upright": round(upright / n, 3), "turned": round(turned / n, 3), "relevance": round(rel / n, 3) if query else None}
+            "upright": round(upright / n, 3), "turned": round(turned / n, 3), "relevance": round(rel / n, 3) if query else None,
+            "walkers": round(walkers / n, 3), "building": round(building / n, 3), "manmade": round(manmade / n, 3)}
 
 
 def bands(path):

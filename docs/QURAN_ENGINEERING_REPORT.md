@@ -18,13 +18,14 @@ to publish: none has had a qualified reviewer's sign-off. Details and numbers: `
 
 | Problem | How found | Fix | Status now |
 |---|---|---|---|
-| Dark cards in the films (runner Ad-Duha 67 of 141 s; Yusuf 9:16 111 of 177 s) | new pixel audit, timestamps | search ladder, Commons Quality images, no silent card, title over a real picture, dark/plain pictures refused | Ad-Duha 1080p and 4K: 100% coverage PASS; Yusuf 9:16 (before the last fixes): 2 empty stretches FAIL, fixes awaiting the runner |
+| Dark cards in the films (runner Ad-Duha 67 of 141 s; Yusuf 9:16 111 of 177 s) | new pixel audit, timestamps | search ladder, Commons Quality images, no silent card, title over a real picture, dark/plain pictures refused | PASS on the runner (run 43530247405): Ad-Duha 1080p, 4K and Yusuf 9:16 all 100% coverage, no card, no empty or frozen stretch |
 | A short video held on its last frame | frame table | a video must cover its shot (slowed at most to 2/3) | PASS (unit test; local film) |
 | A misheard isti'adha became ayah 16:98 | runner QA | fuzzy isti'adha; cut-off fragments never taken as ayat | PASS (re-located from the runner's transcript) |
 | Pause timing called 4 wrong ends "sure" on a recitation without gaps | new continuous test set | sure only when two methods agree; CTC alignment of the given text; alignment-first when pauses disagree; Arabic shown only where sure | PASS: 0 wrong sure ends; continuous Yusuf 0/39 → 34/39 cuts in the gap |
 | An oil painting with figures reached a film | looking at frames | Commons categories; CLIP painting check (MIT) | PARTIAL: 9 of 10 paintings refused, 0 of 9 photos |
 | A sideways video reached a film | looking at frames | sky-side check | PARTIAL: 5 of 9 turned landscapes caught, 0 of 9 upright refused, the real case caught |
 | Irrelevant pictures (a city, fog, plastic tubes) | looking at frames | CLIP relevance against rooms, cities, people, text, vehicles, objects | PARTIAL: 3 of 3 bad caught, 0 of 7 good refused (small set); plastic tubes not caught |
+| A building (the Louvre), small hikers and plastic tree shelters reached runner films | looking at frames | image-text scores for walking figures, buildings, man-made things; title words | PARTIAL: hikers 3 of 3, buildings 1 of 2, man-made 2 of 3 caught; 0 of 22 clean landscapes refused (33 pictures) |
 | No check of the rendered sound | directive | audio audit: length, sync offset, added silence, R128, true peak, clipping, balance | PASS (finds a cut-in silence at the right second) |
 
 ## 3. Still incomplete
@@ -45,7 +46,7 @@ to publish: none has had a qualified reviewer's sign-off. Details and numbers: `
   must look at every scene (the review sheet says what the checks miss).
 - Reused-content rules: films built on recordings other channels also post may not be monetised; the
   owner's own recitation is the safe base.
-- The CLIP and orientation thresholds were set on small labelled sets (19 and 18 pictures).
+- The CLIP, orientation and people/building thresholds were set on small labelled sets (19, 18 and 33 pictures).
 
 ## 5. Next steps, in order
 

@@ -20,6 +20,8 @@ test("a candidate is refused for its licence, its words, its size, its length or
   assert.match(String(await rejectWhy(result({ id: "p:2", title: "oil painting of an olive tree" }), o)), /^adab: "painting"/);
   assert.match(String(await rejectWhy(result({ id: "p:3", title: "farmer picking olives, man smiling" }), o)), /^adab: shows people/);
   assert.match(String(await rejectWhy(result({ id: "p:4", title: "camels in the desert" }), o)), /level strict/);
+  assert.match(String(await rejectWhy(result({ id: "w:6", title: "Cour Napoléon at night - Louvre" }), o)), /^adab: "Louvre"/);
+  assert.match(String(await rejectWhy(result({ id: "w:7", title: "Hikers below the glacier" }), o)), /^adab: shows people/);
   assert.equal(await rejectWhy(result({ id: "p:4", title: "camels in the desert" }), { ...o, level: "nature" }), null);
   assert.match(String(await rejectWhy(result({ id: "p:5", width: 1280 }), o)), /^quality: 1280 px/);
   assert.match(String(await rejectWhy(result({ id: "p:6", durationSeconds: 4 }), o)), /^quality: video is 4 s, 6.7 s needed/);

@@ -417,6 +417,26 @@ pictures and plan moved to zero. Run on Yusuf 1-40 (joined, public-domain mark) 
 added silence, -13.9 LUFS, true peak -1.6 dBTP, the Arabic of all three ayat shown (font raised to 80 for
 9:16 after looking at it). PASS (automated); a person's review not done.
 
+**Runner films after the fixes (run 43530247405, 14 Nov):** all three films passed their own checks.
+Ad-Duha 1080p and 4K: 6 of 6 pictures, coverage 100%, no card, sound offset 0, -14 LUFS, LRA 7.9 LU,
+true peak -4 dBTP; the recording is the Jawad Farogi one, so 0 of 11 ends are sure and no Arabic is shown
+(by design). Yusuf 1-12 at 9:16 (181.7 s): 16 of 16 shots with a picture (the title too), coverage 100%,
+no empty or frozen stretch, 11 of 12 ends sure (alignment and pauses agree), 15 cuts, none inside the voice,
+sound offset 0, no added silence, -14 LUFS, true peak -1.4 dBTP, no clipping: PASS (automated). The two
+empty stretches of the run before are gone.
+
+**Looking at the frames found three pictures the checks passed:** the Louvre's glass pyramid at night
+(Yusuf 12:11, searched as "night sky"), a Himalayan photo with three small hikers (both films; the face
+and person detectors missed them) and plastic tree shelters (Ad-Duha 93:5, known). FAIL by eye. Fixed:
+the image-text model now also scores walking figures, buildings and man-made things; measured on 33
+pictures (the films' 20 and 10 hiker photos from Commons, labelled by eye): people 3 of 3 caught (0.92-0.99),
+0 of 22 clean landscapes refused (highest 0.80); buildings: the Louvre 1.00, every landscape 0.00, a
+mountain hut missed (1 of 2); man-made: tree shelters and a signpost 1.00, a driftwood post 0.45 kept, a
+frosted signpost missed. Titles naming buildings, a city, the Louvre, hikers, climbers or tourists are also
+refused. Run through detect.py on the real files: the three bad pictures refused, the right ones kept.
+PARTIAL: the sets are small; a person must still look at every scene. The runner films are not yet
+re-made with this check.
+
 **Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);
 the review sheet lists the automated reports to read first and the known gaps of the automatic checks.
 

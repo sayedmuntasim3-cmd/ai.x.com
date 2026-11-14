@@ -61,7 +61,7 @@ const HEREAFTER_UNSEEN = new Set(["the Hereafter", "Paradise", "Hell", "the Day 
 const CARRY_THEMES = new Set(["the Hereafter", "gratitude for His favours"]);
 
 /** Search words that would bring living beings, by level. */
-const PEOPLE = /\b(people|person|man|men|woman|women|child|children|crowd|worshipp?ers?|pilgrims?|family|face|faces|portrait)\b/i;
+const PEOPLE = /\b(people|person|man|men|woman|women|child|children|crowd|hikers?|hiking party|trekkers?|climbers?|tourists?|worshipp?ers?|pilgrims?|family|face|faces|portrait)\b/i;
 const ANIMALS = /\b(bees?|cattle|camels?|birds?|horses?|sheep|goats?|fish|animals?|wildlife|honeycomb)\b/i;
 
 /**
