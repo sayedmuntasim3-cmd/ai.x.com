@@ -1,0 +1,33 @@
+1. Adv Biochem Eng Biotechnol. 2026 Nov 10. doi: 10.1007/10_2026_354. Online
+ahead  of print.
+
+Efficient Bioproduction of Citric Acid in Aspergillus niger.
+
+Zheng X(1)(2)(3)(4), Sun J(5)(6)(7)(8), Zheng P(9)(10)(11)(12).
+
+Author information:
+(1)Tianjin Institute of Industrial Biotechnology, Chinese Academy of Sciences, 
+Tianjin, China. zheng_xm@tib.cas.cn.
+(2)State Key Laboratory of Engineering Biology for Low-Carbon Manufacturing, 
+Tianjin, China. zheng_xm@tib.cas.cn.
+(3)National Center of Technology Innovation for Synthetic Biology, Tianjin, 
+China. zheng_xm@tib.cas.cn.
+(4)University of Chinese Academy of Sciences, Beijing, China. 
+zheng_xm@tib.cas.cn.
+(5)Tianjin Institute of Industrial Biotechnology, Chinese Academy of Sciences, 
+Tianjin, China. sun_jb@tib.cas.cn.
+(6)State Key Laboratory of Engineering Biology for Low-Carbon Manufacturing, 
+Tianjin, China. sun_jb@tib.cas.cn.
+(7)National Center of Technology Innovation for Synthetic Biology, Tianjin, 
+China. sun_jb@tib.cas.cn.
+(8)University of Chinese Academy of Sciences, Beijing, China. sun_jb@tib.cas.cn.
+(9)Tianjin Institute of Industrial Biotechnology, Chinese Academy of Sciences, 
+Tianjin, China. zheng_p@tib.cas.cn.
+(10)State Key Laboratory of Engineering Biology for Low-Carbon Manufacturing, 
+Tianjin, China. zheng_p@tib.cas.cn.
+(11)National Center of Technology Innovation for Synthetic Biology, Tianjin, 
+China. zheng_p@tib.cas.cn.
+(12)University of Chinese Academy of Sciences, Beijing, China. 
+zheng_p@tib.cas.cn.
+
+Citr

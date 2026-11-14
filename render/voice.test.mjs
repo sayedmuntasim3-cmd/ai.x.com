@@ -1,0 +1,119 @@
+import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { recordVoice, voiceLines } from "./voice.mjs";
+
+const md = [
+  `**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: The mill opens at dawn. | W 5/5 | ANCHOR: x | SHOTS: (1) R3 mill | LOOK: L`,
+  `**SC0002** | 0:00:04-0:00:06 | C1 | b | E | — | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R1 black | LOOK: L`,
+  `**SC0003** | 0:00:06-0:00:10 | C1 | b | E | C02 | NARR: It cost about [C12 low] dollars. | W 5/5 | ANCHOR: x | SHOTS: (1) R3 coins | LOOK: L`,
+  `**SC0004** | 0:00:10-0:00:14 | C1 | b | E | C03 | NARR: By noon the wheel had stopped. | W 6/6 | ANCHOR: x | SHOTS: (1) R3 wheel | LOOK: L`,
+].join("\n");
+
+test("narrated scenes are recorded with their neighbours as context; placeholders and existing takes are left alone", async () => {
+  const { lines, skipped } = voiceLines([{ markdown: md }]);
+  assert.deepEqual(lines.map((l) => l.scene), ["SC0001", "SC0004"]);
+  assert.deepEqual(skipped, [{ scene: "SC0003", reason: "unresolved number [C12 low]" }]);
+  assert.equal(lines[1].previous, "It cost about [C12 low] dollars.", "context is the film as written, even when a scene is skipped");
+
+  const dir = mkdtempSync(join(tmpdir(), "zupona-voice-"));
+  try {
+    writeFileSync(join(dir, "SC0004.wav"), "the owner's own take");
+    /** @type {any[]} */
+    const calls = [];
+    let first = true;
+    const fake = /** @type {typeof fetch} */ (async (url, init) => {
+      calls.push({ url: String(url), headers: /** @type {any} */ (init?.headers), body: JSON.parse(String(init?.body)) });
+      if (first) { first = false; return new Response("busy", { status: 429, headers: { "retry-after": "1" } }); }
+      return Response.json({ audio_base64: Buffer.from("ID3 fake mp3").toString("base64"), alignment: { characters: ["T"], character_start_times_seconds: [0], character_end_times_seconds: [0.1] } });
+    });
+    /** @type {number[]} */
+    const waits = [];
+    const r = await recordVoice({ apiKey: "KEY", voiceId: "voice 1", outDir: dir, lines, fetch: fake, sleep: async (ms) => { waits.push(ms); } });
+    assert.deepEqual({ recorded: r.recorded, kept: r.kept, failed: r.failed.length }, { recorded: 1, kept: 1, failed: 0 });
+    assert.deepEqual(waits, [1000], "a 429 waits for Retry-After and tries again");
+    assert.equal(calls.length, 2);
+    assert.ok(calls[1].url.startsWith("https://api.elevenlabs.io/v1/text-to-speech/voice%201/with-timestamps"));
+    assert.equal(calls[1].headers["xi-api-key"], "KEY");
+    assert.deepEqual([calls[1].body.model_id, calls[1].body.text, calls[1].body.next_text], ["eleven_multilingual_v2", "The mill opens at dawn.", "It cost about [C12 low] dollars."]);
+    assert.equal(readFileSync(join(dir, "SC0001.mp3"), "utf8"), "ID3 fake mp3");
+    assert.ok(existsSync(join(dir, "SC0001.alignment.json")));
+    assert.equal(readFileSync(join(dir, "SC0004.wav"), "utf8"), "the owner's own take", "a take that exists is never overwritten");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stories read with ElevenLabs v3: each scene's DELIVERY tags lead the line, never read by v2; a model without timings still records", async () => {
+  const { deliveryTags, V3 } = await import("./voice.mjs");
+  assert.equal(deliveryTags("[softly] [serious]"), "[softly] [serious]");
+  assert.equal(deliveryTags("quiet, slow"), "[quiet] [slow]");
+  assert.equal(deliveryTags("[a] [b] [c] [d]"), "", "too short to be a direction");
+  assert.equal(deliveryTags("[warm] [hopeful] [pause] [sighs]"), "[warm] [hopeful] [pause]", "at most three");
+  assert.equal(deliveryTags(undefined), "");
+
+  const md = `**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: He kept the razor. | W 4/4 | ANCHOR: x | SHOTS: (1) R3 razor | DELIVERY: [softly] [serious] | LOOK: L`;
+  const { lines } = voiceLines([{ markdown: md }]);
+  assert.equal(lines[0].delivery, "[softly] [serious]");
+  const dir = mkdtempSync(join(tmpdir(), "zupona-v3-"));
+  try {
+    /** @type {any[]} */
+    const calls = [];
+    const fake = /** @type {typeof fetch} */ (async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      if (String(url).includes("/with-timestamps")) return new Response("timestamps not supported for this model", { status: 422 });
+      return new Response("ID3 v3 audio");
+    });
+    const r = await recordVoice({ apiKey: "K", voiceId: "v", modelId: V3, outDir: dir, lines, fetch: fake, sleep: async () => {} });
+    assert.deepEqual([r.recorded, r.failed.length], [1, 0]);
+    assert.equal(calls[0].body.model_id, "eleven_v3");
+    assert.equal(calls[0].body.text, "[softly] [serious] He kept the razor.");
+    assert.equal(calls[0].body.previous_text, undefined, "v3 has no request stitching");
+    assert.ok(!calls[1].url.includes("with-timestamps"), "falls back to the plain endpoint");
+    assert.equal(readFileSync(join(dir, "SC0001.mp3"), "utf8"), "ID3 v3 audio");
+    assert.ok(!existsSync(join(dir, "SC0001.alignment.json")), "no timings: captions are estimated");
+
+    const v2calls = /** @type {any[]} */ ([]);
+    const dir2 = mkdtempSync(join(tmpdir(), "zupona-v2-"));
+    await recordVoice({ apiKey: "K", voiceId: "v", outDir: dir2, lines, fetch: /** @type {typeof fetch} */ (async (_u, init) => { v2calls.push(JSON.parse(String(init?.body))); return Response.json({ audio_base64: "", alignment: null }); }), sleep: async () => {} });
+    assert.equal(v2calls[0].text, "He kept the razor.", "v2 never sees the tags");
+    rmSync(dir2, { recursive: true, force: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("hard names are read as S4's lexicon spells them, and the captions still show them as written", async () => {
+  const { parseLexicon, applyLexicon } = await import("./voice.mjs");
+  const { wordsFromAlignment } = await import("../engine/src/timeline.mjs");
+  const s4 = [
+    "### 8.6 Pronunciation lexicon (American English)", "", "| Term (on screen) | Narrator says | Note |", "|---|---|---|",
+    "| Ramesh Babu | ruh-MAYSH BAH-boo | Even stress |", "| Bowring Institute | BOW-ring (BOW as in \"now\") | **Verify** |",
+    "| crore | KROR (rhymes with \"core\") | |", "| The Weekend Leader | As written | |", "| PUC | \"pre-university\" | Never letters |", "", "### 8.7 Continuity",
+  ].join("\n");
+  const lexicon = parseLexicon(s4);
+  assert.deepEqual(lexicon, [{ term: "Ramesh Babu", say: "ruh-MAYSH BAH-boo" }, { term: "crore", say: "KROR" }, { term: "PUC", say: "pre-university" }], "a respelling that would drop a word, and 'as written', are left out");
+  assert.equal(applyLexicon("Scrore and Ramesh Babu's crore.", lexicon).text, "Scrore and ruh-MAYSH BAH-boo's KROR.", "whole words only");
+
+  const dir = mkdtempSync(join(tmpdir(), "zupona-lex-"));
+  try {
+    /** @type {string[]} */
+    const sent = [];
+    const fake = /** @type {typeof fetch} */ (async (_url, init) => {
+      const text = JSON.parse(String(init?.body)).text;
+      sent.push(text);
+      const chars = [...text];
+      return Response.json({ audio_base64: Buffer.from("ID3").toString("base64"), alignment: { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.05), character_end_times_seconds: chars.map((_, i) => (i + 1) * 0.05) } });
+    });
+    const lines = [{ scene: "SC0001", text: "Ramesh Babu earned one crore.", previous: "", next: "" }];
+    await recordVoice({ apiKey: "K", voiceId: "v", outDir: dir, lines, lexicon, fetch: fake });
+    assert.deepEqual(sent, ["ruh-MAYSH BAH-boo earned one KROR."]);
+    const words = wordsFromAlignment(JSON.parse(readFileSync(join(dir, "SC0001.alignment.json"), "utf8")));
+    assert.deepEqual(words.map((w) => w.text), ["Ramesh", "Babu", "earned", "one", "crore."]);
+    assert.ok(words[1].end <= words[2].start + 1e-9 && Math.abs(words[1].end - 0.85) < 0.06, "the name keeps the time the voice took to say it");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

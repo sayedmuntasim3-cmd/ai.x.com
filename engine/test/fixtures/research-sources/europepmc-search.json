@@ -1,0 +1,36 @@
+{
+ "hitCount": 61249,
+ "resultList": {
+  "result": [
+   {
+    "id": "PPR1347229",
+    "source": "PPR",
+    "doi": "10.64898/2026.10.20.760532",
+    "title": "Sequencing-Free Protospacer-Adjacent Motif Discovery for Uncharacterized CRISPR-Cas9 Orthologs via Active Learning",
+    "authorString": "Kirillov B, Vasileva A, Fedorov O, Kuzmina Y, Kolesnik M, Trofimova A, Demkina A, Ronchikova V, Drozhzhina M, Abramova M, Gorkovskaia A, Malysheva P, Vilinski-Mazur K, Khodorkovskii M, Panov M, Severinov KV.",
+    "pubYear": "2026",
+    "firstPublicationDate": "2026-10-21",
+    "abstractText": "Cas9 nucleases, essential components of gene editing, recognize target DNA through a Protospacer-Adjacent Motif (PAM) and cleave only if recognition succeeds. Metagenomic searches and generative protein models currently produce novel CRISPR-Cas9 orthologs at scale, but their adoption in practice is limited by a laborious and data-intensive PAM characterization step which requires exhaustive  in vitro and/or  in vivo screens followed by sequencing. We present a workflow that reduces PAM discovery to a handful of iterative cleavage assays, guided by an active learning algorithm prioritizing the most informative candidate sequences. Benchmarking on public datasets (7 orthologs) shows that our m",
+    "isOpenAccess": "N"
+   },
+   {
+    "id": "42808239",
+    "source": "MED",
+    "pmid": "42808239",
+    "doi": "10.1080/15257770.2026.2740083",
+    "title": "\"The pharmacological potential of CRISPR-Cas9: Revolutionizing gene therapy and drug development\".",
+    "authorString": "Acharyya S, Behera B, Pradhan R, Debata J, Patra PK, Giri S, Kumar HK.",
+    "pubYear": "2026",
+    "firstPublicationDate": "2026-09-29",
+    "journalInfo": {
+     "journal": {
+      "title": "Nucleosides, nucleotides & nucleic acids"
+     }
+    },
+    "abstractText": "CRISPR-Cas9 has entered the mainstream of genetic research and therapeutic development, offering a level of programmable and targeted gene editing that has substantially expanded the possibilities of genetic manipulation. This review focuses on the discovery to development of CRISPR-Cas9 and its recent practice in pharmacological and biotechnology field. We discuss further advancements in CRISPR technology such as high-fidelity CRISPR and new systems Cas12 and Cas13 which increases efficiency of editing and opens more opportunities. CRISPR technology has been further advanced when combined with Artificial Intelligence and Machine Learning; guide RNA is now optimized while the off-target effe",
+    "isOpenAccess": "N",
+    "language": "eng"
+   }
+  ]
+ }
+}

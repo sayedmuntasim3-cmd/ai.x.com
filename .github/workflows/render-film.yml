@@ -1,0 +1,166 @@
+name: Render a film
+
+# Render a finished film run to MP4 on GitHub's machines, started by hand
+# (Actions tab > Render a film > Run workflow; this also works from the
+# GitHub mobile app) or by the studio when GitHub is connected.
+# The film, its Shorts and thumbnails are published as a release of this
+# repository (private when the repository is private; release files do not
+# count against the 500 MB Actions storage of the free plan). The small files
+# (thumbnails, captions, report) are also attached to the run for 30 days.
+#
+# Optional repository secrets (Settings > Secrets and variables > Actions):
+#   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID  narration; without them the film renders without a voice
+#   FREESOUND_API_KEY                        sound effects fetched automatically (CC0 only)
+#   FAL_KEY                                  AI scenes for invented stories (one consistent cast); variable AI_BUDGET_USD caps the spend (default 15)
+# Optional own voice: commit your recordings as voice/<film id>/SC0001.wav ... (script: /api/films/<id>/script)
+# Music: composed per cue with ElevenLabs Music when ELEVENLABS_API_KEY is set (repository variable MUSIC_AUTO=off
+#   turns it off); tracks committed as music/<film id>/M01.mp3 ... always win.
+# Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
+# Optional own pictures: pictures/<film id>/SC0012-1.jpg (.png, .webp, .mp4 ...) replaces that shot (shot ids are on the
+#   film page); the licence report says "provided by the owner": the choice and its rights are yours.
+
+on:
+  workflow_dispatch:
+    inputs:
+      film_id:
+        description: "Film ID (from the studio; the long ID in the film page address)"
+        required: true
+      site:
+        description: "Site address"
+        required: true
+        default: "https://ai.zupona.com"
+      resolution:
+        description: "Picture size"
+        type: choice
+        options: ["1920x1080", "1280x720"]
+        default: "1920x1080"
+
+permissions:
+  contents: write  # to publish the release with the film
+
+concurrency:
+  group: render-${{ github.event.inputs.film_id }}
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      FILM_ID: ${{ inputs.film_id }}
+      SITE: ${{ inputs.site }}
+      RESOLUTION: ${{ inputs.resolution }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the inputs
+        run: |
+          [[ "$FILM_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::The film ID must be the 36-character ID from the studio."; exit 1; }
+          [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::The site must look like https://ai.zupona.com"; exit 1; }
+          [[ "$RESOLUTION" =~ ^[0-9]{3,4}x[0-9]{3,4}$ ]] || { echo "::error::Bad resolution."; exit 1; }
+      - name: Release gate (Bossism) - nothing is rendered or spent for a film that failed its checks
+        run: |
+          node render/release-gate.mjs --api "$SITE" --id "$FILM_ID" || { echo "::error::This film is not cleared for release. Fix what its review lists, or approve the release with a reason from the studio."; exit 1; }
+      - name: Reuse the previous render of this film (only changed scenes are redone)
+        uses: actions/cache@v4
+        with:
+          path: |
+            .render
+            ai
+          key: render-${{ inputs.film_id }}-${{ inputs.resolution }}-${{ github.run_id }}
+          restore-keys: |
+            render-${{ inputs.film_id }}-${{ inputs.resolution }}-
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null && ffmpeg -version | head -1
+      - name: Narration (your own recordings first, ElevenLabs for the rest)
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+        run: |
+          mkdir -p narration
+          if [ -d "voice/$FILM_ID" ]; then cp "voice/$FILM_ID"/SC* narration/ 2>/dev/null || true; echo "Own recordings: $(ls narration | wc -l)"; fi
+          if [ -n "$ELEVENLABS_API_KEY" ] && [ -n "$ELEVENLABS_VOICE_ID" ]; then
+            node render/voice.mjs --api "$SITE" --id "$FILM_ID" --voice-id "$ELEVENLABS_VOICE_ID" --out narration/
+          else
+            echo "::warning::No ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID secrets: only your own recordings are used."
+          fi
+      - name: Fetch the sound effects (Freesound, CC0 only)
+        env:
+          FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+        run: |
+          mkdir -p "sfx/$FILM_ID"
+          if [ -n "$FREESOUND_API_KEY" ]; then
+            node render/sound-kit.mjs --api "$SITE" --id "$FILM_ID" --out "sfx/$FILM_ID/" || echo "::warning::Sound effects could not be fetched; the film renders without the missing ones."
+          else
+            echo "No FREESOUND_API_KEY secret: only sound effects committed under sfx/$FILM_ID/ are used."
+          fi
+      - name: Compose the score (ElevenLabs Music, for cues without a track)
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          MUSIC_AUTO: ${{ vars.MUSIC_AUTO }}
+        run: |
+          mkdir -p "music/$FILM_ID"
+          if [ -n "$ELEVENLABS_API_KEY" ] && [ "$MUSIC_AUTO" != "off" ]; then
+            node render/music-kit.mjs --api "$SITE" --id "$FILM_ID" --out "music/$FILM_ID/" || echo "::warning::Some cues could not be composed; they play without music."
+          else
+            echo "Music: only tracks committed under music/$FILM_ID/ are used."
+          fi
+      - name: AI scenes for invented stories (fal.ai, one consistent cast)
+        env:
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          AI_BUDGET_USD: ${{ vars.AI_BUDGET_USD }}
+          AI_IMAGE_MODEL: ${{ vars.AI_IMAGE_MODEL }}
+          AI_EDIT_MODEL: ${{ vars.AI_EDIT_MODEL }}
+          AI_VIDEO_MODEL: ${{ vars.AI_VIDEO_MODEL }}
+        run: |
+          mkdir -p "ai/$FILM_ID"
+          if [ -n "$FAL_KEY" ]; then
+            node render/ai-scenes.mjs --api "$SITE" --id "$FILM_ID" --out "ai/$FILM_ID/" || echo "::warning::Some AI scenes could not be made; those shots keep their cards."
+          else
+            echo "No FAL_KEY secret: no AI scenes (stories show stock and cards)."
+          fi
+      - name: Render
+        run: |
+          node render/render-film.mjs --api "$SITE" --id "$FILM_ID" --voice narration/ --music "music/$FILM_ID" --sfx "sfx/$FILM_ID" --ai "ai/$FILM_ID" --pictures "pictures/$FILM_ID" \
+            --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out "out/$FILM_ID.mp4"
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f "out/$FILM_ID.report.json" ]; then
+            node -e 'const r=require(process.argv[1]);const s=r.stats;console.log(`## ${r.file}\n\n${Math.round(r.durationSeconds/60)} min, ${r.width}×${r.height}. ${s.clips} clips, ${s.cards} cards, ${r.voicedScenes}/${r.narratedScenes} scenes voiced, ${r.musicCues.played}/${r.musicCues.scripted} music cues, ${r.licences.length} licensed clips.\n\n${r.warnings.length} warnings (see the report in the artifact).`)' "$PWD/out/$FILM_ID.report.json" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Check the finished film (Bossism) - the master itself is measured before anything is published
+        run: |
+          node render/release-gate.mjs --report "out/$FILM_ID.report.json" --file "out/$FILM_ID.mp4" || { echo "::error::The rendered film failed its final check and was not published. See out/$FILM_ID.master-gate.json in the run's files."; exit 1; }
+      - name: Publish the film as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=()
+          [ -f "sfx/$FILM_ID/sound-kit.json" ] && cp "sfx/$FILM_ID/sound-kit.json" "out/$FILM_ID.sound-kit.json"
+          [ -f "music/$FILM_ID/music-kit.json" ] && cp "music/$FILM_ID/music-kit.json" "out/$FILM_ID.music-kit.json"
+          [ -f "ai/$FILM_ID/ai-scenes.json" ] && cp "ai/$FILM_ID/ai-scenes.json" "out/$FILM_ID.ai-scenes.json"
+          for f in out/*.mp4 out/*.jpg out/*.srt out/*.json; do
+            if [ "$(stat -c %s "$f")" -ge 2147000000 ]; then echo "::warning::$f is over 2 GB and was not published; render at 1280x720."; else files+=("$f"); fi
+          done
+          [ ${#files[@]} -gt 0 ] || { echo "::error::Nothing was rendered."; exit 1; }
+          tag="film-${FILM_ID:0:8}-${GITHUB_RUN_NUMBER}"
+          printf 'Film %s, rendered from %s.\n\nThe .mp4 is the film; SH-* are the Shorts (9:16), FB-* the Facebook cut (4:5), TH-* the thumbnails for YouTube Test & Compare, and the .report.json lists every clip with its licence page.\n' "$FILM_ID" "$SITE" > notes.md
+          if [ -f "ai/$FILM_ID/ai-scenes.json" ] && node -e 'process.exit(Object.keys(require(process.argv[1]).shots||{}).length?0:1)' "$PWD/ai/$FILM_ID/ai-scenes.json"; then
+            printf '\n**This film contains realistic AI scenes.** When uploading, set "Altered or synthetic content" to Yes in YouTube Studio. Nothing is written on the video.\n' >> notes.md
+          fi
+          gh release create "$tag" "${files[@]}" --prerelease --title "Film $FILM_ID" --notes-file notes.md --target "$GITHUB_SHA"
+          echo "Release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: film-${{ inputs.film_id }}
+          path: |
+            out/*.jpg
+            out/*.srt
+            out/*.json
+          retention-days: 30
+          if-no-files-found: warn

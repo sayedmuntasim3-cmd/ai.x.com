@@ -1,0 +1,317 @@
+{
+ "topic": "Ramesh Babu, the Bengaluru barber who built Ramesh Tours and Travels (Rolls-Royce fleet owner): fact base for a 45-minute documentary. METHOD NOTE: WebFetch could not open any page in this session (every domain, including thebetterindia.com, yourstory.com, onmanorama.com and en.wikipedia.org, returned ENOTFOUND), and Bash egress was refused by the proxy. All evidence below comes from WebSearch result excerpts, not from reading full articles. The 200-search budget ran out before the research was finished. Every quote below must be checked against the original page before broadcast.",
+ "keyFindings": [
+  {
+   "finding": "Identity: Ramesh Babu, also written 'G. Ramesh Babu'. Company-registry aggregators list a 'Ramesh Babu Gopal' (DIN 01923190) as Managing Director of Ramesh Tours and Travels Pvt Ltd and as a director of Motoriders Bikes and Cars Rentals Pvt Ltd (incorporated 2016) and Elfonze Technologies Pvt Ltd (incorporated 2021). The registry record matches him by name only; it was not tied to him explicitly.",
+   "evidence": "Tofler search excerpt: Ramesh Babu Gopal, DIN 01923190, director in 3 companies, Managing Director of Ramesh Tours and Travels Private Limited. Channeliam (28 Jan 2022) calls him 'G. Ramesh Babu'. The patronymic Gopal matches the father's reported name, P. Gopal.",
+   "sourceUrls": [
+    "https://tofler.in/ramesh-babu-gopal/director/01923190",
+    "https://www.tofler.in/ramesh-babu-gopal/director/01923190",
+    "https://en.channeliam.com/2022/01/28/the-millionaire-barber/"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Birth year and age: no source gives a birth date. Sources imply different birth years (CONFLICT). By YourStory (Apr 2014), father died 1979 when he was 7, so born about 1971-72. By Deccan Chronicle (13 Feb 2016), aged 45, so born about 1970-71. By Khaleej Times (2018), a '48-year-old', so born about 1969-70. Exact birth year: unknown.",
+   "evidence": "YourStory first-person excerpt: 'He passed away in 1979, when I was just seven years old.' Deccan Chronicle 13 Feb 2016 describes him as 45. Khaleej Times calls him 'the 48-year-old former barber'. The Logical Indian instead dates the father's death to 1989, which conflicts with the 1979 date.",
+   "sourceUrls": [
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.deccanchronicle.com/nation/current-affairs/130216/from-barber-to-billionaire.html",
+    "https://www.khaleejtimes.com/uae/meet-the-indian-hairdresser-who-owns-500-cars",
+    "https://thelogicalindian.com/rags-to-riches-a-billionaire-barber-who-travels-in-rolls-royce/"
+   ],
+   "confidence": "conflicting"
+  },
+  {
+   "finding": "Father: P. Gopal, a barber in Bangalore (Bengaluru). Year of death: 1979 in most sources (YourStory first-person, India TV/Hindustan Times-based reports), 1989 in The Logical Indian (CONFLICT). Ramesh's age then: 7 (almost all sources). One blog says he was in 'second standard' doing mid-term exams. Cause of death: unknown. Only low-quality motivational blogs say 'heart attack'; this is unverified.",
+   "evidence": "Excerpts: 'He was only 7 years old when his father, P Gopal, a barber in Bengaluru, died' (1979). Awesome India: 'his father, P. Gopal was a barber and had a shop on Bridged road'. ciim.in: 'someone called him that his father has passed away he might a massive heart attack' (garbled, secondhand).",
+   "sourceUrls": [
+    "https://www.awesomeindia.in/inspiring-story-of-ramesh-babu-the-billionaire-barber/",
+    "https://www.indiatvnews.com/news/india/bangalore-barber-owns-rolls-royce-ghost-other-cars-12758.html",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.ciim.in/ramesh-babu-barber-owns-rolls-royce-motivation-story/",
+    "https://thelogicalindian.com/rags-to-riches-a-billionaire-barber-who-travels-in-rolls-royce/"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Mother and family income: after the father's death his mother worked as a domestic help or maid; one source says cook (CONFLICT on job type). The company's own blog quotes him saying she earned about Rs 40-50 a month. The household reportedly included his grandmother and siblings, and the family ate one meal a day. Mother's name: unknown. Number and names of siblings: unknown (one blog says 'three children').",
+   "evidence": "rtt.co.in blog (company site), excerpt: 'My mother took a job as a maid and earned perhaps ₹40-50 per month that was used for everyth[ing]' (truncated). The same blog mentions his mother, grandmother and siblings. Onmanorama (30 Jul 2018): family 'had to be content with one meal a day'. YourStory: mother 'started working as a maid servant'. sptulsian.com: mother 'worked as a cook'.",
+   "sourceUrls": [
+    "https://rtt.co.in/blog/The-Billionaire-Barber",
+    "https://www.onmanorama.com/news/business/2018/07/30/hairdresser-who-owns-500-cars.html",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.sptulsian.com/f/ci/story-of-a-barber",
+    "https://news24online.com/photos/india/who-is-ramesh-babu-his-mother-worked-as-domestic-helper-he-started-as-barber-now-owns-over-400-luxury-cars-he-is-from-893992"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Family barbershop: the father's shop was on Brigade Road, Bengaluru. Some outlets write 'Bridge Road' or 'Bridged road', probably a typo. One account places it in St Patrick's Complex. After the father died, an uncle ran it and paid the family Rs 5 a day (YourStory and The Better India). The arrangement is described three ways (CONFLICT): (a) the uncle ran it and gave Rs 5 a day; (b) the mother leased or rented the shop out for Rs 5 a day; (c) sptulsian.com says it was rented for Rs 5 a MONTH. The uncle's name: unknown.",
+   "evidence": "Search excerpt quoting him: 'He would give us five rupees a day from that.' Other excerpts: 'his uncle took over the business, but gave the family only Rs 5 a day'; 'his mother leased the shop for Rs 5 a day'; sptulsian: 'His mother rented out the shop for Rs.5/month'.",
+   "sourceUrls": [
+    "https://thebetterindia.com/90491/ramesh-babu-billionaire-barber/",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.indiatvnews.com/business/india/meet-ramesh-babu-the-billionaire-barber-who-travels-in-rolls-ro-3866.html",
+    "https://www.sptulsian.com/f/ci/story-of-a-barber"
+   ],
+   "confidence": "conflicting"
+  },
+  {
+   "finding": "Schooling and childhood work: he finished 10th standard, then joined evening PUC (pre-university) classes, working at the salon in the mornings and studying in the evenings. Later he earned a diploma in electronics (ITI per some sources). One source says he failed the 12th exam (CONFLICT on whether he completed PUC). From about age 13 he delivered newspapers and milk. In class V he was refused a Pilot pen, an episode he says fuelled his ambition.",
+   "evidence": "Excerpts attributed to him: 'This way I somehow managed to finish my tenth standard and joined evening PUC.' / 'In the mornings, I would be at the saloon and evenings at college.' Quora/ciim: 'Fail in 12th Exam. Diploma in Electronics from ITI.' The Weekend Leader (P C Vinoj Kumar) tells the Pilot pen story. DNA, News24 and Zee News mention the newspaper and milk delivery work from age 13.",
+   "sourceUrls": [
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.ciim.in/ramesh-babu-barber-owns-rolls-royce-motivation-story/",
+    "https://www.quora.com/What-are-some-of-the-facts-about-the-billionaire-barber-Ramesh-Babu",
+    "https://www.theweekendleader.com/Success/1540/cutting-thru-penury.html",
+    "https://www.dnaindia.com/business/report-meet-ramesh-babu-billionaire-barber-owns-400-luxury-cars-sold-newspapers-slept-hungry-bengaluru-rolly-royce-3036725"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Taking over the salon: the year varies by source (CONFLICT). 1989 per Sugermint, Channeliam and Supercar Blondie; 1991 per Youth Inc and The Logical Indian; 'sometime in the nineties, when I was in my first PU' per YourStory first-person. It is said to have happened after the uncle stopped paying, or argued with his mother. The salon's name is 'Inner Space'. Whether it had another name before is unknown. Channeliam says he studied haircutting and hairstyling in Singapore in 2004; other excerpts name Toni & Guy. This is unverified.",
+   "evidence": "Excerpts: 'In 1989, Ramesh Babu decided to run his fathers' Barber Shop himself'; 'insisted on taking over the barber-shop in 1991'; 'The barbershop is known as the Inner Space'; 'went to Singapore to learn hair cut & hairstyling and did a course with Toni & Guy'.",
+   "sourceUrls": [
+    "https://sugermint.com/ramesh-babu-inspirational-story-of-a-barber-who-owns-a-rolls-royce/",
+    "https://en.channeliam.com/2022/01/28/the-millionaire-barber/",
+    "https://youthincmag.com/rolls-royce-hair-cut-billionaire-barber",
+    "https://thelogicalindian.com/rags-to-riches-a-billionaire-barber-who-travels-in-rolls-royce/",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu"
+   ],
+   "confidence": "conflicting"
+  },
+  {
+   "finding": "First vehicle: a Maruti Omni van. Year: 1993 (YourStory body text, rtt.co.in, DNA), 1994 (YourStory summary line, Cartoq, slide decks) or 1995 (one source) (CONFLICT). YourStory calls it used or second-hand. Financing: his savings plus a loan, with family property or the family home mortgaged. Some say an uncle helped (DNA). A YourStory excerpt mentions a figure of 6,800 rupees, but it is unclear whether that was the interest or the instalment. A claim that the loan came from the Karnataka State Finance Corporation is unverified. How the rental began: he could not meet the instalments, and Nandini, the woman whose house his mother worked at, suggested renting the van out. She got him his first client, Intel, where she worked. CONFLICT: Deccan Chronicle (27 May 2015) says the taxi business started in 2004 with the Omni.",
+   "evidence": "YourStory: 'Later in 1993, I bought a used Maruti van' and elsewhere 'bought a Maruti Van with his meagre savings in 1994'. Onmanorama 2018: 'when he was struggling to pay back the loan, Nandini, at whose house his mother was working, suggested car rental'. Another excerpt: 'he rented out his car to Intel, where Ms. Nandini worked'. Excerpt: 'his first client was Intel, which had a small office in Bangalore then'.",
+   "sourceUrls": [
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.onmanorama.com/news/business/2018/07/30/hairdresser-who-owns-500-cars.html",
+    "https://www.dnaindia.com/business/report-meet-ramesh-babu-billionaire-barber-owns-400-luxury-cars-sold-newspapers-slept-hungry-bengaluru-rolly-royce-3036725",
+    "https://www.rushlane.com/indian-barber-luxury-cars-12235294.html",
+    "https://www.deccanchronicle.com/150527/lifestyle-offbeat/article/billionaire-barber-ramesh-babu",
+    "https://zeenews.india.com/companies/from-humble-beginnings-to-fleet-of-400-cars-the-inspiring-journey-of-ramesh-babu-the-billionaire-barber-2711302.html"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Company founding: Ramesh Tours and Travels Private Limited, CIN U63040KA2004PTC033737, was incorporated on 12 April 2004 with the Registrar of Companies, Bangalore. Its registered office is on Campbell Road, Bangalore, and its status is listed as Active. The rental business ran informally from 1993/94 before incorporation. The garage is reported at Ejipura (Onmanorama 2018). Employee counts vary: about 120 (The Weekend Leader, undated) and about 300 (Zee Business, undated). Some profiles say it also operates in Chennai and Delhi.",
+   "evidence": "companydetails.in, ZaubaCorp and Tofler excerpts: 'registered on 12-APR-2004 at the Ministry of Corporate Affairs', email accounts@rtt.co.in. The Weekend Leader: 'around 120 employees on its rolls'. Zee Business: 'employs about 300 people'.",
+   "sourceUrls": [
+    "https://www.companydetails.in/company/ramesh-tours-and-travels-private-limited",
+    "https://www.zaubacorp.com/company/RAMESH-TOURS-AND-TRAVELS-PRIVATE-LIMITED/U63040KA2004PTC033737",
+    "https://www.tofler.in/ramesh-tours-and-travels-private-limited/company/U63040KA2004PTC033737",
+    "https://www.theweekendleader.com/Success/1540/cutting-thru-penury.html",
+    "https://www.zeebiz.com/india/news-dare-to-dream-success-story-meet-ramesh-babu-the-barber-who-owns-fleet-of-600-luxury-cars-76539"
+   ],
+   "confidence": "confirmed"
+  },
+  {
+   "finding": "Move into luxury cars: in 2004. By then he had about seven regular cars, according to YourStory, and competition in ordinary car rental was intense. He bought a new luxury car to fill unmet demand; one source ties the timing to 'the government opened up the tourism sector'. First luxury car: a Mercedes-Benz E-Class (2004). One excerpt says it 'cost him Rs 38 lakh' and another that 'Mercedes India made him a proposal'. It was paid for with savings plus a bank loan. The price and the Mercedes India approach are unverified.",
+   "evidence": "YourStory excerpt: by 2004 'a fledgling car rental business with seven regular cars'. Analytics Insight: 'In 2004, he bought his first luxury car, a Mercedes-Benz E-Class'. Slide-deck summary: 'the competition at this level was intense'. The Rs 38 lakh figure came up in a search excerpt drawn from Better India, Cartoq and rtt.co.in pages; the exact page could not be identified.",
+   "sourceUrls": [
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.analyticsinsight.net/photo/ramesh-babus-journey-from-barber-to-luxury-fleet-owner",
+    "https://www.slideshare.net/slideshow/ramesh-babu-billionaire-barber/114683977",
+    "https://thebetterindia.com/90491/ramesh-babu-billionaire-barber/",
+    "https://rtt.co.in/blog/Ramesh-Babu-Barber's-Awe-inspiring-journey"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Rolls-Royce: a Ghost (Series I; one site wrongly calls it a 'Silver Ghost'). Purchase year: 2011 in most sources, Cartoq says February 2011, and Trade World News says 2010 (CONFLICT). Reported price (CONFLICT): Rs 3 crore (Cartoq, DNA), Rs 3.1 crore (India TV), Rs 3.3 crore (The Weekend Leader), about Rs 4 crore (one excerpt), Rs 1.2 crore or about $160,000 (Trade World News, unreliable). Financing: a bank loan, reportedly Rs 7 lakh a month (secondary). Tax: YourStory says over Rs 3 crore in road tax; a Deccan Chronicle reprint says Rs 3.78 crore. He mortgaged his wife's jewellery (The Better India) or sold it (Deccan Chronicle) (CONFLICT). Rental rate (CONFLICT): Rs 50,000/day (Cartoq), Rs 75,000/day (India TV), Rs 6,000/hour (one report).",
+   "evidence": "Excerpts: 'bought this sedan back in 2011 for Rs 3 crore'; 'February of 2011, when the Ghost Series 1 was priced at Rs 3 crore'; 'Rs 3.3 crore Rolls Royce' (The Weekend Leader); 'bank loan for which he is paying Rs 7 lakh every month'; YourStory: 'had to pay over three crores in road taxes alone... borrowed from so many people and put up property documents'; Deccan Chronicle reprint: 'road tax of Rs 3.78 crores... sold his wife's jewellery and other properties, but not the cars'.",
+   "sourceUrls": [
+    "https://www.cartoq.com/indian-barber-rolls-royce/",
+    "https://www.cartoq.com/barber-rolls-royce-ghost-india/",
+    "https://www.indiatvnews.com/business/india/meet-ramesh-babu-the-billionaire-barber-who-travels-in-rolls-ro-3866.html",
+    "https://www.theweekendleader.com/Success/1540/cutting-thru-penury.html",
+    "https://thebetterindia.com/90491/ramesh-babu-billionaire-barber/",
+    "https://rtt.co.in/blog/From-barber-to-billionairee",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.tradeworldnews.com/millionaire-barber-the-inspiring-story-of-ramesh-babu-and-his-rolls-royce/",
+    "https://www.thequint.com/tech-and-auto/car-and-bike/this-barber-used-to-have-a-maruti-omni-now-he-owns-a-rolls-royce"
+   ],
+   "confidence": "conflicting"
+  },
+  {
+   "finding": "Fleet size over time (ALL CONFLICT; every figure listed with its date and source). Dec 2011, India TV citing Hindustan Times: Rolls-Royce plus 67 other cars. Undated India TV (/3866): 105 cars (search excerpts disagreed between 67 and 105). Undated sptulsian.com: 105 cars, turnover Rs 10 crore a year. Undated (about 2013) The Weekend Leader: 127 cars, including the Rolls-Royce. 25 Apr 2014 YourStory: 200 cars including 75 luxury. 27 May 2015 Deccan Chronicle: 256 luxury cars. 13 Feb 2016 Deccan Chronicle: 378 ordinary plus 120 luxury cars. About 2017, India TV, Siasat and Sakshi (citing TOI): about 150 luxury cars (a Rolls-Royce, 11 Mercedes, 10 BMW, 3 Audi, 2 Jaguar). 26 Sep 2017 Rushlane: over 378 cars. The Better India (undated): 400+. 30 Jul 2018 Onmanorama: nearly 500, of which 160 luxury. 2018 Khaleej Times: 500. Zee Business Dare to Dream (undated, about 2019): 600 luxury cars. 14 Jun 2020 IIT Delhi E-Cell blog: '400+ minibuses, 127 cars of which 27 are luxury'. 2023-24 DNA, India.com (updated 16 Sep 2024) and Zee News: about 400. Jul 2024 and 7 Oct 2024 Cartoq: more than 200. Oct 2025 M9 News: 400+. Newstrack (undated): 'over 30 luxury cars'.",
+   "evidence": "Each figure comes from the search excerpt for the listed URL. The counts mix total vehicles (including vans, minibuses and Innovas) with luxury cars only, which may explain part of the spread. No official company figure was found.",
+   "sourceUrls": [
+    "https://www.indiatvnews.com/news/india/bangalore-barber-owns-rolls-royce-ghost-other-cars-12758.html",
+    "https://www.indiatvnews.com/business/india/meet-ramesh-babu-the-billionaire-barber-who-travels-in-rolls-ro-3866.html",
+    "https://www.sptulsian.com/f/ci/celebration-human-spirit",
+    "https://www.theweekendleader.com/Success/1540/cutting-thru-penury.html",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.deccanchronicle.com/150527/lifestyle-offbeat/article/billionaire-barber-ramesh-babu",
+    "https://www.deccanchronicle.com/nation/current-affairs/130216/from-barber-to-billionaire.html",
+    "https://www.indiatvnews.com/news/india-this-bengaluru-barber-owns-150-luxury-cars-including-a-mercedes-maybach-worth-rs-3-2-cr-370854",
+    "https://archive.siasat.com/news/hair-job-bengaluru-barber-owns-150-luxury-cars-including-mercedes-maybach-worth-rs-3-2-cr-1142732/",
+    "https://www.rushlane.com/indian-barber-luxury-cars-12235294.html",
+    "https://thebetterindia.com/90491/ramesh-babu-billionaire-barber/",
+    "https://www.onmanorama.com/news/business/2018/07/30/hairdresser-who-owns-500-cars.html",
+    "https://www.khaleejtimes.com/uae/meet-the-indian-hairdresser-who-owns-500-cars",
+    "https://www.zeebiz.com/india/news-dare-to-dream-success-story-meet-ramesh-babu-the-barber-who-owns-fleet-of-600-luxury-cars-76539",
+    "https://ecelliitd.wordpress.com/2020/06/14/ramesh-babu-from-a-barber-to-a-billionaire/",
+    "https://www.india.com/viral/meet-man-who-was-once-a-barber-now-owns-400-luxury-cars-more-than-mukesh-ambani-ratan-tata-his-business-is-net-worth-is-ramesh-babu-barber-ramesh-tours-and-travels-bengaluru-7246265/",
+    "https://www.cartoq.com/car-life/rags-to-riches-story-ramesh-babu-luxury-car-fleet-owner-mercedes-e-class/",
+    "https://www.m9.news/social-media-viral/ramesh-babu-adds-rs-3-cr-range-rover/",
+    "https://english.newstrack.com/india-news/this-bengaluru-barber-owns-over-30-luxury-cars-520816"
+   ],
+   "confidence": "conflicting"
+  },
+  {
+   "finding": "Other notable vehicles. Mercedes-Maybach S600 (about 2017): reportedly imported from Germany for Rs 3.2 crore (Rs 2.7 crore elsewhere), making him the third Maybach owner in Bengaluru after Vijay Mallya and a builder. Three Mercedes-Benz E-Class LWB 220d (2024), Rs 72.8 lakh ex-showroom each, delivered by Sundaram Motors; one report says March and Cartoq dates it 7 Oct 2024 (CONFLICT). Land Rover Defender 130 (Cartoq July 2024; a Sept 2025 article reports Rs 3,000/hour, plate KA 03 AL 0006, billed as India's first commercial Defender). Range Rover Vogue LWB (Oct 2025), Rs 3 crore in most reports and Rs 3.2 crore in Business Today (CONFLICT). BMW i7 and G-Wagen are mentioned in fleet lists.",
+   "evidence": "India TV, Siasat and DriveSpark excerpts on the Maybach. Cartoq on the E-Class: 'three identical Mercedes-Benz E-Class LWB 220d... Rs 72.8 lakh'. Cartoq on the Defender: 'Rs 3000 per hour'. The Instagram caption quoted by Daily Jagran: 'dear friends business partners and colleagues We are happy and proud to induct Range Rover Vogue LWB to our existing fleet'.",
+   "sourceUrls": [
+    "https://www.drivespark.com/off-beat/ramesh-babu-bengaluru-barber-owns-mercedes-maybach-020912.html",
+    "https://www.indiatvnews.com/news/india-this-bengaluru-barber-owns-150-luxury-cars-including-a-mercedes-maybach-worth-rs-3-2-cr-370854",
+    "https://www.cartoq.com/bengaluru-barber-rolls-royce-maybach-3-mercedes-e-class/",
+    "https://www.cartoq.com/car-life/india-land-rover-defender-taxi-rolls-royce-ramesh-babu/",
+    "https://www.cartoq.com/car-life/bengaluru-rolls-royce-barber-adds-land-rover-defender-130-luxury-taxi-fleet/",
+    "https://www.thedailyjagran.com/auto/barber-turned-millionaire-buys-rs-3-crore-range-rover-lwb-to-use-as-luxury-taxi-10271682",
+    "https://www.businesstoday.in/visualstories/news/from-barber-to-millionaire-how-ramesh-babu-became-indias-luxury-taxi-king-263547-09-10-2025"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Notable clients, as reported but not confirmed by any client. Intel was his first client in 1993/94. Film stars named by outlets: Salman Khan, Aamir Khan and Aishwarya Rai Bachchan in several outlets; Aishwarya Rai Bachchan, Amitabh Bachchan and Shah Rukh Khan in the Deccan Chronicle of 27 May 2015. A DNA headline adds a 'link' with Sachin Tendulkar. Other clients mentioned in general terms: corporate executives, politicians, military officers, and visiting Bollywood and Tollywood stars.",
+   "evidence": "Deccan Chronicle 2015 excerpt: clients range 'from Aishwarya Rai Bachchan to Amitabh Bachchan to SRK'. India TV: 'regulars include corporate executives and visiting Bollywood and Tollywood stars'.",
+   "sourceUrls": [
+    "https://www.deccanchronicle.com/150527/lifestyle-offbeat/article/billionaire-barber-ramesh-babu",
+    "https://www.indiatvnews.com/business/india/meet-ramesh-babu-the-billionaire-barber-who-travels-in-rolls-ro-3866.html",
+    "https://www.dnaindia.com/business/report-meet-one-of-indias-richest-barbers-ramesh-babu-once-sold-newspapers-slept-hungry-now-owns-400-luxury-cars-has-this-link-with-amitabh-bachchan-aishwarya-rai-bachchan-sachin-tendulkar-3139565",
+    "https://www.cartoq.com/the-story-behind-the-indian-millionaire-barber-who-owns-rolls-royces-maybachs-video/"
+   ],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Whether he still cuts hair, and his price by date: he still cuts hair, according to every report up to 2025. Price timeline (CONFLICT across dates). Dec 2011 (HT via India TV): Rs 100. Undated Telegraph (via forum) and Gulf Daily News: Rs 65 for regular customers. Undated sptulsian.com: men Rs 65, women Rs 150. Apr 2014 YourStory: Rs 100. Dec 2014 Motoroids: Rs 100. Mar 2017 India TV: Rs 75. Sep 2017 Rushlane: Rs 100. Jan 2022 Channeliam and The Better India: Rs 150, weekend mornings. 2024-25 Cartoq: Rs 100. Schedule (CONFLICT): 8-10 am daily (sptulsian), three days a week (Deccan Chronicle Feb 2016), at least five hours daily (one excerpt), weekends (Channeliam).",
+   "evidence": "See the listed URLs. The TEDx YouTube description also says 'a modest ₹100'. No 2026 price was found; the current price is unknown.",
+   "sourceUrls": [
+    "https://www.indiatvnews.com/news/india/bangalore-barber-owns-rolls-royce-ghost-other-cars-12758.html",
+    "https://www.gdnonline.com/Details/33451/Meet-Indian-barber-who-cuts-hair-for-Rs-65-and-owns-a-Rolls-Royce",
+    "https://www.pakwheels.com/forums/t/namak-mirchi-club-of-pakwheels-part-1/77423?page=2056",
+    "https://www.sptulsian.com/f/ci/story-of-a-barber",
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://www.motoroids.com/news/rags-riches-meet-barber-owns-rolls-royce/",
+    "https://www.indiatvnews.com/news/india-this-bengaluru-barber-owns-150-luxury-cars-including-a-mercedes-maybach-worth-rs-3-2-cr-370854",
+    "https://www.rushlane.com/indian-barber-luxury-cars-12235294.html",
+    "https://en.channeliam.com/2022/01/28/the-millionaire-barber/",
+    "https://www.cartoq.com/car-life/india-land-rover-defender-taxi-rolls-royce-ramesh-babu/",
+    "https://www.deccanchronicle.com/nation/current-affairs/130216/from-barber-to-billionaire.html"
+   ],
+   "confidence": "conflicting"
+  },
+  {
+   "finding": "His salon today: 'Inner Space'. The original shop was on Brigade Road. The Weekend Leader says he opened a hair salon at the Bowring Institute in 1997. Deccan Chronicle (2015 and 2016) places Inner Space at the Bowring Institute, St Mark's Road, near Chinnaswamy Stadium. One source says Koramangala (CONFLICT). The current address and opening hours in 2026 are unknown.",
+   "evidence": "Deccan Chronicle 2015: 'Inner Space salon, near Chinnaswamy stadium'. Deccan Chronicle 2016: 'his salon at the Bowring Institute'. The Weekend Leader: 'opened a hair salon at Bowring Institute in 1997'.",
+   "sourceUrls": [
+    "https://www.deccanchronicle.com/150527/lifestyle-offbeat/article/billionaire-barber-ramesh-babu",
+    "https://www.deccanchronicle.com/nation/current-affairs/130216/from-barber-to-billionaire.html",
+    "https://www.theweekendleader.com/Success/1540/cutting-thru-penury.html",
+    "https://youthincmag.com/rolls-royce-hair-cut-billionaire-barber"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Awards and talks. Zee Business Dare to Dream Awards, Season 2 (2019, held with SAP India; ceremonies 25 Sep - 24 Oct 2019): 'Inspirational Leader' (the city of his ceremony is unclear). TEDxChristUniversity talk 'Millionare barber: Ramesh Babu at TEDxChristUniversity' on YouTube (exact date unknown, probably 2013-2014). He spoke at a symposium during the three-day Mysuru Travel Mart (reported 13 Feb 2016). Other awards are mentioned but not named.",
+   "evidence": "india.com and Exchange4media lists name 'Mr. Ramesh Babu (Inspirational Leader)'. A Zeebiz article says he spoke 'on the sidelines of Zee Business Dare to Dream Awards in Delhi'. The YouTube listing came up in search results; youtube.com could not be fetched.",
+   "sourceUrls": [
+    "https://www.india.com/business/zee-business-dare-to-dream-awards-heres-the-list-of-shining-stars-of-indias-entrepreneurial-ecosystem-3484520/",
+    "https://www.exchange4media.com/industry-briefing-news/zee-business-lauds-indias-entrepreneurial-spirit-at-dare-to-dream-awards-season-2-100537.html",
+    "https://www.zeebiz.com/small-business/news-dare-to-dream-awards-season-2-zee-business-lauds-indias-entrepreneurial-spirit-felicitates-achievers-full-list-of-winners-113197",
+    "https://www.youtube.com/watch?v=nJOdjfq-ALI",
+    "https://www.deccanchronicle.com/nation/current-affairs/130216/from-barber-to-billionaire.html"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "Media coverage found: YourStory (25 Apr 2014), The Better India, Deccan Chronicle (27 May 2015 and 13 Feb 2016), Cosmopolitan India (19 Feb 2016), India TV (several), Hindustan Times (Dec 2011, via India TV), The Telegraph (via a forum repost), Times of India (via Siasat and India TV, about 2017), The Weekend Leader, Rushlane (26 Sep 2017), Onmanorama (30 Jul 2018), Khaleej Times (2018), Gulf Daily News (Bahrain), Zee Business, Zee News, DNA, India.com, News24, Aaj Tak (28 Sep 2023), Business Today (Hindi 20 Aug 2024; English 9 Oct 2025), Cartoq (several), DriveSpark, The Quint, ScoopWhoop, Motoroids, autoevolution, Supercar Blondie, Channeliam (28 Jan 2022). NOT FOUND: BBC, Reuters, AFP, NDTV, The Hindu, Forbes or Forbes India. The search tool refuses bbc.com, reuters.com, ndtv.com, thehindu.com and timesofindia.indiatimes.com, so their absence here does not prove they never covered him. An aggregator's claim that 'according to Forbes, he is one of the 140 billionaires in India' is unsupported; no Forbes listing was found.",
+   "evidence": "Coverage listed from search results. Forbes India and Deccan Herald domain-restricted searches returned nothing about him.",
+   "sourceUrls": [
+    "https://www.cosmopolitan.in/life/news/story/man-went-barber-billionaire-643883-2016-02-19",
+    "https://www.aajtak.in/visualstories/lifestyle/billionaire-barber-of-india-ramesh-babu-owns-more-than-400-cars-including-bmw-jaguar-and-even-rolls-royce-know-his-lifestyle-tvism-65925-28-09-2023",
+    "https://bazaar.businesstoday.in/business/story/ramesh-babu-who-is-the-owner-of-1200-crores-and-still-cuts-peoples-hair-1075149-2024-08-20",
+    "https://www.scoopwhoop.com/inothernews/billionaire-barber-bengaluru-rolls-royce/",
+    "https://www.autoevolution.com/news/indian-barber-drives-a-rolls-royce-ghost-to-work-sets-an-example-video-101878.html",
+    "https://supercarblondie.com/indian-barber-turned-millionaire-with-luxury-vehicles/",
+    "https://www.sptulsian.com/f/ci/story-of-a-barber"
+   ],
+   "confidence": "likely"
+  },
+  {
+   "finding": "His own statements (exact wording as it appeared in search excerpts; check against the originals before use). (1) 'He passed away in 1979, when I was just seven years old.' (YourStory 2014). (2) 'He would give us five rupees a day from that.' (about the uncle; YourStory and The Better India). (3) 'My mother took a job as a maid and earned perhaps ₹40-50 per month...' (rtt.co.in blog, truncated). (4) 'We took to having one meal a day just so we could survive.' (surfaced with the YourStory and Better India set; exact page unconfirmed). (5) 'This way I somehow managed to finish my tenth standard and joined evening PUC.' and 'In the mornings, I would be at the saloon and evenings at college.' (6) 'Later in 1993, I bought a used Maruti van.' (YourStory). (7) 'This is more of a passion.' and, on barbering, 'I will continue to be one as long as my hands are healthy.' (India TV). (8) 'It keeps me humble' (Deccan Chronicle, 13 Feb 2016, Mysuru Travel Mart). (9) 'Work hard. Be Humble. Anything else is just luck.' (The Logical Indian). (10) 'I have always believed that work is worship.' (ScoopWhoop). (11) On the Rolls-Royce, paraphrased in The Better India: in 2011 he bought it, 'the government levied heavy taxes. I was almost bankrupt and even mortgaged my wife's jewellery.' (12) Company Instagram, Oct 2025 (via Daily Jagran): 'dear friends business partners and colleagues We are happy and proud to induct Range Rover Vogue LWB to our existing fleet'.",
+   "evidence": "Quoted text as it appeared in WebSearch excerpts; the full pages could not be opened.",
+   "sourceUrls": [
+    "https://yourstory.com/2014/04/barber-rolls-royce-ramesh-babu",
+    "https://thebetterindia.com/90491/ramesh-babu-billionaire-barber/",
+    "https://rtt.co.in/blog/The-Billionaire-Barber",
+    "https://www.ciim.in/ramesh-babu-barber-owns-rolls-royce-motivation-story/",
+    "https://www.indiatvnews.com/business/india/meet-ramesh-babu-the-billionaire-barber-who-travels-in-rolls-ro-3866.html",
+    "https://www.deccanchronicle.com/nation/current-affairs/130216/from-barber-to-billionaire.html",
+    "https://thelogicalindian.com/rags-to-riches-a-billionaire-barber-who-travels-in-rolls-royce/",
+    "https://www.scoopwhoop.com/inothernews/billionaire-barber-bengaluru-rolls-royce/",
+    "https://www.thedailyjagran.com/auto/barber-turned-millionaire-buys-rs-3-crore-range-rover-lwb-to-use-as-luxury-taxi-10271682"
+   ],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Family members: he is married, since he refers to his wife's jewellery. The wife's name is unknown. One profile says he is 'married with two children' and another mentions 'his son'. The children's names and ages are unknown and were not found; treat them as possibly minors and do not name or show them. Siblings and the uncle are not named in any source found. His grandmother lived with the family after the father's death. Company social accounts exist: Facebook @RameshBabuRTT and the Ramesh Tours & Travels page.",
+   "evidence": "Search excerpts from Car Blog India, Youth Inc and The Better India. No source gives the names of his wife or children.",
+   "sourceUrls": [
+    "https://thebetterindia.com/90491/ramesh-babu-billionaire-barber/",
+    "https://www.carblogindia.com/ramesh-babu-barber-rolls-royce/",
+    "https://youthincmag.com/rolls-royce-hair-cut-billionaire-barber",
+    "https://www.facebook.com/RameshBabuRTT/",
+    "https://www.facebook.com/RameshtoursandtravelsBangalore/"
+   ],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Net worth: some outlets claim Rs 1,200 crore (about 12 billion rupees). No source for this figure was found: no audited filing, Forbes or Hurun listing. The 'billionaire' label is media framing, presumably in rupees; it is not a verified dollar fortune. 'More cars than Ambani, Tata and Adani' headlines are likewise unsourced. One older source cites a turnover of Rs 10 crore a year (sptulsian.com, undated).",
+   "evidence": "News24, India.com and DNA all repeat about Rs 1,200 crore without citing a basis.",
+   "sourceUrls": [
+    "https://hindi.news24online.com/business/india-richest-babrber-ramesh-babu-net-worth-rs-1200-crore-400-cars-owners/828614/",
+    "https://www.india.com/viral/meet-ramesh-babu-indias-richest-barber-owns-a-fleet-of-400-luxury-cars-his-net-worth-is-rs-he-is-from-7690613/",
+    "https://www.dnaindia.com/business/report-this-barber-has-a-bigger-car-collection-than-mukesh-ambani-gautam-adani-combined-net-worth-ramesh-babu-cars-3060552",
+    "https://www.sptulsian.com/f/ci/celebration-human-spirit"
+   ],
+   "confidence": "unverified"
+  },
+  {
+   "finding": "Controversy, disputes, legal cases or criticism: NONE FOUND involving Ramesh Babu or Ramesh Tours and Travels. Searches turned up no court cases (including Indian Kanoon), RTO or tax enforcement, or consumer-forum complaints. A Tofler excerpt shows 'No prosecutions found', but that record may be stale. Justdial shows a 4.2 rating from 805 reviews. The only 'criticism' is that media coverage inflates the numbers: the billionaire label, the net worth and the fleet counts. The 2011 road-tax burden was a financial strain, not a dispute. DO NOT CONFUSE him with: (a) Yusuf Shariff, known as 'KGF Babu', a different Bengaluru businessman whose Rolls-Royces, formerly owned by Amitabh Bachchan and Aamir Khan, drew about Rs 38 lakh in road-tax fines in July 2025 (his Phantom was reportedly impounded in 2021); (b) the Telugu actor-producer Ghattamaneni Ramesh Babu (died 2022); (c) Karnataka Congress MLC Ramesh Babu.",
+   "evidence": "Searches for complaints, court cases, tax and RTO matters returned only registry and review listings. The Deccan Herald and Cartoq results on the Rs 38 lakh fine name Yusuf Shariff (KGF Babu), not Ramesh Babu.",
+   "sourceUrls": [
+    "https://www.tofler.in/ramesh-tours-and-travels-private-limited/company/U63040KA2004PTC033737",
+    "https://tracxn.com/d/legal-entities/india/ramesh-tours-and-travels-private-limited/__9mlm83d6Px2GiZd054aPHwZPyZ0lg_ojGohVzlHhjKA",
+    "https://www.justdial.com/Bangalore/Ramesh-Tours-Travels-Pvt-Ltd-Opposite-Street-Philomenas-Hospital-Vivek-Nagar/080PXX80-XX80-241009120046-H5E9_BZDET",
+    "https://www.deccanherald.com/amp/story/india%2Fkarnataka%2Fbengaluru%2Fbengaluru-bizman-fined-rs-38-lakh-for-unpaid-road-tax-on-luxury-cars-bought-from-amitabh-bachchan-aamir-khan-3644839",
+    "https://svb1.cartoq.com/car-life/bengaluru-businessman-fined-rs-38-lakh-for-luxury-car-tax-evasion",
+    "https://gulfnews.com/entertainment/south-indian/telugu-star-mahesh-babu-mourns-death-of-brother-actor-producer-ramesh-babu-1.84853064"
+   ],
+   "confidence": "likely"
+  }
+ ],
+ "gapsOrUnknowns": [
+  "WebFetch could not open any page in this session (ENOTFOUND on every domain) and the proxy blocked Bash egress. No article was read in full; every fact and quote comes from search-engine excerpts. All quotes must be checked word for word against the original pages before scripting.",
+  "The WebSearch budget (200 calls) ran out before research was complete. The user can send a follow-up to continue, ideally in a session where WebFetch works.",
+  "The search tool refuses bbc.com, reuters.com, ndtv.com, thehindu.com, timesofindia.indiatimes.com, hindustantimes.com, economictimes.indiatimes.com and livemint.com. It is unknown whether BBC, Reuters, AFP, NDTV, The Hindu or TOI ever covered him directly (TOI only appears via secondary citations).",
+  "Exact birth date and birth year: unknown. Estimates from different sources range from about 1969 to about 1972.",
+  "Father's cause of death: unknown. Only low-quality blogs say heart attack.",
+  "Mother's name, siblings' names and number, and the uncle's name: unknown.",
+  "Wife's name: unknown. Children's names, number and ages: unknown. Treat them as possible minors and do not name or show them.",
+  "Year the father died: 1979 vs 1989 (unresolved). Year he took over the salon: 1989 vs 1991 vs 'first PU' (unresolved).",
+  "Rs 5 arrangement: a day vs a month, and whether the uncle paid it or the mother leased the shop: unresolved.",
+  "First van: year (1993/1994/1995), financing details (6,800-rupee figure; KSFC claim) and exact loan amount: unresolved.",
+  "Price of the first luxury car (Rs 38 lakh) and the 'Mercedes India proposal' claim: unverified; the exact source page was not identified.",
+  "Rolls-Royce: purchase month and year (Feb 2011 vs 2010), price (Rs 3, 3.1, 3.3 or 4 crore), EMI (Rs 7 lakh/month) and road-tax amount (over Rs 3 crore vs Rs 3.78 crore): unresolved. Whether he still owns the original Ghost in 2026: unknown.",
+  "Current (2026) fleet size, current haircut price, salon address and opening hours: unknown. No 2026 coverage was found.",
+  "Publication dates are unknown for The Better India (/90491), India TV (/3866), The Weekend Leader, the Zee Business 600-car article, sptulsian.com, Gulf Daily News and the TEDxChristUniversity video.",
+  "Singapore / Toni & Guy training claim: unverified.",
+  "Identity of the registry director 'Ramesh Babu Gopal' (DIN 01923190) with the barber rests on a name match plus the company. The registry page itself was not opened.",
+  "No independent verification of the client names (Salman Khan, Aamir Khan, Aishwarya Rai Bachchan, Amitabh Bachchan, SRK) or of Intel as first client beyond media retellings.",
+  "The net worth (Rs 1,200 crore) and the 'billionaire' label have no primary source.",
+  "Licensed-footage research (Newsflare, ViralHog, Storyful) was not part of this step and was not done."
+ ]
+}

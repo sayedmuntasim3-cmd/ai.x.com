@@ -1,0 +1,132 @@
+# Voice system (System B): any voice file to a film
+
+Next phase (owner, 13 Nov 2026): the Quran recitation documentary, `docs/QURAN_DOCUMENTARY.md`.
+
+The owner gives a voice file (own recording, ElevenLabs, anything ffmpeg reads).
+The system first understands it, then plans pictures scene by scene and makes
+the film. **The spoken words are never changed**: code puts them back and
+checks them; no model is trusted with them.
+
+## Pipeline
+
+| Step | What happens | Where |
+|---|---|---|
+| 1 Intake | ffmpeg makes a 16 kHz mono WAV *copy* for listening machines; the original file is kept untouched for the film. Voice report: duration, loudness (LUFS), true peak, clipping, silence share, SNR, problems | `local/voice-film.mjs` (`--audio`), reuses `engine/src/wav.mjs`, `engine/src/loudness.mjs` |
+| 2 Words | `transcribe` gives `{language, engine, model, modelVersion, words:[{text,start,end,confidence}]}`. Engines: faster-whisper (word timestamps, best), pocketsphinx (weak, but its model ships inside the pip wheel, so it runs where model hosts are blocked), or the transcript that came with the voice (ElevenLabs alignment, SRT, VTT, Whisper JSON) | `local/stt/transcribe.py`, `engine/src/transcript.mjs` |
+| 3 Understand | language (`detectLanguage`), kind: Quran recitation (`matchRecitation` against Tanzil: exact ayat, per-ayah times) or narration (`classifyInput`); narration is cut into scenes on word times (`splitVoiceScenes`); structure summary: topic words, sections, named people, places, dates | `engine/src/voice-understand.mjs` |
+| 4 Pictures | the brain fills only ANCHOR, SHOTS, LOOK of a skeleton whose times and NARR are fixed; `restoreVoiceFields` then `checkVoiceChapter` must find no changed word. No brain: a plan from the scene's own nouns. Media from keyless free providers first; a licence is recorded per asset. Quran: `quran-visual-adab-guard` | `engine/src/voice-visuals.mjs` |
+| 5 Render | the voice is the only narration track; captions from the recording's own word times | `render/` (one-track path) |
+
+## Interfaces (all pure, browser + Node, except step 1-2 runners)
+
+- `normalizeTranscript(raw, {format})` → transcript; `checkTranscript(t, seconds)` → problems.
+- `understandVoice({transcript, totalSeconds, kind, quranIndex, surahNames})` →
+  `{kind, language, classification, scenes | quranPlan, structure, problems}`.
+- `planVoiceVisuals({understanding, brain?, providers?})` → per scene `{sc, start, end, narration, shots, assets[{url, licence, source}]}` + `findings`.
+- `quranVisualAdabGuard({plan, assets, meanings})` → problems + gaps.
+
+## Reused, not rewritten
+
+`voice-scenes.mjs`, `voice-plan.mjs` (chain, NEVER_DONE_TO_A_VOICE), `content-intel.mjs`,
+`quran.mjs`, `quran-film.mjs`, `film-media.mjs` providers, `loudness.mjs`, `wav.mjs`,
+`canSee`/`canSearch` (no stage assumes Claude), `messages.mjs` (every new message en + bn).
+
+## Rules held in code
+
+1. Words: scene NARR equals the transcript's words (case and punctuation aside), in order, none added or dropped.
+2. Time: scenes run 0 → end of recording, no gap, no overlap; times come from words, never from a model.
+3. The voice is never sped up, slowed, re-ordered or re-synthesised; Quran is never synthesised.
+4. Quran: no music, SFX or ambience; no living beings, faces or AI pictures; on-screen text is verbatim Tanzil; a meaning line only from a translation whose licence is recorded and allows it, otherwise the gap is reported, never filled.
+5. Every asset carries its licence; an asset without a free licence is refused.
+
+## Exit criteria
+
+- A public-domain English recording runs steps 1-4 from the command line; the words-unchanged check passes in code and a test.
+- Transcript adapters tested with recorded fixtures (Whisper JSON, ElevenLabs alignment, SRT, VTT).
+- Live speech-to-text reported only where it really ran, with engine, model and version.
+
+## Open risks
+
+- This cloud box cannot reach model hosts (Hugging Face) or archive.org's file servers, so faster-whisper cannot run here; it runs on the owner's PC or a GitHub runner.
+- pocketsphinx is much weaker than Whisper: good enough to prove the path, not for a film.
+- General STT is weak on Quran recitation; a Quran-tuned model is still needed (matching tolerates slips, but not a bad transcript).
+- No licensed Quran translation is bundled yet; meanings stay a reported gap.
+- Picture choice without a seeing brain uses titles and tags only (`canSee` false): it cannot judge a picture.
+
+## State (12 Nov 2026, verified by running it)
+
+Run: `node local/voice-film.mjs --audio a.mp3 --stt faster-whisper [--script text.txt] [--topic "..."] [--media]`,
+then `node render/render-film.mjs --run voice-runs/a --out film.mp4 --one-track a.mp3 --words voice-runs/a/words.json`.
+
+- Real faster-whisper (small.en) on the LibriVox Gettysburg Address: GitHub Actions run 43270503417 (`voice-stt.yml`, runs on push of STT code); 268 words, first word heard "IV" for "Four". Output kept as `engine/test/fixtures/voice/gettysburg-librivox-whisper.json`; `engine/test/voice-exit.test.mjs` runs steps 2-4 on it.
+- pocketsphinx ran here on an espeak-ng reading: 23% of words right, but with the script, 9 of 10 sentence starts land within 0.13 s of the truth (all within 0.54 s).
+- Live Commons search (`--media`) returned public-domain Gettysburg pictures with licences; files could not be downloaded here (upload.wikimedia.org blocked), so the test render used text cards.
+- One-track render: narration.wav is sample-identical to the recording (resampled to 48 kHz); the film can end up to one frame before the recording's last sample.
+- Not built: upload route, studio switch, brain in the CLI (Gemini key invalid; any `Model` works in `planVoiceVisuals`), picture judging, Quran STT, Uthmani text, licensed meanings.
+
+## Voice mastering engine (design and state, 13 Nov 2026)
+
+Takes an ordinary recording and masters it. Priority 1 Quran recitation, 2 US English
+narration. All DSP is pure JS in `engine/src/` (deterministic, same result on the owner's
+PC, a GitHub runner and in tests; no model download). ffmpeg only decodes the input to
+48 kHz mono float and encodes AAC. The voice is treated as mono; the reverb is stereo.
+
+**Rule update (owner, 13 Nov 2026).** A recitation may get a beautiful, smooth hall /
+mosque style *reverb* (what the owner calls "echo"). Discrete echoes or delays that repeat
+syllables stay forbidden, as does everything else in `NEVER_DONE_TO_A_VOICE` (no pitch,
+formant, speed, auto-tune, re-synthesis, generative enhancer). Nothing is laid under a
+recitation. English documentary narration stays close, warm and nearly dry: that is what
+top documentaries use, so the narration profile adds a touch of room at most.
+
+| Stage | What it does (every setting comes from the measurement) | Module |
+|---|---|---|
+| Analyze | noise floor, SNR, hum 50/60 Hz, DC, clipping, plosives, sibilance, tonal balance vs a target voice curve, existing room reverb, LRA, crest, LUFS, true peak, pauses, sustained notes, f0 track; coded en+bn messages | `voice-analyze.mjs` |
+| Clean | DC, high-pass placed under the lowest sung pitch, hum notches only on measured harmonics, spectral denoise with depth scaled to SNR (never deep), de-click, clipped peaks rounded | `voice-chain.mjs` |
+| Tone | corrective EQ toward the profile's target curve (bounded, half-strength), de-esser only as deep as measured | `voice-chain.mjs` |
+| Dynamics | three gentle stages: slow leveller, soft-knee compressor (threshold from the level histogram), a peak stage that eases only what towers over the voice; recitation keeps more range than narration | `voice-chain.mjs`, `voice-master.mjs` |
+| Space | impulse responses synthesised in code (seeded noise, per-frequency decay, pre-delay, early reflections, high-cut), FFT convolution, send automation from pauses / phrase ends / sustained notes (ayah ends when known), ducking under the voice | `voice-reverb.mjs` |
+| Master | gain to -14 LUFS, look-ahead limiter, true peak <= -1 dBTP, measured again and corrected (two-pass); WAV 48 kHz 24-bit + AAC | `voice-master.mjs` |
+| Proof | same sample count (plus a reverb tail at the very end only), alignment lag by cross-correlation in the 1-3 kHz band at start/middle/end, f0 contour of the mastered voice against the original (and of the finished mix), before/after numbers, measured decay of the applied reverb, echo-free check of the impulse | `voice-proof.mjs` |
+
+Profiles and presets: `quran` = `clean` (no added space), `mosque-hall`, `grand-hall`;
+`narration` = `dry`, `warm-room`. Presets set only the *space target* (decay, pre-delay,
+level); cleanup, tone and dynamics are always derived from the file. The reverb level is
+lowered when the recording already carries a room, and the decay is shortened when the
+reciter's pauses are short.
+
+Limits said plainly in the report: heavy room echo already in a recording cannot be
+removed; clipped peaks are rounded, not recovered; denoise is capped (6 dB recitation,
+10 dB narration) because deeper reduction smears letters; meaning-aware ("feeling") send
+variation exists only as a bounded hook (+-1.5 dB), OFF for the Quran until the owner
+approves it by ear. Quality is shown by measurements and a listening pack; nothing here
+claims to be the best in the world.
+
+CLI: `node local/voice-master.mjs --audio <file> --profile quran|narration [--preset <name>|all] [--from s --to s] [--source elevenlabs] [--lufs -14] [--understanding understanding.json] [--lang bn]`
+gives `<preset>.wav` (48 kHz 24-bit), `.m4a` (AAC 256k) and `.report.json`; `--preset all` adds the untouched original (the listening pack).
+In the film path: `node local/voice-film.mjs --audio a.mp3 --kind quran --master [space]` asks `planVoice` for profile and space, runs the engine, and names `master/<space>.wav` for `--one-track`.
+
+### Mastering state (13 Nov 2026, verified by running it)
+
+- Built and tested (V0-V6): analyzer, cleanup, tone, three-stage dynamics, synthesised reverb with automation,
+  two-pass loudness, proofs, CLI, `voice-film --master`, narration profile. 36 tests on synthetic signals
+  (`engine/test/voice-{analyze,chain,reverb,master}.test.mjs`, `local/voice-master.test.mjs`).
+- Real recordings, GitHub Actions run 43374825142 (`voice-master.yml`, runs on a push of the mastering code): 60 s
+  each of two archive.org recitations their uploaders marked CC0 (`jawad-farogi/Az-Zuha.mp3`,
+  `001AlFaatihah_201305`; used for the test only, never committed) and the public-domain LibriVox Gettysburg
+  reading. All 8 masters passed their own proofs: -14.0 LUFS; true peak -1.38 to -4.29 dBTP (AAC decoded again:
+  -1.39 to -4.30); voice within 0.021 ms of the original, no drift; voice pitch median difference 0.62-1.24
+  cents, contour correlation 0.9996-1.0; applied reverb measured 1.47-2.26 s at 500 Hz (shortened from 2.4 / 3.8 s
+  because those reciters pause for about 0.4-0.6 s), echo-free check passed.
+- What the numbers say honestly: both recitations were already loud, processed files (-7 and -9.5 LUFS, one
+  with true peak +4.7 dBTP), so the engine turned them *down* and they are not the "ordinary raw recording"
+  this is for. Noise fell 2.4 dB and 8 dB (floor), the narration's 5.1 dB with its pauses dipped; the
+  narration's tallest peaks stood 21.5 dB above the voice and were eased to 14 dB, leaving the limiter 0.25 dB.
+- Speed and memory (this box): 60 s in about 6 s; 10 minutes in 53 s with 1.1 GB. About ten float buffers are
+  held at once, so an hour needs roughly 7 GB: recordings over about 30 minutes need chunked processing (not built).
+- Not verified: how it sounds. No one has listened yet; targets (tone offsets, reverb level -14 / -12.5 dB,
+  thresholds) are engineering starting points to tune with the owner by ear. No test yet on a raw phone
+  recording, on ElevenLabs audio, or with real ayah times from the understanding layer (the hook is tested with
+  given times only).
+- Not built: stereo in the film renderer (it mixes mono, so a film gets the reverb in mono; the standalone
+  WAV / AAC are stereo), chunked processing for long files, de-reverb (a heavy room cannot be removed), breath
+  control, a feeling model (only the bounded hook exists, off), studio page and upload route.

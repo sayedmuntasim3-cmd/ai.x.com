@@ -1,0 +1,58 @@
+name: Engine checks
+
+on:
+  push:
+    paths:
+      - "engine/**"
+      - "public/studio/**"
+      - "worker/**"
+      - "render/**"
+      - "local/**"
+      - "package*.json"
+      - ".github/workflows/engine-checks.yml"
+  pull_request:
+    paths:
+      - "engine/**"
+      - "public/studio/**"
+      - "worker/**"
+      - "render/**"
+      - "local/**"
+      - "package*.json"
+      - ".github/workflows/engine-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tests
+        run: npm test
+      - name: Strict JSDoc type check
+        run: npm run typecheck
+
+  platform:
+    # The Worker's API client and the ffmpeg renderer (a real 10-second render).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
+      - run: npm ci
+      - name: Tests (engine, worker, render)
+        run: npm test
+      - name: Cloudflare build check
+        run: npm run check

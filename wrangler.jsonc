@@ -2,8 +2,23 @@
   // Must match the Worker name in the Cloudflare dashboard.
   "name": "ai-x-com",
   "compatibility_date": "2026-10-01",
-  // Static site generated from page.tsx (see tools/README.md). No Worker script needed.
+  "compatibility_flags": ["nodejs_compat"],
+  // The film API and its durable Workflow (worker/index.mjs). Everything else
+  // is the static site generated from page.tsx (see tools/README.md).
+  "main": "worker/index.mjs",
   "assets": {
-    "directory": "./public"
-  }
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
+  "workflows": [{ "name": "film-run", "binding": "FILM_RUN", "class_name": "FilmRunWorkflow" }],
+  // Create once: npx wrangler r2 bucket create zupona-films
+  "r2_buckets": [{ "binding": "FILMS", "bucket_name": "zupona-films" }],
+  "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60" },
+  "observability": { "enabled": true }
+  // Secrets (npx wrangler secret put NAME): ANTHROPIC_API_KEY, STUDIO_TOKEN
+  // Optional secrets for the media step: PEXELS_API_KEY, PIXABAY_API_KEY
+  // Optional auto-render: secret GITHUB_TOKEN; vars GITHUB_REPO ("owner/name") and SITE_URL ("https://...")
+  // Optional: secret YOUTUBE_API_KEY (topic radar); var ANTHROPIC_BASE_URL (Cloudflare AI Gateway logs)
 }
