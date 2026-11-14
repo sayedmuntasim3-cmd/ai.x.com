@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+# One film check at a time on this branch: a newer push replaces a running one.
+concurrency:
+  group: quran-film-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   film:
     runs-on: ubuntu-latest

@@ -84,7 +84,32 @@ OTHER = ["the inside of a building or a room", "a city, a street or buildings", 
 # What adab refuses even when the searched thing is there too (measured in docs/QURAN_DOCUMENTARY.md):
 # small walking figures in a landscape, a building or a city, man-made things left in nature.
 PEOPLE = ["a photo of an empty landscape", "a photo of people walking in a landscape"]
-SCENE = ["a natural landscape with no people and no buildings", "a building, a monument or a city", "man-made objects, plastic or litter in nature"]
+# Buildings and man-made things: a yes/no question each, asked of the whole frame and of five parts of it
+# (four quarters, the lower half), the highest answer kept: small huts, ruins, signs and wires fill only a
+# corner. Measured on the 186-picture validation set (thresholds fitted on half, tested on the other half):
+# buildings 0.83 recall, man-made 0.81, 0 of 31 clean landscapes flagged (docs/QURAN_DOCUMENTARY.md).
+BUILDING = ["a photo of untouched nature with no buildings", "a photo with houses, huts, ruins or other buildings in it"]
+MANMADE = ["a photo of untouched nature with nothing made by people", "a photo with signs, poles, power lines, fences, boats, vehicles or litter in it"]
+
+
+def parts(image):
+    w, h = image.size
+    out = [image]
+    for i in range(2):
+        for j in range(2):
+            out.append(image.crop((j * w // 2, i * h // 2, (j + 1) * w // 2, (i + 1) * h // 2)))
+    out.append(image.crop((0, h // 2, w, h)))
+    return out
+
+
+def highest(images, labels):
+    """The highest "yes" over several images, in one pass of the model."""
+    import torch
+
+    model, proc = clip()
+    with torch.no_grad():
+        out = model(**proc(text=labels, images=images, return_tensors="pt", padding=True))
+    return max(row[1] for row in out.logits_per_image.softmax(dim=-1).tolist())
 _clip = None
 
 
@@ -134,14 +159,14 @@ def look(images, query):
         if query:
             rel += probs(img, [f"a photograph of {query}"] + OTHER)[0]
         walkers += probs(img, PEOPLE)[1]
-        scene = probs(img, SCENE)
-        building += scene[1]
-        manmade += scene[2]
+        pieces = parts(img)
+        building = max(building, highest(pieces, BUILDING))
+        manmade = max(manmade, highest(pieces, MANMADE))
     if not n:
         return None
     return {"photograph": round(kind[0] / n, 3), "painting": round(kind[1] / n, 3), "drawing": round(kind[2] / n, 3), "rendering": round(kind[3] / n, 3),
             "upright": round(upright / n, 3), "turned": round(turned / n, 3), "relevance": round(rel / n, 3) if query else None,
-            "walkers": round(walkers / n, 3), "building": round(building / n, 3), "manmade": round(manmade / n, 3)}
+            "walkers": round(walkers / n, 3), "building": round(building, 3), "manmade": round(manmade, 3)}
 
 
 def bands(path):

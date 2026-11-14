@@ -27,16 +27,26 @@ export function hamming(a, b) {
 }
 
 /** The rules the frame check applies, measured on labelled sets (docs/QURAN_DOCUMENTARY.md). */
-export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7, walkers: 0.9, building: 0.5, manmade: 0.6 });
+export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7, walkers: 0.9, building: 0.7, manmade: 0.7 });
 
 /** The uncertain band under each refusal: such a picture may be right, so it goes to a person (WARNING), never in silently. */
-export const DOUBT_RULES = Object.freeze({ art: 0.1, relevance: 0.65, walkers: 0.6, building: 0.2, manmade: 0.3 });
+export const DOUBT_RULES = Object.freeze({ art: 0.1, relevance: 0.65, walkers: 0.6, building: 0.3, manmade: 0.35 });
+
+/**
+ * A search that asks for a building or a man-made thing (the ruins of past
+ * towns, a sailing ship) expects one in the picture: that check is not applied.
+ */
+export const EXPECTS = Object.freeze({
+  building: /\b(ruins?|towns?|city|cities|village|dwellings?|houses?|tower|palace|dam|mosque|walls?)\b/i,
+  manmade: /\b(ships?|boats?|sail|sailing|dam|road|bridge|well|lamps?|ruins?)\b/i,
+});
 
 /**
  * Reasons from one detect.py result, or null when the frames pass.
  * @param {{ frames: number, faces: number, people: number, look?: any, sideways?: boolean, dhash?: string[], exposure?: { brightness: number, entropy: number } | null }} item @param {string[]} usedHashes
+ * @param {string} [query] what was searched for (a search for ruins or a ship expects them)
  */
-export function frameVerdict(item, usedHashes = []) {
+export function frameVerdict(item, usedHashes = [], query = "") {
   if (!item.frames) return "detector: no frame could be read, so it was not checked";
   // The same rule as the film's pixel audit: a dark, plain picture reads as an empty screen (the night-lights map
   // that reached a test film measured brightness 10.5, detail 0.44; photographs here 74-146 and 0.89-0.96).
@@ -50,11 +60,12 @@ export function frameVerdict(item, usedHashes = []) {
   if (item.look) {
     const art = item.look.painting + item.look.drawing + item.look.rendering;
     if (art >= VISUAL_RULES.notPhotograph) return `visual: looks like a painting, drawing or rendering (${Math.round(art * 100)}%), not a photograph`;
-    // Measured on 33 pictures: hikers 0.92-0.99 (3 of 3; the face and person detectors missed them), clean landscapes at most 0.80;
-    // the Louvre at night 1.00 as a building, every landscape 0.00; plastic tree shelters 1.00, a driftwood post 0.45.
+    // Measured on the 186-picture validation set (docs/QURAN_DOCUMENTARY.md): people 0.9 refuses 0.43 of the
+    // pictures with people and 1 of 67 clean ones; buildings 0.7: 0.62, 1 of 67; man-made 0.7: 0.57, 0 of 67.
+    // Below these, the review band (DOUBT_RULES) sends the picture to a person.
     if (typeof item.look.walkers === "number" && item.look.walkers >= VISUAL_RULES.walkers) return `adab: people seem to be in the picture (${Math.round(item.look.walkers * 100)}%), even small or far away`;
-    if (typeof item.look.building === "number" && item.look.building >= VISUAL_RULES.building) return `adab: a building, a monument or a city (${Math.round(item.look.building * 100)}%)`;
-    if (typeof item.look.manmade === "number" && item.look.manmade >= VISUAL_RULES.manmade) return `relevance: man-made things in the picture (${Math.round(item.look.manmade * 100)}%)`;
+    if (typeof item.look.building === "number" && item.look.building >= VISUAL_RULES.building && !EXPECTS.building.test(query ?? "")) return `adab: a building, a monument or a city (${Math.round(item.look.building * 100)}%)`;
+    if (typeof item.look.manmade === "number" && item.look.manmade >= VISUAL_RULES.manmade && !EXPECTS.manmade.test(query ?? "")) return `relevance: man-made things in the picture (${Math.round(item.look.manmade * 100)}%)`;
   }
   // Relevance: the searched thing against rooms, cities, people, text, vehicles, animals and objects.
   // Measured: a city at dawn 0.40, a fogged-out "mountain" 0.18, a sea searched as mountains 0.11; seven right pictures 0.78-0.99.
@@ -66,12 +77,11 @@ export function frameVerdict(item, usedHashes = []) {
 
 /**
  * Doubts from one detect.py result that passed frameVerdict: scores in the
- * uncertain band. Measured: clean landscapes scored walkers up to 0.80 and
- * man-made up to 0.45 (a driftwood post), so those go to a person instead of
- * being refused or passed without a look.
- * @param {{ look?: any, faces?: number, people?: number }} item @returns {string[]}
+ * uncertain band: such pictures may be right, so they go to a person instead
+ * of being refused or passed without a look (measured: docs/QURAN_DOCUMENTARY.md).
+ * @param {{ look?: any, faces?: number, people?: number }} item @param {string} [query] @returns {string[]}
  */
-export function frameDoubts(item) {
+export function frameDoubts(item, query = "") {
   const l = item.look;
   if (!l) return [];
   /** @type {string[]} */
@@ -82,8 +92,8 @@ export function frameDoubts(item) {
   if (art >= DOUBT_RULES.art) out.push(`visual: maybe not a photograph (${pc(art)}%)`);
   if (typeof l.relevance === "number" && l.relevance < DOUBT_RULES.relevance) out.push(`relevance: the frames only partly show what was searched for (${pc(l.relevance)}%)`);
   if (typeof l.walkers === "number" && l.walkers >= DOUBT_RULES.walkers) out.push(`adab: people may be in the picture (${pc(l.walkers)}%)`);
-  if (typeof l.building === "number" && l.building >= DOUBT_RULES.building) out.push(`adab: maybe a building (${pc(l.building)}%)`);
-  if (typeof l.manmade === "number" && l.manmade >= DOUBT_RULES.manmade) out.push(`relevance: maybe man-made things (${pc(l.manmade)}%)`);
+  if (typeof l.building === "number" && l.building >= DOUBT_RULES.building && !EXPECTS.building.test(query)) out.push(`adab: maybe a building (${pc(l.building)}%)`);
+  if (typeof l.manmade === "number" && l.manmade >= DOUBT_RULES.manmade && !EXPECTS.manmade.test(query)) out.push(`relevance: maybe man-made things (${pc(l.manmade)}%)`);
   return out;
 }
 
@@ -130,11 +140,11 @@ export function detector(python, o = {}) {
     try {
       const item = await ask(target, o.clip ? query : undefined);
       if (item.error) throw new Error(item.error);
-      const why = frameVerdict(item, used);
+      const why = frameVerdict(item, used, query ?? "");
       // A passed picture's hashes join the film, so a near-copy later is refused.
       if (!why) used.push(...(item.dhash ?? []));
       if (why) return why;
-      const doubts = frameDoubts(item);
+      const doubts = frameDoubts(item, query ?? "");
       return doubts.length ? { warn: doubts } : null;
     } catch (e) {
       // A frame that cannot be read is not passed as clean.

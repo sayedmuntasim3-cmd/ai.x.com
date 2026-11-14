@@ -458,6 +458,48 @@ be judged by a qualified person. For a top-class recording: a quiet, soft-furnis
 microphone 20-30 cm from the mouth; the recorder's highest quality (WAV or lossless, 48 kHz); no
 loudspeaker in the chain; the reciter's written permission.
 
+**The owner's al-Mulk sample through the whole chain (local, 14 Nov):** recognized as 67:1-7 with no
+surah given; 13 shots; 13 of 13 licensed pictures (8 videos, 5 photos; 2 doubtful candidates passed over
+for clean ones); rendered at 16:9 1080p. First render: two video scenes became placeholder cards (Commons
+answered 429 to ffmpeg mid-render), the pixel audit caught it (coverage 0.943, FAIL). Fixed: every asset is
+fetched once with retries and reused by all formats; second render 13 of 13, coverage 1, no empty or
+frozen stretch, sound offset 0, -14 LUFS, true peak -1.4 dBTP. Looking at the frames: one scene shows
+overhead wires and a fence (67:2), one a sunrise over a town with houses (67:6, an ayah about the
+punishment of Hell): both passed the checks (building score 0.00 on the town: the houses fill only the
+dark bottom of the frame). Publish decision: WARNING (13 scenes not approved, no sign-off, no recording
+rights, 1 of 6 ends unconfirmed). Not a publishable film; a test of the chain.
+
+**Validation set for the visual checks (186 pictures, 18 groups, runner run 43553580225):** labelled by
+looking at every picture on contact sheets (by the assistant, not yet by a person; two unsure pictures left
+out). What the whole check does (relevance aside):
+
+| Pictures | Refused | Sent to a person | Passed silently |
+|---|---|---|---|
+| 68 clean landscape photos | 6 | 13 | 49 |
+| 118 with people, buildings, man-made things or art | 65 | 14 | 39 |
+
+The OpenCV face detector saw faces in 13 of the 68 clean photos (bark, rock, foliage) and had been refusing
+them since Q4; every real person it found, the image-text model scored at least 0.6. It now refuses only
+together with the image-text model. Per category (refused / refused or reviewed, recall): people 0.63 /
+0.83, buildings 0.35 / 0.41, man-made things 0.27 / 0.32, paintings and drawings 0.56 / 0.64 (no clean
+photo taken for a painting). Small huts, ruins, signs, power lines and boats passed: the 33-picture
+measure had made these checks look better than they are.
+
+Fixed: buildings and man-made things are now a yes/no question each ("untouched nature" against "houses,
+huts, ruins" / "signs, poles, power lines, fences, boats, vehicles, litter"), asked of the whole frame and
+of five parts of it, the highest answer kept. Thresholds fitted on the even-numbered half and tested on the
+odd half: buildings 0.83 recall, man-made 0.81, people 0.86 (review band), 0 of 31 clean photos flagged.
+A search that asks for ruins or a ship does not apply that check. On the whole set now:
+
+| Pictures | Refused | Sent to a person | Passed silently |
+|---|---|---|---|
+| 67 clean landscape photos | 3 | 13 | 51 |
+| 118 with people, buildings, man-made things or art | 87 | 18 | 13 |
+
+Still passing silently: a tiny shepherd, three distant huts, a far village, a fence, small plastic litter
+in grass or on pebbles, a distant power station, a drawing with animals. PARTIAL: the labels are the
+assistant's, not yet a person's; a fresh set should confirm the thresholds.
+
 **Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);
 the review sheet lists the automated reports to read first and the known gaps of the automatic checks.
 

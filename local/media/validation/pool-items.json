@@ -1,5 +1,5 @@
 {
- "detector": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+ "detector": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K (yes/no building and man-made questions over five parts)",
  "items": [
   {
    "n": 1,
@@ -18,8 +18,8 @@
     "turned": 0.443,
     "relevance": null,
     "walkers": 0.005,
-    "building": 0.001,
-    "manmade": 0.0
+    "building": 0.068,
+    "manmade": 0.026
    },
    "exposure": {
     "brightness": 183.6,
@@ -44,8 +44,8 @@
     "turned": 0.469,
     "relevance": null,
     "walkers": 0.048,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.03,
+    "manmade": 0.037
    },
    "exposure": {
     "brightness": 163.9,
@@ -70,8 +70,8 @@
     "turned": 0.375,
     "relevance": null,
     "walkers": 0.031,
-    "building": 0.004,
-    "manmade": 0.001
+    "building": 0.019,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 169.3,
@@ -96,8 +96,8 @@
     "turned": 0.58,
     "relevance": null,
     "walkers": 0.008,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.003,
+    "manmade": 0.052
    },
    "exposure": {
     "brightness": 175.6,
@@ -107,32 +107,6 @@
   },
   {
    "n": 5,
-   "group": "hikers",
-   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1131 1350.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1131_1350.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1131_1350.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1131_1350.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
-   "faces": 0,
-   "people": 0,
-   "look": {
-    "photograph": 1.0,
-    "painting": 0.0,
-    "drawing": 0.0,
-    "rendering": 0.0,
-    "upright": 0.481,
-    "turned": 0.359,
-    "relevance": null,
-    "walkers": 0.007,
-    "building": 0.0,
-    "manmade": 0.0
-   },
-   "exposure": {
-    "brightness": 179.6,
-    "entropy": 0.846
-   },
-   "sideways": false
-  },
-  {
-   "n": 6,
    "group": "hikers",
    "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1123 1327.jpg",
    "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1123_1327.jpg",
@@ -148,7 +122,7 @@
     "turned": 0.676,
     "relevance": null,
     "walkers": 0.057,
-    "building": 0.0,
+    "building": 0.001,
     "manmade": 0.0
    },
    "exposure": {
@@ -158,11 +132,11 @@
    "sideways": false
   },
   {
-   "n": 7,
+   "n": 6,
    "group": "hikers",
-   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1139 1370.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1139_1370.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1139_1370.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1139_1370.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1131 1350.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1131_1350.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1131_1350.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1131_1350.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -170,16 +144,42 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.212,
-    "turned": 0.632,
+    "upright": 0.481,
+    "turned": 0.359,
     "relevance": null,
-    "walkers": 0.05,
-    "building": 0.0,
+    "walkers": 0.007,
+    "building": 0.005,
+    "manmade": 0.342
+   },
+   "exposure": {
+    "brightness": 179.6,
+    "entropy": 0.846
+   },
+   "sideways": false
+  },
+  {
+   "n": 7,
+   "group": "hikers",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1124 1330.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1124_1330.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1124_1330.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1124_1330.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 0,
+   "look": {
+    "photograph": 1.0,
+    "painting": 0.0,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.15,
+    "turned": 0.458,
+    "relevance": null,
+    "walkers": 0.002,
+    "building": 0.019,
     "manmade": 0.0
    },
    "exposure": {
-    "brightness": 177.9,
-    "entropy": 0.889
+    "brightness": 160.4,
+    "entropy": 0.822
    },
    "sideways": false
   },
@@ -200,7 +200,7 @@
     "turned": 0.502,
     "relevance": null,
     "walkers": 0.118,
-    "building": 0.0,
+    "building": 0.007,
     "manmade": 0.0
    },
    "exposure": {
@@ -212,9 +212,9 @@
   {
    "n": 9,
    "group": "hikers",
-   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1124 1330.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1124_1330.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1124_1330.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1124_1330.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1139 1370.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_at_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1139_1370.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1139_1370.jpg/1280px-Hiking_trail_at_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1139_1370.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -222,25 +222,25 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.15,
-    "turned": 0.458,
+    "upright": 0.212,
+    "turned": 0.632,
     "relevance": null,
-    "walkers": 0.002,
-    "building": 0.0,
-    "manmade": 0.0
+    "walkers": 0.05,
+    "building": 0.009,
+    "manmade": 0.34
    },
    "exposure": {
-    "brightness": 160.4,
-    "entropy": 0.822
+    "brightness": 177.9,
+    "entropy": 0.889
    },
    "sideways": false
   },
   {
    "n": 10,
    "group": "hikers",
-   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1133 1353.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1133_1353.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1133_1353.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1133_1353.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1134 1359.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1134_1359.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1134_1359.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1134_1359.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -248,16 +248,16 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.026,
-    "turned": 0.632,
+    "upright": 0.164,
+    "turned": 0.501,
     "relevance": null,
-    "walkers": 0.026,
-    "building": 0.0,
-    "manmade": 0.0
+    "walkers": 0.013,
+    "building": 0.049,
+    "manmade": 0.035
    },
    "exposure": {
-    "brightness": 177.7,
-    "entropy": 0.918
+    "brightness": 169.5,
+    "entropy": 0.927
    },
    "sideways": false
   },
@@ -278,7 +278,7 @@
     "turned": 0.572,
     "relevance": null,
     "walkers": 0.03,
-    "building": 0.0,
+    "building": 0.002,
     "manmade": 0.0
    },
    "exposure": {
@@ -290,9 +290,9 @@
   {
    "n": 12,
    "group": "hikers",
-   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1134 1359.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1134_1359.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1134_1359.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1134_1359.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1133 1353.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Hiking_trail_on_N%C3%A1mafjall_Mountain,_Iceland,_20240716_1133_1353.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1133_1353.jpg/1280px-Hiking_trail_on_N%C3%A1mafjall_Mountain%2C_Iceland%2C_20240716_1133_1353.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -300,16 +300,16 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.164,
-    "turned": 0.501,
+    "upright": 0.026,
+    "turned": 0.632,
     "relevance": null,
-    "walkers": 0.013,
-    "building": 0.0,
-    "manmade": 0.0
+    "walkers": 0.026,
+    "building": 0.006,
+    "manmade": 0.013
    },
    "exposure": {
-    "brightness": 169.5,
-    "entropy": 0.927
+    "brightness": 177.7,
+    "entropy": 0.918
    },
    "sideways": false
   },
@@ -330,8 +330,8 @@
     "turned": 0.583,
     "relevance": null,
     "walkers": 0.065,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.012,
+    "manmade": 0.01
    },
    "exposure": {
     "brightness": 131.8,
@@ -356,8 +356,8 @@
     "turned": 0.67,
     "relevance": null,
     "walkers": 0.999,
-    "building": 0.531,
-    "manmade": 0.199
+    "building": 0.934,
+    "manmade": 0.587
    },
    "exposure": {
     "brightness": 127.7,
@@ -382,8 +382,8 @@
     "turned": 0.415,
     "relevance": null,
     "walkers": 0.017,
-    "building": 0.112,
-    "manmade": 0.01
+    "building": 0.822,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 140.0,
@@ -408,8 +408,8 @@
     "turned": 0.484,
     "relevance": null,
     "walkers": 0.917,
-    "building": 0.876,
-    "manmade": 0.027
+    "building": 0.993,
+    "manmade": 0.999
    },
    "exposure": {
     "brightness": 155.3,
@@ -434,7 +434,7 @@
     "turned": 0.527,
     "relevance": null,
     "walkers": 0.017,
-    "building": 0.014,
+    "building": 0.966,
     "manmade": 0.0
    },
    "exposure": {
@@ -460,8 +460,8 @@
     "turned": 0.781,
     "relevance": null,
     "walkers": 0.144,
-    "building": 0.001,
-    "manmade": 0.001
+    "building": 0.073,
+    "manmade": 0.003
    },
    "exposure": {
     "brightness": 82.8,
@@ -486,8 +486,8 @@
     "turned": 0.498,
     "relevance": null,
     "walkers": 0.131,
-    "building": 0.003,
-    "manmade": 0.0
+    "building": 0.399,
+    "manmade": 0.038
    },
    "exposure": {
     "brightness": 144.1,
@@ -512,8 +512,8 @@
     "turned": 0.581,
     "relevance": null,
     "walkers": 0.13,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.421,
+    "manmade": 0.041
    },
    "exposure": {
     "brightness": 124.3,
@@ -538,8 +538,8 @@
     "turned": 0.581,
     "relevance": null,
     "walkers": 0.142,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.235,
+    "manmade": 0.101
    },
    "exposure": {
     "brightness": 107.5,
@@ -564,8 +564,8 @@
     "turned": 0.642,
     "relevance": null,
     "walkers": 0.59,
-    "building": 0.001,
-    "manmade": 0.0
+    "building": 0.451,
+    "manmade": 0.951
    },
    "exposure": {
     "brightness": 92.6,
@@ -590,8 +590,8 @@
     "turned": 0.577,
     "relevance": null,
     "walkers": 0.624,
-    "building": 0.089,
-    "manmade": 0.0
+    "building": 0.996,
+    "manmade": 0.043
    },
    "exposure": {
     "brightness": 124.2,
@@ -616,8 +616,8 @@
     "turned": 0.702,
     "relevance": null,
     "walkers": 0.043,
-    "building": 0.016,
-    "manmade": 0.004
+    "building": 0.154,
+    "manmade": 0.761
    },
    "exposure": {
     "brightness": 76.8,
@@ -642,7 +642,7 @@
     "turned": 0.459,
     "relevance": null,
     "walkers": 0.157,
-    "building": 0.0,
+    "building": 0.816,
     "manmade": 0.0
    },
    "exposure": {
@@ -668,7 +668,7 @@
     "turned": 0.715,
     "relevance": null,
     "walkers": 0.222,
-    "building": 0.0,
+    "building": 0.399,
     "manmade": 0.0
    },
    "exposure": {
@@ -694,8 +694,8 @@
     "turned": 0.572,
     "relevance": null,
     "walkers": 0.231,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.675,
+    "manmade": 0.003
    },
    "exposure": {
     "brightness": 113.5,
@@ -720,8 +720,8 @@
     "turned": 0.591,
     "relevance": null,
     "walkers": 0.344,
-    "building": 0.0,
-    "manmade": 0.006
+    "building": 0.257,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 144.8,
@@ -746,8 +746,8 @@
     "turned": 0.622,
     "relevance": null,
     "walkers": 0.042,
-    "building": 0.373,
-    "manmade": 0.007
+    "building": 0.957,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 103.5,
@@ -772,7 +772,7 @@
     "turned": 0.563,
     "relevance": null,
     "walkers": 0.022,
-    "building": 0.093,
+    "building": 0.988,
     "manmade": 0.0
    },
    "exposure": {
@@ -798,8 +798,8 @@
     "turned": 0.625,
     "relevance": null,
     "walkers": 0.372,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.996,
+    "manmade": 0.001
    },
    "exposure": {
     "brightness": 172.3,
@@ -846,15 +846,15 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.145,
-    "turned": 0.496,
+    "upright": 0.108,
+    "turned": 0.544,
     "relevance": null,
-    "walkers": 0.118,
-    "building": 0.0,
-    "manmade": 0.0
+    "walkers": 0.133,
+    "building": 0.018,
+    "manmade": 0.142
    },
    "exposure": {
-    "brightness": 118.6,
+    "brightness": 118.2,
     "entropy": 0.985
    },
    "sideways": false
@@ -877,7 +877,7 @@
     "relevance": null,
     "walkers": 0.089,
     "building": 0.0,
-    "manmade": 0.0
+    "manmade": 0.007
    },
    "exposure": {
     "brightness": 106.3,
@@ -902,8 +902,8 @@
     "turned": 0.582,
     "relevance": null,
     "walkers": 0.037,
-    "building": 0.265,
-    "manmade": 0.002
+    "building": 0.985,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 146.8,
@@ -928,7 +928,7 @@
     "turned": 0.488,
     "relevance": null,
     "walkers": 0.188,
-    "building": 0.0,
+    "building": 0.151,
     "manmade": 0.0
    },
    "exposure": {
@@ -954,8 +954,8 @@
     "turned": 0.415,
     "relevance": null,
     "walkers": 0.785,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.985,
+    "manmade": 0.002
    },
    "exposure": {
     "brightness": 119.1,
@@ -980,8 +980,8 @@
     "turned": 0.528,
     "relevance": null,
     "walkers": 0.457,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.712,
+    "manmade": 0.699
    },
    "exposure": {
     "brightness": 107.3,
@@ -1006,8 +1006,8 @@
     "turned": 0.473,
     "relevance": null,
     "walkers": 0.637,
-    "building": 0.978,
-    "manmade": 0.0
+    "building": 0.903,
+    "manmade": 0.139
    },
    "exposure": {
     "brightness": 136.9,
@@ -1032,8 +1032,8 @@
     "turned": 0.574,
     "relevance": null,
     "walkers": 0.155,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.471,
+    "manmade": 0.001
    },
    "exposure": {
     "brightness": 128.7,
@@ -1058,8 +1058,8 @@
     "turned": 0.527,
     "relevance": null,
     "walkers": 0.812,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.913,
+    "manmade": 0.011
    },
    "exposure": {
     "brightness": 88.5,
@@ -1084,8 +1084,8 @@
     "turned": 0.56,
     "relevance": null,
     "walkers": 0.083,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.072,
+    "manmade": 0.001
    },
    "exposure": {
     "brightness": 119.0,
@@ -1110,8 +1110,8 @@
     "turned": 0.586,
     "relevance": null,
     "walkers": 0.508,
-    "building": 0.001,
-    "manmade": 0.0
+    "building": 0.965,
+    "manmade": 0.974
    },
    "exposure": {
     "brightness": 123.4,
@@ -1136,8 +1136,8 @@
     "turned": 0.525,
     "relevance": null,
     "walkers": 0.871,
-    "building": 0.001,
-    "manmade": 0.0
+    "building": 0.986,
+    "manmade": 0.801
    },
    "exposure": {
     "brightness": 129.9,
@@ -1162,8 +1162,8 @@
     "turned": 0.738,
     "relevance": null,
     "walkers": 0.731,
-    "building": 0.087,
-    "manmade": 0.0
+    "building": 0.965,
+    "manmade": 0.433
    },
    "exposure": {
     "brightness": 121.6,
@@ -1188,8 +1188,8 @@
     "turned": 0.454,
     "relevance": null,
     "walkers": 0.047,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.938,
+    "manmade": 0.003
    },
    "exposure": {
     "brightness": 165.0,
@@ -1214,8 +1214,8 @@
     "turned": 0.394,
     "relevance": null,
     "walkers": 0.631,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.987,
+    "manmade": 0.122
    },
    "exposure": {
     "brightness": 96.6,
@@ -1240,8 +1240,8 @@
     "turned": 0.485,
     "relevance": null,
     "walkers": 0.56,
-    "building": 1.0,
-    "manmade": 0.0
+    "building": 0.956,
+    "manmade": 0.842
    },
    "exposure": {
     "brightness": 75.6,
@@ -1266,8 +1266,8 @@
     "turned": 0.522,
     "relevance": null,
     "walkers": 0.508,
-    "building": 0.989,
-    "manmade": 0.0
+    "building": 0.903,
+    "manmade": 0.968
    },
    "exposure": {
     "brightness": 116.8,
@@ -1292,8 +1292,8 @@
     "turned": 0.584,
     "relevance": null,
     "walkers": 0.207,
-    "building": 0.994,
-    "manmade": 0.0
+    "building": 0.973,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 73.3,
@@ -1318,8 +1318,8 @@
     "turned": 0.495,
     "relevance": null,
     "walkers": 0.983,
-    "building": 0.88,
-    "manmade": 0.0
+    "building": 0.987,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 104.3,
@@ -1344,8 +1344,8 @@
     "turned": 0.673,
     "relevance": null,
     "walkers": 0.014,
-    "building": 0.981,
-    "manmade": 0.0
+    "building": 0.843,
+    "manmade": 0.992
    },
    "exposure": {
     "brightness": 75.5,
@@ -1370,8 +1370,8 @@
     "turned": 0.663,
     "relevance": null,
     "walkers": 0.061,
-    "building": 0.998,
-    "manmade": 0.0
+    "building": 0.944,
+    "manmade": 0.99
    },
    "exposure": {
     "brightness": 85.1,
@@ -1396,8 +1396,8 @@
     "turned": 0.523,
     "relevance": null,
     "walkers": 0.752,
-    "building": 0.992,
-    "manmade": 0.0
+    "building": 0.909,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 59.3,
@@ -1422,8 +1422,8 @@
     "turned": 0.477,
     "relevance": null,
     "walkers": 0.202,
-    "building": 0.999,
-    "manmade": 0.0
+    "building": 0.616,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 45.4,
@@ -1448,8 +1448,8 @@
     "turned": 0.513,
     "relevance": null,
     "walkers": 0.084,
-    "building": 1.0,
-    "manmade": 0.0
+    "building": 0.845,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 18.7,
@@ -1474,8 +1474,8 @@
     "turned": 0.477,
     "relevance": null,
     "walkers": 0.935,
-    "building": 0.999,
-    "manmade": 0.0
+    "building": 0.881,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 116.6,
@@ -1500,8 +1500,8 @@
     "turned": 0.491,
     "relevance": null,
     "walkers": 0.375,
-    "building": 0.997,
-    "manmade": 0.0
+    "building": 0.194,
+    "manmade": 0.981
    },
    "exposure": {
     "brightness": 81.3,
@@ -1526,8 +1526,8 @@
     "turned": 0.651,
     "relevance": null,
     "walkers": 0.589,
-    "building": 0.991,
-    "manmade": 0.0
+    "building": 0.953,
+    "manmade": 0.984
    },
    "exposure": {
     "brightness": 127.8,
@@ -1552,8 +1552,8 @@
     "turned": 0.476,
     "relevance": null,
     "walkers": 0.985,
-    "building": 0.0,
-    "manmade": 0.469
+    "building": 0.478,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 146.3,
@@ -1578,8 +1578,8 @@
     "turned": 0.648,
     "relevance": null,
     "walkers": 0.956,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.984,
+    "manmade": 0.014
    },
    "exposure": {
     "brightness": 106.6,
@@ -1604,8 +1604,8 @@
     "turned": 0.339,
     "relevance": null,
     "walkers": 0.318,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.015,
+    "manmade": 0.003
    },
    "exposure": {
     "brightness": 155.8,
@@ -1630,8 +1630,8 @@
     "turned": 0.481,
     "relevance": null,
     "walkers": 0.013,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.091,
+    "manmade": 0.808
    },
    "exposure": {
     "brightness": 74.9,
@@ -1656,7 +1656,7 @@
     "turned": 0.572,
     "relevance": null,
     "walkers": 0.128,
-    "building": 0.0,
+    "building": 0.04,
     "manmade": 0.0
    },
    "exposure": {
@@ -1682,7 +1682,7 @@
     "turned": 0.608,
     "relevance": null,
     "walkers": 0.034,
-    "building": 0.001,
+    "building": 0.087,
     "manmade": 0.0
    },
    "exposure": {
@@ -1708,7 +1708,7 @@
     "turned": 0.615,
     "relevance": null,
     "walkers": 0.556,
-    "building": 0.0,
+    "building": 0.005,
     "manmade": 0.001
    },
    "exposure": {
@@ -1734,8 +1734,8 @@
     "turned": 0.241,
     "relevance": null,
     "walkers": 0.008,
-    "building": 0.0,
-    "manmade": 0.076
+    "building": 0.003,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 120.6,
@@ -1760,8 +1760,8 @@
     "turned": 0.62,
     "relevance": null,
     "walkers": 0.07,
-    "building": 0.001,
-    "manmade": 0.001
+    "building": 0.027,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 106.9,
@@ -1782,15 +1782,15 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.137,
-    "turned": 0.526,
+    "upright": 0.129,
+    "turned": 0.498,
     "relevance": null,
-    "walkers": 0.011,
-    "building": 0.0,
-    "manmade": 0.01
+    "walkers": 0.008,
+    "building": 0.012,
+    "manmade": 0.476
    },
    "exposure": {
-    "brightness": 129.0,
+    "brightness": 128.6,
     "entropy": 0.972
    },
    "sideways": false
@@ -1812,7 +1812,7 @@
     "turned": 0.532,
     "relevance": null,
     "walkers": 0.097,
-    "building": 0.0,
+    "building": 0.04,
     "manmade": 0.0
    },
    "exposure": {
@@ -1838,8 +1838,8 @@
     "turned": 0.403,
     "relevance": null,
     "walkers": 0.444,
-    "building": 0.0,
-    "manmade": 0.008
+    "building": 0.05,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 140.3,
@@ -1864,8 +1864,8 @@
     "turned": 0.497,
     "relevance": null,
     "walkers": 0.399,
-    "building": 0.0,
-    "manmade": 0.003
+    "building": 0.015,
+    "manmade": 0.002
    },
    "exposure": {
     "brightness": 138.2,
@@ -1890,7 +1890,7 @@
     "turned": 0.497,
     "relevance": null,
     "walkers": 0.128,
-    "building": 0.0,
+    "building": 0.004,
     "manmade": 0.0
    },
    "exposure": {
@@ -1916,8 +1916,8 @@
     "turned": 0.418,
     "relevance": null,
     "walkers": 1.0,
-    "building": 0.0,
-    "manmade": 0.574
+    "building": 0.984,
+    "manmade": 0.014
    },
    "exposure": {
     "brightness": 220.3,
@@ -1942,7 +1942,7 @@
     "turned": 0.345,
     "relevance": null,
     "walkers": 0.006,
-    "building": 0.0,
+    "building": 0.003,
     "manmade": 0.0
    },
    "exposure": {
@@ -1968,7 +1968,7 @@
     "turned": 0.424,
     "relevance": null,
     "walkers": 0.003,
-    "building": 0.0,
+    "building": 0.002,
     "manmade": 0.0
    },
    "exposure": {
@@ -1994,7 +1994,7 @@
     "turned": 0.524,
     "relevance": null,
     "walkers": 0.109,
-    "building": 0.0,
+    "building": 0.011,
     "manmade": 0.0
    },
    "exposure": {
@@ -2020,7 +2020,7 @@
     "turned": 0.367,
     "relevance": null,
     "walkers": 0.051,
-    "building": 0.0,
+    "building": 0.003,
     "manmade": 0.0
    },
    "exposure": {
@@ -2046,7 +2046,7 @@
     "turned": 0.583,
     "relevance": null,
     "walkers": 0.638,
-    "building": 0.0,
+    "building": 0.011,
     "manmade": 0.0
    },
    "exposure": {
@@ -2072,8 +2072,8 @@
     "turned": 0.643,
     "relevance": null,
     "walkers": 0.926,
-    "building": 0.0,
-    "manmade": 0.389
+    "building": 0.027,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 148.1,
@@ -2124,8 +2124,8 @@
     "turned": 0.485,
     "relevance": null,
     "walkers": 0.351,
-    "building": 0.001,
-    "manmade": 0.004
+    "building": 0.012,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 143.8,
@@ -2150,8 +2150,8 @@
     "turned": 0.687,
     "relevance": null,
     "walkers": 0.087,
-    "building": 0.015,
-    "manmade": 0.004
+    "building": 0.022,
+    "manmade": 0.007
    },
    "exposure": {
     "brightness": 139.8,
@@ -2172,15 +2172,15 @@
     "painting": 0.001,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.236,
-    "turned": 0.442,
+    "upright": 0.396,
+    "turned": 0.337,
     "relevance": null,
-    "walkers": 0.31,
-    "building": 0.0,
-    "manmade": 0.471
+    "walkers": 0.315,
+    "building": 0.007,
+    "manmade": 0.0
    },
    "exposure": {
-    "brightness": 99.3,
+    "brightness": 99.0,
     "entropy": 0.977
    },
    "sideways": false
@@ -2198,15 +2198,15 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.106,
-    "turned": 0.555,
+    "upright": 0.134,
+    "turned": 0.55,
     "relevance": null,
-    "walkers": 0.319,
-    "building": 0.0,
-    "manmade": 0.472
+    "walkers": 0.374,
+    "building": 0.184,
+    "manmade": 0.723
    },
    "exposure": {
-    "brightness": 126.7,
+    "brightness": 126.2,
     "entropy": 0.94
    },
    "sideways": false
@@ -2229,7 +2229,7 @@
     "relevance": null,
     "walkers": 0.006,
     "building": 0.0,
-    "manmade": 0.057
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 113.3,
@@ -2254,8 +2254,8 @@
     "turned": 0.328,
     "relevance": null,
     "walkers": 0.513,
-    "building": 0.0,
-    "manmade": 0.044
+    "building": 0.006,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 92.4,
@@ -2280,8 +2280,8 @@
     "turned": 0.479,
     "relevance": null,
     "walkers": 0.067,
-    "building": 0.0,
-    "manmade": 0.02
+    "building": 0.009,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 106.9,
@@ -2306,8 +2306,8 @@
     "turned": 0.478,
     "relevance": null,
     "walkers": 0.153,
-    "building": 0.002,
-    "manmade": 0.366
+    "building": 0.009,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 99.4,
@@ -2332,8 +2332,8 @@
     "turned": 0.522,
     "relevance": null,
     "walkers": 0.636,
-    "building": 0.0,
-    "manmade": 0.019
+    "building": 0.702,
+    "manmade": 0.055
    },
    "exposure": {
     "brightness": 173.1,
@@ -2358,8 +2358,8 @@
     "turned": 0.425,
     "relevance": null,
     "walkers": 0.016,
-    "building": 0.0,
-    "manmade": 0.827
+    "building": 0.001,
+    "manmade": 0.002
    },
    "exposure": {
     "brightness": 138.7,
@@ -2384,8 +2384,8 @@
     "turned": 0.48,
     "relevance": null,
     "walkers": 0.01,
-    "building": 0.0,
-    "manmade": 0.009
+    "building": 0.138,
+    "manmade": 0.007
    },
    "exposure": {
     "brightness": 107.4,
@@ -2410,8 +2410,8 @@
     "turned": 0.566,
     "relevance": null,
     "walkers": 0.086,
-    "building": 0.0,
-    "manmade": 0.004
+    "building": 0.001,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 158.8,
@@ -2436,8 +2436,8 @@
     "turned": 0.516,
     "relevance": null,
     "walkers": 0.996,
-    "building": 0.246,
-    "manmade": 0.012
+    "building": 0.964,
+    "manmade": 0.212
    },
    "exposure": {
     "brightness": 142.9,
@@ -2448,9 +2448,9 @@
   {
    "n": 95,
    "group": "sea",
-   "title": "File:Kuantan - waves breaking over rocks at Teluk Cempedak - May 2024.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Kuantan_-_waves_breaking_over_rocks_at_Teluk_Cempedak_-_May_2024.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Kuantan_-_waves_breaking_over_rocks_at_Teluk_Cempedak_-_May_2024.jpg/1280px-Kuantan_-_waves_breaking_over_rocks_at_Teluk_Cempedak_-_May_2024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Cape Town (ZA), Sea Point Promenade -- 2024 -- 3629.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Cape_Town_(ZA),_Sea_Point_Promenade_--_2024_--_3629.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c6/Cape_Town_%28ZA%29%2C_Sea_Point_Promenade_--_2024_--_3629.jpg/1280px-Cape_Town_%28ZA%29%2C_Sea_Point_Promenade_--_2024_--_3629.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -2458,16 +2458,16 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.43,
-    "turned": 0.405,
+    "upright": 0.168,
+    "turned": 0.518,
     "relevance": null,
-    "walkers": 0.125,
-    "building": 0.0,
-    "manmade": 0.987
+    "walkers": 0.109,
+    "building": 0.001,
+    "manmade": 0.0
    },
    "exposure": {
-    "brightness": 165.7,
-    "entropy": 0.925
+    "brightness": 104.0,
+    "entropy": 0.979
    },
    "sideways": false
   },
@@ -2489,7 +2489,7 @@
     "relevance": null,
     "walkers": 0.296,
     "building": 0.0,
-    "manmade": 0.493
+    "manmade": 0.001
    },
    "exposure": {
     "brightness": 103.1,
@@ -2515,7 +2515,7 @@
     "relevance": null,
     "walkers": 0.006,
     "building": 0.0,
-    "manmade": 0.001
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 103.1,
@@ -2541,7 +2541,7 @@
     "relevance": null,
     "walkers": 0.033,
     "building": 0.0,
-    "manmade": 0.004
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 129.4,
@@ -2567,7 +2567,7 @@
     "relevance": null,
     "walkers": 0.023,
     "building": 0.0,
-    "manmade": 0.004
+    "manmade": 0.001
    },
    "exposure": {
     "brightness": 150.6,
@@ -2593,7 +2593,7 @@
     "relevance": null,
     "walkers": 0.001,
     "building": 0.0,
-    "manmade": 0.982
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 109.3,
@@ -2619,7 +2619,7 @@
     "relevance": null,
     "walkers": 0.015,
     "building": 0.0,
-    "manmade": 0.003
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 109.6,
@@ -2645,7 +2645,7 @@
     "relevance": null,
     "walkers": 0.066,
     "building": 0.0,
-    "manmade": 0.001
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 70.0,
@@ -2670,7 +2670,7 @@
     "turned": 0.433,
     "relevance": null,
     "walkers": 0.098,
-    "building": 0.0,
+    "building": 0.009,
     "manmade": 0.0
    },
    "exposure": {
@@ -2697,7 +2697,7 @@
     "relevance": null,
     "walkers": 0.075,
     "building": 0.0,
-    "manmade": 0.291
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 86.0,
@@ -2723,7 +2723,7 @@
     "relevance": null,
     "walkers": 0.001,
     "building": 0.0,
-    "manmade": 0.007
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 75.4,
@@ -2749,7 +2749,7 @@
     "relevance": null,
     "walkers": 0.126,
     "building": 0.0,
-    "manmade": 0.008
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 84.5,
@@ -2800,8 +2800,8 @@
     "turned": 0.533,
     "relevance": null,
     "walkers": 0.05,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.001,
+    "manmade": 0.256
    },
    "exposure": {
     "brightness": 139.2,
@@ -2826,7 +2826,7 @@
     "turned": 0.548,
     "relevance": null,
     "walkers": 0.01,
-    "building": 0.0,
+    "building": 0.013,
     "manmade": 0.0
    },
    "exposure": {
@@ -2852,8 +2852,8 @@
     "turned": 0.401,
     "relevance": null,
     "walkers": 0.19,
-    "building": 0.0,
-    "manmade": 0.001
+    "building": 0.317,
+    "manmade": 0.244
    },
    "exposure": {
     "brightness": 109.6,
@@ -2878,8 +2878,8 @@
     "turned": 0.469,
     "relevance": null,
     "walkers": 0.93,
-    "building": 0.0,
-    "manmade": 0.001
+    "building": 0.84,
+    "manmade": 0.92
    },
    "exposure": {
     "brightness": 132.7,
@@ -2904,8 +2904,8 @@
     "turned": 0.467,
     "relevance": null,
     "walkers": 0.007,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.002,
+    "manmade": 0.421
    },
    "exposure": {
     "brightness": 110.0,
@@ -2916,9 +2916,9 @@
   {
    "n": 113,
    "group": "sky",
-   "title": "File:Cumulonimbus sunset panorama, Albury NSW Australia.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Cumulonimbus_sunset_panorama,_Albury_NSW_Australia.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Cumulonimbus_sunset_panorama%2C_Albury_NSW_Australia.jpg/1280px-Cumulonimbus_sunset_panorama%2C_Albury_NSW_Australia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Walkway and hut in paddy fields with water reflection of colorful clouds at sunset in Vang Vieng Laos.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg/1280px-Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -2926,16 +2926,16 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.499,
-    "turned": 0.288,
+    "upright": 0.034,
+    "turned": 0.784,
     "relevance": null,
-    "walkers": 0.032,
-    "building": 0.001,
-    "manmade": 0.0
+    "walkers": 0.014,
+    "building": 0.094,
+    "manmade": 0.926
    },
    "exposure": {
-    "brightness": 113.3,
-    "entropy": 0.895
+    "brightness": 94.5,
+    "entropy": 0.94
    },
    "sideways": false
   },
@@ -2956,8 +2956,8 @@
     "turned": 0.474,
     "relevance": null,
     "walkers": 0.002,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.001,
+    "manmade": 0.495
    },
    "exposure": {
     "brightness": 97.6,
@@ -2968,9 +2968,9 @@
   {
    "n": 115,
    "group": "sky",
-   "title": "File:Walkway and hut in paddy fields with water reflection of colorful clouds at sunset in Vang Vieng Laos.jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg/1280px-Walkway_and_hut_in_paddy_fields_with_water_reflection_of_colorful_clouds_at_sunset_in_Vang_Vieng_Laos.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "title": "File:Cumulonimbus sunset panorama, Albury NSW Australia.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Cumulonimbus_sunset_panorama,_Albury_NSW_Australia.jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Cumulonimbus_sunset_panorama%2C_Albury_NSW_Australia.jpg/1280px-Cumulonimbus_sunset_panorama%2C_Albury_NSW_Australia.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
    "faces": 0,
    "people": 0,
    "look": {
@@ -2978,16 +2978,16 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.034,
-    "turned": 0.784,
+    "upright": 0.499,
+    "turned": 0.288,
     "relevance": null,
-    "walkers": 0.014,
-    "building": 0.0,
-    "manmade": 0.0
+    "walkers": 0.032,
+    "building": 0.002,
+    "manmade": 0.003
    },
    "exposure": {
-    "brightness": 94.5,
-    "entropy": 0.94
+    "brightness": 113.3,
+    "entropy": 0.895
    },
    "sideways": false
   },
@@ -3004,15 +3004,15 @@
     "painting": 0.0,
     "drawing": 0.0,
     "rendering": 0.0,
-    "upright": 0.216,
-    "turned": 0.626,
+    "upright": 0.2,
+    "turned": 0.548,
     "relevance": null,
-    "walkers": 0.012,
-    "building": 0.0,
-    "manmade": 0.0
+    "walkers": 0.015,
+    "building": 0.004,
+    "manmade": 0.723
    },
    "exposure": {
-    "brightness": 82.4,
+    "brightness": 82.5,
     "entropy": 0.93
    },
    "sideways": false
@@ -3034,8 +3034,8 @@
     "turned": 0.366,
     "relevance": null,
     "walkers": 0.019,
-    "building": 0.0,
-    "manmade": 0.001
+    "building": 0.002,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 77.5,
@@ -3060,8 +3060,8 @@
     "turned": 0.509,
     "relevance": null,
     "walkers": 0.394,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.237,
+    "manmade": 0.825
    },
    "exposure": {
     "brightness": 121.9,
@@ -3087,7 +3087,7 @@
     "relevance": null,
     "walkers": 0.836,
     "building": 0.987,
-    "manmade": 0.001
+    "manmade": 0.617
    },
    "exposure": {
     "brightness": 105.8,
@@ -3112,7 +3112,7 @@
     "turned": 0.526,
     "relevance": null,
     "walkers": 0.241,
-    "building": 0.0,
+    "building": 0.006,
     "manmade": 0.0
    },
    "exposure": {
@@ -3138,8 +3138,8 @@
     "turned": 0.767,
     "relevance": null,
     "walkers": 0.428,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.933,
+    "manmade": 0.887
    },
    "exposure": {
     "brightness": 118.2,
@@ -3164,8 +3164,8 @@
     "turned": 0.426,
     "relevance": null,
     "walkers": 0.997,
-    "building": 0.014,
-    "manmade": 0.0
+    "building": 0.864,
+    "manmade": 0.496
    },
    "exposure": {
     "brightness": 138.6,
@@ -3191,7 +3191,7 @@
     "relevance": null,
     "walkers": 0.271,
     "building": 0.0,
-    "manmade": 0.002
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 97.8,
@@ -3216,8 +3216,8 @@
     "turned": 0.492,
     "relevance": null,
     "walkers": 0.448,
-    "building": 0.015,
-    "manmade": 0.0
+    "building": 0.973,
+    "manmade": 0.118
    },
    "exposure": {
     "brightness": 74.9,
@@ -3242,8 +3242,8 @@
     "turned": 0.389,
     "relevance": null,
     "walkers": 0.916,
-    "building": 0.115,
-    "manmade": 0.005
+    "building": 0.873,
+    "manmade": 0.961
    },
    "exposure": {
     "brightness": 154.2,
@@ -3268,8 +3268,8 @@
     "turned": 0.357,
     "relevance": null,
     "walkers": 1.0,
-    "building": 0.249,
-    "manmade": 0.008
+    "building": 0.397,
+    "manmade": 0.812
    },
    "exposure": {
     "brightness": 97.0,
@@ -3294,7 +3294,7 @@
     "turned": 0.429,
     "relevance": null,
     "walkers": 0.614,
-    "building": 0.0,
+    "building": 0.217,
     "manmade": 0.001
    },
    "exposure": {
@@ -3320,8 +3320,8 @@
     "turned": 0.41,
     "relevance": null,
     "walkers": 0.999,
-    "building": 0.723,
-    "manmade": 0.003
+    "building": 0.514,
+    "manmade": 0.898
    },
    "exposure": {
     "brightness": 131.6,
@@ -3346,8 +3346,8 @@
     "turned": 0.484,
     "relevance": null,
     "walkers": 0.15,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.682,
+    "manmade": 0.005
    },
    "exposure": {
     "brightness": 131.4,
@@ -3372,8 +3372,8 @@
     "turned": 0.455,
     "relevance": null,
     "walkers": 0.781,
-    "building": 0.991,
-    "manmade": 0.0
+    "building": 0.996,
+    "manmade": 0.956
    },
    "exposure": {
     "brightness": 121.5,
@@ -3398,8 +3398,8 @@
     "turned": 0.75,
     "relevance": null,
     "walkers": 0.875,
-    "building": 0.104,
-    "manmade": 0.001
+    "building": 0.538,
+    "manmade": 0.267
    },
    "exposure": {
     "brightness": 109.9,
@@ -3424,8 +3424,8 @@
     "turned": 0.574,
     "relevance": null,
     "walkers": 0.978,
-    "building": 0.995,
-    "manmade": 0.0
+    "building": 0.993,
+    "manmade": 0.054
    },
    "exposure": {
     "brightness": 129.4,
@@ -3450,8 +3450,8 @@
     "turned": 0.505,
     "relevance": null,
     "walkers": 0.998,
-    "building": 0.78,
-    "manmade": 0.028
+    "building": 0.989,
+    "manmade": 0.901
    },
    "exposure": {
     "brightness": 150.6,
@@ -3476,8 +3476,8 @@
     "turned": 0.397,
     "relevance": null,
     "walkers": 0.938,
-    "building": 0.449,
-    "manmade": 0.394
+    "building": 0.199,
+    "manmade": 0.143
    },
    "exposure": {
     "brightness": 219.2,
@@ -3502,8 +3502,8 @@
     "turned": 0.805,
     "relevance": null,
     "walkers": 0.946,
-    "building": 0.086,
-    "manmade": 0.022
+    "building": 0.664,
+    "manmade": 0.343
    },
    "exposure": {
     "brightness": 205.9,
@@ -3528,8 +3528,8 @@
     "turned": 0.656,
     "relevance": null,
     "walkers": 0.936,
-    "building": 0.093,
-    "manmade": 0.011
+    "building": 0.929,
+    "manmade": 0.007
    },
    "exposure": {
     "brightness": 148.4,
@@ -3554,8 +3554,8 @@
     "turned": 0.383,
     "relevance": null,
     "walkers": 0.503,
-    "building": 0.974,
-    "manmade": 0.0
+    "building": 0.402,
+    "manmade": 0.002
    },
    "exposure": {
     "brightness": 126.8,
@@ -3580,8 +3580,8 @@
     "turned": 0.467,
     "relevance": null,
     "walkers": 0.44,
-    "building": 0.686,
-    "manmade": 0.0
+    "building": 0.868,
+    "manmade": 0.082
    },
    "exposure": {
     "brightness": 158.3,
@@ -3606,8 +3606,8 @@
     "turned": 0.583,
     "relevance": null,
     "walkers": 0.546,
-    "building": 0.001,
-    "manmade": 0.0
+    "building": 0.155,
+    "manmade": 0.005
    },
    "exposure": {
     "brightness": 151.8,
@@ -3632,8 +3632,8 @@
     "turned": 0.595,
     "relevance": null,
     "walkers": 0.974,
-    "building": 0.035,
-    "manmade": 0.141
+    "building": 0.093,
+    "manmade": 0.001
    },
    "exposure": {
     "brightness": 141.0,
@@ -3658,8 +3658,8 @@
     "turned": 0.477,
     "relevance": null,
     "walkers": 0.283,
-    "building": 0.049,
-    "manmade": 0.0
+    "building": 0.678,
+    "manmade": 0.002
    },
    "exposure": {
     "brightness": 133.6,
@@ -3684,8 +3684,8 @@
     "turned": 0.602,
     "relevance": null,
     "walkers": 0.955,
-    "building": 0.005,
-    "manmade": 0.055
+    "building": 0.654,
+    "manmade": 0.958
    },
    "exposure": {
     "brightness": 135.3,
@@ -3710,8 +3710,8 @@
     "turned": 0.462,
     "relevance": null,
     "walkers": 0.988,
-    "building": 0.992,
-    "manmade": 0.0
+    "building": 0.981,
+    "manmade": 0.459
    },
    "exposure": {
     "brightness": 228.9,
@@ -3736,8 +3736,8 @@
     "turned": 0.636,
     "relevance": null,
     "walkers": 0.949,
-    "building": 0.0,
-    "manmade": 0.947
+    "building": 0.223,
+    "manmade": 0.993
    },
    "exposure": {
     "brightness": 75.6,
@@ -3762,8 +3762,8 @@
     "turned": 0.546,
     "relevance": null,
     "walkers": 0.017,
-    "building": 0.0,
-    "manmade": 0.633
+    "building": 0.542,
+    "manmade": 0.996
    },
    "exposure": {
     "brightness": 140.1,
@@ -3788,7 +3788,7 @@
     "turned": 0.638,
     "relevance": null,
     "walkers": 0.338,
-    "building": 0.0,
+    "building": 0.004,
     "manmade": 0.999
    },
    "exposure": {
@@ -3814,8 +3814,8 @@
     "turned": 0.449,
     "relevance": null,
     "walkers": 0.05,
-    "building": 0.0,
-    "manmade": 0.091
+    "building": 0.363,
+    "manmade": 0.999
    },
    "exposure": {
     "brightness": 139.7,
@@ -3840,8 +3840,8 @@
     "turned": 0.522,
     "relevance": null,
     "walkers": 0.002,
-    "building": 0.0,
-    "manmade": 0.014
+    "building": 0.018,
+    "manmade": 0.96
    },
    "exposure": {
     "brightness": 89.3,
@@ -3866,8 +3866,8 @@
     "turned": 0.498,
     "relevance": null,
     "walkers": 0.002,
-    "building": 0.988,
-    "manmade": 0.002
+    "building": 0.975,
+    "manmade": 1.0
    },
    "exposure": {
     "brightness": 110.3,
@@ -3892,8 +3892,8 @@
     "turned": 0.378,
     "relevance": null,
     "walkers": 0.001,
-    "building": 0.0,
-    "manmade": 0.008
+    "building": 0.003,
+    "manmade": 0.969
    },
    "exposure": {
     "brightness": 152.5,
@@ -3918,8 +3918,8 @@
     "turned": 0.441,
     "relevance": null,
     "walkers": 0.085,
-    "building": 0.001,
-    "manmade": 0.49
+    "building": 0.002,
+    "manmade": 0.31
    },
    "exposure": {
     "brightness": 87.2,
@@ -3944,8 +3944,8 @@
     "turned": 0.594,
     "relevance": null,
     "walkers": 0.197,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.007,
+    "manmade": 0.111
    },
    "exposure": {
     "brightness": 111.7,
@@ -3970,8 +3970,8 @@
     "turned": 0.542,
     "relevance": null,
     "walkers": 0.162,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.749,
+    "manmade": 0.983
    },
    "exposure": {
     "brightness": 130.8,
@@ -3996,8 +3996,8 @@
     "turned": 0.49,
     "relevance": null,
     "walkers": 0.004,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.175,
+    "manmade": 0.985
    },
    "exposure": {
     "brightness": 118.4,
@@ -4022,8 +4022,8 @@
     "turned": 0.333,
     "relevance": null,
     "walkers": 0.096,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.03,
+    "manmade": 0.246
    },
    "exposure": {
     "brightness": 111.8,
@@ -4048,8 +4048,8 @@
     "turned": 0.317,
     "relevance": null,
     "walkers": 0.227,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.343,
+    "manmade": 0.011
    },
    "exposure": {
     "brightness": 118.2,
@@ -4074,8 +4074,8 @@
     "turned": 0.475,
     "relevance": null,
     "walkers": 0.231,
-    "building": 0.0,
-    "manmade": 0.657
+    "building": 0.054,
+    "manmade": 0.983
    },
    "exposure": {
     "brightness": 133.5,
@@ -4101,7 +4101,7 @@
     "relevance": null,
     "walkers": 0.976,
     "building": 0.0,
-    "manmade": 1.0
+    "manmade": 0.039
    },
    "exposure": {
     "brightness": 131.1,
@@ -4127,7 +4127,7 @@
     "relevance": null,
     "walkers": 0.06,
     "building": 0.0,
-    "manmade": 0.998
+    "manmade": 0.002
    },
    "exposure": {
     "brightness": 113.0,
@@ -4152,8 +4152,8 @@
     "turned": 0.396,
     "relevance": null,
     "walkers": 0.049,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.003,
+    "manmade": 0.613
    },
    "exposure": {
     "brightness": 116.7,
@@ -4178,8 +4178,8 @@
     "turned": 0.557,
     "relevance": null,
     "walkers": 1.0,
-    "building": 0.16,
-    "manmade": 0.685
+    "building": 0.998,
+    "manmade": 0.841
    },
    "exposure": {
     "brightness": 185.2,
@@ -4204,8 +4204,8 @@
     "turned": 0.456,
     "relevance": null,
     "walkers": 0.003,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.003,
+    "manmade": 0.031
    },
    "exposure": {
     "brightness": 110.5,
@@ -4230,8 +4230,8 @@
     "turned": 0.582,
     "relevance": null,
     "walkers": 0.004,
-    "building": 0.0,
-    "manmade": 1.0
+    "building": 0.756,
+    "manmade": 0.999
    },
    "exposure": {
     "brightness": 152.8,
@@ -4256,8 +4256,8 @@
     "turned": 0.668,
     "relevance": null,
     "walkers": 0.854,
-    "building": 0.0,
-    "manmade": 0.999
+    "building": 0.961,
+    "manmade": 0.984
    },
    "exposure": {
     "brightness": 166.0,
@@ -4282,8 +4282,8 @@
     "turned": 0.553,
     "relevance": null,
     "walkers": 0.025,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.009,
+    "manmade": 0.012
    },
    "exposure": {
     "brightness": 103.5,
@@ -4387,7 +4387,7 @@
     "relevance": null,
     "walkers": 0.026,
     "building": 0.0,
-    "manmade": 0.008
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 74.9,
@@ -4412,8 +4412,8 @@
     "turned": 0.376,
     "relevance": null,
     "walkers": 0.741,
-    "building": 0.0,
-    "manmade": 0.034
+    "building": 0.001,
+    "manmade": 0.274
    },
    "exposure": {
     "brightness": 111.8,
@@ -4438,8 +4438,8 @@
     "turned": 0.458,
     "relevance": null,
     "walkers": 0.01,
-    "building": 0.0,
-    "manmade": 0.002
+    "building": 0.005,
+    "manmade": 0.054
    },
    "exposure": {
     "brightness": 119.6,
@@ -4464,8 +4464,8 @@
     "turned": 0.438,
     "relevance": null,
     "walkers": 0.01,
-    "building": 0.0,
-    "manmade": 0.001
+    "building": 0.008,
+    "manmade": 0.664
    },
    "exposure": {
     "brightness": 112.3,
@@ -4517,7 +4517,7 @@
     "relevance": null,
     "walkers": 0.073,
     "building": 0.0,
-    "manmade": 0.009
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 103.7,
@@ -4542,8 +4542,8 @@
     "turned": 0.344,
     "relevance": null,
     "walkers": 0.012,
-    "building": 0.0,
-    "manmade": 0.005
+    "building": 0.012,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 118.7,
@@ -4569,7 +4569,7 @@
     "relevance": null,
     "walkers": 0.097,
     "building": 0.0,
-    "manmade": 0.002
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 125.7,
@@ -4594,8 +4594,8 @@
     "turned": 0.289,
     "relevance": null,
     "walkers": 0.008,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.701,
+    "manmade": 0.949
    },
    "exposure": {
     "brightness": 114.4,
@@ -4620,8 +4620,8 @@
     "turned": 0.356,
     "relevance": null,
     "walkers": 0.012,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.056,
+    "manmade": 0.993
    },
    "exposure": {
     "brightness": 141.6,
@@ -4646,8 +4646,8 @@
     "turned": 0.556,
     "relevance": null,
     "walkers": 0.633,
-    "building": 0.0,
-    "manmade": 0.1
+    "building": 0.121,
+    "manmade": 0.947
    },
    "exposure": {
     "brightness": 149.0,
@@ -4657,32 +4657,6 @@
   },
   {
    "n": 180,
-   "group": "power",
-   "title": "File:Mekong pirogue at sunset in the 4000 islands (3).jpg",
-   "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands_(3).jpg",
-   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Mekong_pirogue_at_sunset_in_the_4000_islands_%283%29.jpg/1280px-Mekong_pirogue_at_sunset_in_the_4000_islands_%283%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
-   "faces": 0,
-   "people": 2,
-   "look": {
-    "photograph": 0.999,
-    "painting": 0.001,
-    "drawing": 0.0,
-    "rendering": 0.0,
-    "upright": 0.026,
-    "turned": 0.504,
-    "relevance": null,
-    "walkers": 0.998,
-    "building": 0.001,
-    "manmade": 0.088
-   },
-   "exposure": {
-    "brightness": 125.2,
-    "entropy": 0.928
-   },
-   "sideways": false
-  },
-  {
-   "n": 181,
    "group": "power",
    "title": "File:Mekong pirogue at sunset in the 4000 islands (2).jpg",
    "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands_(2).jpg",
@@ -4698,12 +4672,38 @@
     "turned": 0.539,
     "relevance": null,
     "walkers": 0.826,
-    "building": 0.0,
-    "manmade": 0.019
+    "building": 0.31,
+    "manmade": 0.998
    },
    "exposure": {
     "brightness": 161.0,
     "entropy": 0.899
+   },
+   "sideways": false
+  },
+  {
+   "n": 181,
+   "group": "power",
+   "title": "File:Mekong pirogue at sunset in the 4000 islands (3).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Mekong_pirogue_at_sunset_in_the_4000_islands_(3).jpg",
+   "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Mekong_pirogue_at_sunset_in_the_4000_islands_%283%29.jpg/1280px-Mekong_pirogue_at_sunset_in_the_4000_islands_%283%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+   "faces": 0,
+   "people": 2,
+   "look": {
+    "photograph": 0.999,
+    "painting": 0.001,
+    "drawing": 0.0,
+    "rendering": 0.0,
+    "upright": 0.026,
+    "turned": 0.504,
+    "relevance": null,
+    "walkers": 0.998,
+    "building": 0.482,
+    "manmade": 0.948
+   },
+   "exposure": {
+    "brightness": 125.2,
+    "entropy": 0.928
    },
    "sideways": false
   },
@@ -4724,8 +4724,8 @@
     "turned": 0.466,
     "relevance": null,
     "walkers": 0.295,
-    "building": 0.0,
-    "manmade": 0.0
+    "building": 0.254,
+    "manmade": 0.004
    },
    "exposure": {
     "brightness": 134.6,
@@ -4750,8 +4750,8 @@
     "turned": 0.543,
     "relevance": null,
     "walkers": 0.95,
-    "building": 0.0,
-    "manmade": 0.192
+    "building": 0.011,
+    "manmade": 0.987
    },
    "exposure": {
     "brightness": 137.5,
@@ -4776,8 +4776,8 @@
     "turned": 0.459,
     "relevance": null,
     "walkers": 0.102,
-    "building": 0.0,
-    "manmade": 0.024
+    "building": 0.121,
+    "manmade": 0.999
    },
    "exposure": {
     "brightness": 175.1,
@@ -4802,8 +4802,8 @@
     "turned": 0.595,
     "relevance": null,
     "walkers": 0.072,
-    "building": 0.001,
-    "manmade": 0.0
+    "building": 0.018,
+    "manmade": 0.409
    },
    "exposure": {
     "brightness": 108.1,
@@ -4828,8 +4828,8 @@
     "turned": 0.555,
     "relevance": null,
     "walkers": 0.071,
-    "building": 0.005,
-    "manmade": 0.0
+    "building": 0.021,
+    "manmade": 0.029
    },
    "exposure": {
     "brightness": 124.0,
@@ -4855,7 +4855,7 @@
     "relevance": null,
     "walkers": 0.0,
     "building": 0.0,
-    "manmade": 0.0
+    "manmade": 0.567
    },
    "exposure": {
     "brightness": 153.4,
@@ -4880,8 +4880,8 @@
     "turned": 0.33,
     "relevance": null,
     "walkers": 0.259,
-    "building": 0.0,
-    "manmade": 0.804
+    "building": 0.001,
+    "manmade": 0.0
    },
    "exposure": {
     "brightness": 149.4,

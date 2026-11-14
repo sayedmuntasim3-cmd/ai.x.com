@@ -67,3 +67,13 @@ test("the face and person detectors refuse only when the image-text model agrees
   // Without the image-text model the detectors decide alone, as before.
   assert.match(String(frameVerdict({ ...clean, faces: 1 })), /^detector: 1 face/);
 });
+
+test("a search for ruins or a ship expects a building or a man-made thing: that check is not applied", () => {
+  const look = { ...clean.look, relevance: 0.9, walkers: 0.05, building: 0.95, manmade: 0.95 };
+  assert.match(String(frameVerdict({ ...clean, look }, [], "mountain valley")), /^adab: a building/);
+  assert.match(String(frameVerdict({ ...clean, look: { ...look, building: 0 } }, [], "calm sea")), /^relevance: man-made things/);
+  assert.equal(frameVerdict({ ...clean, look }, [], "ruins of past towns"), null);
+  assert.match(String(frameVerdict({ ...clean, look }, [], "sailing ship")), /^adab: a building/);
+  assert.equal(frameVerdict({ ...clean, look: { ...look, building: 0 } }, [], "sailing ship"), null);
+  assert.deepEqual(frameDoubts({ look: { ...look, building: 0.4, manmade: 0.4 } }, "boat on sea"), ["adab: maybe a building (40%)"]);
+});

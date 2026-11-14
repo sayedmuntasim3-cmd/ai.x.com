@@ -47,7 +47,7 @@ and what blocked a release. Ranked by severity:
 | An oil painting with figures reached a film | looking at frames | Commons categories; CLIP painting check (MIT) | PARTIAL: 9 of 10 paintings refused, 0 of 9 photos |
 | A sideways video reached a film | looking at frames | sky-side check | PARTIAL: 5 of 9 turned landscapes caught, 0 of 9 upright refused, the real case caught |
 | Irrelevant pictures (a city, fog, plastic tubes) | looking at frames | CLIP relevance against rooms, cities, people, text, vehicles, objects | PARTIAL: 3 of 3 bad caught, 0 of 7 good refused (small set); plastic tubes not caught |
-| A building (the Louvre), small hikers and plastic tree shelters reached runner films | looking at frames | image-text scores for walking figures, buildings, man-made things; title words | PARTIAL: hikers 3 of 3, buildings 1 of 2, man-made 2 of 3 caught; 0 of 22 clean landscapes refused (33 pictures) |
+| A building (the Louvre), small hikers and plastic tree shelters reached runner films | looking at frames | image-text scores for walking figures, buildings, man-made things; title words | PARTIAL: on 186 labelled pictures, problem pictures passing silently 39 → 13, clean photos refused 6 → 3 (held-out half: buildings 0.83, man-made 0.81, people 0.86 recall, 0 of 31 clean flagged); labels not yet checked by a person |
 | No check of the rendered sound | directive | audio audit: length, sync offset, added silence, R128, true peak, clipping, balance | PASS (finds a cut-in silence at the right second) |
 
 ## 3. Still incomplete
@@ -68,7 +68,7 @@ and what blocked a release. Ranked by severity:
   must look at every scene (the review sheet says what the checks miss).
 - Reused-content rules: films built on recordings other channels also post may not be monetised; the
   owner's own recitation is the safe base.
-- The CLIP, orientation and people/building thresholds were set on small labelled sets (19, 18 and 33 pictures).
+- The visual thresholds were fitted on one labelled set of 186 pictures (half held out); the labels are the assistant's. A fresh set and a person's labels should confirm them.
 
 ## 5. Next steps, in order
 
