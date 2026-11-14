@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { FORMATS, ayahOnScreen, clipArgs, fetchAsset, filmText, finalArgs, joinPlan, moveFilter } from "./quran-render.mjs";
+import { FORMATS, ayahFontSize, ayahOnScreen, clipArgs, fetchAsset, filmText, finalArgs, joinPlan, moveFilter } from "./quran-render.mjs";
 import { ayahOffset, parseTanzilText } from "../engine/src/quran-meaning.mjs";
 
 const data = new URL("../engine/data/quran/", import.meta.url);
@@ -131,4 +131,22 @@ test("an asset is fetched once with a named client, retried after 429 and server
     // A local file is used as it is.
     assert.equal(await fetchAsset("/tmp/x.jpg", folder), "/tmp/x.jpg");
   } finally { server.close(); }
+});
+
+test("the Arabic is written large for a short ayah and smaller for a long one, within three lines and never below the smallest size", () => {
+  const short = ayahOnScreen(uthmani[ayahOffset(67, 1)], 67, 1);
+  const kursi = uthmani[ayahOffset(2, 255)];
+  const debt = uthmani[ayahOffset(2, 282)];
+  for (const f of Object.values(FORMATS)) {
+    assert.equal(ayahFontSize(short, f).size, f.maxFontSize);
+    const k = ayahFontSize(kursi, f);
+    assert.ok(k.size <= f.maxFontSize && k.size >= f.fontSize);
+    // The longest ayah of the Quran stays at the smallest size and wraps.
+    const d = ayahFontSize(debt, f);
+    assert.equal(d.size, f.fontSize);
+    assert.ok(d.lines > 3);
+  }
+  // The size is written into the ayah's line of the subtitles.
+  const ass = filmText({ scenes: [{ kind: "title", surah: 67, ayah: null, start: 0, end: 2 }, { kind: "ayah", surah: 67, ayah: 1, start: 2, end: 9, spokenStart: 2, spokenEnd: 9, endSure: true }] }, uthmani, [], { format: FORMATS["1080p"], total: 20 });
+  assert.match(ass, /\\fs112\}تَبَٰرَكَ/);
 });

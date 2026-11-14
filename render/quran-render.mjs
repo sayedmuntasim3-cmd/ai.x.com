@@ -21,13 +21,35 @@ import { measureMaster, mediaDuration, run } from "./render-film.mjs";
 
 const FONTS = new URL("./assets/fonts/", import.meta.url).pathname;
 
-/** @typedef {{ width: number, height: number, fps: number, fontSize: number, titleSize: number, margin: number }} Format */
-/** @type {Record<string, Format>} */
+/** @typedef {{ width: number, height: number, fps: number, fontSize: number, maxFontSize: number, titleSize: number, margin: number }} Format */
+/**
+ * fontSize is the smallest the Arabic may be; maxFontSize the size of a short
+ * ayah. Amiri Quran keeps room for the marks, so its letters are small for
+ * their size: at 70 on 1080 lines the letters measured about 28 px, too small
+ * on a phone. A long ayah is made smaller until it fits in three lines.
+ * @type {Record<string, Format>}
+ */
 export const FORMATS = Object.freeze({
-  "1080p": { width: 1920, height: 1080, fps: 30, fontSize: 70, titleSize: 150, margin: 70 },
-  "4k": { width: 3840, height: 2160, fps: 30, fontSize: 140, titleSize: 300, margin: 140 },
-  "9:16": { width: 1080, height: 1920, fps: 30, fontSize: 80, titleSize: 140, margin: 340 },
+  "1080p": { width: 1920, height: 1080, fps: 30, fontSize: 70, maxFontSize: 112, titleSize: 150, margin: 70 },
+  "4k": { width: 3840, height: 2160, fps: 30, fontSize: 140, maxFontSize: 224, titleSize: 300, margin: 140 },
+  "9:16": { width: 1080, height: 1920, fps: 30, fontSize: 80, maxFontSize: 112, titleSize: 140, margin: 340 },
 });
+
+/** Width of one letter or space of Amiri Quran, as a share of the font size (measured: 430 px for 42 letters at 70). */
+const LETTER_WIDTH = 0.15;
+
+/**
+ * The size an ayah is written at: the largest from maxFontSize down to
+ * fontSize at which it needs at most three lines.
+ * @param {string} text @param {Format} f @returns {{ size: number, lines: number }}
+ */
+export function ayahFontSize(text, f) {
+  const letters = text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "").length;
+  const room = f.width * 0.84;
+  const linesAt = (/** @type {number} */ size) => Math.ceil((letters * LETTER_WIDTH * size) / room);
+  for (let size = f.maxFontSize; size > f.fontSize; size -= 4) if (linesAt(size) <= 3) return { size, lines: linesAt(size) };
+  return { size: f.fontSize, lines: linesAt(f.fontSize) };
+}
 
 /** One grade for the whole film: a little less colour, a little more depth, a soft vignette. */
 export const GRADE = "eq=contrast=1.04:saturation=0.9:gamma=0.98,vignette=angle=PI/5";
@@ -149,8 +171,10 @@ export function filmText(plan, uthmani, surahNames, o) {
     const k = plan.scenes.indexOf(s), before = plan.scenes.slice(0, k).reverse().find((x) => x.kind === "ayah");
     if (s.endSure === false || before?.endSure === false) { hidden += 1; continue; }
     const text = ayahOnScreen(uthmani[offsetOf(s.surah) + s.ayah - 1] ?? "", s.surah, s.ayah);
-    // A long ayah is shown whole: libass wraps it on word boundaries.
-    lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6}${assText(text)} \uFD3F${arabicNumber(s.ayah)}\uFD3E`);
+    // A long ayah is shown whole: libass wraps it on word boundaries, at a size that keeps it within three lines.
+    const shown = `${text} \uFD3F${arabicNumber(s.ayah)}\uFD3E`;
+    const { size } = ayahFontSize(shown, f);
+    lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
   }
   if (hidden) lines.push(`; ${hidden} ayah text(s) not shown: their timing is not confirmed by two methods`);
   lines.push(`Dialogue: 0,${assTime(Math.max(0, o.total - 6))},${assTime(o.total - 0.5)},Small,,0,0,0,,{\\fad(800,1200)\\fnDejaVu Sans}Quran text: Tanzil.net`);
