@@ -503,6 +503,16 @@ made it doubtful.) Still passing silently: a tiny shepherd, three distant huts, 
 signs, small plastic litter in grass or on pebbles, a distant power station, a drawing with animals. PARTIAL: the labels are the
 assistant's, not yet a person's; a fresh set should confirm the thresholds.
 
+**Runner films after the fixes (run 43558520172, 14 Nov, before the yes/no building check):** Ad-Duha
+1080p and 4K, Yusuf 1-12 at 9:16 and, for the first time, at 16:9 (the long-form shape). All four: no card,
+coverage 1, no empty or frozen stretch, sound offset 0, -14 LUFS, no clipping. The three pictures found by
+eye are gone: the Louvre (Yusuf 12:11 now the Black Sea coast at Fiolent), the Chola Valley photo with
+hikers (in neither film), the tree shelters (Ad-Duha 93:5 now the Sofia glacier). Looking at the frames:
+every scene is a natural landscape, except the last Yusuf scene (Mandrem beach with huts and bamboo
+shelters), which the old building check passed; the yes/no check is meant to catch such pictures and is
+being verified on the next run. Ad-Duha holds each picture long (no ayah end is confirmed, so cuts fall only
+in measured pauses).
+
 **Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);
 the review sheet lists the automated reports to read first and the known gaps of the automatic checks.
 

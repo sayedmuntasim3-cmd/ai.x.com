@@ -54,25 +54,39 @@ and what blocked a release. Ranked by severity:
 
 | Item | Status |
 |---|---|
-| Jawad Farogi Ad-Duha (very slow, melodic, 20-37 s breaths) | FAIL: Tarteel base, Whisper large-v3-turbo and the CTC alignment all fail; the system asks instead of guessing |
-| Real phone and mosque recordings | NOT TESTED (only code-made copies) |
-| The owner's own recitation | NOT TESTED (not received) |
+| Jawad Farogi Ad-Duha (very slow, melodic, 20-37 s breaths) | FAIL: no ayah end confirmed; the publish decision is now FAIL for it (verse timing not verified), never a guess |
+| Recognized recordings are not cross-checked by the aligner (al-Mulk 67:6: one end unconfirmed, its Arabic hidden) | NOT DONE: needs a third-method rule measured on the known-time sets |
+| The owner's samples | PARTIAL: four recitations recognized (al-Mulk 67:1-7, 67:4-9, Ayat al-Kursi twice), the adhan refused as not Quran; the sound shows a second-hand source; reciter and permission unknown |
+| Real phone and mosque recordings (direct) | NOT TESTED |
 | Film from the website (upload → render) | NOT TESTED (needs a deploy: the owner's decision) |
-| Pexels / Pixabay footage | NOT TESTED (no keys set; keyless archives only) |
-| Retention and views | NOT MEASURABLE from outside; see `docs/QURAN_AUDIENCE_RESEARCH.md` |
+| Pexels / Pixabay footage | NOT TESTED (no keys set; free keys are the owner's decision) |
+| Visual labels checked by a person | NOT DONE (186 pictures labelled by the assistant) |
+| Small litter, distant huts and villages | PARTIAL: still pass silently on the validation set |
+| Maps, manuscripts, calligraphy, thumbnails | NOT STARTED (P2) |
 | Religious review by a qualified person | NOT DONE for any film |
 
 ## 4. Remaining risks
 
-- Picture choice from free archives is thin and judged from titles plus a small image-text model; a person
-  must look at every scene (the review sheet says what the checks miss).
+- Free archives are thin: picture choice repeats familiar landscapes, and videos are few. A person must
+  look at every scene (`review.html`).
 - Reused-content rules: films built on recordings other channels also post may not be monetised; the
-  owner's own recitation is the safe base.
-- The visual thresholds were fitted on one labelled set of 186 pictures (half held out); the labels are the assistant's. A fresh set and a person's labels should confirm them.
+  owner's own, permitted recording is the safe base.
+- The visual thresholds were fitted on one labelled set of 186 pictures (half held out); the labels are the
+  assistant's. A fresh set and a person's labels should confirm them.
 
-## 5. Next steps, in order
+## 5. Release-readiness decision
 
-1. A qualified reviewer reads `docs/QURAN_REVIEW_SHEET.md` against one test film.
-2. The owner's own recitation through the whole chain (it is the real test).
-3. More labelled pictures for the visual checks (paintings, sideways, irrelevant), thresholds re-measured.
-4. A Quran-specific aligner or recognizer for slow melodic recitation (the Ad-Duha case).
+**Not ready to publish. No film is.** Every test film is WARNING or FAIL by the system's own decision:
+no qualified reviewer has signed, no recording has its reciter, source and permission recorded, and the
+Ad-Duha timing is unverified (FAIL). What is verified: the technical chain (coverage, sound, sync,
+loudness, formats 16:9 / 4K / 9:16) on the runner and on the owner's sample, and that the pictures found
+wrong by eye no longer reach the films.
+
+## 6. Next steps, in order
+
+1. A qualified reviewer reads `review.html` and `docs/QURAN_REVIEW_SHEET.md` for one test film.
+2. The owner's own recitation, recorded directly (not through a speaker), with the reciter's written
+   permission, through the whole chain.
+3. A person checks the 186 labels; a fresh picture set confirms the thresholds.
+4. A third-method rule for recognized recordings (recognizer, pauses, aligner), measured on known times.
+5. A Quran-specific aligner or recognizer for slow melodic recitation (the Ad-Duha case).
