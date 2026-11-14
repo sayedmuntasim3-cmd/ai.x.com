@@ -2,8 +2,21 @@
   // Must match the Worker name in the Cloudflare dashboard.
   "name": "ai-x-com",
   "compatibility_date": "2026-10-01",
-  // Static site generated from page.tsx (see tools/README.md). No Worker script needed.
+  // The Worker only runs for requests no static file matches: today that is the media search API
+  // under /api/media/ (see worker/index.ts). Everything else is the static site.
+  "main": "worker/index.ts",
+  // Static site generated from page.tsx (see tools/README.md).
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Default licence level for searches: "no-attribution", "attribution" or "share-alike".
+    "MEDIA_DEFAULT_RIGHTS": "attribution"
+    // API keys are secrets, not vars. Add them with `npx wrangler secret put PIXABAY_API_KEY`
+    // (see MEDIA_SOURCES.md for the full list; every key is free).
   }
 }
