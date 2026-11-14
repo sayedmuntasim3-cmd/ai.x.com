@@ -308,7 +308,33 @@ real ayah times into the send automation; studio page and upload.
 
 The owner's direction for the next phase is recorded in `docs/QURAN_DOCUMENTARY.md` (rules, audit of
 what exists and what is missing, design, stages Q1 to Q7 with measured exits); his full text is in
-`docs/QURAN_DIRECTION_OWNER.md`. This phase is Quran only. Nothing of Q1 to Q7 is built yet.
+`docs/QURAN_DIRECTION_OWNER.md`. This phase is Quran only.
+
+## 4l. Quran films built and verified (13-14 Nov 2026), handoff for the next session
+
+Q1-Q7 are built: locate, meaning, director, media, render (16:9, 4K, 9:16), Shorts, review and sign-off.
+Then came the production-standard pass and the owner's platform brief. Read these, in this order:
+- `docs/QURAN_ENGINEERING_REPORT.md`: assessment, PASS / FAIL table, release decision, next steps.
+- `docs/QURAN_DOCUMENTARY.md`, State section: every measured number and runner run.
+- `docs/QURAN_VOICE_GUIDE.md`: sound, recording and editing standard.
+- `docs/QURAN_REVIEW_SHEET.md`: for the scholar and the editor.
+
+State at the end:
+- Four runner films (run 43562077892) pass their own checks. Their frames were inspected.
+- No film is publishable: no qualified reviewer has signed, no recording's rights are written down, and
+  the Ad-Duha verse timing is unverified (FAIL).
+- The recordings belong to the owner's friend, who gave permission for a documentary YouTube business.
+  The rights still have to be written down with the friend's name (`--rights`).
+- Visual validation: 186 labelled pictures, labelled by the assistant (`local/media/validation/`).
+
+Next work, in order:
+1. The friend's direct recording (voice guide, section 4), through the whole chain.
+2. A scholar reviews one film with `review.html`.
+3. A person checks the 186 labels; a fresh picture set confirms the thresholds.
+4. A third-method rule for recognized recordings: recognizer, pauses and aligner (al-Mulk 67:6).
+5. A Quran-specific aligner for slow melodic recitation (Ad-Duha).
+6. P2: maps, manuscripts and thumbnails for the documentary films; the owner's Pexels / Pixabay free keys
+   for more video.
 
 ## 5. Role entries corrected
 
@@ -323,8 +349,8 @@ no picture is chosen for a Quran film yet, so nothing checks one.
 
 ## 6. Next work, in order
 
-**First (owner, 13 Nov 2026): the Quran recitation documentary**, stages Q1 to Q7 in
-`docs/QURAN_DOCUMENTARY.md`, in that order. The list below waits until he says otherwise.
+**First (owner, 13-14 Nov 2026): the Quran recitation documentary.** Q1 to Q7 are built; continue with
+the list in section 4l. The list below waits until he says otherwise.
 
 Each step ends with tests passing, the type check, the build check, a commit
 and a push.
