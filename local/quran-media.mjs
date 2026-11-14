@@ -31,6 +31,9 @@ export function hamming(a, b) {
 /** The rules the frame check applies, measured on labelled sets (docs/QURAN_DOCUMENTARY.md). */
 export const VISUAL_RULES = Object.freeze({ notPhotograph: 0.2, nearDuplicateBits: 6, minRelevance: 0.5, darkBrightness: 60, plainEntropy: 0.7, walkers: 0.9, building: 0.5, manmade: 0.6 });
 
+/** The uncertain band under each refusal: such a picture may be right, so it goes to a person (WARNING), never in silently. */
+export const DOUBT_RULES = Object.freeze({ art: 0.1, relevance: 0.65, walkers: 0.6, building: 0.2, manmade: 0.3 });
+
 /**
  * Reasons from one detect.py result, or null when the frames pass.
  * @param {{ frames: number, faces: number, people: number, look?: any, sideways?: boolean, dhash?: string[], exposure?: { brightness: number, entropy: number } | null }} item @param {string[]} usedHashes
@@ -59,10 +62,32 @@ export function frameVerdict(item, usedHashes = []) {
 }
 
 /**
+ * Doubts from one detect.py result that passed frameVerdict: scores in the
+ * uncertain band. Measured: clean landscapes scored walkers up to 0.80 and
+ * man-made up to 0.45 (a driftwood post), so those go to a person instead of
+ * being refused or passed without a look.
+ * @param {{ look?: any }} item @returns {string[]}
+ */
+export function frameDoubts(item) {
+  const l = item.look;
+  if (!l) return [];
+  /** @type {string[]} */
+  const out = [];
+  const pc = (/** @type {number} */ x) => Math.round(x * 100);
+  const art = (l.painting ?? 0) + (l.drawing ?? 0) + (l.rendering ?? 0);
+  if (art >= DOUBT_RULES.art) out.push(`visual: maybe not a photograph (${pc(art)}%)`);
+  if (typeof l.relevance === "number" && l.relevance < DOUBT_RULES.relevance) out.push(`relevance: the frames only partly show what was searched for (${pc(l.relevance)}%)`);
+  if (typeof l.walkers === "number" && l.walkers >= DOUBT_RULES.walkers) out.push(`adab: people may be in the picture (${pc(l.walkers)}%)`);
+  if (typeof l.building === "number" && l.building >= DOUBT_RULES.building) out.push(`adab: maybe a building (${pc(l.building)}%)`);
+  if (typeof l.manmade === "number" && l.manmade >= DOUBT_RULES.manmade) out.push(`relevance: maybe man-made things (${pc(l.manmade)}%)`);
+  return out;
+}
+
+/**
  * A frame check through local/media/detect.py: faces and people, painting or
  * photograph, orientation, near-duplicates of what the film already uses.
  * @param {string} python @param {{ clip?: boolean }} [o]
- * @returns {(r: import("../engine/src/documentary-media-fetch.mjs").MediaResult, query?: string) => Promise<string | null>}
+ * @returns {(r: import("../engine/src/documentary-media-fetch.mjs").MediaResult, query?: string) => Promise<string | { warn: string[] } | null>}
  */
 export function detector(python, o = {}) {
   const script = new URL("./media/detect.py", import.meta.url).pathname;
@@ -79,7 +104,9 @@ export function detector(python, o = {}) {
       const why = frameVerdict(item, used);
       // A passed picture's hashes join the film, so a near-copy later is refused.
       if (!why) used.push(...(item.dhash ?? []));
-      return why;
+      if (why) return why;
+      const doubts = frameDoubts(item);
+      return doubts.length ? { warn: doubts } : null;
     } catch (e) {
       // A frame that cannot be read is not passed as clean.
       return "detector: the frames could not be checked (" + String(/** @type {Error} */ (e).message).split("\n")[0].slice(0, 80) + ")";

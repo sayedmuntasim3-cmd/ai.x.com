@@ -615,6 +615,24 @@ export function listeningClips(spans, maxSeconds = 24, pad = 0.15) {
 }
 
 /**
+ * Is this the adhan (or iqama), not a recitation? Its fixed words, as the
+ * Quran recognizer hears them: two or more testimonies ("ashhadu") and a
+ * "hayya 'ala" call, or with the takbir. The adhan is not Quran: no ayah is
+ * matched to it and nothing is shown as an ayah.
+ * @param {{ text: string }[]} words
+ */
+export function isAdhan(words) {
+  const t = tokenizeArabic(words.map((w) => w.text).join(" "));
+  let testimony = 0, call = 0, takbir = 0;
+  for (let i = 0; i < t.length; i += 1) {
+    if (/^[وفي]?[اي]?شهد$/.test(t[i]) && /^(ان|انّ|الا|ان?لا|ولا)$/.test(t[i + 1] ?? "")) testimony += 1;
+    if (t[i] === "حي" && /^عل/.test(t[i + 1] ?? "")) call += 1;
+    if (t[i] === "الله" && wordSimilarity(t[i + 1] ?? "", "اكبر") >= 0.6) takbir += 1;
+  }
+  return testimony >= 2 && (call >= 1 || takbir >= 3);
+}
+
+/**
  * Speech the recognizer wrote down that is neither an ayah nor a known
  * phrase: a takbir is labelled; anything else is reported as not Quran.
  * @param {{ text: string, start?: number, end?: number }[]} words @param {import("./quran.mjs").RecitationMatch} match
@@ -750,6 +768,7 @@ export function locateRecitation(o) {
   const recognition = verdict ? { coverage: verdict.coverage, quality: verdict.quality, why: verdict.why } : null;
   if (verdict && verdict.heard.length) messages.push(msg("quran.heard", { passage: rangesText(verdict.heard), coverage: Math.round(verdict.coverage * 100), quality: Math.round(verdict.quality * 100) }));
 
+  if (isAdhan(words)) return ask(msg("quran.ask.adhan"), { recognition });
   if (!given) {
     if (!verdict || verdict.verdict === "nothing") return ask(msg("quran.ask.passage"), { recognition });
     if (verdict.verdict === "candidate") return ask(msg("quran.ask.confirm", { passage: rangesText(verdict.heard), why: verdict.why.join(",") }), { recognition, heard: verdict.heard });

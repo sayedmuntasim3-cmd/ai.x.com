@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frameVerdict, hamming } from "./quran-media.mjs";
+import { frameDoubts, frameVerdict, hamming } from "./quran-media.mjs";
 
 const clean = { frames: 5, faces: 0, people: 0, look: { photograph: 0.99, painting: 0.005, drawing: 0.003, rendering: 0.002 }, sideways: false, dhash: ["f0f0f0f0f0f0f0f0"] };
 
@@ -31,4 +31,14 @@ test("the frame check refuses small walking figures, buildings and man-made thin
   assert.equal(seen({ manmade: 0.45 }), null);
   // Results from before this check (no such fields) are judged as before.
   assert.equal(frameVerdict(clean), null);
+});
+
+test("scores in the uncertain band are doubts for a person, not refusals and not silent passes", () => {
+  const look = { ...clean.look, relevance: 0.9, walkers: 0.1, building: 0, manmade: 0 };
+  assert.deepEqual(frameDoubts({ look }), []);
+  // Measured: a clean "shadowed path" scored walkers 0.80, a driftwood post man-made 0.45.
+  assert.deepEqual(frameDoubts({ look: { ...look, walkers: 0.8 } }), ["adab: people may be in the picture (80%)"]);
+  assert.deepEqual(frameDoubts({ look: { ...look, manmade: 0.45 } }), ["relevance: maybe man-made things (45%)"]);
+  assert.match(frameDoubts({ look: { ...look, relevance: 0.55 } })[0], /^relevance: the frames only partly/);
+  assert.deepEqual(frameDoubts({}), []);
 });

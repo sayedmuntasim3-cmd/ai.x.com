@@ -20,8 +20,12 @@ test("a candidate is refused for its licence, its words, its size, its length or
   assert.match(String(await rejectWhy(result({ id: "p:2", title: "oil painting of an olive tree" }), o)), /^adab: "painting"/);
   assert.match(String(await rejectWhy(result({ id: "p:3", title: "farmer picking olives, man smiling" }), o)), /^adab: shows people/);
   assert.match(String(await rejectWhy(result({ id: "p:4", title: "camels in the desert" }), o)), /level strict/);
-  assert.match(String(await rejectWhy(result({ id: "w:6", title: "Cour Napoléon at night - Louvre" }), o)), /^adab: "Louvre"/);
-  assert.match(String(await rejectWhy(result({ id: "w:7", title: "Hikers below the glacier" }), o)), /^adab: shows people/);
+  // A title word about a building or hikers does not refuse alone: it makes the picture doubtful (a person looks).
+  /** @type {string[]} */
+  const doubts = [];
+  assert.equal(await rejectWhy(result({ id: "w:6", title: "olive grove by the Louvre" }), { ...o, doubts }), null);
+  assert.equal(await rejectWhy(result({ id: "w:7", title: "Hikers in the olive grove" }), { ...o, doubts }), null);
+  assert.deepEqual(doubts, ['title: "Louvre" in its title or tags', 'title: "Hikers" in its title or tags']);
   assert.equal(await rejectWhy(result({ id: "p:4", title: "camels in the desert" }), { ...o, level: "nature" }), null);
   assert.match(String(await rejectWhy(result({ id: "p:5", width: 1280 }), o)), /^quality: 1280 px/);
   assert.match(String(await rejectWhy(result({ id: "p:6", durationSeconds: 4 }), o)), /^quality: video is 4 s, 6.7 s needed/);
@@ -46,7 +50,7 @@ test("video first, then photographs; no asset twice; a shot with nothing usable 
   assert.deepEqual(m.manifest.gaps.map((g) => g.shot), ["S003"]);
   assert.deepEqual(m.manifest.gaps[0].rejected, { quality: 1, adab: 1 });
   assert.ok(m.shots.every((s) => s.tried.every((t) => !t.startsWith("met:"))), "art archives are not searched for a recitation");
-  assert.deepEqual(m.stats, { shots: 3, found: 2, video: 1, image: 1, gaps: 1 });
+  assert.deepEqual(m.stats, { shots: 3, found: 2, video: 1, image: 1, gaps: 1, warnings: 0 });
   for (const x of m.messages) assert.ok(x.code in MESSAGES && x.bn !== x.en);
   assert.match(mediaTable(m), /\| S003 \| 95:1 \| gap \|/);
 });
@@ -93,4 +97,26 @@ test("the search ladder: own picture, family, plain nouns, then reverent landsca
   assert.equal(m.shots[0].status, "found");
   assert.equal(m.shots[0].rung, "landscape");
   assert.equal(m.shots[0].query, "mountains");
+});
+
+test("a doubtful picture is used only when no clean one is found, and its scene is marked WARNING with the reason", async () => {
+  const hut = result({ id: "w:hut", source: "wikimedia", mediaType: "image", title: "mountain hut below the peak", license: "CC0" });
+  const clean = result({ id: "w:peak", source: "wikimedia", mediaType: "image", title: "mountain peak at dawn", license: "CC0" });
+  const doubtFrames = result({ id: "w:odd", source: "wikimedia", mediaType: "image", title: "mountain ridge", license: "CC0" });
+  const wiki = (/** @type {Record<string, any[]>} */ t) => provider("wikimedia", t, ["image"]);
+  // The clean one comes after the doubtful one: it wins.
+  let m = await findQuranMedia({ shots: [shot("S001", "mountain", ["mountain"], 0, 9)], providers: [wiki({ mountain: [hut, clean] })], verify: () => true });
+  assert.equal(m.shots[0].asset?.id, "w:peak");
+  assert.equal(m.shots[0].check, "PASS");
+  assert.ok(m.shots[0].rejected.some((r) => r.id === "w:hut" && /^doubtful: title: "hut"/.test(r.why)));
+  // Only doubtful ones: the first is used, marked WARNING, never silently.
+  m = await findQuranMedia({ shots: [shot("S001", "mountain", ["mountain"], 0, 9)], providers: [wiki({ mountain: [hut] })], verify: () => true });
+  assert.equal(m.shots[0].asset?.id, "w:hut");
+  assert.equal(m.shots[0].check, "WARNING");
+  assert.deepEqual(m.shots[0].doubts, ['title: "hut" in its title or tags']);
+  assert.equal(m.stats.warnings, 1);
+  assert.match(mediaTable(m), /WARNING: title: "hut"/);
+  // Doubts from the frame check work the same way.
+  m = await findQuranMedia({ shots: [shot("S001", "mountain", ["mountain"], 0, 9)], providers: [wiki({ mountain: [doubtFrames] })], verify: () => true, inspect: () => ({ warn: ["adab: people may be in the picture (70%)"] }) });
+  assert.equal(m.shots[0].check, "WARNING");
 });

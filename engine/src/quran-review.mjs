@@ -14,7 +14,7 @@ import { msg } from "./messages.mjs";
 
 /**
  * @typedef {"pending" | "approved" | "replace" | "rejected"} SceneStatus
- * @typedef {{ shot: string, ayah: string, start: number, end: number, picture: string, because: string, asset: { id: string, title: string, page: string, licence: string } | null, status: SceneStatus, note: string }} ReviewScene
+ * @typedef {{ shot: string, ayah: string, start: number, end: number, picture: string, because: string, asset: { id: string, title: string, page: string, licence: string } | null, status: SceneStatus, note: string, check?: "PASS" | "WARNING", doubts?: string[] }} ReviewScene
  * @typedef {{ at: string, by: string, shot: string | null, action: string, note: string }} ReviewDecision
  * @typedef {{ version: 1, scenes: ReviewScene[], decisions: ReviewDecision[], signoff: { by: string, at: string, statement: string, qualification: string, contact: string } | null }} Review
  */
@@ -24,19 +24,21 @@ export const SIGNOFF_STATEMENT = "I checked the Quran text on screen against the
 
 /**
  * The review sheet of a film: one row per shot, pending.
- * @param {{ shots: import("./quran-director.mjs").Shot[] }} direction @param {{ shots: { shot: string, asset: any }[] } | null} media
+ * @param {{ shots: import("./quran-director.mjs").Shot[] }} direction @param {{ shots: { shot: string, asset: any, check?: "PASS" | "WARNING", doubts?: string[] }[] } | null} media
  * @param {Review | null} [previous] decisions already taken are kept for shots whose picture did not change
  * @returns {Review}
  */
 export function reviewSheet(direction, media, previous = null) {
   const assetOf = new Map((media?.shots ?? []).map((s) => [s.shot, s.asset]));
+  const mediaOf = new Map((media?.shots ?? []).map((s) => [s.shot, s]));
   const old = new Map((previous?.scenes ?? []).map((s) => [s.shot, s]));
   const scenes = direction.shots.map((s) => {
     const a = assetOf.get(s.id) ?? null;
     const asset = a ? { id: a.id, title: a.title, page: a.page, licence: a.licenceName ?? a.licence } : null;
     const before = old.get(s.id);
     const same = before && (before.asset?.id ?? null) === (asset?.id ?? null) && before.start === s.start && before.end === s.end;
-    return { shot: s.id, ayah: s.ayah === null ? "title" : `${s.surah}:${s.ayah}`, start: s.start, end: s.end, picture: s.motif, because: `${s.because.detail} (${s.because.source})`, asset, status: /** @type {SceneStatus} */ (same ? before.status : "pending"), note: same ? before.note : "" };
+    return { shot: s.id, ayah: s.ayah === null ? "title" : `${s.surah}:${s.ayah}`, start: s.start, end: s.end, picture: s.motif, because: `${s.because.detail} (${s.because.source})`, asset, status: /** @type {SceneStatus} */ (same ? before.status : "pending"), note: same ? before.note : "",
+      ...(mediaOf.get(s.id)?.check ? { check: mediaOf.get(s.id)?.check, doubts: mediaOf.get(s.id)?.doubts ?? [] } : {}) };
   });
   // A changed picture undoes the sign-off: it was signed for other pictures.
   const changed = previous ? scenes.some((s) => { const b = old.get(s.shot); return !b || (b.asset?.id ?? null) !== (s.asset?.id ?? null); }) : true;
@@ -74,34 +76,52 @@ export function decide(review, d) {
 }
 
 /**
- * May the film be published? Every scene approved (or rejected, which
- * shows a card), none waiting for a replacement, the render's checks
- * passed, and a named reviewer's sign-off on the pictures as they are.
+ * May the film be published? Three answers, as a production review gives them:
+ * FAIL a critical problem (the render's checks, an empty or placeholder
+ * second, the sound, verse timing not verified): publishing is blocked;
+ * WARNING nothing critical, but a person must still look, listen or sign
+ * (open scenes, doubtful pictures, unconfirmed ayah ends, no sign-off);
+ * PASS every automatic check passed and every human step is done.
+ * A finished render alone is never PASS.
  * @param {Review | null} review @param {{ lengthMatches: boolean, black: any[], frozen: any[], cutsInsideTheVoice: number, integratedLufs: number | null, truePeakDbtp: number | null,
  *   cards?: { start: number, end: number }[], visual?: { ok: boolean, empty: { start: number, end: number }[], frozen: { start: number, end: number }[] },
  *   audio?: { ok: boolean, offsetSeconds: number, addedSilences: any[], clippedSamples: number } } | null} render
+ * @param {{ ayat: { sure?: boolean }[] } | null} [location] the ayah timing (quran-location.json)
+ * @returns {{ ok: boolean, status: "PASS" | "WARNING" | "FAIL", by: string | null, why: any[], fail: any[], warn: any[] }}
  */
-export function readyToPublish(review, render) {
+export function readyToPublish(review, render, location = null) {
   /** @type {any[]} */
-  const why = [];
-  if (!review) why.push(msg("quran.review.none"));
+  const fail = [];
+  /** @type {any[]} */
+  const warn = [];
+  if (!review) warn.push(msg("quran.review.none"));
   else {
     const waiting = review.scenes.filter((s) => s.status === "pending" || s.status === "replace");
-    if (waiting.length) why.push(msg("quran.review.open", { count: waiting.length, shots: waiting.slice(0, 5).map((s) => s.shot).join(", ") }));
-    if (!review.signoff?.by) why.push(msg("quran.review.unsigned"));
+    if (waiting.length) warn.push(msg("quran.review.open", { count: waiting.length, shots: waiting.slice(0, 5).map((s) => s.shot).join(", ") }));
+    const flagged = review.scenes.filter((s) => s.check === "WARNING" && s.status !== "approved" && s.status !== "rejected");
+    if (flagged.length) warn.push(msg("quran.review.flagged", { count: flagged.length, shots: flagged.slice(0, 5).map((s) => `${s.shot} (${(s.doubts ?? []).join("; ")})`).join(", ") }));
+    if (!review.signoff?.by) warn.push(msg("quran.review.unsigned"));
   }
-  if (!render) why.push(msg("quran.review.notRendered"));
+  if (location?.ayat?.length) {
+    // The ends between ayat; the last one is the end of the voice.
+    const ends = location.ayat.slice(0, -1);
+    const sure = ends.filter((a) => a.sure).length;
+    if (ends.length && sure * 2 < ends.length) fail.push(msg("quran.review.timing", { sure, total: ends.length }));
+    else if (sure < ends.length) warn.push(msg("quran.review.timingPartly", { sure, total: ends.length }));
+  }
+  if (!render) fail.push(msg("quran.review.notRendered"));
   else {
-    if (!render.lengthMatches || render.black.length || render.frozen.length || render.cutsInsideTheVoice > 0) why.push(msg("quran.review.renderFailed"));
+    if (!render.lengthMatches || render.black.length || render.frozen.length || render.cutsInsideTheVoice > 0) fail.push(msg("quran.review.renderFailed"));
     // Every second must have a real picture: a placeholder card or an empty stretch blocks publishing.
-    if (render.cards?.length) why.push(msg("quran.review.cards", { count: render.cards.length, at: render.cards.slice(0, 4).map((c) => `${Math.floor(c.start)}-${Math.ceil(c.end)} s`).join(", ") }));
-    if (render.visual && !render.visual.ok) why.push(msg("quran.review.visual", { empty: render.visual.empty.length, frozen: render.visual.frozen.length, at: [...render.visual.empty, ...render.visual.frozen].slice(0, 4).map((c) => `${Math.floor(c.start)}-${Math.ceil(c.end)} s`).join(", ") }));
-    if (!render.visual || !render.audio) why.push(msg("quran.review.noAudit"));
-    if (render.audio && !render.audio.ok) why.push(msg("quran.review.audio", { offset: render.audio.offsetSeconds, silences: render.audio.addedSilences.length, clipped: render.audio.clippedSamples }));
-    if (render.integratedLufs !== null && Math.abs(render.integratedLufs + 14) > 1) why.push(msg("quran.review.loudness", { lufs: render.integratedLufs }));
-    if (render.truePeakDbtp !== null && render.truePeakDbtp > -1) why.push(msg("quran.review.peak", { peak: render.truePeakDbtp }));
+    if (render.cards?.length) fail.push(msg("quran.review.cards", { count: render.cards.length, at: render.cards.slice(0, 4).map((c) => `${Math.floor(c.start)}-${Math.ceil(c.end)} s`).join(", ") }));
+    if (render.visual && !render.visual.ok) fail.push(msg("quran.review.visual", { empty: render.visual.empty.length, frozen: render.visual.frozen.length, at: [...render.visual.empty, ...render.visual.frozen].slice(0, 4).map((c) => `${Math.floor(c.start)}-${Math.ceil(c.end)} s`).join(", ") }));
+    if (!render.visual || !render.audio) fail.push(msg("quran.review.noAudit"));
+    if (render.audio && !render.audio.ok) fail.push(msg("quran.review.audio", { offset: render.audio.offsetSeconds, silences: render.audio.addedSilences.length, clipped: render.audio.clippedSamples }));
+    if (render.integratedLufs !== null && Math.abs(render.integratedLufs + 14) > 1) fail.push(msg("quran.review.loudness", { lufs: render.integratedLufs }));
+    if (render.truePeakDbtp !== null && render.truePeakDbtp > -1) fail.push(msg("quran.review.peak", { peak: render.truePeakDbtp }));
   }
-  return { ok: why.length === 0, by: review?.signoff?.by ?? null, why };
+  const status = fail.length ? "FAIL" : warn.length ? "WARNING" : "PASS";
+  return { ok: status === "PASS", status, by: review?.signoff?.by ?? null, why: [...fail, ...warn], fail, warn };
 }
 
 /** @param {number} t */

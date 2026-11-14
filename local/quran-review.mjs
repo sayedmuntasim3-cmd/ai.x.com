@@ -77,15 +77,19 @@ async function main() {
   await writeFile(join(dir, "review.json"), JSON.stringify(review, null, 1));
   for (const m of said) console.log("- " + m[lang]);
   if (a.status === true || (!a.approve && !a.reject && !a.replace && !a.signoff && !a.ready)) {
-    for (const s of review.scenes) console.log(`${s.shot}  ${s.ayah.padEnd(7)} ${s.status.padEnd(9)} ${s.asset ? s.asset.title.slice(0, 50) : "card"}  [${s.because.slice(0, 60)}]`);
+    for (const s of review.scenes) console.log(`${s.shot}  ${s.ayah.padEnd(7)} ${s.status.padEnd(9)} ${(s.check ?? "").padEnd(8)}${s.asset ? s.asset.title.slice(0, 50) : "card"}  [${s.because.slice(0, 60)}]${s.check === "WARNING" ? "  doubts: " + (s.doubts ?? []).join("; ") : ""}`);
     console.log(review.signoff ? `Signed off by ${review.signoff.by} (${review.signoff.qualification}; ${review.signoff.contact}) at ${review.signoff.at}` : "Not signed off.");
   }
   if (a.ready === true) {
-    const reports = ["1080p", "4k", "9x16"].map((f) => join(dir, `render-report-${f}.json`));
-    let render = null;
-    for (const r of reports) render ??= await readJson(r);
-    const verdict = readyToPublish(review, render);
-    for (const m of verdict.why) console.log("! " + m[lang]);
+    // Every rendered format is judged; the worst decides (a 4K master with a flaw is not saved by a clean 1080p).
+    const location = await readJson(join(dir, "quran-location.json")).catch(() => null);
+    /** @type {{ format: string, report: any }[]} */
+    const reports = [];
+    for (const f of ["1080p", "4k", "9x16"]) { const report = await readJson(join(dir, `render-report-${f}.json`)).catch(() => null); if (report) reports.push({ format: f, report }); }
+    const verdicts = (reports.length ? reports : [{ format: "none", report: null }]).map((r) => ({ format: r.format, ...readyToPublish(review, r.report, location) }));
+    for (const v of verdicts) { console.log(`${v.format}: ${v.status}`); for (const m of v.fail) console.log("  FAIL " + m[lang]); for (const m of v.warn) console.log("  WARNING " + m[lang]); }
+    const verdict = verdicts.find((v) => v.status === "FAIL") ?? verdicts.find((v) => v.status === "WARNING") ?? verdicts[0];
+    const render = reports[0]?.report ?? null;
     if (!verdict.ok) process.exit(1);
     const understanding = await readJson(join(dir, "understanding.json"));
     const surahNames = JSON.parse(await readFile(new URL("../engine/data/quran/surah-names.json", import.meta.url), "utf8"));

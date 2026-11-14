@@ -6,7 +6,7 @@ import { MESSAGES } from "../src/messages.mjs";
 import { ayahText, buildQuranIndex } from "../src/quran.mjs";
 import { planQuranFilm, checkQuranFilm } from "../src/quran-film.mjs";
 import {
-  FIXED_PHRASES, alignByPauses, alignPassage, boundaryErrors, findSurah, heardAyat, judgeMatch, listeningClips, locateRecitation, locationToMatch,
+  FIXED_PHRASES, alignByPauses, alignPassage, boundaryErrors, findSurah, heardAyat, isAdhan, judgeMatch, listeningClips, locateRecitation, locationToMatch,
   parsePassage, passageUnits, recitationUnits, snapToPauses,
 } from "../src/quran-locate.mjs";
 import { matchRecitation } from "../src/quran.mjs";
@@ -405,4 +405,20 @@ test("a recitation with no pauses between ayat: the alignment's timeline is take
   assert.equal(loc.ayat.filter((a) => a.sure).length, 0);
   loc.ayat.slice(0, -1).forEach((a, k) => assert.ok(Math.abs(a.end - voice.truth[k].end) < 0.3, `93:${k + 1} ends at ${a.end}, truly ${voice.truth[k].end}`));
   assert.ok(loc.ayat.every((a) => a.timing === "aligned"));
+});
+
+test("the adhan is recognised as not Quran (the owner's sample, as heard), and no surah of the Quran is taken for it", () => {
+  // What the Quran recognizer heard in the owner's adhan recording (14 Nov), shortened.
+  const heard = "اللَّهُ أَكْبَرُ اللَّهُ وَأَكْبَرُ اللَّهُ أَكْبَرُ أَشْهَدْ وَلَّا إِلَهًا إِنَّ اللَّهَارَ أَشْهَدُ أَلَّا إِلَى إِنَّ اللَّهَ يَشْهَدُ أَنَّ مُحَمَّدًا رَسُولُ اللَّهِ أَشْهَدُ أَنَّ مُحَمَّدَ الرَّسُولُ اللَّهِ حَيَّ عَلَى الْفَلَاحِ";
+  const words = heard.split(" ").map((text, i) => ({ text, start: i, end: i + 0.9 }));
+  assert.equal(isAdhan(words), true);
+  const r = locateRecitation({ index, spans: [{ start: 0, end: words.length }], totalSeconds: words.length + 1, words });
+  assert.equal(r.ok, false);
+  assert.equal(r.question?.code, "quran.ask.adhan");
+  // Every surah, read whole as words: none looks like the adhan.
+  const texts = JSON.parse(readFileSync(new URL("tanzil-quran-simple-1.0.2.json", data), "utf8"));
+  const bySurah = new Map();
+  for (const [i, t] of texts.entries()) { const s = index.ayat?.[i]?.surah ?? null; if (s !== null) bySurah.set(s, (bySurah.get(s) ?? "") + " " + t); }
+  const whole = bySurah.size ? [...bySurah.values()] : [texts.join(" ")];
+  for (const t of whole) assert.equal(isAdhan(t.trim().split(/\s+/).map((text) => ({ text }))), false);
 });

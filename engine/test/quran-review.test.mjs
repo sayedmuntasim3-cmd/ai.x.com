@@ -80,3 +80,25 @@ test("packaging: title, chapters from ayah times, tags and localized titles from
   const part = packaging({ plan: { scenes: plan.scenes.slice(0, 6) }, surahNames, totalSeconds: 70 });
   assert.match(part.title, /سورة الضحى \(1-5\) \| Surah Ad-Dhuhaa \(The Morning Hours\), Ayat 1-5/);
 });
+
+test("the publish decision is PASS, WARNING or FAIL: doubtful pictures and unconfirmed ayah ends need a person; unverified verse timing blocks", () => {
+  const direction = { shots: [{ id: "S001", surah: 95, ayah: 1, start: 0, end: 9, motif: "olive grove", because: { detail: "the olive", source: "Tanzil" } }, { id: "S002", surah: 95, ayah: 2, start: 9, end: 18, motif: "mountain", because: { detail: "Mount Sinai", source: "Tanzil" } }] };
+  const media = { shots: [{ shot: "S001", asset: { id: "a", title: "olives", page: "p", licence: "CC0" }, check: /** @type {const} */ ("PASS") }, { shot: "S002", asset: { id: "b", title: "Sinai hut", page: "p", licence: "CC0" }, check: /** @type {const} */ ("WARNING"), doubts: ['title: "hut" in its title or tags'] }] };
+  let review = reviewSheet(/** @type {any} */ (direction), media);
+  assert.equal(review.scenes[1].check, "WARNING");
+  const sureAll = { ayat: [{ sure: true }, { sure: true }, { sure: true }] };
+  let v = readyToPublish(review, goodRender, sureAll);
+  assert.equal(v.status, "WARNING");
+  assert.ok(v.warn.some((m) => m.code === "quran.review.flagged" && /S002/.test(m.en)));
+  // A finished render with no review is never PASS; a broken one is FAIL whatever the review says.
+  assert.equal(readyToPublish(null, goodRender).status, "WARNING");
+  assert.equal(readyToPublish(review, { ...goodRender, cards: [{ start: 0, end: 4 }] }).status, "FAIL");
+  // Verse timing: fewer than half the ends confirmed blocks (the Ad-Duha case); some unconfirmed asks a person.
+  assert.ok(readyToPublish(review, goodRender, { ayat: [{ sure: false }, { sure: false }, { sure: true }] }).fail.some((m) => m.code === "quran.review.timing"));
+  assert.ok(readyToPublish(review, goodRender, { ayat: [{ sure: true }, { sure: false }, { sure: true }, { sure: true }] }).warn.some((m) => m.code === "quran.review.timingPartly"));
+  for (const shot of ["S001", "S002"]) review = decide(review, { shot, action: "approve", by: "Editor" }).review;
+  review = decide(review, { action: "signoff", by: "Hafiz A", qualification: "hafiz, ijazah in Hafs", contact: "a@example.org" }).review;
+  v = readyToPublish(review, goodRender, sureAll);
+  assert.equal(v.status, "PASS");
+  assert.equal(v.ok, true);
+});
