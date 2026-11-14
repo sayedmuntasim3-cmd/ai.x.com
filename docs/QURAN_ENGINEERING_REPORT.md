@@ -80,7 +80,7 @@ and what blocked a release. Ranked by severity:
 no qualified reviewer has signed, no recording has its reciter, source and permission recorded, and the
 Ad-Duha timing is unverified (FAIL). What is verified: the technical chain (coverage, sound, sync,
 loudness, formats 16:9 / 4K / 9:16) on the runner and on the owner's sample, and that the pictures found
-wrong by eye no longer reach the films.
+wrong by eye no longer reach the films (runner run 43562077892, frames inspected).
 
 ## 6. Next steps, in order
 

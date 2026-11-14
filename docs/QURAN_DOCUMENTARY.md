@@ -513,6 +513,14 @@ shelters), which the old building check passed; the yes/no check is meant to cat
 being verified on the next run. Ad-Duha holds each picture long (no ayah end is confirmed, so cuts fall only
 in measured pauses).
 
+**Runner films with every fix (run 43562077892, 14 Nov):** yes/no building and man-made checks, face rule,
+larger Arabic. Ad-Duha 1080p and 4K, Yusuf 1-12 at 9:16 and 16:9: no card, coverage 1, no empty or frozen
+stretch, no cut inside the voice, sound offset 0, -14 LUFS, true peak -4 / -1.4 dBTP, no clipping. Looking
+at the frames of both Yusuf films: every scene a natural landscape; the Mandrem beach huts are gone (12:11
+now the Black Sea coast; the new check scores that beach photo man-made 0.96); the Arabic in two readable
+lines. Left for a person: a weathered wooden post in the sea at dawn (12:2, two films), the moon held 24 s
+over one long ayah, Ad-Duha holding each picture long. PASS (automated); no person's review yet.
+
 **Religious sign-off** now needs the reviewer's real name, qualification and a contact (refused without);
 the review sheet lists the automated reports to read first and the known gaps of the automatic checks.
 
