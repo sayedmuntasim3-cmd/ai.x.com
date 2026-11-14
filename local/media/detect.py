@@ -206,44 +206,61 @@ def dhash(path):
     return "%016x" % int("".join("1" if b else "0" for b in bits), 2)
 
 
+def check(source, frames, use_clip, query):
+    """One picture or video: faces and people, look (with CLIP), near-duplicate hashes, orientation, exposure."""
+    with tempfile.TemporaryDirectory() as folder:
+        path = source
+        video_url = source.startswith(("http://", "https://")) and source.lower().split("?")[0].endswith((".webm", ".mp4", ".ogv", ".mov", ".m4v"))
+        # A video is read by ffmpeg straight from its address (only the sampled frames are fetched); a photo is downloaded.
+        if source.startswith(("http://", "https://")) and not video_url:
+            path = os.path.join(folder, "input")
+            try:
+                req = urllib.request.Request(source, headers={"User-Agent": "ZuponaStudio/1.0 (media check)"})
+                with urllib.request.urlopen(req, timeout=120) as r, open(path, "wb") as f:
+                    f.write(r.read())
+            except Exception as e:
+                sys.stderr.write(f"{source}: {e}\n")
+        seen, hashes, turned, light = None, [], False, None
+        try:
+            images = frames_of(path, frames, folder)
+            faces, people, read = detect(images)
+            hashes = [h for h in (dhash(i) for i in images if os.path.exists(i)) if h]
+            turned = sideways([i for i in images if os.path.exists(i)])
+            light = exposure([i for i in images if os.path.exists(i)])
+            if use_clip and read:
+                seen = look([i for i in images if os.path.exists(i)], query)
+        except Exception as e:  # one unreadable item is reported, not fatal
+            faces, people, read = 0, 0, 0
+            sys.stderr.write(f"{source}: {e}\n")
+        # Nothing that could not be looked at is passed as clean.
+        return {"source": source, "frames": read, "faces": faces, "people": people, "flag": faces > 0 or people > 0 or read == 0, "look": seen, "dhash": hashes, "sideways": turned, "exposure": light}
+
+
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("inputs", nargs="+")
+    p.add_argument("inputs", nargs="*")
     p.add_argument("--frames", type=int, default=5)
     p.add_argument("--out", default=None)
     p.add_argument("--clip", action="store_true")
     p.add_argument("--query", default=None)
+    p.add_argument("--serve", action="store_true", help="read one JSON request per line ({source, query}) and answer one JSON item per line; the models load once")
     a = p.parse_args()
     import cv2
 
-    items = []
-    for source in a.inputs:
-        with tempfile.TemporaryDirectory() as folder:
-            path = source
-            video_url = source.startswith(("http://", "https://")) and source.lower().split("?")[0].endswith((".webm", ".mp4", ".ogv", ".mov", ".m4v"))
-            # A video is read by ffmpeg straight from its address (only the sampled frames are fetched); a photo is downloaded.
-            if source.startswith(("http://", "https://")) and not video_url:
-                path = os.path.join(folder, "input")
-                try:
-                    req = urllib.request.Request(source, headers={"User-Agent": "ZuponaStudio/1.0 (media check)"})
-                    with urllib.request.urlopen(req, timeout=120) as r, open(path, "wb") as f:
-                        f.write(r.read())
-                except Exception as e:
-                    sys.stderr.write(f"{source}: {e}\n")
-            seen, hashes, turned, light = None, [], False, None
+    if a.serve:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
             try:
-                images = frames_of(path, a.frames, folder)
-                faces, people, read = detect(images)
-                hashes = [h for h in (dhash(i) for i in images if os.path.exists(i)) if h]
-                turned = sideways([i for i in images if os.path.exists(i)])
-                light = exposure([i for i in images if os.path.exists(i)])
-                if a.clip and read:
-                    seen = look([i for i in images if os.path.exists(i)], a.query)
-            except Exception as e:  # one unreadable item is reported, not fatal
-                faces, people, read = 0, 0, 0
-                sys.stderr.write(f"{source}: {e}\n")
-            # Nothing that could not be looked at is passed as clean.
-            items.append({"source": source, "frames": read, "faces": faces, "people": people, "flag": faces > 0 or people > 0 or read == 0, "look": seen, "dhash": hashes, "sideways": turned, "exposure": light})
+                req = json.loads(line)
+                item = check(req["source"], int(req.get("frames", a.frames)), a.clip, req.get("query"))
+            except Exception as e:
+                item = {"source": None, "frames": 0, "faces": 0, "people": 0, "flag": True, "look": None, "dhash": [], "sideways": False, "exposure": None, "error": str(e)[:200]}
+            sys.stdout.write(json.dumps(item) + "\n")
+            sys.stdout.flush()
+        return
+    items = [check(source, a.frames, a.clip, a.query) for source in a.inputs]
     result = {"detector": f"OpenCV {cv2.__version__}: Haar frontal and profile face cascades, HOG person detector" + (f"; {CLIP_MODEL}" if a.clip else ""), "items": items}
     text = json.dumps(result, indent=1)
     if a.out:

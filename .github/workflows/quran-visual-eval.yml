@@ -1,0 +1,36 @@
+name: Quran visual check validation pool
+# A pool of Commons pictures (18 groups: people, buildings, man-made things,
+# paintings, landscapes and hard cases), scored by the films' own frame check,
+# with numbered contact sheets for labelling. Labels live in
+# local/media/validation/labels.json; local/media/visual-eval.mjs measures
+# precision and recall. Free archive only; nothing paid.
+on:
+  push:
+    paths:
+      - "local/media/eval_pool.py"
+      - ".github/workflows/quran-visual-eval.yml"
+  workflow_dispatch:
+jobs:
+  pool:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install OpenCV and CLIP
+        run: |
+          pip install -q opencv-python-headless==4.10.0.84 numpy pillow
+          pip install -q --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -q transformers
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - name: Build and score the pool
+        run: python local/media/eval_pool.py --out pool --per 12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-pool
+          path: |
+            pool/items.json
+            pool/sheet-*.jpg
+          retention-days: 7

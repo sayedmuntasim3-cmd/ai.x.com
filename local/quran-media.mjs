@@ -11,15 +11,13 @@
  * with its reason), media.md, manifest.json, credits.txt. Downloads nothing
  * but what the detector needs to look at.
  */
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { promisify } from "node:util";
 import { mediaProviders, verifyArchiveItem } from "../engine/src/film-media.mjs";
 import { creditsText, findQuranMedia, mediaTable } from "../engine/src/quran-media.mjs";
 import { parseArgs } from "./voice-film.mjs";
 
-const run = promisify(execFile);
 
 /** Bits that differ between two 64-bit difference hashes. @param {string} a @param {string} b */
 export function hamming(a, b) {
@@ -93,14 +91,39 @@ export function detector(python, o = {}) {
   const script = new URL("./media/detect.py", import.meta.url).pathname;
   /** @type {string[]} */
   const used = [];
+  // One detector process for the whole film: the models load once, requests go one per line.
+  /** @type {import("node:child_process").ChildProcessWithoutNullStreams | null} */
+  let proc = null;
+  /** @type {((line: string | null) => void)[]} */
+  const waiting = [];
+  let buffer = "";
+  const start = () => {
+    const p = spawn(python, ["-I", script, "--serve", "--frames", "5", ...(o.clip ? ["--clip"] : [])], { stdio: ["pipe", "pipe", "pipe"] });
+    p.stdout.setEncoding("utf8");
+    p.stdout.on("data", (/** @type {string} */ d) => {
+      buffer += d;
+      for (let i = buffer.indexOf("\n"); i >= 0; i = buffer.indexOf("\n")) { const line = buffer.slice(0, i); buffer = buffer.slice(i + 1); waiting.shift()?.(line); }
+    });
+    p.stderr.on("data", () => {});
+    p.on("close", () => { proc = null; buffer = ""; for (const w of waiting.splice(0)) w(null); });
+    p.unref();
+    /** @type {any} */ (p.stdin).unref?.(); /** @type {any} */ (p.stdout).unref?.(); /** @type {any} */ (p.stderr).unref?.();
+    return p;
+  };
+  /** @param {string} source @param {string | undefined} query @returns {Promise<any>} */
+  const ask = (source, query) => new Promise((done, fail) => {
+    proc ??= start();
+    const timer = setTimeout(() => { proc?.kill(); fail(new Error("the detector did not answer in 10 minutes")); }, 600_000);
+    waiting.push((line) => { clearTimeout(timer); if (line === null) fail(new Error("the detector stopped")); else done(JSON.parse(line)); });
+    proc.stdin.write(JSON.stringify({ source, query }) + "\n");
+  });
   return async (r, query) => {
     // The file that will be used (Commons refuses thumbnail sizes it does not list, so not the preview).
     const target = r.mediaUrl ?? r.previewUrl;
     if (!target) return null;
     try {
-      const args = ["-I", script, target, "--frames", "5", ...(o.clip ? ["--clip", ...(query ? ["--query", query] : [])] : [])];
-      const { stdout } = await run(python, args, { maxBuffer: 1 << 22, timeout: 600_000 });
-      const item = JSON.parse(stdout).items[0];
+      const item = await ask(target, o.clip ? query : undefined);
+      if (item.error) throw new Error(item.error);
       const why = frameVerdict(item, used);
       // A passed picture's hashes join the film, so a near-copy later is refused.
       if (!why) used.push(...(item.dhash ?? []));
