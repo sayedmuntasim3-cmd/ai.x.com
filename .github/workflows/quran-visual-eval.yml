@@ -3,7 +3,8 @@ name: Quran visual check validation pool
 # paintings, landscapes and hard cases), scored by the films' own frame check,
 # with numbered contact sheets for labelling. Labels live in
 # local/media/validation/labels.json; local/media/visual-eval.mjs measures
-# precision and recall. Free archive only; nothing paid.
+# precision and recall. The pictures are kept with the run (7 days) so new
+# checks can be measured on the same set. Free archive only; nothing paid.
 on:
   push:
     paths:
@@ -33,4 +34,5 @@ jobs:
           path: |
             pool/items.json
             pool/sheet-*.jpg
+            pool/[0-9]*.jpg
           retention-days: 7
