@@ -1,0 +1,9 @@
+{
+  "name": "ai-x-com",
+  "private": true,
+  "description": "Runtime dependencies of the Cloudflare Worker (worker/index.ts). Site build tools live in tools/.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "zod": "^4.6.7"
+  }
+}

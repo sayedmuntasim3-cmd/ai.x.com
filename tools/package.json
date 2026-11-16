@@ -3,13 +3,16 @@
   "private": true,
   "description": "Regenerates the static site in ../public from ../page.tsx and ../src",
   "scripts": {
-    "build": "tsx render.tsx && node build-client.mjs && tailwindcss -c tailwind.config.cjs -i input.css -o ../public/styles.css --minify"
+    "build": "tsx render.tsx && node build-client.mjs && tailwindcss -c tailwind.config.cjs -i input.css -o ../public/styles.css --minify",
+    "typecheck": "tsc -p tsconfig.media.json",
+    "check:media": "tsx media-check.ts"
   },
   "devDependencies": {
     "esbuild": "^0.23.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tailwindcss": "3.4.17",
-    "tsx": "4.19.2"
+    "tsx": "4.19.2",
+    "typescript": "^5.6.3"
   }
 }
