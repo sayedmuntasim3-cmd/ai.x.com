@@ -16,7 +16,13 @@
   // Create once: npx wrangler r2 bucket create zupona-films
   "r2_buckets": [{ "binding": "FILMS", "bucket_name": "zupona-films" }],
   "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60" },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Pull-request previews (`wrangler preview`, run by Workers Builds on non-production branches)
+  // do not inherit bindings. They get the vars only: no R2 bucket and no Workflow, so a preview
+  // can never read or write the production films or start a production film run.
+  "previews": {
+    "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60" }
+  }
   // Secrets (npx wrangler secret put NAME): ANTHROPIC_API_KEY, STUDIO_TOKEN
   // Optional secrets for the media step: PEXELS_API_KEY, PIXABAY_API_KEY
   // Optional auto-render: secret GITHUB_TOKEN; vars GITHUB_REPO ("owner/name") and SITE_URL ("https://...")
