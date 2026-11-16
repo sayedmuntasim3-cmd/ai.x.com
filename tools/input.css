@@ -2,35 +2,179 @@
 @tailwind components;
 @tailwind utilities;
 
-/* One language at a time: every string is rendered in both (page.tsx, L). */
-html:not([data-lang="bn"]) [data-l="bn"] { display: none; }
-html[data-lang="bn"] [data-l="en"] { display: none; }
-html[data-lang="bn"] body, [lang="bn"] { font-family: "Noto Sans Bengali", "Hind Siliguri", "Nirmala UI", "Kohinoor Bangla", "Bangla Sangam MN", ui-sans-serif, system-ui, sans-serif; }
-.lang-btn { color: rgba(255,255,255,0.6); }
-.lang-btn[aria-pressed="true"] { background: #bef264; color: #09110c; font-weight: 600; }
+/*
+  Zupona design tokens.
+  A calm, paper-like canvas (warm ivory, deep navy ink) with one signature: the
+  Zupona spectrum gradient, used only where it matters (logo, primary action,
+  the selected choice). Values are space-separated RGB so Tailwind can apply
+  opacity (e.g. bg-brand/10).
+*/
+@layer base {
+  :root {
+    color-scheme: light;
+    --canvas: 250 248 243;
+    --surface: 255 255 255;
+    --sunken: 243 241 235;
+    --sunken-strong: 235 232 224;
+    --line: 231 227 218;
+    --line-strong: 213 208 196;
+    --ink: 15 26 46;
+    --ink-2: 59 69 86;
+    --muted: 104 112 128;
+    --brand: 122 59 238;
+    --brand-ink: 101 44 214;
+    --shadow: 30 32 60;
+    --ridge-1: 226 229 236;
+    --ridge-2: 211 216 228;
+    --ridge-3: 238 240 244;
+    --ridge-snow: 255 255 255;
+    --aurora: 1;
+  }
 
-/* Motion, the same moves the renderer makes. */
-.kb { animation: kb 16s ease-in-out infinite alternate; will-change: transform; }
-.kb-slow { animation: kb-slow 16s ease-in-out infinite alternate; will-change: transform; }
-@keyframes kb { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.16) translate(-3%, -2%); } }
-@keyframes kb-slow { from { transform: translate(0, 0); } to { transform: translate(-2%, -1%); } }
-.parallax-bg { animation: pbg 9s ease-in-out infinite alternate; }
-.parallax-fg { animation: pfg 9s ease-in-out infinite alternate; }
-@keyframes pbg { from { transform: scale(1.05) translateX(2%); } to { transform: scale(1.12) translateX(-2%); } }
-@keyframes pfg { from { transform: scale(1) translateX(-4%); } to { transform: scale(1.08) translateX(4%); } }
-.rise { opacity: 0; animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
-@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-.rise-loop { opacity: 0; animation: rise-loop 4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite; }
-@keyframes rise-loop { 0% { opacity: 0; transform: translateY(12px); } 15%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
-.stage-dot { background: rgba(255, 255, 255, 0.15); animation: stage 7.2s infinite; }
-@keyframes stage { 0%, 6% { background: rgba(255, 255, 255, 0.15); box-shadow: none; } 12%, 88% { background: #bef264; box-shadow: 0 0 10px rgba(190, 242, 100, 0.8); } 100% { background: rgba(255, 255, 255, 0.15); } }
-.bar { transform-origin: bottom; animation: bar 2.4s ease-in-out infinite alternate; }
-@keyframes bar { from { transform: scaleY(0.35); opacity: 0.6; } to { transform: scaleY(1); opacity: 1; } }
-.tile { border-radius: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.1); background: #0d1210; padding: 0.75rem; }
-.tile-title { margin: 0.9rem 0.25rem 0; font-weight: 600; }
-.tile-text { margin: 0.25rem 0.25rem 0.4rem; font-size: 0.875rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.55); }
-details summary::-webkit-details-marker { display: none; }
-@media (prefers-reduced-motion: reduce) {
-  .kb, .kb-slow, .parallax-bg, .parallax-fg, .stage-dot, .bar { animation: none !important; }
-  .rise, .rise-loop { animation: none !important; opacity: 1 !important; transform: none !important; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --canvas: 12 12 18;
+      --surface: 21 21 29;
+      --sunken: 15 15 22;
+      --sunken-strong: 9 9 14;
+      --line: 38 38 48;
+      --line-strong: 58 58 70;
+      --ink: 245 244 240;
+      --ink-2: 199 198 207;
+      --muted: 154 153 166;
+      --brand: 150 110 255;
+      --brand-ink: 185 164 255;
+      --shadow: 0 0 0;
+      --ridge-1: 30 31 46;
+      --ridge-2: 39 40 58;
+      --ridge-3: 22 23 34;
+      --ridge-snow: 78 80 104;
+      --aurora: 1.6;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --canvas: 12 12 18;
+    --surface: 21 21 29;
+    --sunken: 15 15 22;
+    --sunken-strong: 9 9 14;
+    --line: 38 38 48;
+    --line-strong: 58 58 70;
+    --ink: 245 244 240;
+    --ink-2: 199 198 207;
+    --muted: 154 153 166;
+    --brand: 150 110 255;
+    --brand-ink: 185 164 255;
+    --shadow: 0 0 0;
+    --ridge-1: 30 31 46;
+    --ridge-2: 39 40 58;
+    --ridge-3: 22 23 34;
+    --ridge-snow: 78 80 104;
+    --aurora: 1.6;
+  }
+
+  html {
+    background: rgb(var(--canvas));
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: rgb(var(--canvas));
+    color: rgb(var(--ink));
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  html:has(dialog[open]) {
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--brand) / 0.22);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 2px;
+  }
+
+  textarea:focus-visible,
+  input:focus-visible {
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+@layer utilities {
+  /* The Zupona spectrum. Buttons and pills use slightly deeper magenta/orange ends so white text stays readable. */
+  .bg-brand-gradient {
+    background-image: linear-gradient(100deg, #2b63f6 0%, #7a3bee 38%, #de2e7e 70%, #e25505 100%);
+  }
+  .text-brand-gradient {
+    background-image: linear-gradient(100deg, #2b63f6 0%, #7a3bee 40%, #ea3a8c 72%, #ff7a1e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Poster scenes move only while the preview is "playing". */
+@layer components {
+  .is-playing .scene-drift {
+    animation: scene-drift 12s ease-in-out both;
+  }
+  .is-playing .scene-drift-slow {
+    animation: scene-drift-slow 12s ease-in-out both;
+  }
+  .is-playing .scene-rise {
+    animation: scene-rise 12s ease-out both;
+  }
+  .is-playing .scene-shimmer {
+    animation: scene-shimmer 4s ease-in-out 3 both;
+  }
+  .is-playing .scene-twinkle {
+    animation: scene-shimmer 3s ease-in-out 4 both;
+  }
+  .is-playing .scene-sway {
+    transform-origin: 50% 0;
+    animation: scene-sway 4s ease-in-out 3 both;
+  }
+
+  @keyframes scene-drift {
+    from { transform: translateX(0); }
+    to { transform: translateX(-34px); }
+  }
+  @keyframes scene-drift-slow {
+    from { transform: translateX(0); }
+    to { transform: translateX(-14px); }
+  }
+  @keyframes scene-rise {
+    from { transform: translateY(0); }
+    to { transform: translateY(-10px); }
+  }
+  @keyframes scene-shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  @keyframes scene-sway {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(0.8deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-playing * {
+      animation: none !important;
+    }
+  }
 }
