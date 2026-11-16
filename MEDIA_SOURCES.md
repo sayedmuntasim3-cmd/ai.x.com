@@ -10,7 +10,7 @@ Code: `src/media/` (search library, no dependencies), `worker/index.ts` (the `/a
 
 - Needs the `ANTHROPIC_API_KEY` secret (`npx wrangler secret put ANTHROPIC_API_KEY`). Without it, or if Claude cannot answer, the list falls back to keywords taken from the idea.
 - Uses structured output, so the reply is always a valid list, and the API's server-side fallback (`fallbacks: "default"`), so a declined request is retried on another model instead of failing.
-- The same film plan is cached for a day, so Claude is asked once per plan. One plan costs well under a cent at Opus 5.5 prices.
+- The same film plan is cached for a day, so Claude is asked once per plan. One plan costs roughly 2 to 5 US cents at Opus 5.5 prices ($4 per million input tokens, $20 per million output tokens, including its thinking).
 - The studio can call the same endpoint per scene when it writes a script.
 
 ## Connected sources
