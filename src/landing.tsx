@@ -66,6 +66,8 @@ const PREVIEW_SECONDS = 12;
 const container = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8";
 const eyebrow = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brand-ink";
 
+type ScriptState = { status: "idle" | "loading" | "done" | "error"; text: string };
+
 type Voice = { name: string; size: number; seconds: number; url: string; source: "upload" | "record" };
 
 type Draft = {
@@ -137,6 +139,7 @@ export default function Landing() {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
+  const [script, setScript] = useState<ScriptState>({ status: "idle", text: "" });
   const ideaRef = useRef<HTMLTextAreaElement>(null);
 
   const update = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
@@ -195,6 +198,35 @@ export default function Landing() {
     }
     setError("");
     setBriefOpen(true);
+    void writeScript();
+  };
+
+  const writeScript = async () => {
+    const idea = draft.mode === "idea" ? draft.idea.trim() : draft.topic.trim();
+    if (idea.length < 12) {
+      setScript({ status: "idle", text: "" });
+      return;
+    }
+    setScript({ status: "loading", text: "" });
+    try {
+      const res = await fetch("/api/script", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          idea,
+          minutes: Math.max(1, Math.ceil(totalSeconds / 60)),
+          category: category.label,
+          age: findOption(AGES, draft.age).label,
+          style: findOption(STYLES, draft.style).label,
+          music: findOption(MUSIC, draft.music).label,
+        }),
+      });
+      const data = (await res.json()) as { script?: string; error?: string };
+      if (!res.ok || !data.script) throw new Error(data.error || "Could not write the script.");
+      setScript({ status: "done", text: data.script });
+    } catch (e) {
+      setScript({ status: "error", text: e instanceof Error ? e.message : "Could not write the script." });
+    }
   };
 
   const brief = {
@@ -278,7 +310,7 @@ export default function Landing() {
 
       <Footer />
       <MobileNav />
-      <BriefDialog open={briefOpen} onClose={() => setBriefOpen(false)} brief={brief} />
+      <BriefDialog open={briefOpen} onClose={() => setBriefOpen(false)} brief={brief} script={script} onRetry={writeScript} />
     </div>
   );
 }
@@ -1283,7 +1315,19 @@ function briefText(b: Brief) {
   ].join("\n");
 }
 
-function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => void; brief: Brief }) {
+function BriefDialog({
+  open,
+  onClose,
+  brief,
+  script,
+  onRetry,
+}: {
+  open: boolean;
+  onClose: () => void;
+  brief: Brief;
+  script: ScriptState;
+  onRetry: () => void;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -1299,7 +1343,7 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
   }, [open]);
 
   const copy = async () => {
-    const text = briefText(brief);
+    const text = script.status === "done" ? `${briefText(brief)}\n\nScript\n\n${script.text}` : briefText(brief);
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -1369,6 +1413,30 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
           <p className="text-[15px] font-medium text-ink">Chapters</p>
           <Timeline chapters={brief.chapters} totalSeconds={brief.chapters[brief.chapters.length - 1]?.end ?? 60} />
         </div>
+
+        {script.status !== "idle" && (
+          <div className="mt-6">
+            <p className="text-[15px] font-medium text-ink">Script</p>
+            {script.status === "loading" && (
+              <p className="mt-2 rounded-2xl bg-sunken p-4 text-[14px] text-ink-2" aria-live="polite">
+                Writing your script… this takes a few seconds.
+              </p>
+            )}
+            {script.status === "error" && (
+              <div className="mt-2 rounded-2xl bg-sunken p-4 text-[14px] text-ink-2" role="alert">
+                <p>{script.text}</p>
+                <button type="button" onClick={onRetry} className="mt-2 font-medium text-brand-ink underline">
+                  Try again
+                </button>
+              </div>
+            )}
+            {script.status === "done" && (
+              <div className="mt-2 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap rounded-2xl bg-sunken p-4 text-[14.5px] leading-relaxed text-ink-2">
+                {script.text}
+              </div>
+            )}
+          </div>
+        )}
 
         <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
           Rendering happens in Zupona Studio, which is opening to creators soon. Your settings are saved on this device, so they
