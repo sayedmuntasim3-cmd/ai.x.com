@@ -25,7 +25,15 @@ const RIGHTS_OPTIONS: Option<RightsLevel>[] = [
 
 export type ShotPlanInput = { idea: string; topic?: string; style?: string; audience?: string; chapters: { title: string; start: number; end: number }[] };
 export type LibraryRequest = { query: string; n: number; plan?: ShotPlanInput };
-type ShotList = { source: "claude" | "keywords"; scenes: { chapter: string; queries: string[] }[] };
+type ShotList = { source: "agent" | "open-model" | "claude" | "archives" | "keywords"; scenes: { chapter: string; queries: string[] }[] };
+
+const SHOT_SOURCE: Record<ShotList["source"], string> = {
+  agent: "Searches written by your Zupona agent",
+  "open-model": "Searches written by Zupona AI for each chapter",
+  claude: "Searches written by Claude for each chapter",
+  archives: "Names the archives hold most pictures of",
+  keywords: "Searches from your idea's keywords",
+};
 
 const SUGGESTIONS: Record<CategoryId, string[]> = {
   nature: ["Snow leopard", "Rainforest canopy", "Wildebeest migration"],
@@ -164,7 +172,7 @@ export function Library({ idea, topic, request }: { idea: string; topic: Categor
     setQuery(request.query);
     search(request.query);
     if (!request.plan) return;
-    // Meanwhile Claude writes a shot list: short searches for every chapter.
+    // Meanwhile the planner writes a shot list: short searches for every chapter.
     let cancelled = false;
     setShots(null);
     setShotsLoading(true);
@@ -307,7 +315,7 @@ export function Library({ idea, topic, request }: { idea: string; topic: Categor
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="font-serif text-[21px] leading-tight text-ink">Shot list</p>
               <p className="text-[12.5px] text-muted">
-                {shotsLoading ? "Claude is planning searches for each chapter…" : shots?.source === "claude" ? "Searches written by Claude for each chapter" : "Searches from your idea's keywords"}
+                {shotsLoading ? "Planning searches for each chapter…" : shots ? SHOT_SOURCE[shots.source] : ""}
               </p>
             </div>
             {shots && (

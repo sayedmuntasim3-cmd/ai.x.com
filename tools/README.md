@@ -41,7 +41,8 @@ npm run check:media    # live test of every image source (see ../MEDIA_SOURCES.m
 | `src/library.tsx` | Visual library section: search across all image archives, results, image details |
 | `src/media/` | Image search library: sources (`catalog.ts`, `providers/`), licences, ranking, search |
 | `worker/index.ts` | Cloudflare Worker: `/api/media/search`, `/api/media/sources`, `/api/media/track`, `/api/media/plan` |
-| `worker/plan.ts` | Shot list: Claude writes short visual searches per chapter |
+| `worker/plan.ts` | Shot list: short visual searches per chapter (own agent, Workers AI, Claude, or the archives) |
+| `src/media/plan.ts` | Free shot list mined from archive search results |
 | `../package.json` | Worker runtime dependencies (Anthropic SDK, zod); run `npm ci` in the repo root before `wrangler deploy` |
 | `src/icons.tsx` | Icon set |
 | `tools/input.css` | Colour tokens for the light and dark themes |

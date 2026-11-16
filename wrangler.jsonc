@@ -10,6 +10,11 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  // Workers AI: an open-source model on this Cloudflare account writes the shot lists (worker/plan.ts).
+  // Free daily allowance; no outside AI company to pay.
+  "ai": {
+    "binding": "AI"
+  },
   "observability": {
     "enabled": true
   },

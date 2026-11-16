@@ -4,14 +4,21 @@ One search reaches 30 openly licensed image archives at once. 24 work with no ke
 
 Code: `src/media/` (search library, no dependencies), `worker/index.ts` (the `/api/media/*` endpoints), `worker/plan.ts` (Claude's shot list), `src/library.tsx` (the Visual library section on the page).
 
-## Shot list (Claude)
+## Shot list
 
-"Find visuals for this film" in the brief sends the idea and its chapter plan to `POST /api/media/plan`. Claude Opus 5.5 writes two or three short image searches per chapter ("Akbar portrait", "Fatehpur Sikri", "Red Fort Delhi"), which appear as a shot list above the results; each one runs a search when clicked. Short, concrete phrases find far better pictures in archives than a whole sentence does.
+"Find visuals for this film" in the brief sends the idea and its chapter plan to `POST /api/media/plan`, which returns two or three short image searches per chapter ("Akbar portrait", "Fatehpur Sikri", "Red Fort Delhi"). They appear as a shot list above the results; each one runs a search when clicked. Short, concrete phrases find far better pictures than a whole sentence does.
 
-- Needs the `ANTHROPIC_API_KEY` secret (`npx wrangler secret put ANTHROPIC_API_KEY`). Without it, or if Claude cannot answer, the list falls back to keywords taken from the idea.
-- Uses structured output, so the reply is always a valid list, and the API's server-side fallback (`fallbacks: "default"`), so a declined request is retried on another model instead of failing.
-- The same film plan is cached for a day, so Claude is asked once per plan. One plan costs roughly 2 to 5 US cents at Opus 5.5 prices ($4 per million input tokens, $20 per million output tokens, including its thinking).
-- The studio can call the same endpoint per scene when it writes a script.
+No outside AI company is needed. The first planner that is available writes the list:
+
+| Order | Planner | Cost | Set up |
+| --- | --- | --- | --- |
+| 1 | Your own agent | yours | `SHOT_PLANNER_URL` (and `SHOT_PLANNER_TOKEN`): any endpoint that takes the same JSON body and returns `{"scenes":[{"chapter","queries"}]}` |
+| 2 | Open-source model on your Cloudflare account (Workers AI, Llama 3.3 70B) | free daily allowance on Cloudflare, then a small Cloudflare charge | already on: the `ai` binding in `wrangler.jsonc`. Change the model with `WORKERS_AI_MODEL`; switch off with `SHOT_PLANNER_OPEN_MODEL=off` |
+| 3 | Claude Opus 5.5 | paid per use (roughly 2 to 5 US cents per plan) | only if you add `ANTHROPIC_API_KEY` |
+| 4 | The archives themselves: names that recur in search results for the subject | free | always available |
+| 5 | Keywords from the idea | free | always available |
+
+The same film plan is cached for a day, so a planner is asked once per plan. The open-model step was tested with a simulated Workers AI answer; it runs for real once deployed on Cloudflare.
 
 ## Connected sources
 
@@ -57,7 +64,7 @@ The six keyed sources are written against each API's documentation but have not 
 All keys are free. Add each one as a Worker secret (never in `wrangler.jsonc`):
 
 ```sh
-npx wrangler secret put ANTHROPIC_API_KEY      # https://platform.claude.com (shot list)
+npx wrangler secret put ANTHROPIC_API_KEY      # optional, paid: Claude for the shot list
 npx wrangler secret put PIXABAY_API_KEY        # https://pixabay.com/api/docs/
 npx wrangler secret put UNSPLASH_ACCESS_KEY    # https://unsplash.com/oauth/applications
 npx wrangler secret put SMITHSONIAN_API_KEY    # https://api.data.gov/signup/

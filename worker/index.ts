@@ -7,7 +7,7 @@
 //   GET  /api/media/sources                               every source and whether it is switched on
 //   POST /api/media/track  {"url": "<downloadTrackingUrl>"} Unsplash download ping when a photo is used
 //   POST /api/media/plan   {"idea", "topic", "style", "audience", "chapters": [{title,start,end}]}
-//                          Claude's shot list: 2 or 3 short visual searches per chapter (worker/plan.ts)
+//                          shot list: 2 or 3 short visual searches per chapter (worker/plan.ts)
 //
 // Query parameters: q, topic (nature|ocean|space|history|science|culture),
 // rights (no-attribution|attribution|share-alike), orientation (any|landscape|portrait),
@@ -24,11 +24,11 @@ import {
   type SearchOptions,
   type Topic,
 } from "../src/media";
-import { parsePlanRequest, planShots } from "./plan";
+import { parsePlanRequest, planShots, type WorkersAI } from "./plan";
 
 type Fetcher = { fetch(request: Request): Promise<Response> };
 type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
-type Env = { ASSETS: Fetcher; MEDIA_RATE_LIMITER?: RateLimiter } & Record<string, unknown>;
+type Env = { ASSETS: Fetcher; MEDIA_RATE_LIMITER?: RateLimiter; AI?: WorkersAI } & Record<string, unknown>;
 type ExecutionContext = { waitUntil(promise: Promise<unknown>): void };
 type EdgeCache = { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> };
 
@@ -143,15 +143,15 @@ async function plan(request: Request, url: URL, env: Env, ctx: ExecutionContext,
   if (!req) return json({ error: "Send an idea and at least one chapter" }, 400, cors);
   if (await limited(request, env)) return json({ error: "Too many requests. Try again in a minute." }, 429, { ...cors, "Retry-After": "60" });
 
-  // The same film plan gets the same shot list for a day, so Claude is asked once.
-  const key = new Request(new URL(`/api/media/plan/__cache/v1/${await sha256(JSON.stringify(req))}`, url.origin).toString());
+  // The same film plan gets the same shot list for a day, so the model is asked once.
+  const key = new Request(new URL(`/api/media/plan/__cache/v2/${await sha256(JSON.stringify(req))}`, url.origin).toString());
   const cache = edgeCache();
   const cached = await cache?.match(key);
   if (cached) return new Response(cached.body, { headers: { "Content-Type": "application/json; charset=utf-8", ...cors, "X-Media-Cache": "hit" } });
 
-  const result = await planShots(req, menv);
+  const result = await planShots(req, menv, { ai: env.AI });
   const body = JSON.stringify(result);
-  if (cache && result.source === "claude") {
+  if (cache && result.source !== "keywords") {
     ctx.waitUntil(cache.put(key, new Response(body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=86400" } })));
   }
   return new Response(body, { headers: { "Content-Type": "application/json; charset=utf-8", ...cors, "X-Media-Cache": "miss" } });
