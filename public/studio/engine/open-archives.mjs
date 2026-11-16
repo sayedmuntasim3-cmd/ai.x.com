@@ -25,7 +25,7 @@ function licenceText(code, label, url) {
 }
 
 /**
- * @param {{ env?: Record<string, string | undefined>, fetch?: typeof fetch, perSource?: number, limit?: number }} [o]
+ * @param {{ env?: Record<string, string | undefined>, fetch?: import("./film-media.mjs").FetchLike, perSource?: number, limit?: number }} [o]
  * @returns {import("./documentary-media-fetch.mjs").MediaProvider}
  */
 export function openArchivesProvider(o = {}) {
@@ -44,7 +44,7 @@ export function openArchivesProvider(o = {}) {
         previewUrl: r.thumbnailUrl,
         mediaUrl: r.fullUrl,
         sourcePageUrl: r.pageUrl,
-        creator: r.creator ?? r.collection ?? r.sourceName,
+        creator: r.creator ?? r.collection ?? r.sourceName ?? null,
         ...licenceText(r.license.code, r.license.label, r.license.url),
         durationSeconds: null,
         width: r.width ?? null,

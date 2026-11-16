@@ -11,5 +11,6 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["src/**/*.mjs"]
+  "include": ["src/**/*.mjs"],
+  "exclude": ["src/open-archives-lib.mjs"]
 }
