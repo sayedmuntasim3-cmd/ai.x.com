@@ -6,6 +6,8 @@
 //   GET  /api/media/search?q=...&stream=1                 the same, streamed as NDJSON per source
 //   GET  /api/media/sources                               every source and whether it is switched on
 //   POST /api/media/track  {"url": "<downloadTrackingUrl>"} Unsplash download ping when a photo is used
+//   POST /api/media/plan   {"idea", "topic", "style", "audience", "chapters": [{title,start,end}]}
+//                          Claude's shot list: 2 or 3 short visual searches per chapter (worker/plan.ts)
 //
 // Query parameters: q, topic (nature|ocean|space|history|science|culture),
 // rights (no-attribution|attribution|share-alike), orientation (any|landscape|portrait),
@@ -22,6 +24,7 @@ import {
   type SearchOptions,
   type Topic,
 } from "../src/media";
+import { parsePlanRequest, planShots } from "./plan";
 
 type Fetcher = { fetch(request: Request): Promise<Response> };
 type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
@@ -74,11 +77,7 @@ async function search(request: Request, url: URL, env: Env, ctx: ExecutionContex
   const opts = normaliseOptions(options);
   if (opts.query.length < 2) return json({ error: "Add a search query with ?q=" }, 400, cors);
 
-  if (env.MEDIA_RATE_LIMITER) {
-    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    const { success } = await env.MEDIA_RATE_LIMITER.limit({ key: ip });
-    if (!success) return json({ error: "Too many searches. Try again in a minute." }, 429, { ...cors, "Retry-After": "60" });
-  }
+  if (await limited(request, env)) return json({ error: "Too many searches. Try again in a minute." }, 429, { ...cors, "Retry-After": "60" });
 
   const stream = url.searchParams.get("stream") === "1";
   // One cache entry per distinct, normalised search.
@@ -128,6 +127,36 @@ async function search(request: Request, url: URL, env: Env, ctx: ExecutionContex
   return new Response(toClient, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "X-Content-Type-Options": "nosniff", ...headers } });
 }
 
+async function sha256(text: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function limited(request: Request, env: Env) {
+  if (!env.MEDIA_RATE_LIMITER) return false;
+  const { success } = await env.MEDIA_RATE_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") ?? "unknown" });
+  return !success;
+}
+
+async function plan(request: Request, url: URL, env: Env, ctx: ExecutionContext, menv: MediaEnv, cors: Record<string, string>) {
+  const req = parsePlanRequest(await request.json().catch(() => null));
+  if (!req) return json({ error: "Send an idea and at least one chapter" }, 400, cors);
+  if (await limited(request, env)) return json({ error: "Too many requests. Try again in a minute." }, 429, { ...cors, "Retry-After": "60" });
+
+  // The same film plan gets the same shot list for a day, so Claude is asked once.
+  const key = new Request(new URL(`/api/media/plan/__cache/v1/${await sha256(JSON.stringify(req))}`, url.origin).toString());
+  const cache = edgeCache();
+  const cached = await cache?.match(key);
+  if (cached) return new Response(cached.body, { headers: { "Content-Type": "application/json; charset=utf-8", ...cors, "X-Media-Cache": "hit" } });
+
+  const result = await planShots(req, menv);
+  const body = JSON.stringify(result);
+  if (cache && result.source === "claude") {
+    ctx.waitUntil(cache.put(key, new Response(body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=86400" } })));
+  }
+  return new Response(body, { headers: { "Content-Type": "application/json; charset=utf-8", ...cors, "X-Media-Cache": "miss" } });
+}
+
 async function track(request: Request, menv: MediaEnv, cors: Record<string, string>) {
   const body = (await request.json().catch(() => null)) as { url?: string } | null;
   let target: URL | null = null;
@@ -169,6 +198,8 @@ async function api(request: Request, url: URL, env: Env, ctx: ExecutionContext) 
   }
 
   if (url.pathname === "/api/media/track" && request.method === "POST") return track(request, menv, cors);
+
+  if (url.pathname === "/api/media/plan" && request.method === "POST") return plan(request, url, env, ctx, menv, cors);
 
   return json({ error: "Not found" }, 404, cors);
 }

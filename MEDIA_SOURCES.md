@@ -2,7 +2,16 @@
 
 One search reaches 30 openly licensed image archives at once. 24 work with no key; 6 more switch on as soon as their free key is added. Every result is cleared for use in a commercial, edited film and comes with the image's pixel size, its licence and a credit line ready for the end titles.
 
-Code: `src/media/` (search library, no dependencies), `worker/index.ts` (the `/api/media/*` endpoints), `src/library.tsx` (the Visual library section on the page).
+Code: `src/media/` (search library, no dependencies), `worker/index.ts` (the `/api/media/*` endpoints), `worker/plan.ts` (Claude's shot list), `src/library.tsx` (the Visual library section on the page).
+
+## Shot list (Claude)
+
+"Find visuals for this film" in the brief sends the idea and its chapter plan to `POST /api/media/plan`. Claude Opus 5.5 writes two or three short image searches per chapter ("Akbar portrait", "Fatehpur Sikri", "Red Fort Delhi"), which appear as a shot list above the results; each one runs a search when clicked. Short, concrete phrases find far better pictures in archives than a whole sentence does.
+
+- Needs the `ANTHROPIC_API_KEY` secret (`npx wrangler secret put ANTHROPIC_API_KEY`). Without it, or if Claude cannot answer, the list falls back to keywords taken from the idea.
+- Uses structured output, so the reply is always a valid list, and the API's server-side fallback (`fallbacks: "default"`), so a declined request is retried on another model instead of failing.
+- The same film plan is cached for a day, so Claude is asked once per plan. One plan costs well under a cent at Opus 5.5 prices.
+- The studio can call the same endpoint per scene when it writes a script.
 
 ## Connected sources
 
@@ -48,6 +57,7 @@ The six keyed sources are written against each API's documentation but have not 
 All keys are free. Add each one as a Worker secret (never in `wrangler.jsonc`):
 
 ```sh
+npx wrangler secret put ANTHROPIC_API_KEY      # https://platform.claude.com (shot list)
 npx wrangler secret put PIXABAY_API_KEY        # https://pixabay.com/api/docs/
 npx wrangler secret put UNSPLASH_ACCESS_KEY    # https://unsplash.com/oauth/applications
 npx wrangler secret put SMITHSONIAN_API_KEY    # https://api.data.gov/signup/
@@ -68,7 +78,7 @@ Other settings (plain vars in `wrangler.jsonc`, or secrets):
 
 | Name | Default | Meaning |
 | --- | --- | --- |
-| `MEDIA_DEFAULT_RIGHTS` | `attribution` | Licence level when a request does not say: `no-attribution`, `attribution` or `share-alike` |
+| `MEDIA_DEFAULT_RIGHTS` | `share-alike` | Licence level when a request does not say: `no-attribution`, `attribution` or `share-alike` |
 | `MEDIA_DISABLED_SOURCES` | – | Comma-separated source ids to switch off |
 | `MEDIA_ALLOWED_ORIGINS` | – | Comma-separated origins (e.g. `https://zupona.com`) allowed to call the API from a browser on another domain |
 | `MEDIA_SUBREQUEST_BUDGET` | `45` | Upstream requests one search may make. The Workers free plan allows 50; raise it on Workers Paid |
@@ -81,10 +91,10 @@ A documentary is a commercial work that crops, pans, zooms and grades its images
 | Level | Includes | Obligation |
 | --- | --- | --- |
 | `no-attribution` | CC0, public domain, US government works, "no known restrictions", Unsplash and Pixabay licences | none (a credit is still good practice) |
-| `attribution` (default) | adds CC BY | credit line in the end titles |
-| `share-alike` | adds CC BY-SA | credit, and an edited version of the image must be shared under CC BY-SA |
+| `attribution` | adds CC BY | credit line in the end titles |
+| `share-alike` (default) | adds CC BY-SA | credit, and an edited version of the image must be shared under CC BY-SA |
 
-Most Wikimedia Commons photos are CC BY-SA. They are left out by default, because an edited image inside a film may count as an adaptation that has to carry the same licence. The visitor can include them with the licence menu, or the default can change with `MEDIA_DEFAULT_RIGHTS=share-alike`.
+`share-alike` is the default (decided 16 Nov 2026) because most Wikimedia Commons photos are CC BY-SA, so it gives by far the most images. The trade-off: an edited CC BY-SA image inside a film may count as an adaptation that has to carry the same licence. Every result says which licence it has, and the image dialog explains the condition. Visitors can narrow it with the licence menu ("No share-alike"), and `MEDIA_DEFAULT_RIGHTS=attribution` switches the default back.
 
 Every result carries `attribution`, a credit line written the way its licence asks (for example `Photo by X on Unsplash`, or `“Title” by Creator · CC BY 4.0 · Source`). When the studio renders a film, collect the `attribution` of every image used and put them in the end credits. When an Unsplash photo is used, POST its `downloadTrackingUrl` to `/api/media/track` as Unsplash's API terms require. Pixabay's terms ask that files are downloaded and stored rather than hotlinked long term, so the renderer should copy the files it uses to its own storage.
 
@@ -114,7 +124,7 @@ GET /api/media/search?q=snow+leopard&topic=nature
 | --- | --- |
 | `q` | the search, 2 to 200 characters |
 | `topic` | `nature`, `ocean`, `space`, `history`, `science`, `culture` |
-| `rights` | `no-attribution`, `attribution`, `share-alike` |
+| `rights` | `no-attribution`, `attribution`, `share-alike` (default) |
 | `orientation` | `any`, `landscape`, `portrait` |
 | `min` | smallest long edge in pixels for images whose size is known (default 1000; 1920 for HD) |
 | `sources` | comma-separated source ids, e.g. `nasa,esa-hubble,esa-webb` |

@@ -52,7 +52,7 @@ export function normaliseOptions(opts: SearchOptions) {
   return {
     query: (opts.query ?? "").replace(/\s+/g, " ").trim().slice(0, 200),
     topic: opts.topic && TOPICS.includes(opts.topic) ? opts.topic : undefined,
-    rights: opts.rights && RIGHTS.includes(opts.rights) ? opts.rights : ("attribution" as RightsLevel),
+    rights: opts.rights && RIGHTS.includes(opts.rights) ? opts.rights : ("share-alike" as RightsLevel),
     orientation,
     minSize: clamp(opts.minSize, 0, 8000, 1000),
     sources: opts.sources?.length ? opts.sources : undefined,

@@ -56,7 +56,7 @@ import {
   WaveformIcon,
 } from "./icons";
 import { FoxMark, HeroMountains, PosterArt } from "./art";
-import { Library, visualQuery } from "./library";
+import { Library, visualQuery, type LibraryRequest } from "./library";
 import { Select } from "./select";
 
 const DRAFT_KEY = "zupona:studio-draft:v1";
@@ -139,7 +139,7 @@ export default function Landing() {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
-  const [libraryRequest, setLibraryRequest] = useState<{ query: string; n: number } | null>(null);
+  const [libraryRequest, setLibraryRequest] = useState<LibraryRequest | null>(null);
   const ideaRef = useRef<HTMLTextAreaElement>(null);
 
   const update = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
@@ -203,7 +203,17 @@ export default function Landing() {
   const findVisuals = () => {
     const query = visualQuery(userText) || category.label;
     setBriefOpen(false);
-    setLibraryRequest((r) => ({ query, n: (r?.n ?? 0) + 1 }));
+    setLibraryRequest((r) => ({
+      query,
+      n: (r?.n ?? 0) + 1,
+      plan: {
+        idea: userText || category.idea,
+        topic: category.label,
+        style: findOption(STYLES, draft.style).label,
+        audience: findOption(AGES, draft.age).label,
+        chapters,
+      },
+    }));
     window.setTimeout(() => {
       document.getElementById("library")?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
     }, 60);

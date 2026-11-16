@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import type { CategoryId, Option } from "./data";
 import { ArrowUpRightIcon, CheckIcon, ChevronDownIcon, CloseIcon, CopyIcon, DownloadIcon, ImageIcon, SearchIcon } from "./icons";
 import { SOURCE_GROUPS, SOURCES } from "./media/catalog";
-import { mergeResults, terms } from "./media/rank";
+import { visualQuery } from "./media/query";
+import { mergeResults } from "./media/rank";
+
+export { visualQuery };
 import type { License, MediaResult, RightsLevel, SourceReport } from "./media/types";
 import { Select } from "./select";
 
@@ -15,10 +18,14 @@ const LIMIT = 120;
 const PAGE = 24;
 
 const RIGHTS_OPTIONS: Option<RightsLevel>[] = [
-  { id: "attribution", label: "Free with credit", hint: "Public domain, CC0 and CC BY. Recommended" },
+  { id: "share-alike", label: "All open licences", hint: "Public domain, CC0, CC BY and CC BY-SA. Most images" },
+  { id: "attribution", label: "No share-alike", hint: "Public domain, CC0 and CC BY" },
   { id: "no-attribution", label: "No credit needed", hint: "Public domain and CC0 only" },
-  { id: "share-alike", label: "Include share-alike", hint: "Adds CC BY-SA: edited versions must share alike" },
 ];
+
+export type ShotPlanInput = { idea: string; topic?: string; style?: string; audience?: string; chapters: { title: string; start: number; end: number }[] };
+export type LibraryRequest = { query: string; n: number; plan?: ShotPlanInput };
+type ShotList = { source: "claude" | "keywords"; scenes: { chapter: string; queries: string[] }[] };
 
 const SUGGESTIONS: Record<CategoryId, string[]> = {
   nature: ["Snow leopard", "Rainforest canopy", "Wildebeest migration"],
@@ -28,43 +35,6 @@ const SUGGESTIONS: Record<CategoryId, string[]> = {
   science: ["Brain anatomy", "Microscope", "Honeybee"],
   culture: ["Night market", "Hokusai wave", "Jazz musicians"],
 };
-
-// Words that make an idea read well but make a poor image search.
-const FILLER = new Set(
-  "documentary film story stories life lives secret forgotten brutal quietly beautiful beauty fragility journey rise fall how why what people built build keep keeps single great last first one through across inside day days told edge matter matters think thousand trillions km years year our us we they them that could would should hold hunt turns turn moment more than race useful supports support born dies die make makes alive travelled standing see seen busiest world world's".split(
-    " ",
-  ),
-);
-
-/** Turns a written idea into a short search: proper names first, then the first content words. */
-export function visualQuery(text: string) {
-  const clean = text.replace(/[“”"]/g, " ").replace(/\s+/g, " ").trim();
-  if (!clean) return "";
-  // Capitalised runs that do not start a sentence: "Silk Road", "Mughal Empire", "New Orleans".
-  const proper: string[] = [];
-  for (const sentence of clean.split(/[.!?]+\s*/)) {
-    let run: string[] = [];
-    const flush = () => {
-      if (run.length) proper.push(run.join(" "));
-      run = [];
-    };
-    sentence.split(" ").forEach((word, i) => {
-      const bare = word.replace(/[^\p{L}'-]/gu, "");
-      if (i > 0 && /^\p{Lu}/u.test(bare)) run.push(bare);
-      else flush();
-      if (/[,;:]$/.test(word)) flush();
-    });
-    flush();
-  }
-  const words = terms(clean).filter((w) => !FILLER.has(w) && !/^\d/.test(w));
-  const picked: string[] = [];
-  for (const name of proper) if (picked.join(" ").split(" ").length < 3) picked.push(name);
-  for (const w of words) {
-    if (picked.join(" ").split(" ").length >= 3) break;
-    if (!picked.some((p) => p.toLowerCase().includes(w))) picked.push(w);
-  }
-  return picked.join(" ").slice(0, 80);
-}
 
 function shortLicense(l: License) {
   if (l.code === "cc-by") return "CC BY";
@@ -86,9 +56,11 @@ function licenseNote(l: License) {
 type Phase = "idle" | "loading" | "done" | "error";
 type SourceMeta = { id: string; enabled: boolean };
 
-export function Library({ idea, topic, request }: { idea: string; topic: CategoryId; request: { query: string; n: number } | null }) {
+export function Library({ idea, topic, request }: { idea: string; topic: CategoryId; request: LibraryRequest | null }) {
   const [query, setQuery] = useState("");
-  const [rights, setRights] = useState<RightsLevel>("attribution");
+  const [rights, setRights] = useState<RightsLevel>("share-alike");
+  const [shots, setShots] = useState<ShotList | null>(null);
+  const [shotsLoading, setShotsLoading] = useState(false);
   const [hdOnly, setHdOnly] = useState(false);
   const [landscape, setLandscape] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -191,6 +163,23 @@ export function Library({ idea, topic, request }: { idea: string; topic: Categor
     if (!request) return;
     setQuery(request.query);
     search(request.query);
+    if (!request.plan) return;
+    // Meanwhile Claude writes a shot list: short searches for every chapter.
+    let cancelled = false;
+    setShots(null);
+    setShotsLoading(true);
+    fetch("/api/media/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.plan) })
+      .then((r) => (r.ok ? (r.json() as Promise<ShotList>) : null))
+      .then((list) => {
+        if (!cancelled && list?.scenes?.length) setShots(list);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setShotsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [request]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => controller.current?.abort(), []);
@@ -312,6 +301,47 @@ export function Library({ idea, topic, request }: { idea: string; topic: Categor
             </p>
           )}
         </div>
+
+        {(shots || shotsLoading) && (
+          <div className="mt-6 rounded-[22px] border border-line bg-surface p-4 sm:p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-serif text-[21px] leading-tight text-ink">Shot list</p>
+              <p className="text-[12.5px] text-muted">
+                {shotsLoading ? "Claude is planning searches for each chapter…" : shots?.source === "claude" ? "Searches written by Claude for each chapter" : "Searches from your idea's keywords"}
+              </p>
+            </div>
+            {shots && (
+              <ol className="mt-3 space-y-2.5">
+                {shots.scenes.map((scene, i) => (
+                  <li key={`${scene.chapter}-${i}`} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                    <span className="w-36 shrink-0 text-[13px] font-medium text-ink-2">
+                      <span className="mr-1.5 tabular-nums text-muted">{i + 1}</span>
+                      {scene.chapter}
+                    </span>
+                    <span className="flex flex-wrap gap-1.5">
+                      {scene.queries.map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          aria-pressed={lastSearch.current === q}
+                          onClick={() => {
+                            setQuery(q);
+                            search(q);
+                          }}
+                          className={`inline-flex h-8 items-center rounded-full px-3 text-[13px] transition ${
+                            lastSearch.current === q ? "bg-brand/15 font-semibold text-brand-ink" : "border border-line-strong text-ink-2 hover:border-ink/40 hover:text-ink"
+                          }`}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
 
         {phase === "idle" && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
