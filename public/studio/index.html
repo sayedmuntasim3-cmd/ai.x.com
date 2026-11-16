@@ -28,8 +28,12 @@
 
 <main class="wrap">
   <p class="lead" data-t="lead"></p>
+  <nav class="tabs" role="tablist" aria-label="Studio">
+    <button type="button" role="tab" id="tab-idea" aria-controls="panel-idea" aria-selected="true" data-tab="idea" data-t="tabIdea"></button>
+    <button type="button" role="tab" id="tab-voice" aria-controls="panel-voice" aria-selected="false" data-tab="voice" data-t="tabVoice"></button>
+  </nav>
   <div class="grid">
-    <section class="col" aria-labelledby="idea-h">
+    <section class="col" id="panel-idea" role="tabpanel" aria-labelledby="idea-h">
       <form class="card" id="idea-form" novalidate>
         <h2 id="idea-h"><span class="step">1</span> <span data-t="ideaTitle"></span></h2>
         <label class="sr" for="idea" data-t="ideaTitle"></label>
@@ -66,7 +70,7 @@
       <div id="idea-out" class="out" aria-live="polite"></div>
     </section>
 
-    <section class="col" aria-labelledby="voice-h">
+    <section class="col" id="panel-voice" role="tabpanel" aria-labelledby="voice-h">
       <form class="card" id="voice-form" novalidate>
         <h2 id="voice-h"><span class="step">2</span> <span data-t="voiceTitle"></span></h2>
         <label class="drop" id="drop">
@@ -90,6 +94,38 @@
             <option value="quran_recitation" data-t="ctQuran"></option>
           </select>
         </div>
+        <fieldset class="quran-opts" id="quran-opts" hidden>
+          <legend data-t="qTitle"></legend>
+          <div class="row">
+            <label for="q-surah" data-t="qSurah"></label>
+            <input id="q-surah" type="text" inputmode="text" maxlength="40" dir="auto" placeholder="93 / Ad-Dhuhaa / الضحى">
+            <label for="q-ayat" data-t="qAyat"></label>
+            <input id="q-ayat" type="text" inputmode="numeric" maxlength="12" placeholder="1-11">
+          </div>
+          <p class="muted small" data-t="qSurahHint"></p>
+          <div class="row">
+            <label for="q-adab" data-t="qAdab"></label>
+            <select id="q-adab">
+              <option value="strict" data-t="adabStrict"></option>
+              <option value="nature" data-t="adabNature"></option>
+              <option value="people-distant" data-t="adabPeople"></option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="q-format" data-t="qFormat"></label>
+            <select id="q-format"><option value="1080p">16:9 · 1080p</option><option value="4k">16:9 · 4K</option><option value="9:16">9:16 · Shorts</option></select>
+            <label for="q-space" data-t="qSpace"></label>
+            <select id="q-space"><option value="mosque-hall" data-t="spaceMosque"></option><option value="clean" data-t="spaceClean"></option><option value="grand-hall" data-t="spaceGrand"></option></select>
+          </div>
+          <div class="row"><label for="q-reciter" data-t="qReciter"></label><input id="q-reciter" type="text" maxlength="80" dir="auto"></div>
+          <label class="tick"><input id="q-arabic" type="checkbox" checked> <span data-t="qArabic"></span></label>
+          <label class="tick"><input id="q-translation" type="checkbox" disabled> <span data-t="qTranslation"></span></label>
+          <details class="q-steps">
+            <summary data-t="qCommands"></summary>
+            <p class="muted small" data-t="qCommandsHint"></p>
+            <pre id="q-commands" dir="ltr"></pre>
+          </details>
+        </fieldset>
         <p class="status" id="voice-status" role="status"></p>
         <audio id="player" controls hidden></audio>
         <p class="error" id="voice-error" role="alert" hidden></p>

@@ -49,8 +49,8 @@ owner's decisions.
 | Part | State | Where |
 |---|---|---|
 | **System A: idea to documentary** | Built end to end in code for English (USA); tested only with fakes; **never run against real APIs or deployed** | `engine/src/film-run.mjs`, `worker/`, `render/` |
-| **System B: voiceover to documentary** | Pieces built and tested, **not wired**: scene split on word times, words-unchanged check, captions from the recording. Missing: upload route, speech-to-text, the run path, one-track render, studio switch | `engine/src/voice-scenes.mjs`; plan in `docs/NEXT_SESSION.md` ("NEXT BIG TASK") |
-| Quran recitation films | Recognition from a transcript and an ayah-by-ayah plan with verbatim Tanzil text, built and tested, **not wired**. Missing: Quran speech recognition, Uthmani text and font, meanings, picture choice, render | `engine/src/quran.mjs`, `engine/src/quran-film.mjs` |
+| **System B: voiceover to documentary** | **Built and run end to end from the command line** (`local/voice-film.mjs`): any audio via ffmpeg, voice report, speech-to-text (faster-whisper: real run on a LibriVox recording in GitHub Actions; pocketsphinx: real run here), transcripts from ElevenLabs/SRT/VTT/Whisper, the owner's script timed by what was heard, scenes with words proven unchanged, structure, picture plan (brain optional), keyless licensed media, one-track render (voice sample-identical). Missing: upload route, studio switch, a real writer brain in the CLI, picture judging | `docs/VOICE_SYSTEM.md`, `engine/src/transcript.mjs`, `voice-understand.mjs`, `voice-visuals.mjs`, `render/render-film.mjs --one-track` |
+| Quran recitation films | Recognition from a transcript, ayah-by-ayah plan with verbatim Tanzil text, wired into the voice CLI (`--kind quran|auto`); `quranVisualAdabGuard` (no music, no living beings or AI pictures, verbatim text, meanings only with a licence: else a reported gap). Missing: Quran speech recognition (general Whisper is weak on recitation; untested on a real recitation), Uthmani text and font, a licensed translation, picture choice by meaning, render of the ayah cards | `engine/src/quran.mjs`, `engine/src/quran-film.mjs`, `engine/src/voice-visuals.mjs` |
 | **Bossism (central supervisor)** | **Built, first version:** production graph of the real run with roster roles; preflight that refuses what cannot work and names every lowered quality; seven evidence gates; bounded revision with notes; release gate and master gate; decision record; owner approval with a reason. Not yet: an independent critic model, parallel stage execution | `engine/src/bossism.mjs`, `engine/src/supervise.mjs`, `render/release-gate.mjs` |
 | **Distributed work** | **Built:** durable job queue (leases, checkpoints, bounded retries, time limits, eligibility by capability), workers on the owner's machines pulling from the cloud studio, device tiers | `engine/src/jobs.mjs`, `engine/src/job-runner.mjs`, `worker/jobs-api.mjs`, `local/jobs.mjs` |
 | **Phones** | Voice check in constant memory (WAV exact, MP3 in parts, others refused when they do not fit); polling that survives weak signal | `engine/src/loudness.mjs`, `engine/src/wav.mjs`, `public/studio/` |
@@ -283,6 +283,59 @@ for `local/run-film.mjs`. The Worker is **not** changed (no production change).
   room document). LOC is slow. No source ranking or reliability scoring
   exists yet: that is Master Plan Phase 3 (R-stages), not built here.
 
+## 4i. Phase 0 preparation (12 Nov 2026)
+
+Everything for the first real-model experiment is built and tested; nothing
+has run live. See `docs/evals/PHASE0_READINESS.md` (model `gemini-3.8-flash`,
+free tier verified on Google's official pages; arms A = model knowledge,
+B = research desk; 40-request cap; minimal context; copy check; gold sheet
+v1 from official sources; fairness rule). Blocked only on the Gemini key.
+
+## 4j. Voice mastering engine (13 Nov 2026)
+
+Map and state: `docs/VOICE_SYSTEM.md` (section "Voice mastering engine"). Pure JS in `engine/src/`:
+`voice-dsp.mjs` (filters, FFT, STFT), `voice-analyze.mjs`, `voice-chain.mjs` (cleanup, tone, dynamics),
+`voice-reverb.mjs` (impulse responses made in code, echo-free proof, send automation), `voice-master.mjs`
+(orchestration, peak stage, limiter, two-pass loudness), `voice-proof.mjs`, `voice-test-signal.mjs`.
+CLI `local/voice-master.mjs`; `local/voice-film.mjs --master` runs it through `planVoice`.
+Owner decision recorded in `voice-plan.mjs`: smooth hall reverb allowed for recitation, repeating echo never.
+Verified on the GitHub runner (run 43374825142) on three real recordings: -14 LUFS, true peak <= -1 dBTP,
+timing and pitch proofs passed. **Not verified by ear**; the owner's own recording is the real test.
+Next: tune by ear with the owner's recording; stereo in the renderer; chunked processing over 30 minutes;
+real ayah times into the send automation; studio page and upload.
+
+## 4k. Quran recitation documentary: direction and plan (13 Nov 2026)
+
+The owner's direction for the next phase is recorded in `docs/QURAN_DOCUMENTARY.md` (rules, audit of
+what exists and what is missing, design, stages Q1 to Q7 with measured exits); his full text is in
+`docs/QURAN_DIRECTION_OWNER.md`. This phase is Quran only.
+
+## 4l. Quran films built and verified (13-14 Nov 2026), handoff for the next session
+
+Q1-Q7 are built: locate, meaning, director, media, render (16:9, 4K, 9:16), Shorts, review and sign-off.
+Then came the production-standard pass and the owner's platform brief. Read these, in this order:
+- `docs/QURAN_ENGINEERING_REPORT.md`: assessment, PASS / FAIL table, release decision, next steps.
+- `docs/QURAN_DOCUMENTARY.md`, State section: every measured number and runner run.
+- `docs/QURAN_VOICE_GUIDE.md`: sound, recording and editing standard.
+- `docs/QURAN_REVIEW_SHEET.md`: for the scholar and the editor.
+
+State at the end:
+- Four runner films (run 43562077892) pass their own checks. Their frames were inspected.
+- No film is publishable: no qualified reviewer has signed, no recording's rights are written down, and
+  the Ad-Duha verse timing is unverified (FAIL).
+- The recordings belong to the owner's friend, who gave permission for a documentary YouTube business.
+  The rights still have to be written down with the friend's name (`--rights`).
+- Visual validation: 186 labelled pictures, labelled by the assistant (`local/media/validation/`).
+
+Next work, in order:
+1. The friend's direct recording (voice guide, section 4), through the whole chain.
+2. A scholar reviews one film with `review.html`.
+3. A person checks the 186 labels; a fresh picture set confirms the thresholds.
+4. A third-method rule for recognized recordings: recognizer, pauses and aligner (al-Mulk 67:6).
+5. A Quran-specific aligner for slow melodic recitation (Ad-Duha).
+6. P2: maps, manuscripts and thumbnails for the documentary films; the owner's Pexels / Pixabay free keys
+   for more video.
+
 ## 5. Role entries corrected
 
 `research-primary-source` (now also the code desk), `story-transcript-integrity`
@@ -296,8 +349,18 @@ no picture is chosen for a Quran film yet, so nothing checks one.
 
 ## 6. Next work, in order
 
+**First (owner, 13-14 Nov 2026): the Quran recitation documentary.** Q1 to Q7 are built; continue with
+the list in section 4l. The list below waits until he says otherwise.
+
 Each step ends with tests passing, the type check, the build check, a commit
 and a push.
+
+**Owner decision, 12 Nov 2026:** the live Phase 0 Gemini experiment (Tenerife,
+arms A/B) is **skipped for now**. The Gemini key was rejected (HTTP 400 "API key
+not valid") in this session. Nothing ran live; no A-vs-B result exists, so the
+research engine's value over model knowledge stays **unmeasured**. All
+Phase 0 code, gold sheet and readiness docs stay as built; the run can be
+resumed any time with a valid free-tier key. Work continues on the Boss agent.
 
 0. **Owner decisions first** (section 7): deploying, the brain machine,
    `WORKER_TOKEN`, repository privacy.

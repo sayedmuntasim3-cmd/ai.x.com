@@ -5,9 +5,19 @@
  * --min words (12 by default) or more is reported with the quote and the
  * page, so copied sentences from sources are found in code, not by eye.
  *
+ * Two more signals, also code: close paraphrase (a narration sentence of 8+
+ * words whose word trigrams are at least half found in one page: copying
+ * with small edits), and source-order dependence (most matched sentences
+ * come from one page, in that page's own order: the script retells one
+ * source instead of building its own structure).
+ *
  * Pages: the research desk's corpus (research-corpus.json) when there is
  * one, and every page research.json cites, opened again (public hosts only).
- * What it cannot see: other creators' videos (no transcripts are used).
+ *
+ * What it cannot detect: paraphrase with different words (synonyms,
+ * reordered clauses), translation, ideas or structure taken from other
+ * creators' videos (no transcripts are used, by rule), or a source the
+ * research never opened. Those are judged by the readers and the AI critic.
  *
  *   node local/copy-check.mjs --run films/<slug> [--min 12] [--no-fetch]
  *
@@ -18,7 +28,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { readPage } from "../engine/src/research-desk.mjs";
-import { parseSceneLines } from "../engine/src/scene-lines.mjs";
+import { parseSceneLines, splitSentences } from "../engine/src/scene-lines.mjs";
 import { guardedFetch } from "./run-film.mjs";
 
 export const COPY_MIN_WORDS = 12;
@@ -64,6 +74,65 @@ export function sharedRuns(narration, sources, min = COPY_MIN_WORDS) {
   return found.sort((x, y) => y.words - x.words);
 }
 
+export const PARAPHRASE = Object.freeze({ minWords: 8, share: 0.5 });
+
+/** Word trigrams of a text. @param {string[]} w */
+const trigrams = (w) => { const out = new Set(); for (let i = 0; i + 3 <= w.length; i += 1) out.add(w.slice(i, i + 3).join(" ")); return out; };
+
+/**
+ * Close paraphrase and source-order dependence.
+ * @param {string} narration @param {{ url: string, text: string }[]} sources
+ */
+export function paraphraseSignals(narration, sources) {
+  const pages = sources.map((s) => {
+    const w = words(s.text);
+    /** @type {Map<string, number[]>} positions of each trigram */
+    const at = new Map();
+    for (let i = 0; i + 3 <= w.length; i += 1) { const k = w.slice(i, i + 3).join(" "); const l = at.get(k); if (l) l.push(i); else at.set(k, [i]); }
+    return { url: s.url, at };
+  });
+  const sentences = splitSentences(narration).map((s) => (typeof s === "string" ? s : String(/** @type {any} */ (s).text ?? ""))).filter((s) => words(s).length >= PARAPHRASE.minWords);
+  /** @type {{ sentence: string, url: string, share: number, position: number }[]} */
+  const matched = [];
+  for (const sentence of sentences) {
+    const grams = [...trigrams(words(sentence))];
+    let best = { url: "", share: 0, position: -1 };
+    for (const p of pages) {
+      const hits = grams.filter((g) => p.at.has(g));
+      const share = grams.length ? hits.length / grams.length : 0;
+      // Where in the page the sentence sits: trigrams that occur once there place it; common phrases do not.
+      const unique = hits.map((g) => /** @type {number[]} */ (p.at.get(g))).filter((l) => l.length === 1).map((l) => l[0]);
+      const place = unique.length ? unique : hits.map((g) => /** @type {number[]} */ (p.at.get(g))[0]);
+      if (share > best.share) best = { url: p.url, share, position: median(place) };
+    }
+    if (best.share >= 0.25) matched.push({ sentence, ...best });
+  }
+  const close = matched.filter((m) => m.share >= PARAPHRASE.share).map((m) => ({ ...m, share: Math.round(m.share * 100) / 100 }));
+  // Source-order dependence: the page most sentences lean on, and how much of that lean follows its order.
+  /** @type {Map<string, number[]>} */
+  const byPage = new Map();
+  for (const m of matched) { const l = byPage.get(m.url) ?? []; l.push(m.position); byPage.set(m.url, l); }
+  const [topUrl, positions] = [...byPage.entries()].sort((a, b) => b[1].length - a[1].length)[0] ?? ["", []];
+  const inOrder = longestIncreasing(positions);
+  return {
+    sentences: sentences.length,
+    closeParaphrase: close,
+    order: { url: topUrl, sentences: positions.length, shareOfScript: sentences.length ? Math.round((positions.length / sentences.length) * 100) / 100 : 0, inSourceOrder: positions.length ? Math.round((inOrder / positions.length) * 100) / 100 : 0,
+      flagged: sentences.length >= 10 && positions.length / sentences.length >= 0.4 && inOrder / Math.max(1, positions.length) >= 0.8 },
+  };
+}
+
+/** @param {number[]} a */
+function median(a) { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : -1; }
+
+/** Length of the longest strictly increasing subsequence. @param {number[]} a */
+function longestIncreasing(a) {
+  /** @type {number[]} */
+  const tails = [];
+  for (const x of a) { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid] < x) lo = mid + 1; else hi = mid; } tails[lo] = x; }
+  return tails.length;
+}
+
 /** The finished script's narration (s5-<chapter>.md; drafts left out). @param {string} dir */
 export function filmNarration(dir) {
   const files = readdirSync(dir).filter((f) => /^s5-[^.]+\.md$/.test(f)).sort();
@@ -93,7 +162,9 @@ export async function copyCheck(dir, o = {}) {
     }
   }
   const runs = sharedRuns(narration, sources, min);
-  return { min, narrationWords: words(narration).length, sources: sources.length, pagesOpened: opened, pagesUnread: unread, flagged: runs.length, longest: runs[0]?.words ?? 0, runs };
+  const signals = paraphraseSignals(narration, sources);
+  return { min, narrationWords: words(narration).length, sources: sources.length, pagesOpened: opened, pagesUnread: unread, flagged: runs.length, longest: runs[0]?.words ?? 0, runs, ...signals,
+    cannotDetect: "paraphrase with different words, translation, structure or ideas from other creators' videos, sources the research never opened" };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -104,4 +175,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   writeFileSync(join(dir, "copy-check.json"), JSON.stringify(result, null, 1));
   console.log(`${result.narrationWords} narration words against ${result.sources} pages (${result.pagesUnread.length} could not be read): ${result.flagged} run(s) of ${result.min}+ identical words; longest ${result.longest}.`);
   for (const r of result.runs.slice(0, 20)) console.log(`  ${r.words} words, ${r.url}\n    "${r.quote}"`);
+  console.log(`Close paraphrase: ${result.closeParaphrase.length} of ${result.sentences} sentences (half or more of their word trigrams in one page).`);
+  for (const p of result.closeParaphrase.slice(0, 10)) console.log(`  ${Math.round(p.share * 100)}% ${p.url}\n    "${p.sentence}"`);
+  console.log(`Source order: ${Math.round(result.order.shareOfScript * 100)}% of sentences lean on ${result.order.url || "no page"}, ${Math.round(result.order.inSourceOrder * 100)}% of those in its order${result.order.flagged ? " (FLAGGED: the script retells one source)" : ""}.`);
+  console.log(`Cannot detect: ${result.cannotDetect}.`);
 }

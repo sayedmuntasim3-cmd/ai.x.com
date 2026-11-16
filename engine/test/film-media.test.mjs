@@ -48,7 +48,7 @@ test("Pexels and Pixabay results map to licensed candidates; keys go only where 
   const pb = await pixabayProvider({ apiKey: "PB", fetch: f }).search("old mill", "video", signal);
   assert.equal(pb[0].source, "pixabay");
   assert.ok(calls[1].url.includes("key=PB") && !calls[0].url.includes("PB"));
-  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "loc", "met", "artic", "openverse", "pixabay"], "the free archives need no key");
+  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "loc", "met", "artic", "openverse", "open-archives", "pixabay"], "the free archives need no key");
   assert.deepEqual(mediaProviders({ archives: false }), []);
 });
 
@@ -247,7 +247,7 @@ test("more legal sources: the Library of Congress, the Met, the Art Institute, O
 
   // The run's provider list: every keyless archive, the Smithsonian only with its key.
   const ids = (/** @type {any} */ k) => mediaProviders({ fetch: f, ...k }).map((p) => p.id);
-  assert.deepEqual(ids({}), ["wikimedia", "nasa", "loc", "met", "artic", "openverse"]);
+  assert.deepEqual(ids({}), ["wikimedia", "nasa", "loc", "met", "artic", "openverse", "open-archives"]);
   assert.ok(ids({ smithsonianKey: "K" }).includes("smithsonian"));
 });
 

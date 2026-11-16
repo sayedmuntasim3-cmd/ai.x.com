@@ -13,6 +13,8 @@
  *            --script-only (research, script, QA and packaging; no pictures, never cleared for release)
  *            --max-calls <N> (hard cap on requests to the brain for this film folder, retries included;
  *            40 by default for Gemini; every call is logged in calls.jsonl with Google's response id)
+ *            --manual <file> (the context sent as the system prompt; default the production manual;
+ *            Phase 0 uses prompts/phase0-context.txt, built by local/experiment-context.mjs)
  *   resume:  node local/run-film.mjs --out films/<slug>   (finished stages are kept)
  *   stop:    create a file named STOP in the film's folder (or set ZUPONA_STOP=1): the run stops
  *            before its next model call; delete it and resume. A paid brain needs --budget.
@@ -24,7 +26,7 @@
  *
  * The brain and the optional keys come from the environment, with the same
  * names as the studio (worker/brain.mjs, docs/BRAIN.md): BRAIN_URL,
- * BRAIN_MODEL, BRAIN_CONTEXT, BRAIN_VISION, SEARXNG_URL, RESEARCH_SOURCES; PEXELS_API_KEY and
+ * BRAIN_MODEL, BRAIN_CONTEXT, BRAIN_VISION, SEARXNG_URL, RESEARCH_SOURCES, RESEARCH_MODE (knowledge); PEXELS_API_KEY and
  * PIXABAY_API_KEY (free) for stock footage; GEMINI_API_KEY or
  * ANTHROPIC_API_KEY only if you choose those brains.
  *
@@ -86,26 +88,42 @@ const sha256 = (/** @type {string} */ s) => createHash("sha256").update(s).diges
  * gives the brain refuses a request beyond the cap; halt() stops the run
  * cleanly before the next call once the cap is reached.
  * @param {import("../engine/src/film-run.mjs").Store} store @param {number | undefined} maxCalls
- * @param {string} [manual] the production manual, to record whether each request carried it
+ * @param {string} [manual] the full production manual, to record whether each request carried it
+ * @param {string} [context] the context actually given as the manual (its hash is logged per call)
  */
-export async function callLedger(store, maxCalls, manual = "") {
+export async function callLedger(store, maxCalls, manual = "", context = "") {
   const lines = String((await store.get("calls.jsonl")) ?? "").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   let requests = lines.reduce((n, l) => n + (Number(l.requests) || 0), 0);
   let inCall = 0;
   const probe = manual.slice(0, 400);
+  const contextSha256 = context ? sha256(context) : null;
   const cap = Number.isFinite(maxCalls) && /** @type {number} */ (maxCalls) > 0 ? Math.floor(/** @type {number} */ (maxCalls)) : undefined;
   const reached = () => cap !== undefined && requests >= cap;
+  /** Set when the provider says its daily free quota is used up: no request is made after that. */
+  let dailyQuota = "";
   return {
     get requests() { return requests; },
     cap,
     /** @returns {string | null} */
-    halt: () => (reached() ? `the request cap of ${cap} is reached (${requests} requests made; see calls.jsonl)` : null),
+    halt: () => (dailyQuota ? `the provider's daily free quota is used up (${dailyQuota}); resume after it resets` : reached() ? `the request cap of ${cap} is reached (${requests} requests made; see calls.jsonl)` : null),
     /** @param {typeof fetch} get @returns {typeof fetch} */
     fetch: (get) => /** @type {typeof fetch} */ (async (input, init) => {
+      if (dailyQuota) throw Object.assign(new Error(`Refused: the daily free quota is used up (${dailyQuota}).`), { permanent: "The daily free quota is used up." });
       if (reached()) throw Object.assign(new Error(`Refused: the request cap of ${cap} is reached.`), { permanent: `The request cap of ${cap} is reached.` });
       requests += 1;
       inCall += 1;
-      return get(input, init);
+      const res = await get(input, init);
+      // A 429 for a per-day quota will not pass with waiting: stop at once instead of spending retries.
+      if (res.status === 429) {
+        const body = await res.clone().text().catch(() => "");
+        const day = /"quotaId":\s*"([^"]*PerDay[^"]*)"/i.exec(body);
+        if (day) {
+          dailyQuota = day[1];
+          await res.body?.cancel().catch(() => {});
+          throw Object.assign(new Error(`The daily free quota is used up (${dailyQuota}). The run stops; resume after it resets (midnight Pacific time).`), { permanent: "The daily free quota is used up." });
+        }
+      }
+      return res;
     }),
     /** @param {import("../engine/src/film-run.mjs").Model} model @returns {import("../engine/src/film-run.mjs").Model} */
     wrap: (model) => ({
@@ -114,7 +132,7 @@ export async function callLedger(store, maxCalls, manual = "") {
         if (reached()) throw Object.assign(new Error(`Refused: the request cap of ${cap} is reached.`), { permanent: `The request cap of ${cap} is reached.` });
         inCall = 0;
         const sent = JSON.stringify({ system: req.system, messages: req.messages });
-        const entry = /** @type {Record<string, any>} */ ({ n: lines.length + 1, at: new Date().toISOString(), stage: req.stage, model: model.name, webSearch: Boolean(req.webSearch && model.capabilities?.webSearch !== false), sentChars: sent.length, sentSha256: sha256(sent), manualIncluded: probe.length > 0 && sent.includes(JSON.stringify(probe).slice(1, -1)) });
+        const entry = /** @type {Record<string, any>} */ ({ n: lines.length + 1, at: new Date().toISOString(), stage: req.stage, model: model.name, webSearch: Boolean(req.webSearch && model.capabilities?.webSearch !== false), sentChars: sent.length, sentSha256: sha256(sent), contextSha256, fullManualIncluded: probe.length > 0 && sent.includes(JSON.stringify(probe).slice(1, -1)) });
         try {
           const reply = await model.call(req);
           Object.assign(entry, { stopReason: reply.stopReason, responseId: reply.responseId ?? null, modelVersion: reply.modelVersion ?? null, usage: reply.usage, replyChars: reply.text.length, replySha256: sha256(reply.text) });
@@ -141,7 +159,7 @@ export async function callLedger(store, maxCalls, manual = "") {
  * @param {{ film: import("../engine/src/film-run.mjs").Film, store: import("../engine/src/film-run.mjs").Store,
  *   brain: { kind: string, model: import("../engine/src/film-run.mjs").Model }, env: Record<string, string | undefined>,
  *   fetch?: typeof fetch, lookup?: (host: string, o: { all: true }) => Promise<{ address: string }[]>, signal?: AbortSignal, print: (line: string) => void, lang: "en" | "bn",
- *   budgetUsd?: number, edit?: boolean, viewers?: boolean, maxRevisions?: number, ledger?: Awaited<ReturnType<typeof callLedger>>,
+ *   budgetUsd?: number, edit?: boolean, viewers?: boolean, maxRevisions?: number, ledger?: Awaited<ReturnType<typeof callLedger>>, manual?: string,
  *   channel?: { load(): Promise<any[]>, save(list: any[]): Promise<void> } }} o
  */
 export async function produceFilm(o) {
@@ -154,7 +172,7 @@ export async function produceFilm(o) {
 
   // Bossism's preflight: refuse what cannot work before anything runs, and name every lowered quality.
   const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY });
-  const manual = readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8");
+  const manual = o.manual ?? readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8");
   const plan = preflight(productionGraph(understand({ film })), {
     brain: { connected: true, kind: brain.kind, model: brain.model.name, seesPictures: caps.vision !== false, searchesWeb: caps.webSearch !== false, contextTokens: caps.contextTokens, maxOutputTokens: caps.maxOutputTokens },
     researchDesk: true, mediaProviders: media.length, youtube: false, autoRender: false, minutes: film.durationSeconds / 60, manualChars: manual.length,
@@ -182,8 +200,12 @@ export async function produceFilm(o) {
     viewers: o.viewers ?? true,
     media: { providers: media },
     sources: { fetch: pages },
+    // Phase 0 arm A: RESEARCH_MODE=knowledge (no search, no research desk; model knowledge only).
+    ...(env.RESEARCH_MODE === "knowledge" ? { researchMode: /** @type {const} */ ("knowledge") } : {}),
+    // Phase 0 fairness rule: RESEARCH_STRICT=1 (bounded Wikipedia retries; stop rather than write from a partial corpus).
+    ...(env.RESEARCH_STRICT === "1" ? { researchStrict: true } : {}),
     // The search providers' own APIs (Wikipedia, the owner's SearXNG, which may be on this network) use the plain fetch.
-    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES || undefined }), fetch: pages },
+    research: { providers: researchProviders({ fetch: web, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES || undefined, strict: env.RESEARCH_STRICT === "1" }), fetch: pages },
     channel: o.channel,
     log: (/** @type {string} */ line) => print(`[${new Date().toISOString().slice(11, 19)}] ${line}`),
     signal: o.signal,
@@ -234,7 +256,7 @@ export async function main(argv, env, deps = {}) {
       topic: { type: "string" }, minutes: { type: "string" }, format: { type: "string" }, notes: { type: "string" },
       out: { type: "string" }, budget: { type: "string" }, "no-edit": { type: "boolean" }, "no-viewers": { type: "boolean" },
       lang: { type: "string" }, "max-revisions": { type: "string" }, approve: { type: "string" }, "script-only": { type: "boolean" },
-      "max-calls": { type: "string" },
+      "max-calls": { type: "string" }, manual: { type: "string" },
     },
   });
   const lang = values.lang === "bn" ? "bn" : "en";
@@ -244,10 +266,22 @@ export async function main(argv, env, deps = {}) {
   const askedCap = values["max-calls"] === undefined ? undefined : Number(values["max-calls"]);
   if (askedCap !== undefined && !(Number.isInteger(askedCap) && askedCap > 0)) throw new Error("--max-calls must be a whole number above 0.");
   const kind = deps.model ? "test" : chooseBrain(env).ok ? /** @type {any} */ (chooseBrain(env)).kind : "";
-  const ledger = await callLedger(store, askedCap ?? (kind === "gemini" ? GEMINI_MAX_CALLS : undefined), readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8"));
+  const fullManual = readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8");
+  const manual = values.manual ? readFileSync(resolve(values.manual), "utf8") : undefined;
+  if (manual !== undefined && manual.trim().length < 1000) throw new Error(`--manual ${values.manual} is too short to be a context file.`);
+  // A film keeps the context it started with: a resume can never switch to another one (for example back to the full manual).
+  const pinned = JSON.parse((await store.get("context.json")) ?? "null");
+  const usedSha = sha256(manual ?? fullManual);
+  if (pinned && pinned.sha256 !== usedSha) throw new Error(`This film was started with the context ${pinned.file} (sha256 ${String(pinned.sha256).slice(0, 12)}); give the same --manual to resume it.`);
+  // The experiment arm is pinned too: a resume cannot change the model, search, research mode or sources.
+  const arm = { model: env.GEMINI_MODEL ?? null, geminiSearch: env.GEMINI_SEARCH ?? null, researchMode: env.RESEARCH_MODE ?? null, researchSources: env.RESEARCH_SOURCES ?? null, researchStrict: env.RESEARCH_STRICT ?? null };
+  if (pinned?.arm && JSON.stringify(pinned.arm) !== JSON.stringify(arm)) throw new Error(`This film was started with other settings (${JSON.stringify(pinned.arm)}); resume it with the same GEMINI_MODEL, GEMINI_SEARCH, RESEARCH_MODE and RESEARCH_SOURCES.`);
+  if (!pinned && values.approve === undefined) await store.put("context.json", JSON.stringify({ file: values.manual ?? "prompts/1-zupona-master-engine-full.txt", sha256: usedSha, bytes: Buffer.byteLength(manual ?? fullManual), arm }, null, 1));
+  const ledger = await callLedger(store, askedCap ?? (kind === "gemini" ? GEMINI_MAX_CALLS : undefined), fullManual, manual ?? fullManual);
   const chosen = deps.model ? { ok: /** @type {const} */ (true), kind: "test", model: deps.model } : brainFromEnv(env, { fetch: ledger.fetch(deps.brainFetch ?? fetch) });
   if (!chosen.ok) throw new Error(chosen.error);
   const brain = chosen;
+  if (manual !== undefined) print(`Context: ${values.manual} (${Buffer.byteLength(manual)} bytes) in place of the production manual.`);
   if (ledger.cap !== undefined) print(`Request cap: ${ledger.cap} requests to the brain for this film (${ledger.requests} made so far; log in calls.jsonl).`);
   if (values.approve !== undefined) {
     const review = JSON.parse((await store.get("review.json")) ?? "null");
@@ -275,7 +309,7 @@ export async function main(argv, env, deps = {}) {
   const channelDir = join(dirname(out), "channel");
   const budget = Number(values.budget);
   const { state, review } = await produceFilm({
-    film, store, brain, env, fetch: deps.fetch, lookup: deps.lookup, signal: deps.signal, print, lang, ledger,
+    film, store, brain, env, fetch: deps.fetch, lookup: deps.lookup, signal: deps.signal, print, lang, ledger, manual,
     budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
     edit: !values["no-edit"], viewers: !values["no-viewers"],
     maxRevisions: Number(values["max-revisions"] ?? 1),

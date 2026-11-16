@@ -55,6 +55,9 @@ export function classifyLicense(result) {
   if (/\bcc[ -]by\b|licenses\/by\/|^by \d|\bby \d\.\d|creative commons attribution(?! -?share| -?non| -?no)/.test(text)) return decide("CC-BY", true, true, "Attribution licence: credit required.");
   if (result.source === "wikimedia" && /^public domain$/i.test(raw)) return decide("PUBLIC-DOMAIN", true, true, "Commons public-domain file: the file page must show no restrictions.");
   if (result.source === "wikimedia" && /^(no restrictions|copyrighted free use|attribution)$/i.test(raw)) return decide("FREE-WITH-CREDIT", true, true, "Commons free-use file: credit the author; the file page must show no restrictions.");
+  // Open archives (open-archives.mjs): the archive's own public-domain or "no known restrictions" statement,
+  // already checked record by record before it reaches the studio.
+  if (result.source === "open-archives" && /^(public domain|no known (copyright )?restrictions)/.test(raw.toLowerCase())) return decide("PUBLIC-DOMAIN", true, true, `Open archive: ${raw}`);
   if (result.source === "met" && /public domain|open access/.test(text)) return decide("MUSEUM-OPEN-ACCESS", true, true, "Met Open Access (public domain object)");
   if (result.source === "artic" && /public domain/.test(text)) return decide("PUBLIC-DOMAIN", true, true, "Art Institute public-domain artwork");
   if (result.source === "loc" && /no known restrictions on publication/.test(text) && !/copyright|permission|restricted/.test(text.replace(/understanding-copyright/g, ""))) return decide("PUBLIC-DOMAIN", true, true, "Library of Congress: no known restrictions on publication");

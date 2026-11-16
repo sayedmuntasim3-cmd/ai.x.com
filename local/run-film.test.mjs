@@ -112,7 +112,7 @@ test("the request cap stops a run before the call that would pass it, counts acr
   assert.equal(log.length, 1);
   assert.equal(log[0].stage, "s01");
   assert.equal(log[0].requests, 1);
-  assert.equal(log[0].manualIncluded, true, "the log says the production manual was sent");
+  assert.equal(log[0].fullManualIncluded, true, "the log says the production manual was sent");
   assert.match(log[0].sentSha256, /^[0-9a-f]{64}$/);
   assert.match(log[0].replySha256, /^[0-9a-f]{64}$/);
   // Resuming with the same cap makes no call: the count is kept in the folder.
@@ -160,4 +160,88 @@ test("Gemini is capped at 40 requests by default, retries count, and Google's re
   await assert.rejects(f("https://generativelanguage.googleapis.com/a"), /request cap of 2 is reached/);
   assert.equal(ledger.requests, 2);
   assert.match(String(ledger.halt()), /request cap of 2/);
+});
+
+test("--manual sends the Phase 0 context instead of the production manual, and a resume cannot switch context", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-ctx-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  /** @type {string[]} */
+  const systems = [];
+  const free = { name: "local-test", price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: async (/** @type {any} */ req) => { systems.push(req.system.map((/** @type {any} */ b) => b.text).join("\n")); return { text: "ANGLE: x", stopReason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } }; } };
+  const out = join(dir, "a");
+  const ctx = new URL("../prompts/phase0-context.txt", import.meta.url).pathname;
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "1", "--manual", ctx], {}, { model: free, log: () => {} }), /request cap of 1/);
+  assert.equal(systems.length, 1);
+  assert.ok(systems[0].includes("SCRIPT CONTEXT (Phase 0 experiment"));
+  assert.ok(!systems[0].includes("ai.zupona.com"), "the full manual was not sent");
+  const entry = JSON.parse(readFileSync(join(out, "calls.jsonl"), "utf8").trim());
+  assert.equal(entry.fullManualIncluded, false);
+  assert.equal(entry.contextSha256, JSON.parse(readFileSync(join(out, "context.json"), "utf8")).sha256);
+  await assert.rejects(main(["--out", out, "--max-calls", "5"], {}, { model: free, log: () => {} }), /started with the context .*phase0-context\.txt.*give the same --manual/);
+  assert.equal(systems.length, 1, "nothing was sent on the refused resume");
+});
+
+test("arm A (RESEARCH_MODE=knowledge): research from model knowledge only, no page is fetched, facts carry no source; the arm is pinned", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-armA-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const facts = Array.from({ length: 9 }, (_, i) => ({ id: `F0${i + 1}`, claim: `claim ${i}`, value: String(1970 + i), sources: i === 0 ? ["https://invented.example/page"] : [], confidence: "medium", conflict: null }));
+  /** @type {string[]} */
+  const stages = [];
+  const free = { name: "local-test", price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: async (/** @type {any} */ req) => {
+    stages.push(req.stage);
+    assert.equal(req.webSearch, undefined, "no search is ever asked for");
+    return { text: req.stage === "research" ? "```json\n" + JSON.stringify({ subject: "x", facts, unknowns: [], doNotConfuse: [] }) + "\n```" : "ANGLE: x", stopReason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  /** @type {string[]} */
+  const fetched = [];
+  const web = /** @type {typeof fetch} */ (async (input) => { fetched.push(String(input)); return new Response("no", { status: 500 }); });
+  const out = join(dir, "a");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "2"], { RESEARCH_MODE: "knowledge" }, { model: free, fetch: web, log: () => {} }), /request cap of 2/);
+  assert.deepEqual(stages, ["s01", "research"]);
+  assert.deepEqual(fetched, [], "no research desk, no source page opened");
+  const research = JSON.parse(readFileSync(join(out, "research.json"), "utf8"));
+  assert.equal(research.basis, "model knowledge only");
+  assert.equal(research.facts.length, 9);
+  assert.ok(research.facts.every((/** @type {any} */ f) => f.sources.length === 0 && f.basis === "model knowledge (unverified)"), "an invented URL is removed");
+  assert.equal(JSON.parse(readFileSync(join(out, "context.json"), "utf8")).arm.researchMode, "knowledge");
+  await assert.rejects(main(["--out", out, "--max-calls", "5"], {}, { model: free, fetch: web, log: () => {} }), /started with other settings/);
+  assert.equal(stages.length, 2);
+});
+
+test("a 429 for Google's daily free quota stops the run at once, with no retries spent", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-quota-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  let requests = 0;
+  const brainFetch = /** @type {typeof fetch} */ (async () => {
+    requests += 1;
+    return new Response(JSON.stringify({ error: { code: 429, status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] } }), { status: 429 });
+  });
+  const out = join(dir, "q");
+  const env = { BRAIN: "gemini", GEMINI_API_KEY: "dummy", GEMINI_MODEL: "gemini-3.8-flash", GEMINI_SEARCH: "off" };
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out], env, { brainFetch, log: () => {} }), /daily free quota is used up \(GenerateRequestsPerDayPerProjectPerModel-FreeTier\)/);
+  assert.equal(requests, 1, "the adapter's six retries were not spent");
+  const entry = JSON.parse(readFileSync(join(out, "calls.jsonl"), "utf8").trim());
+  assert.equal(entry.requests, 1);
+  assert.match(entry.error, /daily free quota/);
+});
+
+test("fairness rule (RESEARCH_STRICT=1): a research source that stays rate limited stops arm B before anything is written from a partial corpus", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-strict-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  /** @type {string[]} */
+  const stages = [];
+  const free = { name: "local-test", capabilities: { webSearch: false }, price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, call: async (/** @type {any} */ req) => {
+    stages.push(req.stage);
+    return { text: req.stage === "research-plan" ? '```json\n{"queries": ["Tenerife airport disaster"]}\n```' : "ANGLE: x", stopReason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  let wiki = 0;
+  const web = /** @type {typeof fetch} */ (async (input) => {
+    if (new URL(String(input)).hostname === "en.wikipedia.org") { wiki += 1; return new Response("busy", { status: 429, headers: { "retry-after": "1" } }); }
+    return new Response("no", { status: 404 });
+  });
+  const out = join(dir, "b");
+  await assert.rejects(main(["--topic", "The old mill", "--minutes", "2", "--out", out, "--max-calls", "10"], { RESEARCH_STRICT: "1" }, { model: free, fetch: web, log: () => {} }), /Research incomplete: 1 research request failed \(wikipedia: failed: Wikipedia 429\)/);
+  assert.deepEqual(stages, ["s01", "research-plan"], "the research writing call was never made");
+  assert.equal(wiki, 3, "one try and two retries");
+  assert.equal(JSON.parse(readFileSync(join(out, "context.json"), "utf8")).arm.researchStrict, "1");
 });

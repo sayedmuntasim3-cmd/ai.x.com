@@ -199,3 +199,9 @@ repository is **public** on GitHub, so the manual is already published;
 whether it still counts as confidential is the owner's decision. If it is
 confidential, the engine as it stands cannot be run on the free tier without
 sending it, and Phase 0 must wait for that decision.
+
+## 12. Preparation of 12 Nov
+
+Minimal context, request-path limit, extra originality checks and the Google
+terms check: see `PHASE0_READINESS.md` (status: not ready; official Google
+pages unread).

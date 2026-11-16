@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { copyCheck, sharedRuns, words } from "./copy-check.mjs";
+import { copyCheck, paraphraseSignals, sharedRuns, words } from "./copy-check.mjs";
 
 const SOURCE = "At 17:06 local time the KLM aircraft began its takeoff roll in thick fog while the Pan Am aircraft was still taxiing on the same runway toward the exit.";
 
@@ -38,4 +38,24 @@ test("copyCheck reads the finished chapters (not drafts) and the research corpus
   assert.equal(r.pagesOpened, 0);
   assert.equal(r.flagged, 1);
   assert.equal(r.longest, 22);
+});
+
+test("close paraphrase: a source sentence with a few words changed is caught; an original sentence on the same facts is not", () => {
+  const edited = "At 17:06 the KLM jet began its takeoff roll in thick fog while the Pan Am jet was still taxiing on that runway.";
+  const own = "Two crews, one runway, and a cloud that hid each from the other: within seconds, 583 people would be dead.";
+  const r = paraphraseSignals(`${edited} ${own}`, [{ url: "https://example.org/report", text: SOURCE }]);
+  assert.equal(r.sentences, 2);
+  assert.equal(r.closeParaphrase.length, 1);
+  assert.match(r.closeParaphrase[0].sentence, /^At 17:06 the KLM jet/);
+  assert.ok(r.closeParaphrase[0].share >= 0.5);
+});
+
+test("source order: a script that retells one page sentence by sentence, in its order, is flagged; a reordered script is not", () => {
+  const page = Array.from({ length: 12 }, (_, i) => `Fact number ${i} about the runway collision tells part ${i} of the long official story here.`).join(" ");
+  const retold = Array.from({ length: 12 }, (_, i) => `Fact number ${i} about the runway collision tells part ${i} of the story.`).join(" ");
+  const r = paraphraseSignals(retold, [{ url: "https://example.org/one", text: page }]);
+  assert.equal(r.order.url, "https://example.org/one");
+  assert.equal(r.order.flagged, true);
+  const shuffled = [5, 0, 9, 2, 11, 1, 7, 3, 10, 4, 8, 6].map((i) => `Fact number ${i} about the runway collision tells part ${i} of the story.`).join(" ");
+  assert.equal(paraphraseSignals(shuffled, [{ url: "https://example.org/one", text: page }]).order.flagged, false);
 });

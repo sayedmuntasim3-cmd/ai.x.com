@@ -3,10 +3,19 @@
  * under it. The owner's own recording is cleaned, never changed: no pitch or
  * formant shift, no auto-tune, no speed change, no re-synthesis, and the
  * untouched original is always kept. A cloned ElevenLabs voice is used as
- * delivered and only levelled. The Quran is never synthesised, and nothing
- * (music, nasheed, nature sounds, echo) is ever laid under a recitation.
+ * delivered: its repair steps stay off, only tone, level and loudness are set. The Quran is never synthesised, and nothing
+ * (music, nasheed, nature sounds) is ever laid under a recitation.
+ *
+ * OWNER DECISION, 13 Nov 2026: a recitation MAY get a smooth hall / mosque
+ * style reverb, like the best recitation videos (what the owner calls
+ * "echo"). It is a reverb only: a dense, decaying tail made in code
+ * (voice-reverb.mjs), checked to hold no discrete repeat. An echo or delay
+ * that repeats syllables stays forbidden. English documentary narration stays
+ * close, warm and nearly dry (a touch of room at most). The real chain is
+ * voice-master.mjs; this file keeps the rules and the plan.
  */
 import { getVersion } from "./versions.mjs";
+import { PROFILE_SPACES, SPACES } from "./voice-reverb.mjs";
 
 /**
  * @typedef {"quran_recitation" | "islamic" | "documentary" | "story"} ContentType
@@ -30,6 +39,17 @@ export const NEVER_DONE_TO_A_VOICE = Object.freeze([
   "voice conversion or re-synthesis (speech-to-speech, dubbing, generative enhancers)",
   "echo or delay that repeats syllables",
 ]);
+
+/**
+ * What a recitation may get since the owner's decision of 13 Nov 2026: a
+ * smooth reverb tail, never a repeat. voice-reverb.mjs `echoFree` proves it
+ * on every impulse response before it is used.
+ */
+export const ALLOWED_SPACE = Object.freeze({
+  quran: "smooth hall or mosque reverb (dense decaying tail, pre-delay, no discrete echo); nothing else is added",
+  narration: "close and nearly dry; a short warm room at most",
+  decidedOn: "2026-11-13",
+});
 
 /** YouTube turns uploads louder than this down; -1 dBTP leaves room for its encoder. */
 export const MASTER = Object.freeze({ targetLufs: -14, ceilingDbtp: -1, lowBitrateCeilingDbtp: -2 });
@@ -94,14 +114,23 @@ export function musicPlanFor({ contentType, versionId }) {
  * The processing plan for one voice track, built from its measured analysis.
  * Returns blocked (with the reason) instead of a plan when the request must
  * not be carried out, such as a synthetic voice for Quran recitation.
- * @param {{ source: VoiceSource, contentType: ContentType, versionId: string, analysis?: RecordingAnalysis | null, roomReverb?: boolean }} input
+ * `space` names the reverb of the real engine (voice-reverb.mjs SPACES); the
+ * returned `mastering` is what voice-master.mjs then runs, so this plan is
+ * carried out, not only described.
+ * @param {{ source: VoiceSource, contentType: ContentType, versionId: string, analysis?: RecordingAnalysis | null, roomReverb?: boolean, space?: string }} input
  */
-export function planVoice({ source, contentType, versionId, analysis = null, roomReverb = false }) {
+export function planVoice({ source, contentType, versionId, analysis = null, roomReverb = false, space }) {
   const music = musicPlanFor({ contentType, versionId });
   const quran = contentType === "quran_recitation";
   if (quran && source !== "own-recording") {
-    return { blocked: "Quran recitation is never synthesised or voice-cloned; upload a recitation recorded by a person.", chain: [], music, warnings: [] };
+    return { blocked: "Quran recitation is never synthesised or voice-cloned; upload a recitation recorded by a person.", chain: [], music, warnings: [], mastering: null };
   }
+  const profile = masterProfileFor(contentType);
+  const preset = space ?? (roomReverb && source === "own-recording" ? (quran ? "mosque-hall" : "warm-room") : quran ? "clean" : "dry");
+  if (!PROFILE_SPACES[profile].includes(preset)) {
+    return { blocked: "The " + profile + " profile does not use the space \"" + preset + "\"; it uses " + PROFILE_SPACES[profile].join(", ") + ".", chain: [], music, warnings: [], mastering: null };
+  }
+  const room = SPACES[preset];
   /** @type {string[]} */
   const warnings = [...(analysis?.problems ?? [])];
   /** @type {ChainStep[]} */
@@ -122,7 +151,7 @@ export function planVoice({ source, contentType, versionId, analysis = null, roo
       ? { step: "compressor", ratio: 1.5, thresholdDb: -20, attackMs: 20, releaseMs: 250, note: "gentle, so the reciter's dynamics and elongations stay intact" }
       : { step: "compressor", ratio: 3, thresholdDb: -22, attackMs: 10, releaseMs: 100, targetReductionDb: [3, 6] });
     chain.push({ step: "de-ess", rangeHz: [5000, 9000], maxReductionDb: 4 });
-    if (roomReverb) chain.push({ step: "reverb", preset: "natural-room", decaySeconds: 0.6, wetDb: -20, discreteEchoes: false });
+    if (room) chain.push({ step: "reverb", preset, decaySeconds: room.rt60, preDelayMs: room.preDelayMs, wetDb: room.wetDb, discreteEchoes: false, note: "a smooth tail made in code and checked to hold no repeat; shortened or lowered to fit the recording" });
   } else {
     const model = ELEVENLABS_MODELS[/** @type {keyof typeof ELEVENLABS_MODELS} */ (versionId)];
     chain.push({
@@ -146,6 +175,7 @@ export function planVoice({ source, contentType, versionId, analysis = null, roo
     versionId,
     never: NEVER_DONE_TO_A_VOICE,
     keepOriginal: true,
+    mastering: { engine: "voice-master.mjs", profile, preset },
     voiceIsolator: quran ? "never" : "opt-in only, with a before/after comparison",
     chain,
     music,
@@ -155,6 +185,15 @@ export function planVoice({ source, contentType, versionId, analysis = null, roo
       : { cutAt: "sentence ends and breaths", timing: "pauses between sentences are trimmed or extended; the voice is never sped up or slowed" },
     warnings,
   };
+}
+
+/**
+ * Which mastering profile a kind of content gets: a recitation its own,
+ * everything else the close, nearly dry narration profile.
+ * @param {ContentType} contentType @returns {"quran" | "narration"}
+ */
+export function masterProfileFor(contentType) {
+  return contentType === "quran_recitation" ? "quran" : "narration";
 }
 
 /**

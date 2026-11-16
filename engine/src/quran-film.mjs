@@ -31,9 +31,9 @@ const MIN_SCENE_SECONDS = 1.5;
 const LONG_GAP_SECONDS = 6;
 
 /**
- * @typedef {{ id: string, surah: number, ayah: number | null, kind: "title" | "ayah", start: number, end: number, spokenStart: number | null, spokenEnd: number | null, text: string, label: string, complete: boolean, estimated: boolean, needsReview: string[] }} QuranScene
+ * @typedef {{ id: string, surah: number, ayah: number | null, kind: "title" | "ayah", start: number, end: number, spokenStart: number | null, spokenEnd: number | null, text: string, label: string, complete: boolean, estimated: boolean, needsReview: string[], endSure?: boolean }} QuranScene
  * @typedef {{ start: number, end: number, text: string }} QuranCaption
- * @typedef {{ ok: boolean, timed: boolean, totalSeconds: number, scenes: QuranScene[], captions: QuranCaption[], credit: string, audio: typeof RECITATION_AUDIO, visuals: typeof RECITATION_VISUALS, rules: string[], review: string[], summary: { surah: number | null, fromAyah: number | null, toAyah: number | null, ayat: number, coverage: number } }} QuranFilmPlan
+ * @typedef {{ ok: boolean, timed: boolean, totalSeconds: number, scenes: QuranScene[], captions: QuranCaption[], credit: string, audio: typeof RECITATION_AUDIO, visuals: typeof RECITATION_VISUALS, rules: string[], review: string[], summary: { surah: number | null, fromAyah: number | null, toAyah: number | null, ayat: number, coverage: number }, timing?: "recognized" | "estimated", source?: string }} QuranFilmPlan
  */
 
 /** @param {number} n */

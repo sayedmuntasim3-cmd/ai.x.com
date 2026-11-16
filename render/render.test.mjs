@@ -458,3 +458,30 @@ test("the synthesised sound design is heard under the edit", { skip: !hasFfmpeg 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("one-track film (voice system): the recording is the narration, sample for sample, never sped up", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-onetrack-"));
+  try {
+    const voice = join(dir, "voice.mp3");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=f=300:d=5:sample_rate=44100", "-b:a", "128k", voice]);
+    const seconds = await mediaDuration(voice);
+    const md = [
+      `**SC0001** | 0:00:00-0:00:02.500 | C1 | BEAT | SLOT | CLAIMS | NARR: One long sentence is spoken here. | W 6/6 | ANCHOR: x | SHOTS: (1) R1 card "one" | LOOK: L`,
+      `**SC0002** | 0:00:02.500-0:00:05 | C1 | BEAT | SLOT | CLAIMS | NARR: And another one ends it. | W 5/5 | ANCHOR: x | SHOTS: (1) R1 card "two" | LOOK: L`,
+    ].join("\n");
+    const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
+    const out = join(dir, "film.mp4");
+    // A per-scene voice is given too, and must be ignored: the one recording is the whole narration.
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, oneTrack: { file: voice }, voice: { SC0001: voice } });
+    assert.ok(!report.warnings.some((w) => /sped up|cut\./.test(w)), report.warnings.join("\n"));
+    assert.ok(Math.abs((await mediaDuration(out)) - timeline.durationSeconds) < 0.1);
+    const ref = join(dir, "ref.wav");
+    const samples = Math.round(timeline.durationSeconds * 48000);
+    await run("ffmpeg", ["-v", "error", "-y", "-i", voice, "-af", `aresample=48000,apad,atrim=end_sample=${samples}`, "-ac", "1", "-c:a", "pcm_s16le", ref]);
+    const pcm = (/** @type {string} */ f) => { const b = readFileSync(f); const at = b.indexOf("data") + 8; return b.subarray(at); };
+    assert.ok(pcm(join(dir, "w", "narration.wav")).equals(pcm(ref)), "the narration is the recording itself");
+    assert.ok(seconds > 4.9);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

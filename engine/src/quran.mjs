@@ -198,7 +198,9 @@ function findMarkers(tokens, times, used) {
     markers.push({ type, from, to, start: times?.[from]?.start ?? null, end: times?.[to - 1]?.end ?? null });
   };
   for (let t = 0; t < tokens.length; t += 1) {
-    if (tokens[t] === "اعوذ" && tokens[t + 1] === "بالله") {
+    // The first word is often misheard ("wa-a'udu", "a'idh"): "billahi" after a word close to "a'udhu" is enough.
+    const first = tokens[t].replace(/^[وف](?=.{3})/, "");
+    if (tokens[t + 1] === "بالله" && (first === "اعوذ" || wordSimilarity(first, "اعوذ") >= 0.5) && tokens.slice(t + 2, t + 9).includes("الرجيم")) {
       // "a'udhu billahi (as-sami'i al-'alim) mina sh-shaytani r-rajim": ends at "ar-rajim".
       let end = -1;
       for (let k = t + 2; k < Math.min(tokens.length, t + 9); k += 1) {

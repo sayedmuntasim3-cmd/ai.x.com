@@ -9,6 +9,7 @@
  * Pure ES module with injected fetch, so it runs in the Worker and in Node
  * tests with fakes alike.
  */
+import { openArchivesProvider } from "./open-archives.mjs";
 import { createRateLimiter, fetchShotMedia, ProviderError } from "./documentary-media-fetch.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
@@ -27,7 +28,7 @@ export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0", "PDM
  * Archives: real, historical, scientific and museum pictures, free for
  * commercial use. All but the Smithsonian are searched without a key.
  */
-export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa", "loc", "smithsonian", "met", "artic", "openverse"]);
+export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa", "loc", "smithsonian", "met", "artic", "openverse", "open-archives"]);
 
 /**
  * Archives of historical evidence and museum objects: searched for evidence
@@ -48,7 +49,7 @@ export async function verifyArchiveItem(c) {
   // NASA: third-party credits refused by classifyLicense. The Library of Congress, the Met, the
   // Art Institute and the Smithsonian: each provider keeps only items whose own record says
   // "no known restrictions", public domain or CC0. Openverse: CC0, PDM and CC BY only, as the source states them.
-  if (["nasa", "loc", "smithsonian", "met", "artic", "openverse"].includes(c.source)) return c.rights.allowed && !c.restrictions;
+  if (["nasa", "loc", "smithsonian", "met", "artic", "openverse", "open-archives"].includes(c.source)) return c.rights.allowed && !c.restrictions;
   return false;
 }
 
@@ -389,7 +390,7 @@ export function wikimediaProvider(o = {}) {
         action: "query", format: "json", formatversion: "2", generator: "search", gsrnamespace: "6", gsrlimit: String(perPage),
         gsrsearch: `${query.slice(0, 200)} filetype:${kind === "video" ? "video" : "bitmap"}`,
         prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "1920",
-        iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName",
+        iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName|Categories",
       });
       const res = await get(`https://commons.wikimedia.org/w/api.php?${params}`, { headers: { "user-agent": COMMONS_UA, "api-user-agent": COMMONS_UA }, signal });
       if (!res.ok) throw httpError(res);
@@ -415,6 +416,8 @@ export function wikimediaProvider(o = {}) {
           restrictions: plain(meta.Restrictions?.value) || null,
           durationSeconds: isVideo && Number.isFinite(Number(info.duration)) ? Number(info.duration) : null,
           width: info.width ?? null, height: info.height ?? null,
+          // The file's categories ("Landscape paintings", "People in ...") tell what a title may not.
+          tags: plain(meta.Categories?.value).split("|").map((c) => c.trim()).filter(Boolean),
         }];
       });
     },
@@ -652,7 +655,7 @@ export function mediaProviders(keys) {
   /** @type {MediaProvider[]} */
   const out = [];
   if (keys.archives !== false) {
-    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }));
+    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }), openArchivesProvider({ fetch: keys.fetch }));
     if (keys.smithsonianKey) out.push(smithsonianProvider({ apiKey: keys.smithsonianKey, fetch: keys.fetch }));
   }
   if (keys.pexelsKey) out.push(pexelsProvider({ apiKey: keys.pexelsKey, fetch: keys.fetch }));

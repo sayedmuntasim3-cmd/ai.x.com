@@ -193,7 +193,9 @@ async function downloadClip(url, dir) {
 
 /**
  * @typedef {import("../engine/src/timeline.mjs").Timeline} Timeline
- * @typedef {{ timeline: Timeline, workDir: string, outFile: string, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void }} RenderOptions
+ * oneTrack: the voice system's path: one recording is the whole narration, laid from 0:00, never sped up,
+ *   slowed, cut or re-ordered (the timeline was built on its own word times); per-scene voice is ignored.
+ * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void }} RenderOptions
  */
 
 /**
@@ -671,19 +673,29 @@ export async function renderFilm(o) {
   log("picture: joined");
 
   // 2. Narration: each scene's voice in its slot, sped up at most 15%, silence elsewhere.
+  //    One-track films (the voice system): the recording itself, untouched in time.
   /** @type {{ start: number, end: number, file: string | null, scene: string | null }[]} */
   const pieces = [];
   let clock = 0;
-  for (const n of [...t.narration].sort((a, b) => a.start - b.start)) {
+  const narrationFile = join(o.workDir, "narration.wav");
+  if (o.oneTrack) {
+    const spoken = await mediaDuration(o.oneTrack.file, ffprobe);
+    if (spoken > t.durationSeconds + 0.05) warnings.push(`The voice is ${spoken.toFixed(2)} s but the film is ${t.durationSeconds.toFixed(2)} s: its end would be cut. The scenes must be built on this recording.`);
+    const samples = Math.round(t.durationSeconds * SAMPLE_RATE);
+    await run(ffmpeg, ["-v", "error", "-y", "-i", o.oneTrack.file, "-vn", "-af", `aresample=${SAMPLE_RATE},apad,atrim=end_sample=${samples}`, "-ac", "1", "-c:a", "pcm_s16le", narrationFile]);
+    pieces.push({ start: 0, end: t.durationSeconds, file: o.oneTrack.file, scene: "voice" });
+    log("narration: the one voice track");
+  }
+  for (const n of o.oneTrack ? [] : [...t.narration].sort((a, b) => a.start - b.start)) {
     if (n.start > clock + 1e-6) pieces.push({ start: clock, end: n.start, file: null, scene: null });
     const end = Math.min(n.end, t.durationSeconds);
     if (end > n.start) pieces.push({ start: n.start, end, file: o.voice?.[n.scene] ?? null, scene: n.scene });
     clock = Math.max(clock, end);
   }
-  if (t.durationSeconds > clock + 1e-6) pieces.push({ start: clock, end: t.durationSeconds, file: null, scene: null });
+  if (!o.oneTrack && t.durationSeconds > clock + 1e-6) pieces.push({ start: clock, end: t.durationSeconds, file: null, scene: null });
   const audioFiles = [];
   let samplesSoFar = 0;
-  for (const p of pieces) {
+  for (const p of o.oneTrack ? [] : pieces) {
     // Sample counts come from the running total, so the track ends exactly with the picture.
     const endSample = Math.round(p.end * SAMPLE_RATE);
     const samples = endSample - samplesSoFar;
@@ -709,11 +721,12 @@ export async function renderFilm(o) {
     renameSync(file + ".part.wav", file);
     stats.audioRendered += 1;
   }
-  const audioList = join(o.workDir, "audio.txt");
-  writeFileSync(audioList, audioFiles.map((f) => `file '${resolve(f).replace(/'/g, "'\\''")}'`).join("\n") + "\n");
-  const narrationFile = join(o.workDir, "narration.wav");
-  await run(ffmpeg, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", audioList, "-c", "copy", narrationFile]);
-  log("narration: joined");
+  if (!o.oneTrack) {
+    const audioList = join(o.workDir, "audio.txt");
+    writeFileSync(audioList, audioFiles.map((f) => `file '${resolve(f).replace(/'/g, "'\\''")}'`).join("\n") + "\n");
+    await run(ffmpeg, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", audioList, "-c", "copy", narrationFile]);
+    log("narration: joined");
+  }
 
   // 3. Music: each cue looped to its segment, faded in and out, silence between cues.
   /** @type {string | null} */
@@ -938,7 +951,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--ai <folder>] [--pictures <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--ai <folder>] [--pictures <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -955,8 +968,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   // The film's format decides its look (cinematic for stories and motivation, archive for history); --look overrides.
   const filmInfo = JSON.parse((await loadRunText(from, "film.json")) ?? (await loadRunText(from, "run.json")) ?? "{}");
   const look = /** @type {"documentary" | "cinematic" | "archive"} */ (["documentary", "cinematic", "archive"].includes(args.look) ? args.look : lookFor(filmInfo.formatId ?? filmInfo.film?.formatId));
-  const timeline = buildTimeline({ chapters, voice: spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
+  // The voice system: one recording is the whole narration; captions come from its own word times.
+  const oneTrack = typeof args["one-track"] === "string" ? { file: args["one-track"] } : undefined;
+  const timeline = buildTimeline({ chapters, voice: oneTrack ? {} : spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
   console.log(`look: ${look}`);
+  if (oneTrack && typeof args.words === "string") {
+    const { captionsFromWords } = await import("../engine/src/timeline.mjs");
+    timeline.captions = captionsFromWords(JSON.parse(readFileSync(args.words, "utf8")).words);
+  }
   // AI scenes made by ai-scenes.mjs replace their cards (stories with one cast).
   let aiShots = 0;
   if (args.ai) {
@@ -982,7 +1001,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
   }
   const workDir = args.work ?? ".render";
-  const report = await renderFilm({ timeline, voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
   // The three A/B thumbnails from the S7 briefs, next to the film.
   const s7 = await loadRunText(from, "s7.md");
   if (s7) {
