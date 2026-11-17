@@ -2,12 +2,8 @@
   // Must match the Worker name in the Cloudflare dashboard.
   "name": "ai-x-com",
   "compatibility_date": "2026-10-01",
-  // The Worker answers /api/* (script writer); everything else is the static site in ./public.
-  // Secrets GEMINI_API_KEY and GROQ_API_KEY are set in the Cloudflare dashboard, not here.
-  "main": "./worker/index.js",
+  // Static site generated from page.tsx (see tools/README.md). No Worker script needed.
   "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "directory": "./public"
   }
 }
