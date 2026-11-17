@@ -1,0 +1,93 @@
+name: Quran media check
+
+# Finds licensed media for the shot lists of two recitations and prints
+# what was found, refused and why, between QURAN-MEDIA-BEGIN/END:
+#  - the CC0 recitation of Ad-Duha (archive.org jawad-farogi, given surah 93);
+#  - Yusuf 1-40 built from single-ayah files with a public-domain mark.
+# Each chosen asset's frames go through local/media/detect.py (OpenCV face
+# and person detectors, Apache 2.0). The detector's own hit and false-alarm
+# rates are measured first on 12 NASA astronaut portraits (faces) and 12
+# NASA photographs of the Earth (none), all public domain.
+# Pexels and Pixabay are searched only if their free keys are repository
+# secrets; nothing paid is called. Test audio is never committed.
+
+on:
+  push:
+    paths:
+      - "engine/src/quran-media.mjs"
+      - "engine/src/quran-director.mjs"
+      - "local/quran-media.mjs"
+      - "local/media/**"
+      - ".github/workflows/quran-media.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg and OpenCV
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q "opencv-python-headless==4.10.0.84"
+      - name: The detector's own rates (12 portraits, 12 Earth photographs)
+        run: |
+          mkdir -p det
+          for q in "astronaut%20portrait" "earth%20from%20orbit"; do
+            curl -sSf "https://images-api.nasa.gov/search?q=$q&media_type=image&page_size=12" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const it of JSON.parse(s).collection.items.slice(0,12))console.log(it.links[0].href)})' > "det/$q.txt"
+          done
+          python -I local/media/detect.py $(cat det/astronaut%20portrait.txt) --out det/faces.json > /dev/null
+          python -I local/media/detect.py $(cat det/earth%20from%20orbit.txt) --out det/none.json > /dev/null
+      - name: Shot lists from two recitations
+        run: |
+          curl -sSfL --retry 3 -o duha.mp3 https://archive.org/download/jawad-farogi/Az-Zuha.mp3
+          node local/voice-film.mjs --audio duha.mp3 --surah 93 --out runs/duha > runs-duha.log 2>&1 || true
+          node local/quran-locate.mjs --fetch quran-audio-verse-by-verse-by-sadaqat-ali-surah-012 --count 40 --out audio/yusuf
+          node local/quran-locate.mjs --join audio/yusuf --surah 12 --ayat 1-40 --gap 0.5 --out sets/yusuf
+          node local/voice-film.mjs --audio sets/yusuf/joined.wav --surah 12 --ayat 1-40 --opening basmala --out runs/yusuf > runs-yusuf.log 2>&1 || true
+          ls runs/duha/shots.json runs/yusuf/shots.json
+      - name: Media for every shot (with the frame check)
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          for r in duha yusuf; do node local/quran-media.mjs --run runs/$r --detect python > runs/$r/media.log 2>&1 || echo "$r failed" >> failed.txt; done
+      - name: Print what was measured
+        if: always()
+        run: |
+          echo QURAN-MEDIA-BEGIN
+          node -e '
+          const fs = require("fs");
+          const rate = (f) => { try { const d = JSON.parse(fs.readFileSync(f, "utf8")); return { flagged: d.items.filter((x) => x.flag).length, of: d.items.length }; } catch { return null; } };
+          console.log(JSON.stringify({ detector: { portraitsFlagged: rate("det/faces.json"), earthFlagged: rate("det/none.json") } }));
+          for (const r of ["duha", "yusuf"]) {
+            const log = fs.existsSync(`runs/${r}/media.log`) ? fs.readFileSync(`runs/${r}/media.log`, "utf8") : "";
+            const line = log.split("\n").find((l) => l.startsWith("QURAN-MEDIA ")); console.log(r, line ? line.slice(12) : "no result: " + log.slice(-300));
+            try { const m = JSON.parse(fs.readFileSync(`runs/${r}/media.json`, "utf8")); for (const s of m.shots) console.log(`  ${s.shot} ${s.ayah} ${s.status === "found" ? s.kind + " " + s.asset.source + " " + s.asset.licence + " " + JSON.stringify(s.asset.title.slice(0, 60)) : "gap"}`); } catch {}
+          }'
+          echo QURAN-MEDIA-END
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quran-media
+          path: |
+            runs/**/shots.md
+            runs/**/media.md
+            runs/**/media.json
+            runs/**/manifest.json
+            runs/**/credits.txt
+            runs/**/meaning.md
+            det/*.json
+          retention-days: 30
+      - name: Fail when the media step failed
+        run: if [ -s failed.txt ]; then cat failed.txt; exit 1; fi

@@ -1,0 +1,95 @@
+name: Voice mastering check
+
+# Runs the voice mastering engine for real on two recordings and keeps the
+# listening packs (original + every space) as a run file for 30 days:
+#  - narration: the LibriVox reading of the Gettysburg Address (archive.org
+#    item gettysburg_johng_librivox, public domain);
+#  - recitation: archive.org items their uploaders marked CC0 (the mark is the
+#    uploader's statement; the audio is used for this test only and is never
+#    committed). Other items can be given when the run is started by hand.
+# The measurements and proofs are printed between VOICE-MASTER-BEGIN/END.
+# Free GitHub runner minutes only; no API key and no paid service is used.
+
+on:
+  push:
+    paths:
+      - "engine/src/voice-*.mjs"
+      - "engine/src/loudness.mjs"
+      - "local/voice-master.mjs"
+      - ".github/workflows/voice-master.yml"
+  workflow_dispatch:
+    inputs:
+      recitations:
+        description: "archive.org paths (item/file, space separated) of recitations with a free licence"
+        default: "jawad-farogi/Az-Zuha.mp3 001AlFaatihah_201305/001AlFaatihah.mp3"
+      from:
+        description: "start of the excerpt, seconds"
+        default: "0"
+      to:
+        description: "end of the excerpt, seconds"
+        default: "60"
+
+permissions:
+  contents: read
+
+jobs:
+  master:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Recitation packs (original, clean, mosque hall, grand hall)
+        env:
+          RECITATIONS: ${{ github.event.inputs.recitations || 'jawad-farogi/Az-Zuha.mp3 001AlFaatihah_201305/001AlFaatihah.mp3' }}
+          FROM: ${{ github.event.inputs.from || '0' }}
+          TO: ${{ github.event.inputs.to || '60' }}
+        run: |
+          n=0
+          for item in $RECITATIONS; do
+            n=$((n+1))
+            echo "== recitation $n: $item =="
+            if curl -sSfL --retry 3 -o "recitation-$n.mp3" "https://archive.org/download/$item"; then
+              node local/voice-master.mjs --audio "recitation-$n.mp3" --profile quran --preset all --from "$FROM" --to "$TO" --out "pack/quran-$n" || echo "quran-$n" >> failed.txt
+            else
+              echo "not downloaded: $item"
+            fi
+          done
+      - name: Narration pack (original, dry, warm room)
+        if: always()
+        run: |
+          curl -sSfL --retry 3 -o gettysburg.mp3 https://archive.org/download/gettysburg_johng_librivox/gettysburg_address_64kb.mp3
+          node local/voice-master.mjs --audio gettysburg.mp3 --profile narration --preset all --to 60 --out pack/narration || echo narration >> failed.txt
+      - name: Print the measurements and proofs
+        if: always()
+        run: |
+          echo VOICE-MASTER-BEGIN
+          node -e '
+          const fs = require("fs"), path = require("path");
+          for (const dir of fs.existsSync("pack") ? fs.readdirSync("pack").sort().map((d) => "pack/" + d) : []) {
+            for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".report.json")).sort()) {
+              const r = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")), b = r.before, a = r.after, d = r.chain.did, p = r.proof;
+              console.log(JSON.stringify({ file: dir + "/" + f, ok: r.ok,
+                before: { lufs: b.lufs, tp: b.truePeakDb, lra: b.lra, snr: b.snrDb, noise: b.noiseFloorDb, crest: b.crestDb, room: b.roomRt60, pause: b.medianPauseSeconds, pops: b.plosives, ess: b.sibilanceDb, f0: b.pitch && b.pitch.medianHz, tone: b.tone.map((t) => t.deviationDb) },
+                voiceAfter: { noise: a.dryNoiseFloorDb, snr: a.drySnrDb, lra: a.dryLra, crest: a.dryCrestDb, tone: a.dryTone.map((t) => t.deviationDb) },
+                did: { denoise: d.denoisedDb, clicks: d.clicks, eq: r.chain.plan.eq.map((e) => e.gainDb + "@" + e.hz), deess: d.deess, leveller: d.leveller, compressor: d.compressor, peaks: d.peaks },
+                space: r.space && { rt: r.space.rt60, rt500: r.space.rt60At500, rt4k: r.space.rt60At4000, wet: r.space.wetDb, lowered: r.space.loweredDb, echoFree: r.space.echoFree },
+                master: r.master, aacTp: r.aacTruePeakDb,
+                proof: { ok: p.ok, extra: p.duration.extraSeconds, lags: p.alignment.lagsSamples, voice: [p.pitch.medianCents, p.pitch.within20Cents, p.pitch.correlation], mix: [p.pitch.mix.medianCents, p.pitch.mix.within20Cents, p.pitch.mix.trackerSlips] } }));
+            }
+          }'
+          echo VOICE-MASTER-END
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voice-master-listening-pack
+          path: |
+            pack/**/*.m4a
+            pack/**/*.report.json
+          retention-days: 30
+      - name: Fail when a master did not pass its own proofs
+        run: if [ -s failed.txt ]; then echo "failed:"; cat failed.txt; exit 1; fi

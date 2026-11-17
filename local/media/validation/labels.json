@@ -1,0 +1,492 @@
+{
+ "labelledBy": "the assistant, looking at each picture on 480 px contact sheets (14 Nov 2026); NOT yet checked by a person. Small figures may be missed at that size.",
+ "categories": {
+  "people": "a person visible anywhere, however small",
+  "building": "a building, hut, ruin, tower, tent camp or city",
+  "manmade": "a man-made object in view: sign, pole, power line, fence, boat, vehicle, boardwalk, litter, plastic, tools (a plain road or path alone is not counted)",
+  "art": "a painting, drawing, engraving or diagram, not a photograph"
+ },
+ "unsure": [
+  "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1130 1348.jpg",
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1126 1332.jpg"
+ ],
+ "source": "runner job quran-visual-eval.yml, run 43553580225 (Commons, 188 pictures in 18 groups)",
+ "labels": {
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1140 1373.jpg": [],
+  "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1130 1346.jpg": [],
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1137 1368.jpg": [],
+  "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1131 1350.jpg": [],
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1123 1327.jpg": [],
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1139 1370.jpg": [],
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1126 1334.jpg": [],
+  "File:Hiking trail at Námafjall Mountain, Iceland, 20240716 1124 1330.jpg": [],
+  "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1133 1353.jpg": [],
+  "File:Hiking trail on Námafjall Mountain, Iceland, 20240716 1134 1359.jpg": [],
+  "File:Poplar Sunset Douar Chiker Morocco Nov25 A7CR 09360.jpg": [
+   "people"
+  ],
+  "File:Tropea - Fotografi di fronte a Santa Maria dell'Isola.jpg": [
+   "people",
+   "building"
+  ],
+  "File:Steve Tshwete (ZA), Alzu Petroport -- 2024 -- 142958.jpg": [
+   "manmade"
+  ],
+  "File:Talavar Gatta on Tungavhadra river.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Lukmanierpass, Passo del Lucomagno. 20-09-2022. (actm.) 26.jpg": [
+   "building"
+  ],
+  "File:Glecksteinhütte front 20200121.jpg": [
+   "building"
+  ],
+  "File:Water reflection of mountains and hut in a paddy field with blue sky in Vang Vieng, Laos.jpg": [
+   "building"
+  ],
+  "File:Wooden hut fence mountains and blue sky in the green rice fields of Vang Vieng in Laos.jpg": [
+   "building"
+  ],
+  "File:Water reflection of a wooden hut with colorful sky and karst mountains in a paddy field at sunset Vang Vieng Laos.jpg": [
+   "building"
+  ],
+  "File:Felsenkammer hut 20200207 1.jpg": [
+   "building"
+  ],
+  "File:Felsenkammer hut 20200207 2.jpg": [
+   "building"
+  ],
+  "File:Alpine hut ruin pasture Alpe Cortaccio 1670m - Vigezzo Valley, Re, Piedmont, Italy 2022-01-06.jpg": [
+   "building"
+  ],
+  "File:Water reflection of mountains, hut, green rice sheaves scattered in a paddy field and clouds with blue sky in Vang Vieng, Laos.jpg": [
+   "building"
+  ],
+  "File:Mountain hut Ciadinat Sëlva.jpg": [
+   "building",
+   "people"
+  ],
+  "File:Wooden walkway leading to a hut with straw roof in front of karst mountains with mist, at sunrise, Vang Vieng, Laos.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Wooden walkway leading to a hut with straw roof in front of karst mountains at sunset, Vang Vieng, Laos.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Amboy (California, USA) -- 2012 -- 4.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Amboy (California, USA) -- 2012 -- 5703.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:ISR-2016-Makhtesh Ramon-Ein Saharonim 02 (ruins).jpg": [
+   "building"
+  ],
+  "File:ISR-2016-Makhtesh Ramon-Ein Saharonim 03 (ruins).jpg": [
+   "building"
+  ],
+  "File:Nankendorf Burgstall-20210725-RM-170055.jpg": [],
+  "File:Niesten Burgstall-20210629-RM-172042.jpg": [
+   "manmade"
+  ],
+  "File:Tretzendorf Burgstall-20200530-RM-170714.jpg": [
+   "building"
+  ],
+  "File:Shila Tsarap Mountains Zanskar Oct22 A7C 04113.jpg": [
+   "building"
+  ],
+  "File:SW Hullathy Gram Panchayat Villages Nilgiris Nov24 A7CR 05293.jpg": [
+   "building"
+  ],
+  "File:Ingushetia, Russia, Armkhi, Ingush tower.jpg": [
+   "building"
+  ],
+  "File:Fields Zangla Zanskar River Ladakh Jun24 A7CR 00981.jpg": [
+   "building"
+  ],
+  "File:Kardhang Biling Bhaga Dhauladhar Oct22 A7C 04645.jpg": [
+   "building"
+  ],
+  "File:Kagbeni Mustang-WLV-0741.jpg": [
+   "building"
+  ],
+  "File:2025-09-20 D500-0784 Achim-Lammerts Rechtenbach-Protestantische-Pfarrkirche-Rheinebene.jpg": [
+   "building"
+  ],
+  "File:North Campus, IIT Mandi, HP, India, D35 6311 01.jpg": [
+   "building"
+  ],
+  "File:Koaksar Village, D35 6995 01.jpg": [
+   "people",
+   "manmade"
+  ],
+  "File:Padum Zanskar View From Karsha Oct22 A7C 03984.jpg": [],
+  "File:NE View Stongdey Zanskar Jun24 A7CR 00966.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Batal, Lahaul and Spiti Dist., HP, India. Elev. 4,000m, D35 7121 01.jpg": [
+   "manmade"
+  ],
+  "File:Price Building illuminated at night in Quebec City.jpg": [
+   "building"
+  ],
+  "File:Québec city at night, view from Lévis city.jpg": [
+   "building"
+  ],
+  "File:Chateau Frontenac illuminated at night in Quebec City.jpg": [
+   "building"
+  ],
+  "File:Château Frontenac city at night.jpg": [
+   "building"
+  ],
+  "File:Lower Manhattan from Jersey City September 2020 panorama.jpg": [
+   "building"
+  ],
+  "File:Lower Manhattan from Jersey City November 2014 panorama 3.jpg": [
+   "building"
+  ],
+  "File:At New York City 2025 001 - Hudson Yards skyline, New York, at night.jpg": [
+   "building"
+  ],
+  "File:Kansas City, MO skyline at night.jpg": [
+   "building"
+  ],
+  "File:Jacksonville Skyline Night Panorama Digon3.jpg": [
+   "building"
+  ],
+  "File:Long Island City New York May 2015 panorama 3.jpg": [
+   "building"
+  ],
+  "File:Midtown Manhattan from Jersey City September 2020 HDR.jpg": [
+   "building"
+  ],
+  "File:Sydney skyline at dusk - Dec 2008.jpg": [
+   "building"
+  ],
+  "File:Mountains in snow, Mountain lake, Chola Valley, Nepal, Himalayas.jpg": [
+   "people"
+  ],
+  "File:Landscape Arnisee-region.JPG": [
+   "building"
+  ],
+  "File:Catoctin Mountain and farm MD1.jpg": [
+   "building"
+  ],
+  "File:Ergaki, Mountain lake Skazka, Rock formations, Sayan Mountains, Russia.jpg": [],
+  "File:Mountain landscape, Weathering and erosion in glacial valley, Ergaki, Sayan Mountains, Siberia.jpg": [],
+  "File:Mountain Peak, Alaska (1999).jpg": [],
+  "File:Blue Mountains National Park (AU), Three Sisters -- 2019 -- 1987-9.jpg": [],
+  "File:Frosty Raftsundet landscape with Trolltindan in morning, 2012 October.JPG": [],
+  "File:Cheops Mountain seen the Sir Donald Trail.jpg": [],
+  "File:Vihren & Kutelo Pirin Mountains Bulgaria 2025.jpg": [],
+  "File:Zagedan Ridge, Zagedan Valley, Caucasus Mountains, Karachay-Cherkessia.jpg": [],
+  "File:Landscape in Peyriac-de-Mer, february 2018 (05).jpg": [
+   "manmade"
+  ],
+  "File:006 Dune 45 in Sossusvlei at sunrise Photo by Giles Laurent.jpg": [],
+  "File:Sossusvlei sand dunes.jpg": [],
+  "File:Un groupe de dromadaire dans le desert tunisien.jpg": [],
+  "File:Dune Namib Naukluft 2.jpg": [],
+  "File:Sand Dunes sa.jpg": [],
+  "File:Dune Namib Naukluft 1.jpg": [],
+  "File:Hidden Vlei Dune and Wind.jpg": [],
+  "File:Sossusvlei, Namibia, 2018-08-06, DD 040.jpg": [],
+  "File:Düne S-Schlag Sossusvlei.JPG": [],
+  "File:Duna en Sossusvlei, Namibia, 2018-08-06, DD 002.jpg": [],
+  "File:Libya 4985 Tadrart Acacus Luca Galuzzi 2007.jpg": [
+   "people"
+  ],
+  "File:Desert Exploration.jpg": [
+   "people"
+  ],
+  "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3489.jpg": [],
+  "File:Waves at La Corniche.jpg": [],
+  "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3450.jpg": [],
+  "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3484.jpg": [],
+  "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3489 (bw).jpg": [],
+  "File:The coast of Crete Sea near Chania. Crete, Greece.jpg": [],
+  "File:Sea and cliffs near Lindos. Rhodes, Greece.jpg": [],
+  "File:Peterborough (AU), Port Campbell National Park, Worm Bay -- 2019 -- 0863.jpg": [],
+  "File:Kuantan - waves breaking over rocks at Teluk Cempedak - May 2024.jpg": [],
+  "File:Baltic Sea view from Schmiedeberg hill in Rerik, 2025-06-23.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Long Spit Sea of Azov2.jpg": [
+   "people",
+   "building"
+  ],
+  "File:Gaztelugache, Bermeo, País Vasco, España, 2019-08-13, DD 14.jpg": [
+   "building"
+  ],
+  "File:Spring forest Yyteri 3.jpg": [],
+  "File:Beech forest Mátra in winter.jpg": [],
+  "File:Forest road Slavne 2017 BW G9.jpg": [],
+  "File:Forest road Slavne 2017 G8.jpg": [],
+  "File:Two holes and green leaves on the bark of a tree trunk in the forest in Luang Prabang Laos.jpg": [],
+  "File:Mezmay, Forest, Trees, Russia.jpg": [],
+  "File:Møns Klint beech trees in gorge 2015-04-01-4864.jpg": [],
+  "File:Bali, Forest, Trees, East Bali, Indonesia.jpg": [],
+  "File:Beech Forest (AU), Great Otway National Park, Beauchamp Falls -- 2019 -- 1271.jpg": [],
+  "File:Spruce forest at Holma.jpg": [],
+  "File:Trees along the Hald Sø Viborg Commune Danemark.jpg": [],
+  "File:Fanal (Madeira, Portugal), Lorbeerwald -- 2025 -- 1532.jpg": [],
+  "File:Pirogue running on the Mekong at sunset with pink clouds in Don Det Laos.jpg": [],
+  "File:Colorful sky with orange clouds reflecting in the water of a paddy field, at sunset, Vang Vieng, Laos.jpg": [],
+  "File:Blue and orange clouds over the Mekong with a pirogue running in the water at sunset in Don Det Laos.jpg": [],
+  "File:Cumulonimbus sunset panorama, Albury NSW Australia.jpg": [],
+  "File:Li Phi falls at dusk with colorful sky and clouds in Don Khon Laos.jpg": [],
+  "File:Water reflection of sunset with gray and orange clouds and boats moored to the bank in Pakse Laos.jpg": [
+   "manmade"
+  ],
+  "File:Clouds over the Xe Don River with boats at sunset in Pakse Laos.jpg": [
+   "manmade"
+  ],
+  "File:Blue stormy clouds at sunset with water reflection and a pirogue moored to the bank, in Don Det, Laos.jpg": [
+   "manmade"
+  ],
+  "File:Water reflection of sunset with gray and orange clouds and pirogues moored to the bank in Don Det Laos.jpg": [
+   "manmade"
+  ],
+  "File:Pirogue and boat on the Mekong with colorful sky at sunset in Luang Prabang Laos.jpg": [
+   "manmade"
+  ],
+  "File:Walkway and hut in paddy fields with water reflection of colorful clouds at sunset in Vang Vieng Laos.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Three golden statues of the Buddha at Wat Mai with colorful clouds at sunset in Luang Prabang Laos.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Hendrik Voogd - Italian landscape with Umbrella Pines.jpg": [
+   "art",
+   "people"
+  ],
+  "File:Winter Landscape with Brabrand Church.jpg": [
+   "art",
+   "people"
+  ],
+  "File:Winter on the Canal - Douai - Impressionist Landscape Oil Painting - Henri Duhem, 1904.jpg": [
+   "art",
+   "people"
+  ],
+  "File:Landscape with the Good Samaritan - Rembrandt.jpg": [
+   "art",
+   "people"
+  ],
+  "File:Edward Bailey painting of Wailuku and Iao Valley.jpg": [
+   "art",
+   "building",
+   "manmade"
+  ],
+  "File:Wooded Landscape, an Oil Painting by Hudson Mindell Kitchell.jpg": [
+   "art"
+  ],
+  "File:Landscape oil on canvas painting by Claude-Joseph Vernet.jpg": [
+   "art",
+   "building"
+  ],
+  "File:Landscape painting by Thomas Worthington Whittredge, oil on canvas.jpg": [
+   "art",
+   "building"
+  ],
+  "File:'Pastoral Landscape', oil on canvas painting by Claude Lorrain.jpg": [
+   "art",
+   "people",
+   "building"
+  ],
+  "File:The Canal at Douai - Impressionist Landscape Oil Painting by Henri Duhem 1921.jpg": [
+   "art",
+   "people",
+   "building"
+  ],
+  "File:Lauterbach, H. - Ljubljana iz Tivolija (jeklorez, ok. 1855).jpg": [
+   "art",
+   "people",
+   "building"
+  ],
+  "File:Evening Sunset - Douai - Impressionist Landscape Oil Painting by Henri Duhem 1909.jpg": [
+   "art",
+   "building",
+   "manmade"
+  ],
+  "File:Scottish Landscape, oil on canvas painting by Princess Victoria Kaiulani, c. 1891, Bishop Museum.JPG": [
+   "art",
+   "building",
+   "manmade"
+  ],
+  "File:Strehla (in Sachsen) by J. Umbach.jpg": [
+   "art",
+   "people",
+   "building",
+   "manmade"
+  ],
+  "File:The progressive drawing-book - containing a series of easy and comprehensive lessons for drawing landscape, architecture, the human figure, shipping, and animals, &c. without the aid of a master - (14597365620).jpg": [
+   "art",
+   "manmade"
+  ],
+  "File:The American Landscape MET R49DD389R1.jpg": [
+   "art",
+   "manmade"
+  ],
+  "File:The American Landscape MET MM89531.jpg": [
+   "art",
+   "manmade"
+  ],
+  "File:The American Landscape MET MM89536.jpg": [
+   "art"
+  ],
+  "File:The American Landscape MET MM89530.jpg": [
+   "art"
+  ],
+  "File:The American Landscape MET MM89532.jpg": [
+   "art"
+  ],
+  "File:The American Landscape MET MM89535.jpg": [
+   "art",
+   "people"
+  ],
+  "File:The American Landscape MET MM89534.jpg": [
+   "art",
+   "people"
+  ],
+  "File:The American Landscape MET MM89533.jpg": [
+   "art",
+   "building"
+  ],
+  "File:The progressive drawing-book - containing a series of easy and comprehensive lessons for drawing landscape, architecture, the human figure, shipping, and animals, &c. without the aid of a master - (14761047886).jpg": [
+   "art",
+   "building"
+  ],
+  "File:Signpost along the Coast Trail, East Sooke Regional Park, British Columbia, Canada 19.jpg": [
+   "manmade"
+  ],
+  "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9437.jpg": [
+   "manmade"
+  ],
+  "File:Schönwald im Schwarzwald, Wegweiser -- 2025 -- 7868.jpg": [
+   "manmade"
+  ],
+  "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9435.jpg": [
+   "manmade"
+  ],
+  "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9437 (bw).jpg": [
+   "manmade"
+  ],
+  "File:Detzem, Wegekreuz -- 2015 -- 7539.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Norderney, Dünenlandschaft, Wegweiser -- 2025 -- 9438.jpg": [
+   "manmade"
+  ],
+  "File:Hainfeld Kirchberg Wegweiser 01.JPG": [
+   "manmade"
+  ],
+  "File:Vordere Tormäuer Wegweiser 01.jpg": [
+   "manmade"
+  ],
+  "File:Plastic Pollution in Ghana.jpg": [
+   "manmade"
+  ],
+  "File:Plastic pollution north of Guihou Fishing Harbour.jpg": [
+   "manmade"
+  ],
+  "File:004 Beach pollution in Tenerife - Atlantic Ocean beach plastic garbage debris.jpg": [
+   "manmade"
+  ],
+  "File:Litter from plastic balage wrappings.JPG": [
+   "manmade"
+  ],
+  "File:Plastic bag litter in Crocodile river, Pelindaba.jpg": [
+   "manmade"
+  ],
+  "File:Plastic bag-Litter-001.jpg": [
+   "manmade"
+  ],
+  "File:Litter in Sundarbans.jpg": [
+   "manmade"
+  ],
+  "File:Physical weathering clear plastic tub.jpg": [
+   "manmade"
+  ],
+  "File:Beach litter - geograph.org.uk - 966946.jpg": [
+   "manmade"
+  ],
+  "File:Plastic Pollution in Santa Luzia, Cape Verde.jpg": [
+   "people",
+   "manmade"
+  ],
+  "File:End Plastic Pollution.jpg": [
+   "people",
+   "building",
+   "manmade"
+  ],
+  "File:Stages of marine plastic biodegradation.jpg": [
+   "art",
+   "manmade"
+  ],
+  "File:Road through paddy fields in rural Haryana, India.jpg": [],
+  "File:Dülmen, Merfeld, Feldweg am Mühlenbach -- 2021 -- 4278-80.jpg": [],
+  "File:Dülmen, Merfeld, Feldweg am Mühlenbach -- 2021 -- 4347-51.jpg": [],
+  "File:Dülmen, Leuste, Bäume im Nebel -- 2020 -- 5042 (bw).jpg": [],
+  "File:Dülmen, Umland, Sonnenaufgang -- 2012 -- 8069.jpg": [],
+  "File:Dülmen, Hausdülmen, Kettbach -- 2015 -- 8499-503.jpg": [],
+  "File:Haltern am See, Westruper Heide -- 2021 -- 4714-8.jpg": [],
+  "File:Dülmen, Börnste, Waldweg -- 2015 -- 4649.jpg": [],
+  "File:Haltern am See, Westruper Heide -- 2015 -- 8306-10.jpg": [],
+  "File:Snowy trees on the GR-16 between Membre and Vresse-sur-Semois (DSCF4800).jpg": [],
+  "File:Schönwald im Schwarzwald, Escheckstraße -- 2025 -- 0150.jpg": [
+   "manmade"
+  ],
+  "File:Lüdinghausen, Berenbrock, Dortmund-Ems-Kanal (an der Kreisstraße 23) -- 2015 -- 4668-70.jpg": [
+   "manmade"
+  ],
+  "File:Power lines during Blue Hour BW.jpg": [
+   "manmade"
+  ],
+  "File:Power lines during Blue Hour LR.jpg": [
+   "manmade"
+  ],
+  "File:Lasarte - Campo 01.jpg": [
+   "manmade"
+  ],
+  "File:Mekong pirogue at sunset in the 4000 islands.jpg": [
+   "people",
+   "manmade"
+  ],
+  "File:Mekong pirogue at sunset in the 4000 islands (3).jpg": [
+   "people",
+   "manmade"
+  ],
+  "File:Mekong pirogue at sunset in the 4000 islands (2).jpg": [
+   "people",
+   "manmade"
+  ],
+  "File:Mekong pirogue at sunset in the 4000 islands (4).jpg": [
+   "people",
+   "manmade"
+  ],
+  "File:Felber Tauern und Alter Tauern.jpg": [],
+  "File:Dülmen, Hausdülmen, Hochzeitsallee -- 2020 -- 0348.jpg": [],
+  "File:Duisburg, Mündelheim, Rheinbogen, 2020-04 CN-01.jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Neckarsulm - Scheuerberg - Blick vom SW-Hang bei Sonnenuntergang mit Herbstlaub (2).jpg": [
+   "building",
+   "manmade"
+  ],
+  "File:Neckarsulm - Scheuerberg - Blick vom SW-Hang bei Sonnenuntergang mit Herbstlaub (1).jpg": [
+   "building",
+   "manmade"
+  ]
+ },
+ "keyedBy": "Commons file title (stable across runs of the pool job)"
+}

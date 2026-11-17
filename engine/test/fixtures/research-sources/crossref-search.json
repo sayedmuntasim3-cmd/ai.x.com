@@ -1,0 +1,95 @@
+{
+ "status": "ok",
+ "message": {
+  "total-results": 177678,
+  "items": [
+   {
+    "DOI": "10.15581/023.7.38299",
+    "title": [
+     "Nuevo Área Terminal, Aeropuerto Tenerife-Sur / New Terminal Area, Tenerife-Sur Airport"
+    ],
+    "container-title": [
+     "Memoria de Proyectos"
+    ],
+    "issued": {
+     "date-parts": [
+      [
+       2019,
+       9,
+       5
+      ]
+     ]
+    },
+    "author": [
+     {
+      "given": "J.C.",
+      "family": "Coll-Barreu",
+      "sequence": "first",
+      "affiliation": [],
+      "role": [
+       {
+        "role": "author",
+        "vocabulary": "crossref"
+       }
+      ]
+     }
+    ],
+    "type": "journal-article",
+    "URL": "https://doi.org/10.15581/023.7.38299"
+   },
+   {
+    "DOI": "10.1017/s1049023x00062348",
+    "title": [
+     "Airport Emergency Medical Assistance: The Experience from Stockholm\n                        Airport"
+    ],
+    "container-title": [
+     "Prehospital and Disaster Medicine"
+    ],
+    "issued": {
+     "date-parts": [
+      [
+       2007,
+       4
+      ]
+     ]
+    },
+    "author": [
+     {
+      "given": "A.C.",
+      "family": "Olsberg",
+      "sequence": "first",
+      "affiliation": [
+       {
+        "name": "Karolinska University Hospital"
+       }
+      ],
+      "role": [
+       {
+        "vocabulary": "crossref",
+        "role": "author"
+       }
+      ]
+     },
+     {
+      "given": "K.",
+      "family": "Hult-Langton",
+      "sequence": "additional",
+      "affiliation": [
+       {
+        "name": "Karolinska University Hospital"
+       }
+      ],
+      "role": [
+       {
+        "vocabulary": "crossref",
+        "role": "author"
+       }
+      ]
+     }
+    ],
+    "type": "journal-article",
+    "URL": "https://doi.org/10.1017/s1049023x00062348"
+   }
+  ]
+ }
+}

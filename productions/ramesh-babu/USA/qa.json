@@ -1,0 +1,132 @@
+{
+ "mustFix": [
+  {
+   "lens": "language",
+   "chapter": "C1",
+   "scene": "SC0029",
+   "issue": "Year written as digits in narration; the film spells numbers for the read.",
+   "find": "to YourStory in 2014, and",
+   "replace": "to YourStory in twenty fourteen, and"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C1",
+   "scene": "SC0038",
+   "issue": "28 words for 10 s (+12%); year in digits.",
+   "find": "NARR: How little? In 2018, the news site Onmanorama reported that his family made do with one meal a day. One meal, on a five-rupee share and a mother's wages. | W 28/25",
+   "replace": "NARR: How little? In twenty eighteen, Onmanorama reported his family made do with one meal a day, on a small share and a mother's wages. | W 23/25"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C1",
+   "scene": "SC0039",
+   "issue": "28 words for 10 s before a SIL-3 breath (+12%).",
+   "find": "NARR: That is where this story really starts. Not with a car, and not with a nickname. With an empty plate, and a boy who would soon go to work. | W 28/25",
+   "replace": "NARR: This is where the story starts. Not with a car, not a nickname. With an empty plate, and a boy who would soon go to work. | W 26/25"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C1",
+   "scene": "SC0039",
+   "issue": "Stale timing note after the trim.",
+   "find": "LOOK-G; LOOK-M + LOOK-A (28/25 = +12%: read at 155 wpm; the breath sits after the last word)",
+   "replace": "LOOK-G; LOOK-M + LOOK-A (the breath sits after the last word)"
+  },
+  {
+   "lens": "facts",
+   "chapter": "C1",
+   "scene": "SC0042",
+   "issue": "'every single day' states a frequency no source gives.",
+   "find": "Small money, paid for showing up every single day.",
+   "replace": "Small money, earned before most of the city was awake."
+  },
+  {
+   "lens": "craft",
+   "chapter": "C1",
+   "scene": "SC0046",
+   "issue": "29 words for 10 s (+16%).",
+   "find": "NARR: He told The Weekend Leader about a pen he wasn't allowed to have in fifth grade: a particular brand of pen, which he asked for and did not get. | W 27/25",
+   "replace": "NARR: He told The Weekend Leader about a pen he wasn't allowed to have in fifth grade: one particular brand, which he asked for and didn't get. | W 25/25"
+  },
+  {
+   "lens": "language",
+   "chapter": "C1",
+   "scene": "SC0049",
+   "issue": "Year written as digits in narration.",
+   "find": "He told YourStory in 2014 that he went on",
+   "replace": "He told YourStory in twenty fourteen that he went on"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C1",
+   "scene": "QA",
+   "issue": "QA line cites a variance that the fix removes.",
+   "find": " and SC0039 (28/25, +12%, read at 155 wpm)",
+   "replace": ""
+  },
+  {
+   "lens": "language",
+   "chapter": "C5",
+   "scene": "SC0192",
+   "issue": "Year written as digits in narration.",
+   "find": "dollars in 2011; about [C40 today] today.",
+   "replace": "dollars in twenty eleven; about [C40 today] today."
+  },
+  {
+   "lens": "craft",
+   "chapter": "C5",
+   "scene": "SC0186",
+   "issue": "29 words for 10 s (+16%).",
+   "find": "NARR: His fleet had already added luxury cars, as the last chapter showed. The Ghost was the top of that line, and the hardest of them all to pay for. | W 28/25",
+   "replace": "NARR: His fleet already had luxury cars, as the last chapter showed. The Ghost was the top of that line, and the hardest to pay for. | W 25/25"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C5",
+   "scene": "SC0186",
+   "issue": "Stale timing note after the trim.",
+   "find": "LOOK-G (28/25 = +12%: read at 155 wpm, the tilt is the breath)",
+   "replace": "LOOK-G"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C5",
+   "scene": "SC0194",
+   "issue": "30 words for 10 s (+20%).",
+   "find": "NARR: Look at it from the fleet's side. A car like this isn't bought to sit in a garage. It has to be booked, again and again, to pay its way. | W 28/25",
+   "replace": "NARR: Look at it from the fleet's side. A car like this isn't bought to sit in a garage. It must be booked again and again. | W 25/25"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C5",
+   "scene": "SC0194",
+   "issue": "Stale timing note after the trim.",
+   "find": "LOOK-M + LOOK-C (28/25: read at 155 wpm)",
+   "replace": "LOOK-M + LOOK-C"
+  },
+  {
+   "lens": "craft",
+   "chapter": "C5",
+   "scene": "QA",
+   "issue": "QA line cites variances that the fix removes.",
+   "find": "except SC0186 and SC0194 (+12%, read at 155 wpm), SC0210",
+   "replace": "except SC0210"
+  }
+ ],
+ "passed": [
+  "Timing: 270 scenes, SC0001-SC0270 continuous, timestamps tile 0:00:00-0:45:00 with no gap or overlap (scripted check).",
+  "Word budget per chapter within ±4% of the 150 wpm targets: C1 +3.6%, C2 +1.1%, C3 −0.5%, C4 +3.3%, C5 +3.1%, C6 −0.8% (6,315 words before fixes).",
+  "Open loops: L01-L09 each opened and paid; none left open at 0:45:00.",
+  "Version lock: no Bangla script in any narration; no British spellings found; banned-list phrases (engine section 16) absent from narration.",
+  "Rights: every R3 source is Pexels, Pixabay, Videvo Free, Coverr (by hand) or Mixkit; AI 0 s in every chapter; no stock face planned for Ramesh Babu or family; his children never named or shown.",
+  "Facts (C1 and C5, read in full): conflicts disclosed (age vs year of father's death, ₹5 a day vs a month, Ghost 2011 vs 2010, tax ₹3 crore+ vs ₹3.78 crore, jewelry mortgaged vs sold); quotes paraphrased with the outlet named; 'billionaire barber' only as an attributed nickname; C71 never mentioned; C75 unused; no dollar day rate.",
+  "Hook (C1 SC0001-SC0004): four beats, 11 cuts, no money figure before the method chip.",
+  "80% cliffhanger at 0:36:00 (SC0217) is a real turn: the road-tax bill, with silence before it and no riser."
+ ],
+ "notChecked": [
+  "$[C##] placeholders (C1 6, C2 4, C4 1, C5 5, C6 8 lines) cannot be filled from the ledger: every rate and CPI value in S2 is PENDING (LEAD-03). Fill them from FRED AEXINUS and BLS CPI-U before render; the export gate blocks any '['.",
+  "The facts pass for C2, C3, C4 and C6 was done by scripted scans only (digits, risky terms, quotes, loops), not a line-by-line read, to save credits; those chapters carry their own S5 QA lines.",
+  "Clip-reuse spacing across chapters was checked only for the assets in the C1 and C5 reuse logs.",
+  "research_bio.json was not reopened; facts were checked against the S2 ledger."
+ ]
+}

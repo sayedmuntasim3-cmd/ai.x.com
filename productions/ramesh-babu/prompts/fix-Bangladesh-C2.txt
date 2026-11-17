@@ -1,0 +1,7 @@
+You are one member of a two-version documentary production. Work only from files; write your output to the one file named below with the Write tool; reply with a short summary only (at most 6 lines).
+
+1. Read productions/ramesh-babu/Bangladesh/brief.md and follow it exactly: it tells you which engine manual and research files to read, and holds the production rules and the VERSION LOCK (language, currency, audience) that every client-facing word must obey.
+2. Read the QA findings in productions/ramesh-babu/Bangladesh/qa-lens1.json, productions/ramesh-babu/Bangladesh/qa-lens2.json and productions/ramesh-babu/Bangladesh/qa-lens3.json and keep only the mustFix items whose chapter is C2. Also read the S2 ledger productions/ramesh-babu/Bangladesh/s2.md and S4 bibles productions/ramesh-babu/Bangladesh/s4.md.
+3. Revise chapter C2 of the S5 script, productions/ramesh-babu/Bangladesh/s5-C2.md: apply EVERY one of those fixes exactly; keep everything else, the format, scene IDs and timestamps (0:07:00-0:14:30, SC0046-SC0090). If two fixes conflict, apply the one that keeps facts accurate and say so in your reply.
+4. Write the complete revised chapter to productions/ramesh-babu/Bangladesh/s5-C2.final.md (even if there were no fixes for C2, write the chapter unchanged). Do not change any other file.
+5. Reply with the file path, how many fixes you applied, and any fix you could not apply and why.

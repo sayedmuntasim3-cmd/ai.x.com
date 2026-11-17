@@ -1,0 +1,57 @@
+name: Voice speech-to-text check
+
+# Runs the voice system's steps 1-2 for real on a public-domain recording:
+# the LibriVox reading of the Gettysburg Address (archive.org item
+# gettysburg_johng_librivox, public domain), ffmpeg intake, then
+# faster-whisper with word timestamps. The words with times are printed to
+# the log between VOICE-WORDS-BEGIN/END and kept as a run file for 30 days.
+# Runs on a push that changes the speech-to-text code (any branch), or by hand.
+# Free GitHub runner minutes only; no API key and no paid service is used.
+
+on:
+  push:
+    paths:
+      - "local/stt/**"
+      - "local/voice-film.mjs"
+      - "engine/src/transcript.mjs"
+      - ".github/workflows/voice-stt.yml"
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "faster-whisper model"
+        default: "small.en"
+
+permissions:
+  contents: read
+
+jobs:
+  stt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg and faster-whisper
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q faster-whisper==1.2.1
+      - name: Download the public-domain recording
+        run: curl -sSfL --retry 3 -o gettysburg.mp3 https://archive.org/download/gettysburg_johng_librivox/gettysburg_address_64kb.mp3
+      - name: Steps 1-2 (intake, speech-to-text)
+        env:
+          MODEL: ${{ github.event.inputs.model || 'small.en' }}
+        run: node local/voice-film.mjs --audio gettysburg.mp3 --out voice-run --stt faster-whisper --model "$MODEL" --language en
+      - name: Print the words
+        run: |
+          echo VOICE-REPORT-BEGIN; cat voice-run/voice-report.json; echo VOICE-REPORT-END
+          echo VOICE-WORDS-BEGIN; node -e 'const d=require("./voice-run/heard.json"); console.log(JSON.stringify(d))'; echo VOICE-WORDS-END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-stt
+          path: voice-run/*.json
+          retention-days: 30
