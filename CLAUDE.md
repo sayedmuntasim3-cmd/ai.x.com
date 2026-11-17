@@ -3,6 +3,22 @@
 Owner writes in Bangla: reply in Bangla, short and plain. Work continues on the
 branch you are on; never merge to `main`, deploy, spend money or add a paid API.
 
+## Start of every session (before any code or advice; cheap, about 5 commands)
+1. `git fetch origin -q && git log --oneline -5 origin/main && git branch -r --sort=-committerdate | head -5`
+   Other sessions work in parallel: know what `main` and the newest branches hold.
+2. Read `docs/ENGINEERING_STATE.md` section 0 (live facts) and section 6 (next work) only.
+3. Before building anything: `git grep -n -i "<feature word>" origin/main -- worker engine/src public/studio`
+   If it exists, extend it; never build a second copy.
+4. Unsure what the owner means or which branch/feature he refers to: ask one short question.
+5. Advice about money, YouTube or results: no promises; say what is unverified.
+6. End of a milestone: update section 0 with any new live fact (keys set, errors seen, branches).
+
+## Mistakes already made (do not repeat)
+- 16-17 Nov: a session built a second script Worker without checking `main`, which
+  already had the film API, and told the owner to merge it. Always do step 1 and 3.
+- Claimed the docs said things they did not. Quote the file and line, or say "my opinion".
+- Assumed the Gemini free tier works: on the owner's account it shows "Free tier unavailable".
+
 ## Save tokens (the owner pays for every token)
 - Do NOT explore the repo or re-audit it. The state is in two files; read only
   the section you need: `docs/ENGINEERING_STATE.md` (state, next work in order),
