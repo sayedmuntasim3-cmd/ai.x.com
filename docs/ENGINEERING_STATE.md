@@ -11,6 +11,20 @@ of 12 Nov 2026 (two production systems, a central orchestrator "Bossism", no
 mandatory paid API) are the goals. This file is the honest gap between those
 goals and the code.
 
+## 0. Live facts (keep short; newest first)
+
+17 Nov 2026 (checked with git; the site itself was not reachable from the cloud session):
+- `main` now holds the whole studio (PR #5): `worker/index.mjs`, `engine/`, `public/studio/`.
+  Section 1 below ("main = landing page only") is out of date.
+- Cloudflare secrets the owner set (seen in his screenshot): `GEMINI_API_KEY`, `PIXABAY_API_KEY`.
+  He was getting `GROQ_API_KEY`. Not seen: `STUDIO_TOKEN`; R2 bucket and Workflow unknown.
+- Gemini: every key on the owner's Google account shows "Free tier unavailable"
+  (projects "Jisan xxx" and "Zupona"). Expect 429/403 until billing; free option: Groq via the
+  local brain's OpenAI-compatible settings (`BRAIN_URL`, `BRAIN_MODEL`, `BRAIN_KEY`), not tested.
+- `ai.zupona.com` cannot be reached from cloud sessions (proxy 502). Ask the owner to paste
+  `/api/health` instead.
+- Not one film has run against real APIs yet. The owner's next goal: a 2-minute test film from an idea.
+
 ## 1. Where the code is
 
 | Place | What it holds |
