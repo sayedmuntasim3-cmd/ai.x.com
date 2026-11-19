@@ -110,6 +110,29 @@ export const DURATION_PRESETS: Option<string>[] = [
   { id: "60", label: "60 min", hint: "Feature" },
 ];
 
+/**
+ * The idea system a typed idea belongs to, from its words ("Apollo 11" is space, not nature), or
+ * null when nothing is clear. Used only until the visitor picks one by hand.
+ */
+export function suggestCategory(text: string): CategoryId | null {
+  const t = ` ${String(text ?? "").toLowerCase()} `;
+  const cues: [CategoryId, RegExp][] = [
+    ["space", /\b(space|apollo|nasa|moon|mars|planets?|galax(y|ies)|stars?|astronauts?|rockets?|orbit|universe|black holes?|telescope|voyager|comets?|asteroids?|spacex)\b/g],
+    ["ocean", /\b(oceans?|seas?|reefs?|coral|whales?|sharks?|deep sea|marine|tides?|dolphins?|octopus|jellyfish|underwater)\b/g],
+    ["history", /\b(war|wars|battles?|empires?|kings?|queens?|ancient|century|centuries|revolution|dynasty|pharaohs?|medieval|history|civili[sz]ations?|wwi+|world war|1[0-9]{3}s?)\b/g],
+    ["science", /\b(science|physics|chemistry|biology|brain|dna|quantum|atoms?|virus(es)?|robots?|technology|inventions?|medicine|climate|ai|computers?|engineering)\b/g],
+    ["nature", /\b(wildlife|animals?|forests?|lions?|tigers?|elephants?|birds?|mountains?|jungles?|rivers?|deserts?|migration|insects?|nature|wolves|wolf|bears?|leopards?)\b/g],
+    ["culture", /\b(cultures?|festivals?|music|food|traditions?|art|artists?|cities|city|religions?|languages?|fashion|sports?|football|cricket|people of)\b/g],
+  ];
+  let best: CategoryId | null = null;
+  let most = 0;
+  for (const [id, re] of cues) {
+    const n = (t.match(re) ?? []).length;
+    if (n > most) { best = id; most = n; }
+  }
+  return best;
+}
+
 export const MIN_MINUTES = 1;
 export const MAX_MINUTES = 120;
 

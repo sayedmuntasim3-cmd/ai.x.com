@@ -14,6 +14,7 @@ import {
   formatRuntime,
   planChapters,
   stepMinutes,
+  suggestCategory,
   workingTitle,
   type AgeId,
   type CategoryId,
@@ -78,6 +79,8 @@ type Draft = {
   style: StyleId;
   music: MusicId;
   topic: string;
+  /** true once the visitor picks an idea system by hand; until then it follows the idea's words */
+  categoryLocked: boolean;
 };
 
 const DEFAULT_DRAFT: Draft = {
@@ -89,6 +92,7 @@ const DEFAULT_DRAFT: Draft = {
   style: "cinematic",
   music: "epic",
   topic: "",
+  categoryLocked: false,
 };
 
 function readDraft(): Partial<Draft> {
@@ -105,6 +109,7 @@ function readDraft(): Partial<Draft> {
     if (typeof saved.minutes === "number" && Number.isFinite(saved.minutes))
       out.minutes = Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round(saved.minutes)));
     out.category = pick(saved.category, CATEGORIES);
+    if (typeof saved.categoryLocked === "boolean") out.categoryLocked = saved.categoryLocked;
     out.age = pick(saved.age, AGES);
     out.style = pick(saved.style, STYLES);
     out.music = pick(saved.music, MUSIC);
@@ -159,6 +164,13 @@ export default function Landing() {
     }
   }, [draft, ready]);
 
+  // The idea system follows what the idea is about until the visitor picks one by hand.
+  useEffect(() => {
+    if (!ready || draft.categoryLocked || draft.mode !== "idea") return;
+    const suggested = suggestCategory(draft.idea);
+    if (suggested && suggested !== draft.category) update("category", suggested);
+  }, [ready, draft.idea, draft.mode, draft.categoryLocked, draft.category, update]);
+
   const category = findOption(CATEGORIES, draft.category);
   const voiceLocked = draft.mode === "voice" && voice !== null;
   const totalSeconds = voiceLocked ? voice.seconds : draft.minutes * 60;
@@ -210,6 +222,10 @@ export default function Landing() {
     music: findOption(MUSIC, draft.music).label,
     credits,
     chapters,
+    minutes: Math.max(1, Math.round(totalSeconds / 60)),
+    // What the visitor chose reaches the writers as notes; calm styles and children's films move gently.
+    notes: `Audience: ${findOption(AGES, draft.age).label}. Idea system: ${category.label}. Style: ${findOption(STYLES, draft.style).label}. Music: ${findOption(MUSIC, draft.music).label}.`,
+    motionLevel: ["observational", "minimal", "storybook"].includes(draft.style) || draft.age === "kids" ? "calm" : undefined,
   };
 
   return (
@@ -487,7 +503,10 @@ function Composer(props: ComposerProps) {
             triggerLabel={`Idea system: ${findOption(CATEGORIES, draft.category).label}`}
             value={draft.category}
             options={CATEGORIES}
-            onChange={(v) => update("category", v)}
+            onChange={(v) => {
+              update("category", v);
+              update("categoryLocked", true);
+            }}
             renderIcon={(id) => <CategoryIcon id={id} size={18} />}
             triggerClassName="mt-3 flex h-11 w-full items-center justify-between gap-1 rounded-full border border-line-strong py-1 pl-1 pr-2.5 transition hover:border-ink/40 sm:pr-3"
           >
@@ -1273,7 +1292,21 @@ type Brief = {
   music: string;
   credits: number;
   chapters: Chapter[];
+  minutes: number;
+  notes: string;
+  motionLevel?: string;
 };
+
+/** The studio key saved on this device by Zupona Studio (/studio/), the same one the studio uses. */
+function studioKey() {
+  try {
+    return window.localStorage.getItem("studio-token") ?? "";
+  } catch {
+    return "";
+  }
+}
+
+type Start = { state: "idle" | "sending" | "started" | "failed"; message?: string; id?: string };
 
 function briefText(b: Brief) {
   return [
@@ -1293,12 +1326,16 @@ function briefText(b: Brief) {
 function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => void; brief: Brief }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState(false);
+  const [key, setKey] = useState("");
+  const [start, setStart] = useState<Start>({ state: "idle" });
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     if (open && !dialog.open) {
       setCopied(false);
+      setKey(studioKey());
+      setStart({ state: "idle" });
       dialog.showModal();
     } else if (!open && dialog.open) {
       dialog.close();
@@ -1322,6 +1359,24 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
     }
     setCopied(true);
   };
+
+  // With the studio key on this device, the brief starts a real film in the engine (/api/films).
+  const startFilm = async () => {
+    setStart({ state: "sending" });
+    try {
+      const res = await fetch("/api/films", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({ topic: brief.idea, minutes: brief.minutes, versionId: "en-US", formatId: "auto", notes: brief.notes, ...(brief.motionLevel ? { motionLevel: brief.motionLevel } : {}) }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (res.ok && body.id) setStart({ state: "started", id: body.id });
+      else setStart({ state: "failed", message: body.error ?? `The studio answered ${res.status}.` });
+    } catch {
+      setStart({ state: "failed", message: "The studio could not be reached. Check the connection and try again." });
+    }
+  };
+  const canStart = brief.mode === "idea" && key !== "";
 
   const facts = [
     ["Starts from", brief.mode === "idea" ? "Your idea" : "Your voiceover"],
@@ -1377,10 +1432,39 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
           <Timeline chapters={brief.chapters} totalSeconds={brief.chapters[brief.chapters.length - 1]?.end ?? 60} />
         </div>
 
-        <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
-          Rendering happens in Zupona Studio, which is opening to creators soon. Your settings are saved on this device, so they
-          will be waiting for you.
-        </p>
+        {canStart ? (
+          <div className="mt-6">
+            {start.state === "started" ? (
+              <p role="status" className="rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
+                Your film has started. The writers, the research and the edit run in Zupona Studio;{" "}
+                <a className="font-medium text-brand-ink underline" href={`/api/films/${start.id}/page`}>
+                  follow it on its page
+                </a>
+                .
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={startFilm}
+                disabled={start.state === "sending"}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand-gradient text-[15px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60"
+              >
+                <SparkleIcon size={18} />
+                {start.state === "sending" ? "Starting…" : "Start the film"}
+              </button>
+            )}
+            {start.state === "failed" && (
+              <p role="alert" className="mt-3 text-[14px] leading-relaxed text-ink-2">
+                {start.message}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
+            Rendering happens in Zupona Studio, which is opening to creators soon. Your settings are saved on this device, so they
+            will be waiting for you.
+          </p>
+        )}
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button

@@ -13,6 +13,17 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026 (live site checked: https://ai-x-com.sayedmuntasim3.workers.dev, reachable from cloud sessions):
+- `/api/health`: brain Gemini 2.5 Flash connected, storage, workflow, studio token, Pixabay and YouTube set;
+  GitHub not connected (no automatic render), Pexels not set. Whether Gemini's free tier answers is unverified.
+- Live landing: Create sent nothing (only a "Brief ready" sheet); an Apollo idea stayed "Nature".
+  On this branch (not deployed): the idea system follows the idea's words until picked by hand; with the
+  studio key on the device (the key `/studio/` saves), the brief sheet has "Start the film", which POSTs
+  `/api/films` (topic, length, formatId auto, notes with audience, idea system, style and music; calm motion
+  for observational, minimal, storybook or kids) and links the film page. Without a key: the old note.
+  Voiceover mode still has no upload route. Checked in Chromium with the API answered by a stand-in.
+- "~N credits" on the landing is a made-up number (1.25 a minute), not a cost.
+
 19 Nov 2026, second session (motion and timing; checked by rendering real MP4s):
 - **Timing bug found and fixed.** Scene slots came from the script's word count; a longer take was sped up
   (max 15 %) and then **cut**: on chapter 1 of `ramesh-babu/USA` 14 of 48 scenes, 3 lost words (the hook
