@@ -13,6 +13,25 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026, free score: the owner chose voice A (Kokoro, the Zupona narrator) after listening.
+- Without ElevenLabs every music cue played nothing: on chapter 1 of `ramesh-babu/USA` 6 gaps of 6-12 s of
+  dead silence. `engine/src/score-plan.mjs` reads each S4 cue's brief (mood, mode, tempo, instruments named
+  first) and `render/score-synth.mjs` plays an original track (pads, low strings, ostinato pulse,
+  Karplus-Strong guitar or pizzicato, felt piano, marimba, soft percussion, sub hits, a small hall reverb)
+  in 1-4 s of CPU per 40 s; it enters gently and ends on the tonic. Refused where the music policy is not
+  "score" (Quran, Islamic content, the Arabic version). Ambience the script asks for without a recording
+  (SND-AMB-*) now plays as synthesised room tone. Re-render: all 5 cues played, 0 silences of 2.5 s or more
+  at -50 dB (was 6); the script's own "music out" moment is room tone at about -35 dB. Musical quality is
+  not measured by any metric here: the owner listens.
+- Render workflow: committed tracks, then ElevenLabs Music when its key is set, then the free score.
+
+20 Nov 2026, deploy: with the owner's written permission, PR #9 (this branch, after merging main's PR #7 and
+#8; this branch's own "Start the film" dropped as a duplicate of PR #7) was merged and Cloudflare Workers
+Builds deployed it in ~100 s. Production checked in Chromium: landing steps, Apollo -> Space, PR #7's key
+field and "Make my film", `/studio/` motion choice and English/Arabic only, `/api/health` all connected
+(Gemini 3.8 Flash, storage, workflow, token), no page errors. PR previews deploy to
+`<branch>-ai-x-com.sayedmuntasim3.workers.dev` (no R2, workflow or secrets there: health shows false).
+
 20 Nov 2026 (live site checked: https://ai-x-com.sayedmuntasim3.workers.dev, reachable from cloud sessions):
 - `/api/health`: brain Gemini 2.5 Flash connected, storage, workflow, studio token, Pixabay and YouTube set;
   GitHub not connected (no automatic render), Pexels not set. Whether Gemini's free tier answers is unverified.

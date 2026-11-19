@@ -23,6 +23,9 @@ export const SYNTH = Object.freeze({
   "AUTO-RISER": { seconds: 1.6, expr: "0.45*sin(2*PI*(180+420*t*t)*t)*pow(t/1.6,2)+0.28*(random(0)*2-1)*pow(t/1.6,3)", chain: "highpass=f=120,lowpass=f=6000" },
   // A camera-like click for a photograph.
   "AUTO-CLICK": { seconds: 0.18, expr: "(random(0)*2-1)*exp(-t*90)+0.4*sin(2*PI*2400*t)*exp(-t*160)", chain: "highpass=f=900" },
+  // Room tone: the quiet air of a room, for an ambience the script asks for (SND-AMB-*) when no
+  // recording of it exists, so a "music out" moment is a held breath, not dead digital silence.
+  "AUTO-ROOM": { seconds: 20, src: "anoisesrc=c=brown:a=0.5:s=48000", chain: "highpass=f=45,lowpass=f=700,volume=0.35" },
   // A digital stutter.
   "AUTO-GLITCH": { seconds: 0.4, expr: "(random(0)*2-1)*gt(sin(2*PI*28*t),0.2)*exp(-t*5)", chain: "acrusher=bits=6:mode=lin:samples=6,highpass=f=500" },
 });
@@ -41,7 +44,7 @@ export async function synthSounds(dir, ffmpeg = "ffmpeg") {
   for (const [token, s] of Object.entries(SYNTH)) {
     const file = join(dir, `${token.toLowerCase()}-v1.wav`);
     if (!existsSync(file)) {
-      await run(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", `aevalsrc='${s.expr}':s=48000:d=${s.seconds}`, "-af", `${s.chain},afade=t=out:st=${(s.seconds * 0.8).toFixed(3)}:d=${(s.seconds * 0.2).toFixed(3)},alimiter=limit=0.9`, "-ac", "1", "-c:a", "pcm_s16le", file + ".part.wav"]);
+      await run(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "src" in s ? `${s.src}:d=${s.seconds}` : `aevalsrc='${s.expr}':s=48000:d=${s.seconds}`, "-af", "src" in s ? `${s.chain},afade=t=in:d=0.03,afade=t=out:st=${(s.seconds - 0.03).toFixed(3)}:d=0.03` : `${s.chain},afade=t=out:st=${(s.seconds * 0.8).toFixed(3)}:d=${(s.seconds * 0.2).toFixed(3)},alimiter=limit=0.9`, "-ac", "1", "-c:a", "pcm_s16le", file + ".part.wav"]);
       renameSync(file + ".part.wav", file);
     }
     out[token] = file;
