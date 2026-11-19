@@ -160,3 +160,21 @@ Not measured (a person must listen): warmth, emotion, how "human" it sounds next
 minutes. Bangla and Arabic narration: no free voice was tested; Arabic recitation is never synthesized.
 Candidates not adopted now: IndicF5 and Indic Parler-TTS (Bangla; Bangla is switched off), MOSS-TTS and
 other large models (need a GPU; hosting is not free).
+
+### Free voice benchmark, second round (20 Nov 2026; owner: Kokoro "not extreme level")
+
+Same two passages (Magellan 76 words, Apollo 85 words), this container (4 CPUs, no GPU). Scores:
+torchaudio SQUIM subjective MOS against a clean LibriVox human reference, Whisper small.en word error.
+
+| Voice | Licence | MOS (human ref 4.50) | Word error | Pace (wpm) | CPU s per s of speech |
+|---|---|---|---|---|---|
+| A Kokoro, Zupona narrator | Apache-2.0 | 4.41-4.42 | 1.1-3.9 % | 143-144 | 0.27 |
+| B Chatterbox 0.1.7, Zupona identity (reference = the narrator's own synthetic take) | MIT, Perth watermark kept | 4.41 | 5.3-6.4 % | 137-141 | 5.2 |
+| C Chatterbox, its own voice | MIT | 4.42-4.44 | 6.6-8.5 % | 186-191 | 4.5 |
+
+Result: the MOS model cannot tell them apart (all within 0.03); Chatterbox mishears more words and is
+15-20x slower (a 40-minute film: about 3.5 CPU hours, possible on GitHub runners split by chapter).
+No objective evidence that Chatterbox is better; the owner listens to A/B/C and decides. Not yet tried:
+NeuTTS Air (Apache-2.0), VoxCPM-0.5B (Apache-2.0); GPU-only models (Orpheus, Higgs Audio, VibeVoice)
+cost money to host. UTMOS could not be run here (torch.hub blocked; the PyPI package needs fairseq,
+which fails on Python 3.11).

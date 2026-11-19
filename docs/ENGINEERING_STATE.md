@@ -13,6 +13,13 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026, deploy: with the owner's written permission, PR #9 (this branch, after merging main's PR #7 and
+#8; this branch's own "Start the film" dropped as a duplicate of PR #7) was merged and Cloudflare Workers
+Builds deployed it in ~100 s. Production checked in Chromium: landing steps, Apollo -> Space, PR #7's key
+field and "Make my film", `/studio/` motion choice and English/Arabic only, `/api/health` all connected
+(Gemini 3.8 Flash, storage, workflow, token), no page errors. PR previews deploy to
+`<branch>-ai-x-com.sayedmuntasim3.workers.dev` (no R2, workflow or secrets there: health shows false).
+
 20 Nov 2026 (live site checked: https://ai-x-com.sayedmuntasim3.workers.dev, reachable from cloud sessions):
 - `/api/health`: brain Gemini 2.5 Flash connected, storage, workflow, studio token, Pixabay and YouTube set;
   GitHub not connected (no automatic render), Pexels not set. Whether Gemini's free tier answers is unverified.
