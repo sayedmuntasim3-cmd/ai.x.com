@@ -47,7 +47,7 @@ One key is enough; both give more choice. `GET /api/health` shows `pexels` and `
 
 ## Free writer: Google Gemini (instead of Claude)
 
-No ANTHROPIC_API_KEY? Create a free key at aistudio.google.com (Get API key) and set it as the secret `GEMINI_API_KEY` (Cloudflare dashboard > Workers > ai-x-com > Settings > Variables and Secrets > Add, type Secret). The film is then written by `gemini-2.5-flash` on the free tier (change with the var `GEMINI_MODEL`). Free-tier limits are a few requests a minute, so a film takes longer; the run waits and retries by itself. On Gemini the footage desk is off and saving mode does not apply. When both keys are set, Claude is used.
+No ANTHROPIC_API_KEY? Create a free key at aistudio.google.com (Get API key) and set it as the secret `GEMINI_API_KEY` (Cloudflare dashboard > Workers > ai-x-com > Settings > Variables and Secrets > Add, type Secret). The film is then written by `gemini-3.8-flash` on the free tier (change with the var `GEMINI_MODEL`). Free-tier limits are a few requests a minute, so a film takes longer; the run waits and retries by itself. On Gemini the footage desk is off and saving mode does not apply. When both keys are set, Claude is used.
 
 ## Learn from published films (optional, free)
 

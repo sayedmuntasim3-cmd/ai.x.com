@@ -46,7 +46,7 @@ test("health shows the brain without its address or any key", () => {
   const h = brainHealth({ BRAIN_URL: "https://brain.secret-tunnel.example", BRAIN_MODEL: "qwen3:32b", BRAIN_KEY: "k3y", ANTHROPIC_API_KEY: "sk-ant" });
   assert.deepEqual(h, { connected: true, kind: "local", model: "qwen3:32b", seesPictures: false, searchesWeb: false, contextTokens: 32768, maxOutputTokens: 8192, pricing: "free (runs on your own machine)" });
   assert.ok(!JSON.stringify(h).includes("secret-tunnel") && !JSON.stringify(h).includes("k3y") && !JSON.stringify(h).includes("sk-ant"));
-  assert.deepEqual(brainHealth({ GEMINI_API_KEY: "g" }), { connected: true, kind: "gemini", model: "gemini-2.5-flash", seesPictures: false, searchesWeb: true, pricing: "free tier (daily limits apply)" });
+  assert.deepEqual(brainHealth({ GEMINI_API_KEY: "g" }), { connected: true, kind: "gemini", model: "gemini-3.8-flash", seesPictures: false, searchesWeb: true, pricing: "free tier (daily limits apply)" });
   assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk", BRAIN: "claude" }).seesPictures, true);
   assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk" }).connected, false, "a paid key alone connects nothing");
   assert.equal(brainHealth({}).connected, false);

@@ -11,7 +11,8 @@
  * and Google Search is never sent as a tool. Each reply also carries the
  * responseId and modelVersion Google returns, as evidence of a live call.
  */
-export const GEMINI_DEFAULT = "gemini-2.5-flash";
+// gemini-2.5-flash is closed to new users (Gemini 404, Nov 2026: "use models/gemini-3.8-flash").
+export const GEMINI_DEFAULT = "gemini-3.8-flash";
 
 /**
  * @param {{ apiKey: string, model?: string, webSearch?: boolean, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void> }} o
