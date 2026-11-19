@@ -85,6 +85,14 @@ export const VERSIONS = Object.freeze({
 export const VERSION_IDS = Object.freeze(/** @type {VersionId[]} */ (Object.keys(VERSIONS)));
 
 /**
+ * The versions the studio offers today. Owner's decision (19 Nov 2026): American English for
+ * documentaries and Arabic for Quran recitation films only. Bangla stays defined above (its rules,
+ * fonts and tests are kept) but is not offered, planned or voiced until the owner switches it on.
+ * @type {readonly VersionId[]}
+ */
+export const ACTIVE_VERSION_IDS = Object.freeze(/** @type {VersionId[]} */ (["ar", "en-US"]));
+
+/**
  * @param {string} id
  * @returns {FilmVersion | null}
  */

@@ -34,14 +34,13 @@ test("an idea becomes a story with beats, a description note and no label on scr
   assert.equal(plan.closestStyle?.id, "rags-to-riches");
   assert.equal(plan.durationSeconds, 600);
   assert.ok(plan.beats.length >= 8 && plan.beats[0].atSeconds === 0);
-  assert.deepEqual(plan.versions.map((v) => v.id), ["ar", "en-US", "bn-BD"]);
+  assert.deepEqual(plan.versions.map((v) => v.id), ["ar", "en-US"]);
   for (const v of plan.versions) {
     assert.equal(v.onScreenLabel, false);
     assert.ok(v.descriptionNote);
     assert.equal(v.writtenNatively, true);
   }
   assert.equal(plan.versions[0].music.policy, "no-instruments");
-  assert.equal(plan.versions[2].voice.elevenlabs, "eleven_v3");
   assert.equal(plan.versions[1].voice.elevenlabs, "eleven_multilingual_v2");
   assert.equal(plan.run.humanApprovalSteps, 0);
   assert.ok(plan.rules.includes("never-real-person") && plan.rules.includes("legal-footage-only"));
@@ -99,12 +98,12 @@ test("WAV files are read at their own rate and depth", () => {
 test("a recording gets a report and a voice plan that never alters the voice", () => {
   const rate = 48000;
   const analysis = analyzeRecording([tone(6, rate, 0.1, 0.0005)], rate);
-  const plan = planRecording({ analysis, versionId: "bn-BD", contentType: "documentary" });
+  const plan = planRecording({ analysis, versionId: "en-US", contentType: "documentary" });
   assert.equal(plan.report.items[0].id, "duration");
   assert.ok(["ready", "usable", "fix-first"].includes(plan.report.verdict));
   assert.equal(plan.own.keepOriginal, true);
   assert.ok(plan.own.never?.includes("pitch shift"));
-  assert.deepEqual(plan.others.map((o) => [o.versionId, o.modelId]), [["ar", "eleven_multilingual_v2"], ["en-US", "eleven_multilingual_v2"]]);
+  assert.deepEqual(plan.others.map((o) => [o.versionId, o.modelId]), [["ar", "eleven_multilingual_v2"]]);
   const noisy = analyzeRecording([tone(6, 16000, 0.05, 0.2)], 16000);
   const bad = planRecording({ analysis: noisy, versionId: "en-US", contentType: "documentary" });
   assert.equal(bad.report.verdict, "fix-first");

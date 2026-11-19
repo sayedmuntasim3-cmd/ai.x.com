@@ -12,7 +12,7 @@ import { gainToTarget } from "./loudness.mjs";
 import { planRun } from "./pipeline.mjs";
 import { FICTION_LABELS, planStory } from "./story-mode.mjs";
 import { toAsciiDigits } from "./text-scripts.mjs";
-import { VERSION_IDS, getVersion, narrationWordBudget } from "./versions.mjs";
+import { ACTIVE_VERSION_IDS, getVersion, narrationWordBudget } from "./versions.mjs";
 import { ELEVENLABS_MODELS, MASTER, musicPlanFor, planVoice } from "./voice-plan.mjs";
 
 /**
@@ -318,7 +318,7 @@ export function planIdea({ text, mode = "auto", minutes = null }) {
   const reHooks = story ? story.reHooks : doc ? doc.reHooks : [];
   const narrationSeconds = durationSeconds - (doc ? doc.creditsSeconds : planRetention(durationSeconds).creditsSeconds);
 
-  const versions = VERSION_IDS.map((id) => {
+  const versions = ACTIVE_VERSION_IDS.map((id) => {
     const v = getVersion(id);
     if (!v) throw new Error("Unknown version " + id);
     return {
@@ -341,7 +341,7 @@ export function planIdea({ text, mode = "auto", minutes = null }) {
     };
   });
 
-  const run = planRun({ contentType, islamic: auto.islamic, needsAiVisuals: auto.needsAiVisuals, versions: VERSION_IDS, durationSeconds });
+  const run = planRun({ contentType, islamic: auto.islamic, needsAiVisuals: auto.needsAiVisuals, versions: ACTIVE_VERSION_IDS, durationSeconds });
   /** @type {string[]} */
   const rules = ["legal-footage-only", "versions-native", "no-approval-step"];
   if (isStory) rules.push("no-label-on-screen", "never-real-person");
@@ -415,7 +415,7 @@ export function planRecording({ analysis, versionId, contentType, nativeRate = t
   const report = recordingReport(analysis, { nativeRate, targetLufs });
   const own = planVoice({ source: "own-recording", contentType, versionId, analysis });
   const gain = gainToTarget(analysis, { targetLufs, ceilingDbtp: MASTER.ceilingDbtp });
-  const others = VERSION_IDS.filter((id) => id !== versionId).map((id) => {
+  const others = ACTIVE_VERSION_IDS.filter((id) => id !== versionId).map((id) => {
     if (quran) return { versionId: id, kind: /** @type {const} */ ("same-recitation"), modelId: null, blocked: null };
     const plan = planVoice({ source: "elevenlabs", contentType, versionId: id });
     return { versionId: id, kind: /** @type {const} */ ("elevenlabs"), modelId: ELEVENLABS_MODELS[id].modelId, blocked: plan.blocked };

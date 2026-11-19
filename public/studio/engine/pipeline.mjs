@@ -7,7 +7,7 @@
  * waiting for a person. Publishing is never automatic: the owner publishes.
  */
 import { getAgent, rosterStatus } from "./agent-roster.mjs";
-import { VERSION_IDS, getVersion } from "./versions.mjs";
+import { ACTIVE_VERSION_IDS, getVersion } from "./versions.mjs";
 import { musicPlanFor } from "./voice-plan.mjs";
 
 /**
@@ -47,7 +47,7 @@ const from = (squad, ids) => ids.map((id) => squad + "-" + id);
  * Plan a run for one input.
  * @param {{ contentType: ContentType, islamic?: boolean, needsAiVisuals?: boolean, source?: VoiceSource | "none", versions?: readonly string[], durationSeconds?: number }} input
  */
-export function planRun({ contentType, islamic, needsAiVisuals = false, source = "none", versions = VERSION_IDS, durationSeconds }) {
+export function planRun({ contentType, islamic, needsAiVisuals = false, source = "none", versions = ACTIVE_VERSION_IDS, durationSeconds }) {
   for (const id of versions) if (!getVersion(id)) throw new Error("Unknown version \"" + id + "\".");
   if (versions.length === 0) throw new Error("Choose at least one version.");
   const quran = contentType === "quran_recitation";

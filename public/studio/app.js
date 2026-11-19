@@ -88,7 +88,7 @@ const T = {
     copied: "কপি হয়েছে",
     rules: {
       "legal-footage-only": "ফুটেজ শুধু বৈধ ফ্রি সোর্স (stock সাইট, Commons, NASA, Library of Congress, Smithsonian, Met, Art Institute, Openverse) বা ক্রিয়েটরের লিখিত অনুমতিতে। Facebook, X, YouTube, TikTok থেকে কোনো ডাউনলোড নয়।",
-      "versions-native": "আরবি (ইসলামিক দৃষ্টিভঙ্গি), ইংরেজি (USA), বাংলা: তিনটিই আলাদা করে নিজ ভাষায় লেখা।",
+      "versions-native": "ইংরেজি (USA) আর আরবি (ইসলামিক দৃষ্টিভঙ্গি): দুটোই আলাদা করে নিজ ভাষায় লেখা।",
       "no-approval-step": "রানের ভেতরে কোনো human approval নেই; আপনি নিজে পাবলিশ করবেন।",
       "no-label-on-screen": "স্ক্রিনে \"fictional story\" লেবেল নেই; শুধু ডেসক্রিপশনে এক লাইনের নোট।",
       "never-real-person": "বানানো গল্পকে কখনো সত্য বলা হবে না, কোনো বাস্তব মানুষের সাথেও জোড়া হবে না।",
@@ -255,7 +255,7 @@ const T = {
     copied: "Copied",
     rules: {
       "legal-footage-only": "Footage only from legal free sources (stock sites, Commons, NASA, Library of Congress, Smithsonian, the Met, Art Institute, Openverse) or with the creator's written permission. Nothing downloaded from Facebook, X, YouTube or TikTok.",
-      "versions-native": "Arabic (Islamic outlook), English (USA) and Bangla, each written natively.",
+      "versions-native": "English (USA) and Arabic (Islamic outlook), each written natively.",
       "no-approval-step": "No human approval step inside the run; you publish.",
       "no-label-on-screen": "No \"fictional story\" label on screen; a one-line note in the description only.",
       "never-real-person": "An invented story is never called true and never tied to a real person.",
