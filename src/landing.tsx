@@ -1586,6 +1586,7 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
         writeStore(KEY_STORE, "");
+        setFilm(null);
         setAskKey(true);
         setError("That studio key is not right. Check it and try again.");
         return;
@@ -1638,6 +1639,7 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
         )}
         {film.warning && <p className="mt-3 text-[13px] text-muted">Waiting and retrying: {film.warning}</p>}
         {stopped && film.error && <p className="mt-3 text-[14px] text-[#c2410c]">{film.error}</p>}
+        {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <a
             href={`/api/films/${film.id}/page`}
@@ -1649,10 +1651,15 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
           </a>
           <button
             type="button"
-            onClick={() => setFilm(null)}
-            className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40"
+            disabled={busy}
+            onClick={() => {
+              // A stopped film is started again in one tap with the saved key; otherwise back to the form.
+              if (stopped && key.trim()) start();
+              else setFilm(null);
+            }}
+            className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
           >
-            Make another
+            {stopped ? (busy ? "Starting…" : "Try again") : "Make another"}
           </button>
         </div>
       </div>

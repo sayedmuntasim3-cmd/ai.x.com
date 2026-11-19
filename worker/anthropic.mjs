@@ -167,10 +167,15 @@ export function permanentError(error) {
   if (typeof own === "string" && own) return own.slice(0, 500);
   const status = Number(/** @type {any} */ (error)?.status);
   const raw = error instanceof Error ? error.message : String(error);
-  if (status === 401) return "The Claude API key is wrong or revoked (401). Set ANTHROPIC_API_KEY again, then resume the film.";
-  if (status === 403) return "The Claude API key has no access to this model or feature (403). Check the key's workspace, then resume the film.";
+  // Gemini errors arrive here too (worker/gemini.mjs throws "Gemini <status>: ..."): name the right service.
+  const gemini = /^Gemini \d{3}\b/.test(raw);
+  const api = gemini ? "Gemini API" : "Claude API";
+  const keyName = gemini ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+  if (gemini && /User location is not supported/i.test(raw)) return `Gemini is not offered where Cloudflare ran this step (400, user location). The Worker's placement must be a region Gemini serves; then resume the film. ${raw}`.slice(0, 500);
+  if (status === 401) return `The ${api} key is wrong or revoked (401). Set ${keyName} again, then resume the film.`;
+  if (status === 403) return `The ${api} key has no access to this model or feature (403). Check the key, then resume the film.`;
   if (status === 404) return `The model was not found (404). Check the MODEL setting, then resume the film. ${raw}`.slice(0, 500);
-  if (status === 400 || status === 413 || status === 422) return `The Claude API rejected the request (${status}): ${raw}`.slice(0, 500);
+  if (status === 400 || status === 413 || status === 422) return `The ${api} rejected the request (${status}): ${raw}`.slice(0, 500);
   if (/^The model declined stage /.test(raw)) return raw;
   return null;
 }
