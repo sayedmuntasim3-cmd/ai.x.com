@@ -14,8 +14,8 @@ name: Render a film
 #   FREESOUND_API_KEY                        sound effects fetched automatically (CC0 only)
 #   FAL_KEY                                  AI scenes for invented stories (one consistent cast); variable AI_BUDGET_USD caps the spend (default 15)
 # Optional own voice: commit your recordings as voice/<film id>/SC0001.wav ... (script: /api/films/<id>/script)
-# Music: composed per cue with ElevenLabs Music when ELEVENLABS_API_KEY is set (repository variable MUSIC_AUTO=off
-#   turns it off); tracks committed as music/<film id>/M01.mp3 ... always win.
+# Music: tracks committed as music/<film id>/M01.mp3 ... always win; then ElevenLabs Music when ELEVENLABS_API_KEY is
+#   set; every cue still without a track gets the free score (render/score-synth.mjs). MUSIC_AUTO=off turns both off.
 # Optional sound effects: sfx/<film id>/SND-FX-01.mp3, SND-AMB-01.mp3 ... (tokens from S4's sound bible)
 # Optional own pictures: pictures/<film id>/SC0012-1.jpg (.png, .webp, .mp4 ...) replaces that shot (shot ids are on the
 #   film page); the licence report says "provided by the owner": the choice and its rights are yours.
@@ -114,17 +114,21 @@ jobs:
           else
             echo "No FREESOUND_API_KEY secret: only sound effects committed under sfx/$FILM_ID/ are used."
           fi
-      - name: Compose the score (ElevenLabs Music, for cues without a track)
+      - name: Compose the score (your tracks first, then ElevenLabs Music, then the free score)
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           MUSIC_AUTO: ${{ vars.MUSIC_AUTO }}
         run: |
           mkdir -p "music/$FILM_ID"
-          if [ -n "$ELEVENLABS_API_KEY" ] && [ "$MUSIC_AUTO" != "off" ]; then
-            node render/music-kit.mjs --api "$SITE" --id "$FILM_ID" --out "music/$FILM_ID/" || echo "::warning::Some cues could not be composed; they play without music."
-          else
-            echo "Music: only tracks committed under music/$FILM_ID/ are used."
+          if [ "$MUSIC_AUTO" = "off" ]; then
+            echo "Music: MUSIC_AUTO=off, only tracks committed under music/$FILM_ID/ are used."
+            exit 0
           fi
+          if [ -n "$ELEVENLABS_API_KEY" ]; then
+            node render/music-kit.mjs --api "$SITE" --id "$FILM_ID" --out "music/$FILM_ID/" || echo "::warning::Some cues could not be composed by ElevenLabs; the free score fills them."
+          fi
+          # The free score (render/score-synth.mjs): original music made here for every cue still without a track.
+          node render/score-synth.mjs --api "$SITE" --id "$FILM_ID" --out "music/$FILM_ID/" || echo "::warning::The free score could not be made; those cues play without music."
       - name: AI scenes for invented stories (fal.ai, one consistent cast)
         env:
           FAL_KEY: ${{ secrets.FAL_KEY }}
