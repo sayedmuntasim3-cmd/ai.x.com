@@ -783,7 +783,13 @@ export async function renderFilm(o) {
   /** @type {string | null} */
   let sfxFile = null;
   // The edit's own sound design is synthesised here (free, nobody's copyright); a file the owner gives wins.
-  const sfxFiles = (t.sfx ?? []).some((e) => e.token.startsWith("AUTO-")) ? { ...(await synthSounds(join(dirs.audio, "synth"), ffmpeg)), ...(o.sfx ?? {}) } : { ...(o.sfx ?? {}) };
+  const needsSynth = (t.sfx ?? []).some((e) => e.token.startsWith("AUTO-") || (e.kind === "bed" && !o.sfx?.[e.token]));
+  const synth = needsSynth ? await synthSounds(join(dirs.audio, "synth"), ffmpeg) : {};
+  const sfxFiles = { ...synth, ...(o.sfx ?? {}) };
+  // An ambience the script asks for without a recording becomes synthesised room tone, never dead silence.
+  const roomTone = [...new Set((t.sfx ?? []).filter((e) => e.kind === "bed" && !o.sfx?.[e.token]).map((e) => e.token))];
+  for (const token of roomTone) sfxFiles[token] = synth["AUTO-ROOM"];
+  if (roomTone.length) warnings.push(`Ambience without a recording, played as synthesised room tone: ${roomTone.sort().join(", ")}.`);
   const sounds = (t.sfx ?? []).filter((e) => sfxFiles[e.token]);
   const missingSfx = new Set((t.sfx ?? []).filter((e) => !sfxFiles[e.token]).map((e) => e.token));
   if (missingSfx.size && sounds.length) warnings.push(`Sound effects without a file: ${[...missingSfx].sort().join(", ")}.`);

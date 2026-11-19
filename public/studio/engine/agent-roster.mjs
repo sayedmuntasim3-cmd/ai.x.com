@@ -439,7 +439,7 @@ export const ROLE_STATUS = Object.freeze({
   "voice-elevenlabs-operator": ["code", "voice.mjs: one take per scene with word timings"],
   "voice-pronunciation": ["code", "S4's pronunciation lexicon is applied to the text sent to the voice: render/voice.mjs (ElevenLabs) and narrator.mjs (free narrator; measured: a respelled Spanish place name heard back with 0 % word error)"],
   "voice-pacing-editor": ["code", "words per scene; timeline.mjs fitToVoice fits scene times to the real takes (never sped up or cut); --timing script keeps the old capped speed-up"],
-  "voice-music-supervisor": ["code", "music-kit.mjs and the mix"],
+  "voice-music-supervisor": ["code", "music-kit.mjs (ElevenLabs Music) or, free, score-plan.mjs + score-synth.mjs: an original track per cue from its brief (mood, mode, tempo, instruments); never where the music policy forbids instruments; the mix ducks it under the voice"],
   "voice-mix-engineer": ["code", "renderer mix"],
 
   "quran-ayah-aligner": ["built", "quran.mjs matchRecitation and quran-film.mjs planQuranFilm: one scene per ayah from the transcript's word times; not wired to a run or a render yet"],
