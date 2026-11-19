@@ -187,3 +187,15 @@ test("half-price mode: an expired batch is bought again on retry; a rejected req
   const error = await anthropicBatchModel({ apiKey: "t", fetch: rejected.f, maxRetries: 0, store, sleep: async () => {} }).call(req).catch((e) => e);
   assert.match(String(permanentError(error)), /rejected the request \(400\).*prompt is too long/);
 });
+
+test("a Gemini error is named as Gemini, and a blocked location says what to change", async () => {
+  const { permanentError } = await import("./anthropic.mjs");
+  const loc = Object.assign(new Error('Gemini 400: { "error": { "code": 400, "message": "User location is not supported for the API use." } }'), { status: 400 });
+  assert.match(String(permanentError(loc)), /^Gemini is not offered where Cloudflare ran this step/);
+  const bad = Object.assign(new Error("Gemini 400: bad field"), { status: 400 });
+  assert.match(String(permanentError(bad)), /^The Gemini API rejected the request \(400\)/);
+  const key = Object.assign(new Error("Gemini 401: no"), { status: 401 });
+  assert.match(String(permanentError(key)), /GEMINI_API_KEY/);
+  const claude = Object.assign(new Error("invalid request"), { status: 400 });
+  assert.match(String(permanentError(claude)), /^The Claude API rejected/);
+});
