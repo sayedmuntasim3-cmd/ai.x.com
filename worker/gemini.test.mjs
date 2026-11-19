@@ -82,3 +82,32 @@ test("a model that refuses thought summaries is asked again once without them", 
   assert.equal(bodies.length, 2);
   assert.equal(bodies[1].generationConfig.thinkingConfig, undefined);
 });
+
+test("a 429 waits as long as Google asks; a daily or zero limit stops with the reason instead of burning retries", async () => {
+  const { quotaInfo } = await import("./gemini.mjs");
+  const body = (/** @type {any[]} */ violations, /** @type {string} */ delay) => JSON.stringify({ error: { code: 429, message: "You exceeded your current quota", details: [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations }, { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: delay }] } });
+  const minute = quotaInfo(body([{ quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests", quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", quotaValue: "10" }], "37s"));
+  assert.equal(minute.retryMs, 37000);
+  assert.equal(minute.permanent, "");
+  assert.match(minute.summary, /PerMinute.*= 10; retry in 37s/);
+  const day = quotaInfo(body([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "250" }], "3600s"));
+  assert.match(day.permanent, /daily limit is used up/);
+  const zero = quotaInfo(body([{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", quotaValue: "0" }], "10s"));
+  assert.match(zero.permanent, /no free quota/);
+
+  /** @type {number[]} */
+  const waits = [];
+  let calls = 0;
+  const m = geminiModel({ apiKey: "k", sleep: async (ms) => { waits.push(ms); }, fetch: /** @type {typeof fetch} */ (async () => {
+    calls += 1;
+    if (calls === 1) return new Response(body([{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", quotaValue: "10" }], "12s"), { status: 429 });
+    return Response.json({ candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }] });
+  }) });
+  assert.equal((await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 })).text, "ok");
+  assert.deepEqual(waits, [12000]);
+
+  let dailyCalls = 0;
+  const d = geminiModel({ apiKey: "k", sleep: async () => {}, fetch: /** @type {typeof fetch} */ (async () => { dailyCalls += 1; return new Response(body([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "250" }], "3600s"), { status: 429 }); }) });
+  await assert.rejects(d.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 }), (/** @type {any} */ e) => /daily limit/.test(e.permanent));
+  assert.equal(dailyCalls, 1, "a used-up day is not retried");
+});
