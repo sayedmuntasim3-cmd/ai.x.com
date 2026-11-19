@@ -13,6 +13,20 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026, dead air and genre (owner: "no second wasted, motion by the kind of video"):
+- `engine/src/voice-tighten.mjs` + `local/voice-film.mjs` (on by default, `--tighten off`): long stops in a
+  voiceover are shortened only inside measured silence, crossfaded; narration: pauses over 1.2 s -> 0.7 s;
+  Quran and unknown kind: only stops over 3.5 s -> 1.8 s, every natural pause kept, every cut listed in
+  tighten.json for the reviewer; a given transcript is moved onto the new clock; the original file is never
+  changed. Tested: a 42.8 s take with a 4 s pause and a 7 s stop -> 32.6 s, Whisper heard 73 words before
+  and after; a 2-minute LibriVox human reading: no cut in either mode. Not done: filler words ("um") and
+  false starts (need word times; never automatic for recitation).
+- Idea films after `fitToVoice`: no voiced scene holds more than 2.5 s after its take (chapter 1 measured),
+  so no extra trimming was added.
+- Genre: `profileFor` scores the topic (x3) and the narration or voiceover words against 11 motion
+  languages when a film has no format (Knowspire's title -> motivation, a Wake Island text -> war); the
+  renderer passes the narration. The saved Ramesh Babu chapter reads as business.
+
 20 Nov 2026, free score: the owner chose voice A (Kokoro, the Zupona narrator) after listening.
 - Without ElevenLabs every music cue played nothing: on chapter 1 of `ramesh-babu/USA` 6 gaps of 6-12 s of
   dead silence. `engine/src/score-plan.mjs` reads each S4 cue's brief (mood, mode, tempo, instruments named

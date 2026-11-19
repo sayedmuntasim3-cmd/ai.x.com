@@ -4,7 +4,7 @@
  *        [--transcript <json|srt|vtt>] [--stt faster-whisper|pocketsphinx] [--model small.en]
  *        [--surah 93] [--ayat 1-11] [--passage "93, 94:1-8"] [--opening auto|none|basmala|istiadha|both] [--closing auto|none|sadaqa]
  *        [--adab strict|nature|people-distant]
- *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media]
+ *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media] [--tighten on|off]
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
  * and channels, float, for the voice checks) and voice-16k.wav (16 kHz mono,
@@ -45,6 +45,8 @@ import { mediaProviders } from "../engine/src/film-media.mjs";
 import { planVoice } from "../engine/src/voice-plan.mjs";
 import { ayahEndsOf } from "../engine/src/voice-master.mjs";
 import { masterFile } from "./voice-master.mjs";
+import { applyTighten, planTighten, remapWords } from "../engine/src/voice-tighten.mjs";
+import { encodeWav24 } from "../engine/src/wav.mjs";
 
 const run = promisify(execFile);
 
@@ -160,6 +162,26 @@ export async function intake(o) {
 }
 
 /**
+ * Take the long silences out of the recording (engine/src/voice-tighten.mjs) into tightened.wav,
+ * at the original rate; the original file is never changed. Null when nothing is long enough to cut.
+ * A recitation (and a recording whose kind is not known yet) keeps every natural pause.
+ * @param {{ out: string, analysisWav: string, sttWav: string, kind: "narration" | "quran" }} o
+ */
+export async function tightenRecording(o) {
+  const { spans, seconds } = await readSpans(o.sttWav);
+  const plan = planTighten({ spans, totalSeconds: seconds, kind: o.kind });
+  if (!plan.cuts.length) return null;
+  const bytes = await readFile(o.analysisWav);
+  const wav = decodeWav(/** @type {ArrayBuffer} */ (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)));
+  const file = join(o.out, "tightened.wav");
+  await writeFile(file, Buffer.from(encodeWav24(applyTighten(wav.channels, wav.sampleRate, plan.cuts), wav.sampleRate)));
+  const pauses = plan.cuts.filter((c) => c.at === "pause");
+  const message = msg(o.kind === "quran" ? "voice.tightenedQuran" : "voice.tightened", { count: plan.cuts.length, keep: plan.rule.keep, seconds: plan.removedSeconds });
+  await writeFile(join(o.out, "tighten.json"), JSON.stringify({ kind: o.kind, rule: plan.rule, originalSeconds: seconds, newSeconds: plan.newSeconds, removedSeconds: plan.removedSeconds, cuts: plan.cuts, longestStop: Math.max(0, ...pauses.map((c) => c.gap)), message }, null, 1));
+  return { file, plan, message };
+}
+
+/**
  * Run local/stt/transcribe.py on the 16 kHz copy. Python and the engine's
  * package must be installed on this machine (pip install faster-whisper).
  * @param {{ wav: string, out: string, engine: string, model?: string, language?: string, python?: string, clips?: number[] }} o
@@ -176,11 +198,15 @@ export async function speechToText(o) {
 
 /**
  * Step 2: the timed words, checked against the recording.
- * @param {{ out: string, totalSeconds: number, sttWav?: string, transcript?: string, stt?: string, model?: string, language?: string, script?: string }} o
+ * @param {{ out: string, totalSeconds: number, sttWav?: string, transcript?: string, stt?: string, model?: string, language?: string, script?: string, remap?: (t: number) => number }} o
  */
 export async function words(o) {
   let t;
-  if (o.transcript) t = normalizeTranscript(await readFile(o.transcript, "utf8"), { name: o.transcript });
+  if (o.transcript) {
+    t = normalizeTranscript(await readFile(o.transcript, "utf8"), { name: o.transcript });
+    // A transcript timed on the original recording moves onto the tightened one.
+    if (o.remap) t = { ...t, words: remapWords(t.words, o.remap) };
+  }
   else if (o.stt && o.sttWav) t = await speechToText({ wav: o.sttWav, out: join(o.out, "heard.json"), engine: o.stt, model: o.model, language: o.language });
   else throw new Error("Give --transcript <file> or --stt faster-whisper|pocketsphinx.");
   /** @type {any} */
@@ -324,9 +350,24 @@ async function main() {
   }
   const out = resolve(typeof args.out === "string" ? args.out : join("voice-runs", basename(args.audio).replace(/\.[^.]+$/, "")));
   const lang = args.lang === "bn" ? "bn" : "en";
-  const step1 = await intake({ audio: resolve(args.audio), out });
+  let step1 = await intake({ audio: resolve(args.audio), out });
   for (const m of step1.messages) console.log("- " + m[lang]);
   if (!step1.ok || !step1.report) process.exit(1);
+  // Long silences out, so the film never holds on dead air (--tighten off keeps the recording as it is).
+  let voicePath = resolve(args.audio);
+  /** @type {((t: number) => number) | undefined} */
+  let remap;
+  if (args.tighten !== "off" && step1.analysisWav && step1.sttWav) {
+    const t = await tightenRecording({ out, analysisWav: step1.analysisWav, sttWav: step1.sttWav, kind: args.kind === "narration" ? "narration" : "quran" });
+    if (t) {
+      console.log("- " + t.message[lang]);
+      await writeFile(join(out, "voice-report-original.json"), JSON.stringify(step1.report, null, 2));
+      voicePath = t.file;
+      remap = t.plan.map;
+      step1 = await intake({ audio: voicePath, out });
+      if (!step1.ok || !step1.report) process.exit(1);
+    }
+  }
   /** @param {string | boolean | undefined} x */
   const str = (x) => (typeof x === "string" ? resolve(x) : undefined);
   /** @type {string | null} */
@@ -337,7 +378,7 @@ async function main() {
     /** @type {any} */
     let step2 = { words: [], language: null };
     if (args.transcript || args.stt) {
-      step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
+      step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), remap, stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
       for (const m of step2.messages) console.log("- " + m[lang]);
       if (!step2.check.ok) process.exit(1);
     }
@@ -351,7 +392,7 @@ async function main() {
     let understanding = step3;
     if (args.master) {
       const kind = step3.kind === "quran" ? "quran" : "narration";
-      const m = await master({ audio: resolve(args.audio), out, kind, space: typeof args.master === "string" ? args.master : undefined, ayahEnds: kind === "quran" ? ayahEndsOf(/** @type {any} */ (step3).quranPlan) : undefined, lang, log: (line) => console.log(line) });
+      const m = await master({ audio: voicePath, out, kind, space: typeof args.master === "string" ? args.master : undefined, ayahEnds: kind === "quran" ? ayahEndsOf(/** @type {any} */ (step3).quranPlan) : undefined, lang, log: (line) => console.log(line) });
       if (!m.ok) { console.error(m.blocked ?? "Mastering failed its own checks; see the report."); process.exit(1); }
       mastered = m.file;
       // Cut again on the mastered length, so the last picture holds through the reverb's tail. Word times do not move.
@@ -365,11 +406,12 @@ async function main() {
     if (!step4.ok) process.exit(1);
   } else if (args.master) {
     if (args.kind === "auto") { console.error("--master needs --kind quran or narration when there is no transcript to tell them apart."); process.exit(2); }
-    const m = await master({ audio: resolve(args.audio), out, kind: /** @type {any} */ (args.kind), space: typeof args.master === "string" ? args.master : undefined, lang, log: (line) => console.log(line) });
+    const m = await master({ audio: voicePath, out, kind: /** @type {any} */ (args.kind), space: typeof args.master === "string" ? args.master : undefined, lang, log: (line) => console.log(line) });
     if (!m.ok) { console.error(m.blocked ?? "Mastering failed its own checks; see the report."); process.exit(1); }
     mastered = m.file;
   }
   if (mastered) console.log(`Mastered voice: ${mastered} (use it as --one-track for the film)`);
+  else if (voicePath !== resolve(args.audio)) console.log(`Tightened voice: ${voicePath} (use it as --one-track for the film; its words are timed on it)`);
   console.log(`Saved in ${out}`);
 }
 
