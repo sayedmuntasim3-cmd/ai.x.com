@@ -11,17 +11,53 @@ of 12 Nov 2026 (two production systems, a central orchestrator "Bossism", no
 mandatory paid API) are the goals. This file is the honest gap between those
 goals and the code.
 
+## 0. Live facts (keep short; newest first)
+
+19 Nov 2026 (branch `claude/zupona-studio-audit-stabilization-wrtgn1`, from `main` at PR #5; checked with git and by running code):
+- **Owner decisions:** PR #5 is production. Content languages now: **American English documentaries and
+  Arabic Quran recitation films only**; Bangla and Hindi are not offered (Bangla code, rules and tests are
+  kept, switched off by `ACTIVE_VERSION_IDS` in `engine/src/versions.mjs`; the studio's own UI stays in
+  Bangla for the owner). No merge, deploy, branch deletion, force push or reset without his written OK;
+  on any conflict, ask him.
+- **Branches:** `main` already holds every commit of PR #2 (the 151 roles, Bossism; merged through PR #5)
+  and of every `ccr-*` branch except four. Unmerged, kept, not touched: PR #4 `ccr-c21902ce-p7sii2`
+  (4 commits, 197 behind: TypeScript `src/media/` = the source of `engine/src/open-archives-lib.mjs`,
+  which `main` already bundles; a second Worker entry `worker/index.ts` that conflicts with
+  `worker/index.mjs`; a `library.tsx` page; shot lists), PR #6 `ccr-3f6f211f-agtnzh` (its Worker was
+  reverted; only notes left, copied into CLAUDE.md and here), `ccr-00e313f2-4u4e00` (one CLAUDE.md note,
+  copied), `ccr-48feac19-2ao1hq` (an old landing redesign, 200 behind).
+- **Tests:** 334 engine + 127 platform pass; type check and `npm run check` pass.
+- **Landing page:** its Create/Studio section sends no request (`src/*.tsx` has no `fetch`); the working
+  engine UI is `/studio/`.
+- **Brain:** Gemini free tier is unavailable on the owner's Google account (17 Nov). `GROQ_API_KEY` is set on
+  Cloudflare but **no code reads it**. Groq works today without code through the OpenAI-compatible local
+  brain: `BRAIN_URL=https://api.groq.com/openai/v1`, `BRAIN_API=openai`, `BRAIN_MODEL=<model>`, secret
+  `BRAIN_KEY`. Untested: Groq's free tier allows only a few thousand tokens a minute, likely less than one
+  stage's prompt (the manual is ~73 KB).
+- **Voice:** new free **Zupona narrator** (Kokoro-82M, Apache-2.0; `docs/VOICE_SYSTEM.md`, last section).
+  Proven here: chapter 1 of `productions/ramesh-babu/USA` narrated (48 scenes, 7 min 21 s, 2 min of CPU)
+  and rendered to a real MP4 (510 s, 640x360, h264 + aac; -15.9 LUFS, peak -1.2 dBFS, no black or frozen
+  frames). Found: wordless scenes are 6-12 s of dead silence without paid music (free music is missing).
+- **Costs:** `wrangler.jsonc` still has `BUDGET_USD "60"` and `MODEL claude-opus-5-5` (used only when
+  `BRAIN=claude` is set). The owner's whole cash budget is BDT 2,000 (~16 USD): lower it before Claude is
+  ever switched on.
+- Not one film has run against a real brain yet.
+
+17 Nov 2026 (from PR #6's notes): Cloudflare secrets seen: `GEMINI_API_KEY`, `PIXABAY_API_KEY`,
+`STUDIO_TOKEN`, `GROQ_API_KEY`; `YOUTUBE_API_KEY` not seen by the Worker. `ai.zupona.com` cannot be
+reached from cloud sessions (proxy 502): ask the owner to paste `/api/health`.
+
 ## 1. Where the code is
 
 | Place | What it holds |
 |---|---|
-| `sayedmuntasim3-cmd/ai.x.com`, branch `main` | only the landing page (`page.tsx` rendered to `public/`). This is what is live. |
+| `sayedmuntasim3-cmd/ai.x.com`, branch `main` | since PR #5 (16 Nov 2026): the landing page and the whole studio (`engine/`, `worker/`, `render/`, `public/studio/`). This is what is live. |
 | branch `ccr-5d51ed58-vk6gaw` (and this branch, which continues it) | the whole AI documentary studio: `engine/`, `worker/`, `render/`, `public/studio/`, `prompts/`, `docs/`, one saved production |
 | `ccr-d2a6b2aa-chfb81`, `ccr-cb190ece-ukm6vg`, `ccr-cd4452ea-fvd6po`, `claude/studio-first-screen-y4tp15` | earlier stages of the same work; all merged into `ccr-5d51ed58-vk6gaw` |
 | `ccr-48feac19-2ao1hq` | a landing-page redesign, not merged anywhere |
 | `sajid1234sajid/zupona` and the ~70 branches in `branches.txt` | **not reachable from these sessions.** `README.txt` describes folders and a git bundle that are not in this repository. |
 
-Nothing of the studio is deployed. Merging into `main` and deploying are the
+The studio is deployed from `main` (PR #5). Merging into `main` and deploying are the
 owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
@@ -348,6 +384,17 @@ four Quran roles (built, not wired). `quran-visual-adab-guard` stays planned:
 no picture is chosen for a Quran film yet, so nothing checks one.
 
 ## 6. Next work, in order
+
+**Updated 19 Nov 2026 (this order wins over the older lists below):**
+1. **First real film with a real brain**, 2-3 minutes, through `/studio/` or `local/run-film.mjs`: the
+   brain is the open question (Groq's free tier is probably too small per minute; a local 30B model on the
+   owner's machine; or a paid key only with the owner's written OK and a cost estimate first). Fix what breaks.
+2. **No dead silence:** free music or room tone under wordless scenes (licensed CC0 tracks or a generated
+   bed), measured with silencedetect on a render.
+3. The owner listens to the narrator samples; then a 40-minute narration test (stability over length).
+4. Connect the landing page's Studio section to `/api/films`, keeping its design (owner, 16 Nov).
+5. Quran films: section 4l's list (needs the friend's recording and a scholar's review).
+6. Cost ledger checked against a real run; lower `BUDGET_USD` before any paid brain.
 
 **First (owner, 13-14 Nov 2026): the Quran recitation documentary.** Q1 to Q7 are built; continue with
 the list in section 4l. The list below waits until he says otherwise.

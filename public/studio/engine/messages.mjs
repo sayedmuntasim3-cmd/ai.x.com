@@ -60,6 +60,13 @@ export const MESSAGES = Object.freeze({
   "plan.noMarket": { en: () => "No YouTube key: titles are written without the videos that already won on this topic.", bn: () => "YouTube কী নেই: এই বিষয়ে আগে সফল ভিডিও না দেখেই টাইটেল লেখা হবে।" },
   "plan.noMedia": { en: () => "No footage source is connected: shots get no pictures.", bn: () => "কোনো ফুটেজ উৎস সংযুক্ত নেই: শটগুলোতে ছবি থাকবে না।" },
   "plan.waitWorker": { en: () => "No machine with a brain is connected right now: the film waits in the queue until one is (node local/jobs.mjs work --api ...).", bn: () => "এই মুহূর্তে ব্রেইনসহ কোনো মেশিন সংযুক্ত নেই: একটি সংযুক্ত না হওয়া পর্যন্ত ফিল্মটি কিউতে অপেক্ষা করবে (node local/jobs.mjs work --api ...)।" },
+  // The Zupona narrator (engine/src/narrator.mjs)
+  "narrator.quran": { en: () => "Quran recitation is never made by a machine voice: use the reciter's own recording.", bn: () => "কুরআন তিলাওয়াত কখনো মেশিনের কণ্ঠে বানানো হয় না: ক্বারীর নিজের রেকর্ডিং ব্যবহার করুন।" },
+  "narrator.language": { en: (p) => `The free narrator speaks American English only; the ${p.version} version needs a human recording.`, bn: (p) => `ফ্রি ন্যারেটর শুধু আমেরিকান ইংরেজি বলে; ${p.version} ভার্সনের জন্য মানুষের রেকর্ডিং লাগবে।` },
+  "narrator.arabicLine": { en: () => "This line has Arabic text: the narrator does not read it (a Quran verse or Arabic quote needs a human recording).", bn: () => "এই লাইনে আরবি লেখা আছে: ন্যারেটর এটা পড়বে না (কুরআনের আয়াত বা আরবি উদ্ধৃতির জন্য মানুষের রেকর্ডিং লাগবে)।" },
+  "narrator.pace": { en: (p) => `Narration pace ${p.wpm} words a minute is outside ${p.min}-${p.max}: choose another delivery preset.`, bn: (p) => `ন্যারেশনের গতি মিনিটে ${p.wpm} শব্দ, ${p.min}-${p.max} এর বাইরে: অন্য ডেলিভারি প্রিসেট বেছে নিন।` },
+  "narrator.clipped": { en: (p) => `The narration clips (peak ${p.peak}): it must be made again.`, bn: (p) => `ন্যারেশন ক্লিপ করছে (পিক ${p.peak}): আবার বানাতে হবে।` },
+  "narrator.missingFile": { en: (p) => `The narrator's model file ${p.file} is missing or damaged (checksum): download it again.`, bn: (p) => `ন্যারেটরের মডেল ফাইল ${p.file} নেই বা নষ্ট (চেকসাম মেলেনি): আবার ডাউনলোড করুন।` },
   "plan.noAutoRender": { en: () => "GitHub is not connected: the film is not rendered automatically.", bn: () => "GitHub সংযুক্ত নেই: ফিল্ম নিজে থেকে রেন্ডার হবে না।" },
 
   // Bossism: gates

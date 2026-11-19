@@ -3,6 +3,19 @@
 Owner writes in Bangla: reply in Bangla, short and plain. Work continues on the
 branch you are on; never merge to `main`, deploy, spend money or add a paid API.
 
+## Owner's decisions (newest first; never undo without him)
+- 19 Nov 2026: PR #5 is production. Content languages: American English documentaries and Arabic Quran
+  recitation only (Bangla/Hindi off: `ACTIVE_VERSION_IDS`). No merge, deploy, branch deletion, force push
+  or reset without his written OK; on any conflict, ask him first.
+- 16 Nov 2026: the landing page design at `/` IS the product's face; future studio screens use it.
+  Unmerged on purpose, never deleted: PR #4 and PR #6 (each sets a different Worker entry).
+
+## Start of every session (cheap)
+1. `git fetch origin -q && git log --oneline -5 origin/main`; read `docs/ENGINEERING_STATE.md` section 0 and 6 only.
+2. Before building: `git grep -n -i "<feature word>" origin/main -- worker engine/src render public/studio`.
+   If it exists, extend it; never build a second copy (a session built a second script Worker on 16-17 Nov).
+3. Quote file and line for claims, or say "my opinion". Never assume a free tier works (Gemini's does not on his account).
+
 ## Save tokens (the owner pays for every token)
 - Do NOT explore the repo or re-audit it. The state is in two files; read only
   the section you need: `docs/ENGINEERING_STATE.md` (state, next work in order),
