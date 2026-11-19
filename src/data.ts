@@ -113,6 +113,17 @@ export const DURATION_PRESETS: Option<string>[] = [
 export const MIN_MINUTES = 1;
 export const MAX_MINUTES = 120;
 
+/**
+ * The next length the − / + buttons go to: minute by minute up to 10, then 5-minute steps up to
+ * 30, then 10-minute steps (8 → 60 took 52 taps; now 12). Always on a round number.
+ */
+export function stepMinutes(minutes: number, direction: 1 | -1): number {
+  const m = Math.round(minutes);
+  const up = m < 10 ? m + 1 : m < 30 ? Math.floor(m / 5) * 5 + 5 : Math.floor(m / 10) * 10 + 10;
+  const down = m <= 10 ? m - 1 : m <= 30 ? Math.ceil(m / 5) * 5 - 5 : Math.ceil(m / 10) * 10 - 10;
+  return Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, direction === 1 ? up : down));
+}
+
 /** Ideas the "Inspire me" wand types into the box, one category each. */
 export const INSPIRATIONS: { text: string; category: CategoryId }[] = [
   { text: "The life of a mountain lion in the wild", category: "nature" },
@@ -144,11 +155,12 @@ export type Chapter = { title: string; start: number; end: number };
  * middle chapters that grows with the running time, and a closing reflection.
  */
 export function planChapters(totalSeconds: number): Chapter[] {
-  const total = Math.max(60, Math.round(totalSeconds));
+  // The preview spans the real length, even for a recording under a minute (it used to stretch to 60 s).
+  const total = Math.max(1, Math.round(totalSeconds));
   const minutes = total / 60;
   const count = Math.min(9, Math.max(3, Math.round(minutes / 3) + 2));
-  const open = Math.max(20, Math.round(total * 0.08));
-  const close = Math.max(20, Math.round(total * 0.1));
+  const open = Math.max(Math.min(20, Math.round(total * 0.2)), Math.round(total * 0.08));
+  const close = Math.max(Math.min(20, Math.round(total * 0.2)), Math.round(total * 0.1));
   const middle = BEATS.slice(0, count - 2);
   const each = (total - open - close) / middle.length;
 

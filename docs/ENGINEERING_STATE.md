@@ -13,6 +13,32 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+19 Nov 2026, second session (motion and timing; checked by rendering real MP4s):
+- **Timing bug found and fixed.** Scene slots came from the script's word count; a longer take was sped up
+  (max 15 %) and then **cut**: on chapter 1 of `ramesh-babu/USA` 14 of 48 scenes, 3 lost words (the hook
+  included). `fitToVoice` (timeline.mjs) now fits scene times to the real takes: a long take borrows the
+  chapter's spare time, else the chapter grows; timed shots and the Edit Director's moves follow the new
+  clock. Re-render: 0 cut, 0 sped up, 510 s -> 514 s. `--timing script` keeps the old rule.
+- **Motion audit:** already working: transitions (whip, slide, zoom, flash, glitch, leak, dips), punch-ins
+  and shakes (Edit Director), maps with routes, charts, counters, kinetic type, highlights, split cards,
+  print frames, focus zooms, 2.5D parallax for portrait photos. Weak: a still's move came by rota (push,
+  pull, pan), linear, a fixed 9 % whatever the shot length; MOTION was read only for "push" and slow motion.
+- **Adaptive motion** (`engine/src/motion.mjs`): 13 motion languages (25 formats mapped), levels
+  reduced/calm/balanced/dynamic, scene purpose from the script, MOTION locks, speed capped per second,
+  no move three times running, pans alternate, eased moves, flashes rationed by genre (photosensitivity),
+  shakes only where the genre shakes. Owner/creator choice "Picture motion" in `/studio/` -> `film.motionLevel`.
+  Measured on a 6-photo render: eased shots start and end 3-10x slower than their middle (old: constant
+  speed into every cut); a document is held still to be read.
+- **Landing page** (design unchanged; only `public/app.js` rebuilt): duration steps 1/5/10 minutes (8 -> 60
+  was 52 taps, now 12); a recording over 2 h is refused with its real length (was silently shown as 2 h);
+  the chapter preview of a short recording spans its real length (a 40 s take was drawn as 60 s).
+  Checked in Chromium at phone width. Still true: its Create button sends nothing to the engine.
+- Reference videos the owner sent (19 Nov): Yarnhub (military history: 3D reenactment, maps), Isaac
+  (creator education), Knowspire (motivation). Titles read; the videos themselves were not watched
+  (no video access here). 3D reenactment is out of reach without a GPU; maps, routes, archive
+  treatment and type are in the engine.
+- Owner, 19 Nov: Kokoro samples are "not extreme level"; zero cost, no Claude. Brain test later (Groq).
+
 19 Nov 2026 (branch `claude/zupona-studio-audit-stabilization-wrtgn1`, from `main` at PR #5; checked with git and by running code):
 - **Owner decisions:** PR #5 is production. Content languages now: **American English documentaries and
   Arabic Quran recitation films only**; Bangla and Hindi are not offered (Bangla code, rules and tests are
@@ -385,7 +411,16 @@ no picture is chosen for a Quran film yet, so nothing checks one.
 
 ## 6. Next work, in order
 
-**Updated 19 Nov 2026 (this order wins over the older lists below):**
+**Updated 19 Nov 2026, second session (this order wins):**
+1. **A better free narrator** (owner: Kokoro is not good enough). Benchmark CPU-runnable open voices with
+   commercial licences (Chatterbox MIT, NeuTTS Air Apache-2.0, VoxCPM Apache-2.0; Kyutai TTS CC-BY) against
+   Kokoro with a predicted-MOS model (UTMOS) and Whisper word error, same passage; send the owner samples.
+   Never XTTS, F5, Fish/OpenAudio, Spark (non-commercial weights).
+2. Free music or room tone under wordless scenes (6-12 s of dead silence today).
+3. Footage motion: measure each clip's own movement before adding any (today footage gets none unless written).
+4. Then the list below.
+
+**Updated 19 Nov 2026, first session:**
 1. **First real film with a real brain**, 2-3 minutes, through `/studio/` or `local/run-film.mjs`: the
    brain is the open question (Groq's free tier is probably too small per minute; a local 30B model on the
    owner's machine; or a paid key only with the owner's written OK and a cost estimate first). Fix what breaks.

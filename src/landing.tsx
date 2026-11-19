@@ -13,6 +13,7 @@ import {
   formatClock,
   formatRuntime,
   planChapters,
+  stepMinutes,
   workingTitle,
   type AgeId,
   type CategoryId,
@@ -457,7 +458,7 @@ function Composer(props: ComposerProps) {
             <StepButton
               label="Shorter"
               disabled={voiceLocked || draft.minutes <= MIN_MINUTES}
-              onClick={() => update("minutes", Math.max(MIN_MINUTES, draft.minutes - 1))}
+              onClick={() => update("minutes", stepMinutes(draft.minutes, -1))}
             >
               <MinusIcon size={20} />
             </StepButton>
@@ -467,7 +468,7 @@ function Composer(props: ComposerProps) {
             <StepButton
               label="Longer"
               disabled={voiceLocked || draft.minutes >= MAX_MINUTES}
-              onClick={() => update("minutes", Math.min(MAX_MINUTES, draft.minutes + 1))}
+              onClick={() => update("minutes", stepMinutes(draft.minutes, 1))}
             >
               <PlusIcon size={20} />
             </StepButton>
@@ -738,8 +739,14 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
         setError("We couldn't read the length of that file. Try another format.");
         return;
       }
+      // A recording longer than the studio takes is refused with its real length, never shortened silently.
+      if (seconds > MAX_MINUTES * 60) {
+        URL.revokeObjectURL(url);
+        setError(`That recording is ${formatRuntime(seconds)} long; the studio takes up to ${MAX_MINUTES / 60} hours. Split it into parts.`);
+        return;
+      }
       setError("");
-      replaceVoice({ name: file.name, size: file.size, seconds: Math.min(seconds, MAX_MINUTES * 60), url, source: "upload" });
+      replaceVoice({ name: file.name, size: file.size, seconds, url, source: "upload" });
     };
     probe.onerror = () => {
       URL.revokeObjectURL(url);
