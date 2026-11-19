@@ -35,3 +35,17 @@ after editing `engine/src/`: `cd engine && npm run sync` (the studio serves a co
 - No stage may assume Claude: use `canSearch(model)` / `canSee(model)`.
 - Every new user-facing message goes in `engine/src/messages.mjs` (en + bn).
 - Never claim something works without running it; say what is unverified.
+
+## Owner's decision (16 Nov 2026): the landing page design IS the product
+- The site's face is the landing page at `/` (PR #3: page.tsx, public/index.html, public/app.js).
+  Every future studio screen must use this design. Do not replace it with another look.
+- Today its "Studio" section is design only: public/app.js sends no request to the server.
+  The working engine UI is `/studio/` (Gemini, Pixabay, R2, Workflow all connected; /api/health).
+- Next work, in order: (1) one short real test film through `/studio/` (3 minutes) and fix what
+  breaks; (2) connect the landing page's Studio section to the same `/api/films` engine, keeping
+  the landing design unchanged.
+- Live state on 16 Nov: Worker `ai-x-com` on the owner's Cloudflare account; secrets set:
+  GEMINI_API_KEY, PIXABAY_API_KEY, STUDIO_TOKEN (GROQ_API_KEY set but unused by the code).
+  YOUTUBE_API_KEY not seen by the Worker yet (name to re-check). No film has run yet.
+- Not merged on purpose: PR #4 and branch ccr-3f6f211f-agtnzh (each sets a different Worker entry
+  in wrangler.jsonc). Nothing on them is deleted.
