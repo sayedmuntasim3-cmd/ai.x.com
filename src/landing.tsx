@@ -13,6 +13,8 @@ import {
   formatClock,
   formatRuntime,
   planChapters,
+  stepMinutes,
+  suggestCategory,
   workingTitle,
   type AgeId,
   type CategoryId,
@@ -72,11 +74,14 @@ type Draft = {
   mode: Mode;
   idea: string;
   minutes: number;
+  motionLevel?: string;
   category: CategoryId;
   age: AgeId;
   style: StyleId;
   music: MusicId;
   topic: string;
+  /** true once the visitor picks an idea system by hand; until then it follows the idea's words */
+  categoryLocked: boolean;
 };
 
 const DEFAULT_DRAFT: Draft = {
@@ -88,6 +93,7 @@ const DEFAULT_DRAFT: Draft = {
   style: "cinematic",
   music: "epic",
   topic: "",
+  categoryLocked: false,
 };
 
 function readDraft(): Partial<Draft> {
@@ -104,6 +110,7 @@ function readDraft(): Partial<Draft> {
     if (typeof saved.minutes === "number" && Number.isFinite(saved.minutes))
       out.minutes = Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round(saved.minutes)));
     out.category = pick(saved.category, CATEGORIES);
+    if (typeof saved.categoryLocked === "boolean") out.categoryLocked = saved.categoryLocked;
     out.age = pick(saved.age, AGES);
     out.style = pick(saved.style, STYLES);
     out.music = pick(saved.music, MUSIC);
@@ -158,6 +165,13 @@ export default function Landing() {
     }
   }, [draft, ready]);
 
+  // The idea system follows what the idea is about until the visitor picks one by hand.
+  useEffect(() => {
+    if (!ready || draft.categoryLocked || draft.mode !== "idea") return;
+    const suggested = suggestCategory(draft.idea);
+    if (suggested && suggested !== draft.category) update("category", suggested);
+  }, [ready, draft.idea, draft.mode, draft.categoryLocked, draft.category, update]);
+
   const category = findOption(CATEGORIES, draft.category);
   const voiceLocked = draft.mode === "voice" && voice !== null;
   const totalSeconds = voiceLocked ? voice.seconds : draft.minutes * 60;
@@ -200,6 +214,8 @@ export default function Landing() {
   const brief = {
     title,
     minutes: Math.max(1, Math.round(totalSeconds / 60)),
+    // Calm styles and children's films move gently (engine/src/motion.mjs); otherwise the genre decides.
+    motionLevel: ["observational", "minimal", "storybook"].includes(draft.style) || draft.age === "kids" ? "calm" : undefined,
     mode: draft.mode,
     idea: draft.mode === "idea" ? draft.idea.trim() : draft.topic.trim(),
     voiceName: voice?.name,
@@ -458,7 +474,7 @@ function Composer(props: ComposerProps) {
             <StepButton
               label="Shorter"
               disabled={voiceLocked || draft.minutes <= MIN_MINUTES}
-              onClick={() => update("minutes", Math.max(MIN_MINUTES, draft.minutes - 1))}
+              onClick={() => update("minutes", stepMinutes(draft.minutes, -1))}
             >
               <MinusIcon size={20} />
             </StepButton>
@@ -468,7 +484,7 @@ function Composer(props: ComposerProps) {
             <StepButton
               label="Longer"
               disabled={voiceLocked || draft.minutes >= MAX_MINUTES}
-              onClick={() => update("minutes", Math.min(MAX_MINUTES, draft.minutes + 1))}
+              onClick={() => update("minutes", stepMinutes(draft.minutes, 1))}
             >
               <PlusIcon size={20} />
             </StepButton>
@@ -487,7 +503,10 @@ function Composer(props: ComposerProps) {
             triggerLabel={`Idea system: ${findOption(CATEGORIES, draft.category).label}`}
             value={draft.category}
             options={CATEGORIES}
-            onChange={(v) => update("category", v)}
+            onChange={(v) => {
+              update("category", v);
+              update("categoryLocked", true);
+            }}
             renderIcon={(id) => <CategoryIcon id={id} size={18} />}
             triggerClassName="mt-3 flex h-11 w-full items-center justify-between gap-1 rounded-full border border-line-strong py-1 pl-1 pr-2.5 transition hover:border-ink/40 sm:pr-3"
           >
@@ -739,8 +758,14 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
         setError("We couldn't read the length of that file. Try another format.");
         return;
       }
+      // A recording longer than the studio takes is refused with its real length, never shortened silently.
+      if (seconds > MAX_MINUTES * 60) {
+        URL.revokeObjectURL(url);
+        setError(`That recording is ${formatRuntime(seconds)} long; the studio takes up to ${MAX_MINUTES / 60} hours. Split it into parts.`);
+        return;
+      }
       setError("");
-      replaceVoice({ name: file.name, size: file.size, seconds: Math.min(seconds, MAX_MINUTES * 60), url, source: "upload" });
+      replaceVoice({ name: file.name, size: file.size, seconds, url, source: "upload" });
     };
     probe.onerror = () => {
       URL.revokeObjectURL(url);
@@ -1556,7 +1581,7 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
       const res = await fetch("/api/films", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
-        body: JSON.stringify({ topic: brief.idea, minutes: brief.minutes, notes, formatId: "auto", allowAi: false }),
+        body: JSON.stringify({ topic: brief.idea, minutes: brief.minutes, notes, formatId: "auto", allowAi: false, ...(brief.motionLevel ? { motionLevel: brief.motionLevel } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {

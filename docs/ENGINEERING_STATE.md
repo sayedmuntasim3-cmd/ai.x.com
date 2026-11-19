@@ -11,17 +11,90 @@ of 12 Nov 2026 (two production systems, a central orchestrator "Bossism", no
 mandatory paid API) are the goals. This file is the honest gap between those
 goals and the code.
 
+## 0. Live facts (keep short; newest first)
+
+20 Nov 2026 (live site checked: https://ai-x-com.sayedmuntasim3.workers.dev, reachable from cloud sessions):
+- `/api/health`: brain Gemini 2.5 Flash connected, storage, workflow, studio token, Pixabay and YouTube set;
+  GitHub not connected (no automatic render), Pexels not set. Whether Gemini's free tier answers is unverified.
+- Live landing: Create sent nothing (only a "Brief ready" sheet); an Apollo idea stayed "Nature".
+  On this branch (not deployed): the idea system follows the idea's words until picked by hand; with the
+  studio key on the device (the key `/studio/` saves), the brief sheet has "Start the film", which POSTs
+  `/api/films` (topic, length, formatId auto, notes with audience, idea system, style and music; calm motion
+  for observational, minimal, storybook or kids) and links the film page. Without a key: the old note.
+  Voiceover mode still has no upload route. Checked in Chromium with the API answered by a stand-in.
+- "~N credits" on the landing is a made-up number (1.25 a minute), not a cost.
+
+19 Nov 2026, second session (motion and timing; checked by rendering real MP4s):
+- **Timing bug found and fixed.** Scene slots came from the script's word count; a longer take was sped up
+  (max 15 %) and then **cut**: on chapter 1 of `ramesh-babu/USA` 14 of 48 scenes, 3 lost words (the hook
+  included). `fitToVoice` (timeline.mjs) now fits scene times to the real takes: a long take borrows the
+  chapter's spare time, else the chapter grows; timed shots and the Edit Director's moves follow the new
+  clock. Re-render: 0 cut, 0 sped up, 510 s -> 514 s. `--timing script` keeps the old rule.
+- **Motion audit:** already working: transitions (whip, slide, zoom, flash, glitch, leak, dips), punch-ins
+  and shakes (Edit Director), maps with routes, charts, counters, kinetic type, highlights, split cards,
+  print frames, focus zooms, 2.5D parallax for portrait photos. Weak: a still's move came by rota (push,
+  pull, pan), linear, a fixed 9 % whatever the shot length; MOTION was read only for "push" and slow motion.
+- **Adaptive motion** (`engine/src/motion.mjs`): 13 motion languages (25 formats mapped), levels
+  reduced/calm/balanced/dynamic, scene purpose from the script, MOTION locks, speed capped per second,
+  no move three times running, pans alternate, eased moves, flashes rationed by genre (photosensitivity),
+  shakes only where the genre shakes. Owner/creator choice "Picture motion" in `/studio/` -> `film.motionLevel`.
+  Measured on a 6-photo render: eased shots start and end 3-10x slower than their middle (old: constant
+  speed into every cut); a document is held still to be read.
+- **Landing page** (design unchanged; only `public/app.js` rebuilt): duration steps 1/5/10 minutes (8 -> 60
+  was 52 taps, now 12); a recording over 2 h is refused with its real length (was silently shown as 2 h);
+  the chapter preview of a short recording spans its real length (a 40 s take was drawn as 60 s).
+  Checked in Chromium at phone width. Still true: its Create button sends nothing to the engine.
+- Reference videos the owner sent (19 Nov): Yarnhub (military history: 3D reenactment, maps), Isaac
+  (creator education), Knowspire (motivation). Titles read; the videos themselves were not watched
+  (no video access here). 3D reenactment is out of reach without a GPU; maps, routes, archive
+  treatment and type are in the engine.
+- Owner, 19 Nov: Kokoro samples are "not extreme level"; zero cost, no Claude. Brain test later (Groq).
+
+19 Nov 2026 (branch `claude/zupona-studio-audit-stabilization-wrtgn1`, from `main` at PR #5; checked with git and by running code):
+- **Owner decisions:** PR #5 is production. Content languages now: **American English documentaries and
+  Arabic Quran recitation films only**; Bangla and Hindi are not offered (Bangla code, rules and tests are
+  kept, switched off by `ACTIVE_VERSION_IDS` in `engine/src/versions.mjs`; the studio's own UI stays in
+  Bangla for the owner). No merge, deploy, branch deletion, force push or reset without his written OK;
+  on any conflict, ask him.
+- **Branches:** `main` already holds every commit of PR #2 (the 151 roles, Bossism; merged through PR #5)
+  and of every `ccr-*` branch except four. Unmerged, kept, not touched: PR #4 `ccr-c21902ce-p7sii2`
+  (4 commits, 197 behind: TypeScript `src/media/` = the source of `engine/src/open-archives-lib.mjs`,
+  which `main` already bundles; a second Worker entry `worker/index.ts` that conflicts with
+  `worker/index.mjs`; a `library.tsx` page; shot lists), PR #6 `ccr-3f6f211f-agtnzh` (its Worker was
+  reverted; only notes left, copied into CLAUDE.md and here), `ccr-00e313f2-4u4e00` (one CLAUDE.md note,
+  copied), `ccr-48feac19-2ao1hq` (an old landing redesign, 200 behind).
+- **Tests:** 334 engine + 127 platform pass; type check and `npm run check` pass.
+- **Landing page:** its Create/Studio section sends no request (`src/*.tsx` has no `fetch`); the working
+  engine UI is `/studio/`.
+- **Brain:** Gemini free tier is unavailable on the owner's Google account (17 Nov). `GROQ_API_KEY` is set on
+  Cloudflare but **no code reads it**. Groq works today without code through the OpenAI-compatible local
+  brain: `BRAIN_URL=https://api.groq.com/openai/v1`, `BRAIN_API=openai`, `BRAIN_MODEL=<model>`, secret
+  `BRAIN_KEY`. Untested: Groq's free tier allows only a few thousand tokens a minute, likely less than one
+  stage's prompt (the manual is ~73 KB).
+- **Voice:** new free **Zupona narrator** (Kokoro-82M, Apache-2.0; `docs/VOICE_SYSTEM.md`, last section).
+  Proven here: chapter 1 of `productions/ramesh-babu/USA` narrated (48 scenes, 7 min 21 s, 2 min of CPU)
+  and rendered to a real MP4 (510 s, 640x360, h264 + aac; -15.9 LUFS, peak -1.2 dBFS, no black or frozen
+  frames). Found: wordless scenes are 6-12 s of dead silence without paid music (free music is missing).
+- **Costs:** `wrangler.jsonc` still has `BUDGET_USD "60"` and `MODEL claude-opus-5-5` (used only when
+  `BRAIN=claude` is set). The owner's whole cash budget is BDT 2,000 (~16 USD): lower it before Claude is
+  ever switched on.
+- Not one film has run against a real brain yet.
+
+17 Nov 2026 (from PR #6's notes): Cloudflare secrets seen: `GEMINI_API_KEY`, `PIXABAY_API_KEY`,
+`STUDIO_TOKEN`, `GROQ_API_KEY`; `YOUTUBE_API_KEY` not seen by the Worker. `ai.zupona.com` cannot be
+reached from cloud sessions (proxy 502): ask the owner to paste `/api/health`.
+
 ## 1. Where the code is
 
 | Place | What it holds |
 |---|---|
-| `sayedmuntasim3-cmd/ai.x.com`, branch `main` | only the landing page (`page.tsx` rendered to `public/`). This is what is live. |
+| `sayedmuntasim3-cmd/ai.x.com`, branch `main` | since PR #5 (16 Nov 2026): the landing page and the whole studio (`engine/`, `worker/`, `render/`, `public/studio/`). This is what is live. |
 | branch `ccr-5d51ed58-vk6gaw` (and this branch, which continues it) | the whole AI documentary studio: `engine/`, `worker/`, `render/`, `public/studio/`, `prompts/`, `docs/`, one saved production |
 | `ccr-d2a6b2aa-chfb81`, `ccr-cb190ece-ukm6vg`, `ccr-cd4452ea-fvd6po`, `claude/studio-first-screen-y4tp15` | earlier stages of the same work; all merged into `ccr-5d51ed58-vk6gaw` |
 | `ccr-48feac19-2ao1hq` | a landing-page redesign, not merged anywhere |
 | `sajid1234sajid/zupona` and the ~70 branches in `branches.txt` | **not reachable from these sessions.** `README.txt` describes folders and a git bundle that are not in this repository. |
 
-Nothing of the studio is deployed. Merging into `main` and deploying are the
+The studio is deployed from `main` (PR #5). Merging into `main` and deploying are the
 owner's decisions.
 
 ## 2. Verified numbers (12 Nov 2026)
@@ -348,6 +421,26 @@ four Quran roles (built, not wired). `quran-visual-adab-guard` stays planned:
 no picture is chosen for a Quran film yet, so nothing checks one.
 
 ## 6. Next work, in order
+
+**Updated 19 Nov 2026, second session (this order wins):**
+1. **A better free narrator** (owner: Kokoro is not good enough). Benchmark CPU-runnable open voices with
+   commercial licences (Chatterbox MIT, NeuTTS Air Apache-2.0, VoxCPM Apache-2.0; Kyutai TTS CC-BY) against
+   Kokoro with a predicted-MOS model (UTMOS) and Whisper word error, same passage; send the owner samples.
+   Never XTTS, F5, Fish/OpenAudio, Spark (non-commercial weights).
+2. Free music or room tone under wordless scenes (6-12 s of dead silence today).
+3. Footage motion: measure each clip's own movement before adding any (today footage gets none unless written).
+4. Then the list below.
+
+**Updated 19 Nov 2026, first session:**
+1. **First real film with a real brain**, 2-3 minutes, through `/studio/` or `local/run-film.mjs`: the
+   brain is the open question (Groq's free tier is probably too small per minute; a local 30B model on the
+   owner's machine; or a paid key only with the owner's written OK and a cost estimate first). Fix what breaks.
+2. **No dead silence:** free music or room tone under wordless scenes (licensed CC0 tracks or a generated
+   bed), measured with silencedetect on a render.
+3. The owner listens to the narrator samples; then a 40-minute narration test (stability over length).
+4. Connect the landing page's Studio section to `/api/films`, keeping its design (owner, 16 Nov).
+5. Quran films: section 4l's list (needs the friend's recording and a scholar's review).
+6. Cost ledger checked against a real run; lower `BUDGET_USD` before any paid brain.
 
 **First (owner, 13-14 Nov 2026): the Quran recitation documentary.** Q1 to Q7 are built; continue with
 the list in section 4l. The list below waits until he says otherwise.

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { checkMoneyPath, FICTION_LABELS, lintNarration, planStory, usMinimumWage } from "../src/story-mode.mjs";
 import { AGENTS, SQUADS, getAgent } from "../src/agent-roster.mjs";
 import { GATES, planRun } from "../src/pipeline.mjs";
-import { checkVersionPurity, VERSION_IDS } from "../src/versions.mjs";
+import { checkVersionPurity, VERSION_IDS, ACTIVE_VERSION_IDS } from "../src/versions.mjs";
 
 test("stories carry no on-screen label, only a description note in each language", () => {
   for (const id of VERSION_IDS) assert.equal(checkVersionPurity(FICTION_LABELS[id], id).ok, true, id);
@@ -85,7 +85,7 @@ test("a recitation plan has no music, no story writers and only verbatim Quran t
   const plan = planRun({ contentType: "quran_recitation", source: "own-recording", durationSeconds: 300 });
   const agents = plan.stages.flatMap((s) => s.agents);
   assert.equal(plan.humanApprovalSteps, 0);
-  for (const v of VERSION_IDS) assert.equal(plan.music[v].policy, "none");
+  for (const v of ACTIVE_VERSION_IDS) assert.equal(plan.music[v].policy, "none");
   assert.ok(!agents.includes("voice-music-supervisor"));
   assert.ok(!agents.some((id) => id.startsWith("screenplay-") || id.startsWith("research-")));
   for (const gate of ["quran-text", "quran-reference", "music-policy", "visual-adab", "voice-preservation"]) assert.ok(plan.gates.some((g) => g.id === gate), gate);

@@ -130,3 +130,33 @@ In the film path: `node local/voice-film.mjs --audio a.mp3 --kind quran --master
 - Not built: stereo in the film renderer (it mixes mono, so a film gets the reverb in mono; the standalone
   WAV / AAC are stereo), chunked processing for long files, de-reverb (a heavy room cannot be removed), breath
   control, a feeling model (only the bounded hook exists, off), studio page and upload route.
+
+## Free narrator: the Zupona narrator (19 Nov 2026, verified by running it)
+
+Why: without an ElevenLabs key every film rendered **without a voice**. The studio now has its own
+narrator for American English, at no cost, on any CPU (the owner's machine, the GitHub runner).
+
+| Item | Value |
+|---|---|
+| Engine | Kokoro-82M v1.0 through kokoro-onnx 0.6.1; weights and voice styles Apache-2.0, kokoro-onnx MIT, onnxruntime MIT: commercial use allowed, no account, no per-character fee |
+| Identity | `zupona-narrator-1`: a fixed blend of three stock styles (am_michael 0.6, am_fenrir 0.25, bm_george 0.15), American phonemes. Sounds like no single stock voice; imitates no real person or company voice |
+| Files | `engine/src/narrator.mjs` (identity, 6 delivery presets, sentence plan, refusals, caption timings, checks), `render/narrate.mjs` (CLI, resumable, checksums), `render/kokoro_tts.py` (the worker), workflow step in `render-film.yml` |
+| Presets | cinematic (default), historical, science, nature, investigative, islamic-calm (English only). Each sets speed and the pause after a sentence and after a question |
+| Never | Quran recitation, Arabic, a line with Arabic text (refused with the reason, before any sound). The owner's own recording always wins over it |
+| Captions | sentence edges measured exactly; words spread evenly inside a sentence |
+
+Benchmark (same 76-word passage, this container, 4 CPUs, Whisper small.en hearing it back):
+- 6 stock voices and a first blend compared (int8 model, one speed): every word heard in every take;
+  errors only on "Sanlúcar de Barrameda" (all) and "cloves" heard as "clothes" (am_fenrir, am_onyx,
+  bm_fable). 0.28-0.31 s of CPU per second of speech; the full model used by the narrator: 0.27.
+- The narrator in all 6 presets: word error 4.1-5.5 %, all of it the Spanish place name; 140-153
+  words a minute; no clipping (fixed gain 0.75, ceiling 0.97).
+- With a lexicon respelling ("San Lookar day Barra-mayda"): **0 % word error**. The S4 pronunciation
+  lexicon is applied to every line, so hard names are fixed per film.
+- Real chapter (saved production `ramesh-babu/USA`, chapter 1): 48 scenes, 1,163 words, 7 min 21 s of
+  narration in 2 min 2 s; pace 158 words a minute (the check refused 161 at a faster setting, which was then lowered).
+
+Not measured (a person must listen): warmth, emotion, how "human" it sounds next to ElevenLabs over 40
+minutes. Bangla and Arabic narration: no free voice was tested; Arabic recitation is never synthesized.
+Candidates not adopted now: IndicF5 and Indic Parler-TTS (Bangla; Bangla is switched off), MOSS-TTS and
+other large models (need a GPU; hosting is not free).

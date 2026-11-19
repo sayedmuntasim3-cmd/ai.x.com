@@ -23,6 +23,8 @@ const T = {
     minutes: "দৈর্ঘ্য (মিনিট)",
     format: "ভিডিওর ধরন",
     formatAuto: "বিষয় দেখে নিজে বেছে নাও",
+    motion: "ছবির নড়াচড়া",
+    motionLevels: { auto: "ধরন দেখে নিজে ঠিক করো", calm: "শান্ত", balanced: "মাঝারি", dynamic: "জোরালো", reduced: "কম নড়াচড়া (ঝলকানি ও ঝাঁকুনি নেই)" },
     formatPlain: "সাধারণ ডকুমেন্টারি",
     saving: "সাশ্রয়ী মোড: Claude-এর খরচ অর্ধেক (Anthropic Batch), মান একই; তবে ধীরে, পুরো ফিল্মে কয়েক ঘণ্টা লাগতে পারে",
     onWorker: "আমার নিজের কম্পিউটারে বানাও (তার নিজের ব্রেইন দিয়ে; কম্পিউটারে node local/jobs.mjs work --api চালু থাকতে হবে)",
@@ -100,6 +102,8 @@ const T = {
     minutes: "Length (minutes)",
     format: "Kind of film",
     formatAuto: "Choose from the topic",
+    motion: "Picture motion",
+    motionLevels: { auto: "Decide from the kind of film", calm: "Calm", balanced: "Balanced", dynamic: "Dynamic", reduced: "Reduced (no flashes or shakes)" },
     formatPlain: "General documentary",
     saving: "Saving mode: half the Claude cost (Anthropic Batch API), same quality; slower, a full film can take a few hours",
     onWorker: "Make it on my own computer (with its own brain; the computer runs node local/jobs.mjs work --api)",
@@ -174,6 +178,10 @@ function formatOptions() {
   const option = (/** @type {string} */ value, /** @type {string} */ label) => { const o = document.createElement("option"); o.value = value; o.textContent = label; return o; };
   select.replaceChildren(option("auto", l.formatAuto), option("", l.formatPlain), ...FORMATS.map((f) => option(f.id, lang() === "bn" ? f.bn : f.name)));
   select.value = keep;
+  const motion = /** @type {HTMLSelectElement} */ ($("film-motion"));
+  const keepMotion = motion.value || "auto";
+  motion.replaceChildren(...Object.entries(l.motionLevels).map(([value, label]) => option(value, label)));
+  motion.value = keepMotion;
 }
 
 function render() {
@@ -229,8 +237,9 @@ async function start(/** @type {SubmitEvent} */ ev) {
     const allowAi = /** @type {HTMLInputElement} */ ($("film-ai")).checked;
     const saving = /** @type {HTMLInputElement} */ ($("film-saving")).checked;
     const runOn = /** @type {HTMLInputElement} */ ($("film-worker")).checked ? "worker" : undefined;
+    const motionLevel = /** @type {HTMLSelectElement} */ ($("film-motion")).value;
     const notes = idea && idea.topic === topic ? idea.note : undefined;
-    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes, saving, runOn }) });
+    const res = await fetch("/api/films", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ topic, minutes, versionId: "en-US", formatId, allowAi, notes, saving, runOn, ...(motionLevel && motionLevel !== "auto" ? { motionLevel } : {}) }) });
     const body = await res.json().catch(() => ({}));
     const isApi = (res.headers.get("content-type") ?? "").includes("json");
     if (!isApi || [404, 405, 501].includes(res.status)) { error(L().notConnected); return; }
