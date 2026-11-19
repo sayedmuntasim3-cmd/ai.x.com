@@ -36,6 +36,11 @@ test("each genre has its own motion language: nature pans a wide place calmly, a
   assert.equal(profileFor({ formatId: "war-battle" }).id, "war");
   assert.equal(profileFor({ formatId: "nope", topic: "The great wildebeest migration" }).id, "nature");
   assert.equal(profileFor({}).id, "documentary");
+  // No format: the film's own words decide, so a voiceover gets its genre's motion.
+  assert.equal(profileFor({ topic: "Stop Wasting Your Teenage Years: 7 Hard Truths Every Teen Needs to Hear" }).id, "motivation");
+  assert.equal(profileFor({ topic: "Wake Island: The Last Stand That Stunned Japan" , text: "The Marines dug in. Japanese bombers came at noon; the pilots of four Wildcats climbed to meet them." }).id, "war");
+  assert.equal(profileFor({ text: "Why do cells divide? Step by step, the DNA is copied, and the cell splits in two. Scientists explained it in 1882." }).id, "science");
+  assert.equal(profileFor({ text: "It was a quiet morning." }).id, "documentary", "too few cues: the general documentary");
 });
 
 test("speed is capped per second, short shots hold, nothing repeats three times, pans alternate, reduced motion holds", () => {

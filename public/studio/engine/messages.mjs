@@ -128,6 +128,8 @@ export const MESSAGES = Object.freeze({
 
   // Voice system: intake, words, understanding, pictures
   "voice.ready": { en: (p) => `Voice checked: ${p.seconds} s, ${p.lufs} LUFS, true peak ${p.peak} dBTP, ${p.silence}% silence.`, bn: (p) => `ভয়েস পরীক্ষা হয়েছে: ${p.seconds} সেকেন্ড, ${p.lufs} LUFS, ট্রু পিক ${p.peak} dBTP, ${p.silence}% নীরবতা।` },
+  "voice.tightened": { en: (p) => `${p.count} long pause${p.count === 1 ? "" : "s"} shortened to ${p.keep} s: ${p.seconds} s of dead air taken out (the original file is unchanged).`, bn: (p) => `${p.count}টি লম্বা বিরতি ${p.keep} সেকেন্ডে ছোট করা হলো: ${p.seconds} সেকেন্ডের ফাঁকা সময় বাদ (মূল ফাইল অপরিবর্তিত)।` },
+  "voice.tightenedQuran": { en: (p) => `Recitation: ${p.count} unusually long stop${p.count === 1 ? "" : "s"} shortened to ${p.keep} s (${p.seconds} s). No word was cut and every natural pause was kept; each cut is listed in tighten.json for the reviewer.`, bn: (p) => `তিলাওয়াত: ${p.count}টি অস্বাভাবিক লম্বা থামা ${p.keep} সেকেন্ডে ছোট করা হলো (${p.seconds} সেকেন্ড)। কোনো শব্দ কাটা হয়নি, স্বাভাবিক সব বিরতি রাখা হয়েছে; প্রতিটি কাট রিভিউয়ের জন্য tighten.json-এ আছে।` },
   "voice.noFfmpeg": { en: () => "ffmpeg is not installed, so the voice file cannot be read.", bn: () => "ffmpeg ইনস্টল নেই, তাই ভয়েস ফাইল পড়া যাচ্ছে না।" },
   "voice.unreadable": { en: (p) => `The voice file could not be read as audio: ${p.error}`, bn: (p) => `ভয়েস ফাইলটি অডিও হিসেবে পড়া গেল না: ${p.error}` },
   "voice.short": { en: () => "The recording is shorter than one second.", bn: () => "রেকর্ডিং এক সেকেন্ডের চেয়ে ছোট।" },

@@ -343,7 +343,7 @@ export const ROLE_STATUS = Object.freeze({
   "cinematography-shot-variety": ["code", "media step: no clip twice within 10 minutes"],
   "cinematography-accessibility": ["planned", "no contrast or flashing check yet"],
 
-  "animation-motion-director": ["model", "S4 motion-graphics style"],
+  "animation-motion-director": ["code", "S4 motion-graphics style (model); motion.mjs picks the film's motion language from its format, else from its topic and narration words (a voiceover too), and the move of every still"],
   "animation-map-motion": ["code", "maps.mjs: animated maps from public-domain Natural Earth shapes (country lit, pin, name, push-in) and route lines that draw themselves between two places, for FX-MAP shots with coordinates"],
   "animation-data-graphics": ["code", "renderer: counter cards and animated bar charts (FX-CHART, eased bars from the shot's own numbers)"],
   "animation-kinetic-type": ["code", "renderer: FX-KINETIC kinetic type, line by line; highlighter sweeps on documents and underlines (FX-HIGHLIGHT), measured to the words"],
@@ -438,7 +438,7 @@ export const ROLE_STATUS = Object.freeze({
   "voice-loudness-engineer": ["code", "gain to target in the studio; loudness in the renderer"],
   "voice-elevenlabs-operator": ["code", "voice.mjs: one take per scene with word timings"],
   "voice-pronunciation": ["code", "S4's pronunciation lexicon is applied to the text sent to the voice: render/voice.mjs (ElevenLabs) and narrator.mjs (free narrator; measured: a respelled Spanish place name heard back with 0 % word error)"],
-  "voice-pacing-editor": ["code", "words per scene; timeline.mjs fitToVoice fits scene times to the real takes (never sped up or cut); --timing script keeps the old capped speed-up"],
+  "voice-pacing-editor": ["code", "words per scene; timeline.mjs fitToVoice fits scene times to the real takes (never sped up or cut); voice-tighten.mjs shortens a recording's long stops, only inside measured silence (a recitation keeps every natural pause)"],
   "voice-music-supervisor": ["code", "music-kit.mjs (ElevenLabs Music) or, free, score-plan.mjs + score-synth.mjs: an original track per cue from its brief (mood, mode, tempo, instruments); never where the music policy forbids instruments; the mix ducks it under the voice"],
   "voice-mix-engineer": ["code", "renderer mix"],
 

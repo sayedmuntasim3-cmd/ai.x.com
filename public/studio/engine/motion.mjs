@@ -64,21 +64,40 @@ const FORMAT_PROFILE = Object.freeze({
   "ancient-civilization": "history", "sports-legend": "motivation", "dramatized-story": "story",
 });
 
+/** Words that mark each motion language, for a film with no format (a voiceover, a free idea). */
+const GENRE_CUES = /** @type {[string, RegExp][]} */ ([
+  ["nature", /\b(wildlife|animals?|forests?|oceans?|reefs?|species|migration|birds?|jungles?|predators?|habitat|lions?|whales?)\b/g],
+  ["science", /\b(space|planets?|galax(y|ies)|universe|physics|quantum|black holes?|stars?|mars|atoms?|cells?|dna|experiment|scientists?|nasa|orbit)\b/g],
+  ["technology", /\b(ai|software|computers?|internet|chips?|robots?|technology|algorithm|app|startup|code)\b/g],
+  ["war", /\b(war|battles?|army|soldiers?|aircraft|tanks?|navy|bombers?|pilots?|troops|invasion|front line|squadron|marines?|last stand|siege|enemy|fighters?|battleships?|garrison|surrender)\b/g],
+  ["history", /\b(empires?|ancient|centur(y|ies)|kings?|queens?|dynast(y|ies)|history|historians?|medieval|pharaohs?|civili[sz]ations?|revolution)\b/g],
+  ["motivation", /\b(success|dreams?|discipline|mindset|habits?|motivat\w*|hard truths?|life lessons?|goals?|confidence|failure|grind|self[- ]improvement|teen(s|agers?)?)\b/g],
+  ["business", /\b(compan(y|ies)|markets?|money|econom(y|ics)|billions?|millions?|profit|stocks?|investors?|revenue|brand|ceo)\b/g],
+  ["investigative", /\b(myster(y|ies)|crimes?|murders?|disappear\w*|unsolved|secrets?|investigat\w*|evidence|detectives?|suspects?|cover[- ]up)\b/g],
+  ["biography", /\b(born|childhood|life of|career|his life|her life|grew up|legend|biography)\b/g],
+  ["geography", /\b(countr(y|ies)|borders?|maps?|islands?|rivers?|mountains?|population|climate|cities|capital|desert)\b/g],
+  ["education", /\b(how (does|do|to)|why (does|do|is|are)|explained|learn|lesson|step by step|tutorial|guide)\b/g],
+]);
+
 /**
- * The motion language of a film: its format's, else a hint from its topic, else general documentary.
- * @param {{ formatId?: string | null, contentType?: string, topic?: string }} film
+ * The motion language of a film: its format's when it has one; otherwise the genre its own
+ * words point to most clearly (the topic counts three times, the narration or voiceover once),
+ * so an education film is not cut like a history epic. Too few cues: general documentary.
+ * @param {{ formatId?: string | null, contentType?: string, topic?: string, text?: string }} film
  */
 export function profileFor(film) {
   const byFormat = film.formatId ? FORMAT_PROFILE[/** @type {keyof typeof FORMAT_PROFILE} */ (film.formatId)] : undefined;
   if (byFormat) return MOTION_PROFILES[byFormat];
   if (film.contentType === "story") return MOTION_PROFILES.story;
-  const t = String(film.topic ?? "").toLowerCase();
-  if (/\b(wildlife|animals?|forest|ocean|reef|species|migration|birds?|jungle)\b/.test(t)) return MOTION_PROFILES.nature;
-  if (/\b(space|planet|galaxy|universe|physics|quantum|black hole|star|mars)\b/.test(t)) return MOTION_PROFILES.science;
-  if (/\b(ai|software|computer|internet|chip|robot|technology)\b/.test(t)) return MOTION_PROFILES.technology;
-  if (/\b(war|battle|army|soldier|aircraft|tank|navy)\b/.test(t)) return MOTION_PROFILES.war;
-  if (/\b(empire|ancient|century|king|dynasty|history)\b/.test(t)) return MOTION_PROFILES.history;
-  return MOTION_PROFILES.documentary;
+  const topic = String(film.topic ?? "").toLowerCase();
+  const text = String(film.text ?? "").toLowerCase().slice(0, 40000);
+  let best = "documentary";
+  let most = 0;
+  for (const [id, re] of GENRE_CUES) {
+    const score = 3 * (topic.match(re) ?? []).length + (text.match(re) ?? []).length;
+    if (score > most) { best = id; most = score; }
+  }
+  return most >= 3 ? MOTION_PROFILES[/** @type {keyof typeof MOTION_PROFILES} */ (best)] : MOTION_PROFILES.documentary;
 }
 
 /** @param {string | null | undefined} level */

@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { lookFor } from "../engine/src/formats.mjs";
 import { buildTimeline, MAX_VOICE_TEMPO, toSrt } from "../engine/src/timeline.mjs";
 import { easeExpr, moveFilter, profileFor } from "../engine/src/motion.mjs";
+import { parseSceneLines } from "../engine/src/scene-lines.mjs";
 import { cutBriefs, renderCuts } from "./cuts.mjs";
 import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
@@ -987,7 +988,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   // The voice system: one recording is the whole narration; captions come from its own word times.
   const oneTrack = typeof args["one-track"] === "string" ? { file: args["one-track"] } : undefined;
   // Scenes follow the takes (no take sped up or cut); --timing script keeps the script's times.
-  const timeline = buildTimeline({ chapters, voice: oneTrack ? {} : spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30), fitVoice: args.timing !== "script", motionProfile: profileFor({ formatId: filmInfo.formatId ?? filmInfo.film?.formatId, contentType: filmInfo.contentType ?? filmInfo.film?.contentType, topic: filmInfo.topic ?? filmInfo.film?.topic }), motionLevel: args.motion ?? filmInfo.motionLevel ?? filmInfo.film?.motionLevel });
+  const timeline = buildTimeline({ chapters, voice: oneTrack ? {} : spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30), fitVoice: args.timing !== "script", motionProfile: profileFor({ formatId: filmInfo.formatId ?? filmInfo.film?.formatId, contentType: filmInfo.contentType ?? filmInfo.film?.contentType, topic: filmInfo.topic ?? filmInfo.film?.topic, text: chapters.flatMap((c) => parseSceneLines(c.markdown).map((sc) => sc.narration)).join(" ") }), motionLevel: args.motion ?? filmInfo.motionLevel ?? filmInfo.film?.motionLevel });
   if (timeline.timing) console.log(`timing: ${timeline.timing.plannedSeconds} s planned, ${timeline.timing.fittedSeconds} s fitted to the voice (${timeline.timing.stretched} scenes longer, ${timeline.timing.shortened} shorter)`);
   console.log(`look: ${look}`);
   if (oneTrack && typeof args.words === "string") {
