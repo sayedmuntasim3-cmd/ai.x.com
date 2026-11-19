@@ -33,20 +33,49 @@ export function geminiModel(o) {
         generationConfig: { maxOutputTokens: Math.min(req.maxTokens, 65536) },
         ...(req.webSearch && o.webSearch !== false ? { tools: [{ google_search: {} }] } : {}),
       };
+      let thoughts = true;
       for (let attempt = 0; ; attempt += 1) {
-        const res = await get(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": o.apiKey }, body: JSON.stringify(body) });
+        // Streamed (server-sent events), with thought summaries switched on, so bytes keep flowing
+        // while the model thinks: a long silent wait was cut off as "Gemini 524" (Nov 2026).
+        const sent = thoughts ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: { includeThoughts: true } } } : body;
+        const res = await get(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": o.apiKey }, body: JSON.stringify(sent) });
         if (res.ok) {
-          const data = /** @type {any} */ (await res.json());
-          const cand = data.candidates?.[0];
-          const out = (cand?.content?.parts ?? []).map((/** @type {any} */ p) => p.text ?? "").join("");
-          const reason = cand?.finishReason === "MAX_TOKENS" ? "max_tokens" : cand?.finishReason === "SAFETY" || data.promptFeedback?.blockReason ? "refusal" : "end_turn";
-          return { text: out, stopReason: reason, model, ...(data.responseId ? { responseId: String(data.responseId) } : {}), ...(data.modelVersion ? { modelVersion: String(data.modelVersion) } : {}), usage: { input_tokens: data.usageMetadata?.promptTokenCount ?? 0, output_tokens: (data.usageMetadata?.candidatesTokenCount ?? 0) + (data.usageMetadata?.thoughtsTokenCount ?? 0) } };
+          const chunks = parseChunks(await res.text());
+          const parts = chunks.flatMap((c) => c.candidates?.[0]?.content?.parts ?? []);
+          const out = parts.filter((/** @type {any} */ p) => !p.thought).map((/** @type {any} */ p) => p.text ?? "").join("");
+          const finish = [...chunks].reverse().map((c) => c.candidates?.[0]?.finishReason).find(Boolean);
+          const blocked = chunks.some((c) => c.promptFeedback?.blockReason);
+          const usage = [...chunks].reverse().map((c) => c.usageMetadata).find(Boolean) ?? {};
+          const responseId = chunks.map((c) => c.responseId).find(Boolean);
+          const modelVersion = chunks.map((c) => c.modelVersion).find(Boolean);
+          const reason = finish === "MAX_TOKENS" ? "max_tokens" : finish === "SAFETY" || blocked ? "refusal" : "end_turn";
+          return { text: out, stopReason: reason, model, ...(responseId ? { responseId: String(responseId) } : {}), ...(modelVersion ? { modelVersion: String(modelVersion) } : {}), usage: { input_tokens: usage.promptTokenCount ?? 0, output_tokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) } };
         }
+        const detail = (await res.text()).slice(0, 300);
+        // A model that refuses thought summaries: ask again without them (once).
+        if (res.status === 400 && thoughts && /thinking|thought/i.test(detail)) { thoughts = false; continue; }
         // The free tier allows a few requests a minute: wait and try again.
         if ((res.status === 429 || res.status >= 500) && attempt < 6) { await sleep(Math.min(60_000, 5000 * 2 ** attempt)); continue; }
-        const err = Object.assign(new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 300)}`), { status: res.status });
-        throw err;
+        throw Object.assign(new Error(`Gemini ${res.status}: ${detail}`), { status: res.status });
       }
     },
   };
+}
+
+/**
+ * The reply of streamGenerateContent: server-sent events ("data: {...}" lines), or, from a
+ * fake or a proxy that buffers, one JSON object or an array of them.
+ * @param {string} raw
+ * @returns {any[]}
+ */
+export function parseChunks(raw) {
+  const text = raw.trim();
+  if (!text) return [];
+  if (/^data:/m.test(text)) {
+    return text.split(/\r?\n/).filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).filter((l) => l && l !== "[DONE]").flatMap((l) => {
+      try { return [JSON.parse(l)]; } catch { return []; }
+    });
+  }
+  const data = JSON.parse(text);
+  return Array.isArray(data) ? data : [data];
 }
