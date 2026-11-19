@@ -15,7 +15,8 @@ test("Gemini writes like the Claude stages: system, messages, search, cut-off an
   const r = await m.call({ stage: "research", system: [{ text: "MANUAL", cache: true }], messages: [{ role: "user", content: [{ text: "go" }, { text: "", image: "https://x/1.jpg" }] }, { role: "assistant", content: [{ text: "part" }] }], maxTokens: 32000, effort: "high", webSearch: { maxUses: 30 } });
   assert.deepEqual([r.text, r.stopReason, r.usage.output_tokens], ["## S0", "max_tokens", 8]);
   assert.equal(sent.length, 2, "a 429 waits and tries again");
-  assert.match(sent[1].url, /models\/gemini-3\.8-flash:generateContent$/);
+  assert.match(sent[1].url, /models\/gemini-3\.8-flash:streamGenerateContent\?alt=sse$/);
+  assert.deepEqual(sent[1].body.generationConfig.thinkingConfig, { includeThoughts: true }, "thought summaries keep the stream busy");
   assert.equal(sent[1].headers["x-goog-api-key"], "K");
   assert.deepEqual(sent[1].body.contents.map((/** @type {any} */ c) => c.role), ["user", "model"]);
   assert.deepEqual(sent[1].body.contents[0].parts, [{ text: "go" }], "images by URL are not sent");
@@ -54,4 +55,30 @@ test("thinking tokens count as output (they are billed as output on paid tiers)"
   const m = geminiModel({ apiKey: "k", fetch: /** @type {typeof fetch} */ (async () => Response.json({ candidates: [{ content: { parts: [{ text: "x" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20, thoughtsTokenCount: 30 } })) });
   const r = await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 });
   assert.deepEqual(r.usage, { input_tokens: 100, output_tokens: 50 });
+});
+
+test("a streamed reply: thought summaries are left out, the text joins, the last chunk gives the finish and usage", async () => {
+  const sse = [
+    { candidates: [{ content: { parts: [{ text: "planning the title", thought: true }] } }] },
+    { responseId: "r-1", modelVersion: "gemini-3.8-flash-001", candidates: [{ content: { parts: [{ text: "## S0 " }] } }] },
+    { candidates: [{ content: { parts: [{ text: "Title" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 4, thoughtsTokenCount: 9 } },
+  ].map((c) => `data: ${JSON.stringify(c)}\r\n\r\n`).join("");
+  const m = geminiModel({ apiKey: "k", fetch: /** @type {typeof fetch} */ (async () => new Response(sse, { headers: { "content-type": "text/event-stream" } })) });
+  const r = await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 });
+  assert.deepEqual([r.text, r.stopReason, r.responseId, r.modelVersion, r.usage], ["## S0 Title", "end_turn", "r-1", "gemini-3.8-flash-001", { input_tokens: 7, output_tokens: 13 }]);
+});
+
+test("a model that refuses thought summaries is asked again once without them", async () => {
+  /** @type {any[]} */
+  const bodies = [];
+  const m = geminiModel({ apiKey: "k", sleep: async () => {}, fetch: /** @type {typeof fetch} */ (async (_u, init) => {
+    const b = JSON.parse(String(init?.body));
+    bodies.push(b);
+    if (b.generationConfig.thinkingConfig) return new Response(JSON.stringify({ error: { message: "Thinking is not supported by this model." } }), { status: 400 });
+    return Response.json({ candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }] });
+  }) });
+  const r = await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 });
+  assert.equal(r.text, "ok");
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[1].generationConfig.thinkingConfig, undefined);
 });
