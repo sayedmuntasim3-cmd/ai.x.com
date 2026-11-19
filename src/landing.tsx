@@ -199,6 +199,7 @@ export default function Landing() {
 
   const brief = {
     title,
+    minutes: Math.max(1, Math.round(totalSeconds / 60)),
     mode: draft.mode,
     idea: draft.mode === "idea" ? draft.idea.trim() : draft.topic.trim(),
     voiceName: voice?.name,
@@ -1256,6 +1257,7 @@ function MobileNav() {
 
 type Brief = {
   title: string;
+  minutes: number;
   mode: Mode;
   idea: string;
   voiceName?: string;
@@ -1370,12 +1372,9 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
           <Timeline chapters={brief.chapters} totalSeconds={brief.chapters[brief.chapters.length - 1]?.end ?? 60} />
         </div>
 
-        <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
-          Rendering happens in Zupona Studio, which is opening to creators soon. Your settings are saved on this device, so they
-          will be waiting for you.
-        </p>
+        <MakeFilm brief={brief} open={open} />
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={copy}
@@ -1387,7 +1386,7 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-ink text-[15px] font-medium text-canvas transition hover:opacity-90"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-line-strong text-[15px] font-medium text-ink transition hover:border-ink/40"
           >
             Keep editing
           </button>
@@ -1397,5 +1396,277 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
         </p>
       </div>
     </dialog>
+  );
+}
+
+/* ================================================================== */
+/* Make the film: the landing studio talks to the film engine          */
+/* ================================================================== */
+
+const KEY_STORE = "zupona:studio-key";
+const FILMS_STORE = "zupona:films";
+
+type FilmView = {
+  id: string;
+  status: string;
+  done: number;
+  stages: string[];
+  costUsd: number;
+  error?: string;
+  warning?: string;
+};
+
+const STAGE_NAMES: Record<string, string> = {
+  market: "Studying what viewers want",
+  s01: "Title and plan",
+  research: "Researching the facts",
+  sources: "Checking every source",
+  s2: "Building the evidence",
+  s3: "Planning the chapters",
+  s4: "Characters, music and look",
+  media: "Finding the footage",
+  qa: "Quality check",
+  edit: "Editing",
+  viewer: "First-viewer test",
+  originality: "Originality check",
+  s6: "Final review",
+  s7: "Titles, thumbnails and description",
+};
+
+function stageName(id: string) {
+  if (id.startsWith("s5:")) return `Writing chapter ${id.slice(3).replace(/^C/, "")}`;
+  if (id.startsWith("media:")) return `Footage for chapter ${id.slice(6).replace(/^C/, "")}`;
+  if (id.startsWith("edit:")) return `Editing chapter ${id.slice(5).replace(/^C/, "")}`;
+  return STAGE_NAMES[id] ?? id;
+}
+
+const STATUS_TEXT: Record<string, string> = {
+  queued: "Getting ready",
+  running: "Your film is being made",
+  revising: "Improving the script",
+  done: "Your film is ready",
+  "done-with-gaps": "Your film is ready (a few shots need pictures)",
+  paused: "Paused",
+  failed: "Stopped",
+  "stopped-budget": "Stopped at the budget limit",
+};
+
+function readStore(key: string) {
+  try {
+    return window.localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStore(key: string, value: string) {
+  try {
+    if (value) window.localStorage.setItem(key, value);
+    else window.localStorage.removeItem(key);
+  } catch {
+    /* private mode: the key is asked again next time */
+  }
+}
+
+function rememberFilm(id: string, title: string) {
+  try {
+    const list = JSON.parse(readStore(FILMS_STORE) || "[]") as { id: string; title: string; at: string }[];
+    const next = [{ id, title, at: new Date().toISOString() }, ...list.filter((f) => f.id !== id)].slice(0, 20);
+    writeStore(FILMS_STORE, JSON.stringify(next));
+  } catch {
+    writeStore(FILMS_STORE, JSON.stringify([{ id, title, at: new Date().toISOString() }]));
+  }
+}
+
+function lastFilmFor(title: string) {
+  try {
+    const list = JSON.parse(readStore(FILMS_STORE) || "[]") as { id: string; title: string }[];
+    return list.find((f) => f.title === title)?.id ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
+  const [key, setKey] = useState("");
+  const [askKey, setAskKey] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [film, setFilm] = useState<FilmView | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const saved = readStore(KEY_STORE);
+    setKey(saved);
+    setAskKey(!saved);
+    setError("");
+    const last = lastFilmFor(brief.title);
+    setFilm(last ? { id: last, status: "queued", done: 0, stages: [], costUsd: 0 } : null);
+  }, [open, brief.title]);
+
+  // Follow the film while the sheet is open.
+  useEffect(() => {
+    if (!open || !film?.id) return;
+    let stop = false;
+    let timer = 0;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/films/${film.id}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          const run = data.run ?? {};
+          const stages = Object.keys(run.stages ?? {});
+          if (!stop)
+            setFilm({
+              id: film.id,
+              status: String(run.status ?? data.workflow?.status ?? "queued"),
+              done: stages.length,
+              stages,
+              costUsd: Number(run.costUsd ?? 0),
+              error: run.error ? String(run.error) : undefined,
+              warning: run.status === "running" && run.lastError ? String(run.lastError.message ?? "") : undefined,
+            });
+          const finished = ["done", "done-with-gaps", "failed", "stopped-budget", "paused"].includes(String(run.status));
+          if (finished) return;
+        }
+      } catch {
+        /* offline for a moment: try again */
+      }
+      if (!stop) timer = window.setTimeout(poll, 8000);
+    };
+    poll();
+    return () => {
+      stop = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, film?.id]);
+
+  const start = async () => {
+    if (brief.mode !== "idea") return;
+    const studioKey = key.trim();
+    if (!studioKey) {
+      setAskKey(true);
+      setError("Enter your studio key to start.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const notes = `Audience: ${brief.age}. Idea system: ${brief.category}. Style: ${brief.style}. Music: ${brief.music}.`;
+      const res = await fetch("/api/films", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
+        body: JSON.stringify({ topic: brief.idea, minutes: brief.minutes, notes, formatId: "auto", allowAi: false }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        writeStore(KEY_STORE, "");
+        setAskKey(true);
+        setError("That studio key is not right. Check it and try again.");
+        return;
+      }
+      if (!res.ok || !data.id) {
+        setError(String(data.error ?? "The studio could not start the film. Try again in a minute."));
+        return;
+      }
+      writeStore(KEY_STORE, studioKey);
+      setAskKey(false);
+      rememberFilm(data.id, brief.title);
+      setFilm({ id: data.id, status: "queued", done: 0, stages: [], costUsd: 0 });
+    } catch {
+      setError("No connection. Check your internet and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (brief.mode !== "idea") {
+    return (
+      <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
+        Films from your own voiceover are coming next. For now, switch to Idea and describe your story in a sentence.
+      </p>
+    );
+  }
+
+  if (film) {
+    const finished = film.status === "done" || film.status === "done-with-gaps";
+    const stopped = film.status === "failed" || film.status === "stopped-budget" || film.status === "paused";
+    return (
+      <div className="mt-6 rounded-2xl border border-line bg-canvas/50 p-4" aria-live="polite">
+        <p className={`${eyebrow} flex items-center gap-1.5`}>
+          {finished ? <CheckIcon size={16} /> : <span className="inline-block size-2 animate-pulse rounded-full bg-brand" />}
+          {STATUS_TEXT[film.status] ?? film.status}
+        </p>
+        {!finished && !stopped && (
+          <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
+            You can close this and come back: the film keeps being made. A short film takes a while on the free plan.
+          </p>
+        )}
+        {film.stages.length > 0 && (
+          <ol className="mt-3 space-y-1.5 text-[14px] text-ink">
+            {film.stages.slice(-6).map((s) => (
+              <li key={s} className="flex items-center gap-2">
+                <CheckIcon size={15} className="shrink-0 text-brand-ink" /> {stageName(s)}
+              </li>
+            ))}
+          </ol>
+        )}
+        {film.warning && <p className="mt-3 text-[13px] text-muted">Waiting and retrying: {film.warning}</p>}
+        {stopped && film.error && <p className="mt-3 text-[14px] text-[#c2410c]">{film.error}</p>}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <a
+            href={`/api/films/${film.id}/page`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex h-11 items-center justify-center rounded-full bg-ink text-[14px] font-medium text-canvas transition hover:opacity-90"
+          >
+            Open the film
+          </a>
+          <button
+            type="button"
+            onClick={() => setFilm(null)}
+            className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40"
+          >
+            Make another
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6">
+      {askKey && (
+        <label className="block">
+          <span className="text-[14px] font-medium text-ink">Studio key</span>
+          <input
+            type="password"
+            autoComplete="current-password"
+            autoCapitalize="off"
+            spellCheck={false}
+            value={key}
+            onChange={(e) => {
+              setKey(e.target.value);
+              setError("");
+            }}
+            className="mt-2 h-12 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15"
+          />
+          <span className="mt-1.5 block text-[12.5px] text-muted">Asked once, then saved on this device.</span>
+        </label>
+      )}
+      <button
+        type="button"
+        onClick={start}
+        disabled={busy}
+        className="mt-4 flex h-[56px] w-full items-center justify-center rounded-2xl bg-brand-gradient px-4 text-[16px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60"
+      >
+        {busy ? "Starting…" : "Make my film"}
+      </button>
+      {error && (
+        <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
