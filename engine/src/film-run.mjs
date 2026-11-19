@@ -18,6 +18,7 @@ import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, valid
 import { buildTimeline } from "./timeline.mjs";
 import { chapterMedia, createUseHistory } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
+import { MOTION_LEVELS } from "./motion.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
 import { applyFixes, checkChapter, checkFilm, hookFindings, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
@@ -65,7 +66,7 @@ export const WEB_SEARCH_USD = 0.01;
  * Validate a new film request. formatId picks one of the format presets
  * (formats.mjs: motivational life story, dramatized story, history epic ...);
  * "auto" lets the topic choose; none keeps the general documentary.
- * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown, saving?: unknown, scriptOnly?: unknown }} input
+ * @param {{ topic?: unknown, minutes?: unknown, versionId?: unknown, allowAi?: unknown, notes?: unknown, formatId?: unknown, saving?: unknown, scriptOnly?: unknown, motionLevel?: unknown }} input
  * @param {string} id
  * @returns {{ ok: true, film: Film } | { ok: false, error: string }}
  */
@@ -86,7 +87,10 @@ export function newFilm(input, id) {
   const saving = input.saving === true;
   // A script-only film (for script tests and baselines) never reaches pictures, render or release.
   const scriptOnly = input.scriptOnly === true;
-  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null, saving, ...(scriptOnly ? { scriptOnly } : {}) } };
+  // Picture motion (motion.mjs): unset means the film's genre decides; "reduced" has no flashes, shakes or punch-ins.
+  const motionLevel = typeof input.motionLevel === "string" && Object.hasOwn(MOTION_LEVELS, input.motionLevel) ? input.motionLevel : undefined;
+  if (input.motionLevel !== undefined && !motionLevel) return { ok: false, error: `Picture motion must be one of ${Object.keys(MOTION_LEVELS).join(", ")}.` };
+  return { ok: true, film: { id, topic, durationSeconds: Math.round(minutes * 60), versionId, allowAi, notes, formatId: format?.id ?? null, saving, ...(scriptOnly ? { scriptOnly } : {}), ...(motionLevel ? { motionLevel } : {}) } };
 }
 
 /**

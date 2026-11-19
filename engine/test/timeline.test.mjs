@@ -106,11 +106,17 @@ test("captions land on the voice's own word timings, sped up exactly as the rend
   assert.deepEqual(captionsFromWords(words, 16).map((c) => c.text), ["The mill opens.", "It never stops."]);
 
   const md = `**SC0001** | 0:00:00-0:00:02 | C1 | b | E | C01 | NARR: ${text} | W 6/5 | ANCHOR: x | SHOTS: (1) R1 card | LOOK: L`;
-  // A 3.1 s take for a 2 s scene is sped up 15% (the cap); the rest is cut, and so are its captions.
-  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md }], voice: { SC0001: { durationSeconds: 3.1, alignment } } });
+  // With the script's times kept, a 3.1 s take for a 2 s scene is sped up 15% (the cap); the rest is cut, and so are its captions.
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md }], voice: { SC0001: { durationSeconds: 3.1, alignment } }, fitVoice: false });
   const all = t.captions.flatMap((c) => c.words ?? []);
   assert.equal(all[1].start, Math.round((0.4 / 1.15) * 1000) / 1000);
   assert.ok(all.every((w) => w.end <= 2), "no caption runs past its scene");
+  // By default the scene follows the take: nothing sped up, nothing cut.
+  const fitted = buildTimeline({ chapters: [{ id: "C1", markdown: md }], voice: { SC0001: { durationSeconds: 3.1, alignment } } });
+  const heard = fitted.captions.flatMap((c) => c.words ?? []);
+  assert.ok(Math.abs(fitted.durationSeconds - 3.45) <= 1 / 30, "3.1 s take + breath, to the frame");
+  assert.equal(heard[1].start, 0.4);
+  assert.equal(heard.length, 6);
   const estimated = buildTimeline({ chapters: [{ id: "C1", markdown: md }] });
   assert.ok(estimated.captions.every((c) => c.words && c.words.length > 0), "without timings, every word still gets an estimated time");
 });
@@ -185,4 +191,29 @@ test("a chart is drawn only from numbers the shot writes; a highlight only on wo
   assert.equal(highlightFor("R1 FX-PAPER, highlight \"on all counts\"", "", "FX-PAPER", "Guilty on all counts"), "on all counts");
   assert.equal(highlightFor("R1 card, highlight \"not there\"", "", "", "Guilty"), "", "a phrase the card does not show is ignored");
   assert.equal(highlightFor("R1 card", "", "FX-HIGHLIGHT", "He lost everything"), "He lost everything");
+});
+
+test("scene times follow the takes: a long take borrows the spare time of its chapter, never sped up or cut", async () => {
+  const { fitToVoice, VOICE_TAIL } = await import("../src/timeline.mjs");
+  const line = (/** @type {string} */ sc, /** @type {string} */ a, /** @type {string} */ b, /** @type {string} */ narr) => `**${sc}** | ${a}-${b} | C1 | b | E | C01 | NARR: ${narr} | W 4/4 | ANCHOR: x | SHOTS: (1) R1 card "A"; (2) ${b === "0:00:10" ? "0:00:08-0:00:10 " : ""}R1 card "B" | LOOK: L`;
+  const md = [line("SC0001", "0:00:00", "0:00:04", "One two three four."), line("SC0002", "0:00:04", "0:00:10", "Five six seven eight."), `**SC0003** | 0:00:10-0:00:13 | C1 | b | E | C01 | NARR: — | W 0/0 | ANCHOR: x | SHOTS: (1) R1 card "C" | LOOK: L`].join("\n");
+  const voice = { SC0001: { durationSeconds: 5.65 }, SC0002: { durationSeconds: 3.65 } };
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, edit: /** @type {any} */ ({ chapter: "C1", by: "edit-director", problems: [], scenes: [{ scene: "SC0002", punchIns: [9], shakes: [], hits: [] }] }) }], voice });
+  const starts = Object.fromEntries(t.narration.map((n) => [n.scene, [n.start, n.end]]));
+  // SC0001 needs 6 s (5.65 + breath), 2 more than written; SC0002 needs 4 of its 6, so it gives 2. The chapter keeps its 13 s.
+  assert.deepEqual(starts.SC0001, [0, 6]);
+  assert.deepEqual(starts.SC0002, [6, 10]);
+  assert.equal(t.durationSeconds, 13);
+  assert.equal(t.timing?.stretched, 1);
+  assert.equal(t.timing?.shortened, 1);
+  // The wordless scene keeps its 3 s; SC0002's timed shot and the director's punch-in move with the new clock.
+  assert.deepEqual(t.video.filter((v) => v.scene === "SC0003").map((v) => [v.start, v.end]), [[10, 13]]);
+  const b = t.video.find((v) => v.scene === "SC0002" && v.shot === 2);
+  assert.ok(b && Math.abs(b.start - (6 + (4 * 4) / 6)) < 0.04, "a timed shot keeps its place inside its scene");
+  assert.ok(t.video.some((v) => v.punchIns?.length), "the director's punch-in is still placed");
+  // A chapter with no spare time grows instead: the take is never cut.
+  const tight = fitToVoice([[{ sc: "A", start: 0, end: 4, wordless: false }, { sc: "B", start: 4, end: 8, wordless: false }]], { A: { durationSeconds: 5 }, B: { durationSeconds: 4 } });
+  assert.equal(tight.map(8), 8 + 1 + 2 * VOICE_TAIL);
+  assert.equal(tight.report.grownChapters, 1);
+  assert.equal(tight.map(20), 20 + 1 + 2 * VOICE_TAIL, "later chapters shift by the growth");
 });

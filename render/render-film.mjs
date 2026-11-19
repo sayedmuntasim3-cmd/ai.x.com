@@ -26,6 +26,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lookFor } from "../engine/src/formats.mjs";
 import { buildTimeline, MAX_VOICE_TEMPO, toSrt } from "../engine/src/timeline.mjs";
+import { easeExpr, moveFilter, profileFor } from "../engine/src/motion.mjs";
 import { cutBriefs, renderCuts } from "./cuts.mjs";
 import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
@@ -234,11 +235,14 @@ const FOCUS = { left: [0, 0.5], right: [1, 0.5], top: [0.5, 0], bottom: [0.5, 1]
  * Director names (the face, the document's line, the crowd on the left); a
  * print drifts in gently; otherwise push, pull and pan take turns.
  * @param {string | undefined} focus @param {boolean} print @param {number} i @param {number} n frames
+ * @param {import("../engine/src/motion.mjs").Move} [move]
  */
-export function stillMove(focus, print, i, n) {
+export function stillMove(focus, print, i, n, move) {
   const f = focus ? FOCUS[/** @type {keyof typeof FOCUS} */ (focus)] : null;
-  if (f) return `zoompan=z='1+${print ? 0.1 : 0.16}*on/${n}':x='(iw-iw/zoom)*${f[0]}':y='(ih-ih/zoom)*${f[1]}'`;
-  if (print) return `zoompan=z='1.02+0.05*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
+  if (f) return `zoompan=z='1+${print ? 0.1 : 0.16}*${easeExpr("inOut", n)}':x='(iw-iw/zoom)*${f[0]}':y='(ih-ih/zoom)*${f[1]}'`;
+  if (print) return `zoompan=z='1.02+0.05*${easeExpr("inOut", n)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
+  // The move decided for the scene (engine/src/motion.mjs), eased; older timelines without one keep the rota.
+  if (move) return moveFilter(move, n);
   const moves = [
     `zoompan=z='1+0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
     `zoompan=z='1.09-0.09*on/${n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`,
@@ -365,7 +369,7 @@ export async function renderFilm(o) {
   await pool(t.video, limit, async (v, i) => {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
-    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}) };
+    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
     const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
@@ -398,11 +402,17 @@ export async function renderFilm(o) {
           if (!existsSync(fg)) await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=-2:${Math.round(H * 0.86 / 2) * 2},setsar=1`, fg]);
           input = ["-loop", "1", "-framerate", String(t.fps), "-i", bg, "-loop", "1", "-framerate", String(t.fps), "-i", fg];
           complex = true;
-          const dir = i % 2 ? -1 : 1;
+          // The scene's move sets the float's direction, strength and easing (hold: barely; reduced motion: still).
+          const mv = v.move;
+          const dir = mv && (mv.kind === "pan" || mv.kind === "drift") ? mv.dir : i % 2 ? -1 : 1;
+          const k = mv ? (mv.kind === "hold" ? (mv.amount === 0 && mv.why.startsWith("reduced") ? 0 : 0.3) : Math.min(1.6, mv.amount / 0.09)) : 1;
+          const e = easeExpr(mv?.ease ?? "linear", n);
+          const en = e.replaceAll("on/", "n/");
+          const r = (/** @type {number} */ x) => Math.round(x * k * 10000) / 10000;
           chain.push(
-            `[0]zoompan=z='1+0.05*on/${n}':x='iw/2-(iw/zoom/2)+${dir}*iw*0.03*on/${n}':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${t.fps}[pbg];` +
-            `[1]scale=w='trunc(iw*(1+0.07*n/${n})/2)*2':h=-2:eval=frame[pfg];` +
-            `[pbg][pfg]overlay=x='(W-w)/2-${dir}*W*0.025*n/${n}':y='(H-h)/2'`,
+            `[0]zoompan=z='1+${r(0.05)}*${e}':x='iw/2-(iw/zoom/2)+${dir}*iw*${r(0.03)}*${e}':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${t.fps}[pbg];` +
+            `[1]scale=w='trunc(iw*(1+${r(0.07)}*${en})/2)*2':h=-2:eval=frame[pfg];` +
+            `[pbg][pfg]overlay=x='(W-w)/2-${dir}*W*${r(0.025)}*${en}':y='(H-h)/2'`,
             "setsar=1", LOOK,
           );
         } else {
@@ -423,7 +433,7 @@ export async function renderFilm(o) {
             await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-filter_complex", `[0]split=2[bg][fg];${bg};${fg}`, plate]);
           }
           input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
-          chain.push(`${stillMove(v.focus, print, i, n)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
+          chain.push(`${stillMove(v.focus, print, i, n, v.move)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
         }
       } catch (error) {
         stats.clipsFailed += 1;
@@ -884,7 +894,7 @@ export async function renderFilm(o) {
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
   // What the Edit Director's plan put on screen (punch-ins and shakes drawn, glitches into scenes).
   const edit = { punchIns: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).punchIns), 0), shakes: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).shakes), 0), glitches: t.video.filter((v) => v.transition === "glitch" && !v.fadeIn).length };
-  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, master, licences, warnings };
+  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, voicedScenes: pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, master, licences, ...(t.timing ? { timing: t.timing } : {}), ...(t.motion ? { motion: t.motion } : {}), warnings };
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;
@@ -951,7 +961,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--ai <folder>] [--pictures <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -970,7 +980,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const look = /** @type {"documentary" | "cinematic" | "archive"} */ (["documentary", "cinematic", "archive"].includes(args.look) ? args.look : lookFor(filmInfo.formatId ?? filmInfo.film?.formatId));
   // The voice system: one recording is the whole narration; captions come from its own word times.
   const oneTrack = typeof args["one-track"] === "string" ? { file: args["one-track"] } : undefined;
-  const timeline = buildTimeline({ chapters, voice: oneTrack ? {} : spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30) });
+  // Scenes follow the takes (no take sped up or cut); --timing script keeps the script's times.
+  const timeline = buildTimeline({ chapters, voice: oneTrack ? {} : spoken, look, width: Number(args.width ?? 1920), height: Number(args.height ?? 1080), fps: Number(args.fps ?? 30), fitVoice: args.timing !== "script", motionProfile: profileFor({ formatId: filmInfo.formatId ?? filmInfo.film?.formatId, contentType: filmInfo.contentType ?? filmInfo.film?.contentType, topic: filmInfo.topic ?? filmInfo.film?.topic }), motionLevel: args.motion ?? filmInfo.motionLevel ?? filmInfo.film?.motionLevel });
+  if (timeline.timing) console.log(`timing: ${timeline.timing.plannedSeconds} s planned, ${timeline.timing.fittedSeconds} s fitted to the voice (${timeline.timing.stretched} scenes longer, ${timeline.timing.shortened} shorter)`);
   console.log(`look: ${look}`);
   if (oneTrack && typeof args.words === "string") {
     const { captionsFromWords } = await import("../engine/src/timeline.mjs");

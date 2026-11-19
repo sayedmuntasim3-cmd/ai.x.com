@@ -10,10 +10,11 @@
 import { EDIT_SOUNDS } from "./edit-director.mjs";
 import { shotParts } from "./film-media.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
+import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionReport, sceneIntent, writtenMove } from "./motion.mjs";
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", move?: import("./motion.mjs").Move, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch" | "leak"} Transition
  *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera;
  *   highlight: words on a card swept by a highlighter (paper) or an underline (FX-HIGHLIGHT); chart: an animated bar chart (FX-CHART);
@@ -36,7 +37,7 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
  * @typedef {{ token: string, kind: "bed" | "hit", scene: string, start: number, end: number }} SoundEvent
  *   bed: ambience under the whole scene; hit: a one-shot from start (end is the scene's end)
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number } }} Timeline
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, motion?: ReturnType<typeof motionReport> }} Timeline
  */
 
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
@@ -377,8 +378,79 @@ export function slowMotion(motion) {
   return 1;
 }
 
+/** Seconds of breath left after a take before the next scene starts. */
+export const VOICE_TAIL = 0.35;
+
 /**
- * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string, edit?: import("./edit-director.mjs").EditPlan | null }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook, autoSound?: boolean }} o
+ * Scene times fitted to the recorded voice. The script's times are a plan made from a word
+ * count; the takes are the truth. A take is never sped up or cut: a scene whose take runs
+ * longer than its slot (plus a breath) takes the time from scenes of the same chapter that hold
+ * the picture longer than their take needs, in proportion to that spare time; only when the
+ * chapter has too little spare time does it grow. Wordless scenes and scenes without a take keep
+ * their length; gaps between scenes are kept. Returns a clock map (old film time to new) that
+ * every time in the timeline goes through: scenes, timed shots, the Edit Director's moves.
+ * @param {{ start: number, end: number, sc: string, wordless: boolean }[][]} chapters scenes per chapter, in order
+ * @param {Record<string, { durationSeconds: number }>} voice
+ */
+export function fitToVoice(chapters, voice) {
+  /** @type {[number, number][]} old and new time at each scene edge, in order */
+  const points = [];
+  let shift = 0;
+  const report = { plannedSeconds: 0, fittedSeconds: 0, stretched: 0, shortened: 0, grownChapters: 0, skipped: /** @type {string[]} */ ([]) };
+  for (const scenes of chapters) {
+    const timed = scenes.filter((s) => s.end > s.start);
+    if (!timed.length) continue;
+    const ordered = timed.every((s, i) => i === 0 || s.start >= timed[i - 1].end - 0.001);
+    const need = timed.map((s) => {
+      const spoken = Number(voice[s.sc]?.durationSeconds);
+      return !s.wordless && spoken > 0 ? spoken + VOICE_TAIL : null;
+    });
+    const length = timed.map((s, i) => {
+      const d = s.end - s.start;
+      return need[i] === null || !ordered ? d : Math.max(d, /** @type {number} */ (need[i]));
+    });
+    const over = timed.reduce((a, s, i) => a + length[i] - (s.end - s.start), 0);
+    const spare = timed.map((s, i) => (need[i] !== null && ordered ? Math.max(0, s.end - s.start - /** @type {number} */ (need[i])) : 0));
+    const spareTotal = spare.reduce((a, b) => a + b, 0);
+    const take = spareTotal > 0 ? Math.min(1, over / spareTotal) : 0;
+    if (!ordered) report.skipped.push(timed[0].sc);
+    if (over > spareTotal + 0.001) report.grownChapters += 1;
+    let at = timed[0].start + shift;
+    timed.forEach((s, i) => {
+      const gap = i ? s.start - timed[i - 1].end : 0;
+      at += Math.max(0, gap);
+      const d = s.end - s.start;
+      const fitted = length[i] - spare[i] * take;
+      if (fitted > d + 0.001) report.stretched += 1;
+      else if (fitted < d - 0.001) report.shortened += 1;
+      points.push([s.start, at], [s.end, at + fitted]);
+      report.plannedSeconds += d;
+      report.fittedSeconds += fitted;
+      at += fitted;
+    });
+    shift = at - timed[timed.length - 1].end;
+  }
+  report.plannedSeconds = round3(report.plannedSeconds);
+  report.fittedSeconds = round3(report.fittedSeconds);
+  /** @param {number} t */
+  const map = (t) => {
+    if (!points.length || !Number.isFinite(t)) return t;
+    if (t <= points[0][0]) return t + (points[0][1] - points[0][0]);
+    for (let i = 1; i < points.length; i += 1) {
+      const [a0, b0] = points[i - 1];
+      const [a1, b1] = points[i];
+      if (t <= a1) return a1 > a0 ? b0 + ((t - a0) * (b1 - b0)) / (a1 - a0) : b1;
+    }
+    const [a, b] = points[points.length - 1];
+    return t + (b - a);
+  };
+  return { map, report };
+}
+
+/**
+ * @param {{ chapters: { id: string, markdown: string, media?: ChapterMedia | null, title?: string, edit?: import("./edit-director.mjs").EditPlan | null }[], width?: number, height?: number, fps?: number, voice?: Record<string, { durationSeconds: number, alignment?: Parameters<typeof wordsFromAlignment>[0] }>, look?: FilmLook, autoSound?: boolean, fitVoice?: boolean, motionProfile?: import("./motion.mjs").MotionProfile, motionLevel?: string }} o
+ *   motionProfile / motionLevel: the film's motion language and level (motion.mjs; default: general documentary, balanced)
+ *   fitVoice: scene times follow the takes (fitToVoice); false keeps the script's times (a take that runs long is then sped up, at most 15%, and cut)
  * @returns {Timeline}
  */
 export function buildTimeline(o) {
@@ -405,11 +477,22 @@ export function buildTimeline(o) {
   /** @type {number[]} film times of the director's camera shakes */
   const shakeTimes = [];
 
+  const parsed = o.chapters.map((chapter) => parseSceneLines(chapter.markdown));
+  const fit = o.voice && o.fitVoice !== false && Object.keys(o.voice).length ? fitToVoice(parsed, o.voice) : null;
+  const clock = fit ? fit.map : (/** @type {number} */ t) => t;
+  const profile = o.motionProfile ?? MOTION_PROFILES.documentary;
+  const level = motionLevel(o.motionLevel, profile);
+  /** @type {import("./motion.mjs").Move[]} the moves decided so far, for the budget */
+  const moves = [];
   for (const [chapterIndex, chapter] of o.chapters.entries()) {
     const picks = new Map((chapter.media?.shots ?? []).map((s) => [`${s.scene}#${s.shot}`, s]));
     const edits = new Map((chapter.edit?.scenes ?? []).map((e) => [e.scene, e]));
     let chapterStart = chapterIndex > 0;
-    for (const s of parseSceneLines(chapter.markdown)) {
+    for (const [sceneIndex, written] of parsed[chapterIndex].entries()) {
+      const opening = chapterStart || (chapterIndex === 0 && sceneIndex === 0);
+      const closing = sceneIndex === parsed[chapterIndex].length - 1;
+      const s = fit ? { ...written, start: round3(clock(written.start)), end: round3(clock(written.end)) } : written;
+      if (fit) s.seconds = round3(s.end - s.start);
       scenes += 1;
       if (!(s.end > s.start)) { notes.push(`${s.sc}: no duration, skipped.`); continue; }
       if (s.start > filmEnd + 0.001) notes.push(`${s.sc}: ${round3(s.start - filmEnd)} s gap before it, held on the previous shot.`);
@@ -421,8 +504,8 @@ export function buildTimeline(o) {
       /** @type {{ text: string, index: number, start: number | null, end: number | null }[]} */
       const shots = parts.map((text, k) => {
         const m = TIME.exec(text);
-        const a = m ? toSeconds(m[1]) : NaN;
-        const b = m ? toSeconds(m[2]) : NaN;
+        const a = m ? clock(toSeconds(m[1])) : NaN;
+        const b = m ? clock(toSeconds(m[2])) : NaN;
         return { text: m ? text.slice(m[0].length) : text, index: k + 1, start: Number.isFinite(a) ? clamp(a, s.start, s.end) : null, end: Number.isFinite(b) ? clamp(b, s.start, s.end) : null };
       });
       for (let k = 0; k < shots.length; k += 1) {
@@ -500,7 +583,10 @@ export function buildTimeline(o) {
           const sourceIn = clipSeconds > shotSeconds ? Math.round(Math.min(3, (clipSeconds - shotSeconds) / 2) * 100) / 100 : 0;
           // A still photograph (an archive picture) always moves: the renderer gives it a slow push, pull or pan.
           const still = row.pick.kind === "image";
-          video.push({ ...base, sourceIn: still ? 0 : sourceIn, ...(speed < 1 && !still ? { speed } : {}), ...(still ? { still: true } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push || still ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
+          // A still's move is decided from the scene (motion.mjs); footage keeps its own movement.
+          const move = still ? decideMove({ intent: sceneIntent(s, { shotText: shot.text, chapterOpen: lead && opening, chapterClose: closing }), seconds: frames / fps, written: writtenMove(s.fields.MOTION ?? ""), profile, level, previous: moves, index: moves.length }) : null;
+          if (move) moves.push(move);
+          video.push({ ...base, sourceIn: still ? 0 : sourceIn, ...(speed < 1 && !still ? { speed } : {}), ...(still ? { still: true } : {}), ...(move ? { move } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push || still ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
           video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: cardText(shot.text, ost) });
@@ -519,9 +605,10 @@ export function buildTimeline(o) {
         };
         // How the scene's photos are shown (the renderer uses it on stills, the owner's pictures included).
         if (edit.photo) for (const v of laid) { if (edit.photo.frame) v.frame = edit.photo.frame; if (edit.photo.focus) v.focus = edit.photo.focus; }
-        for (const t of edit.punchIns ?? []) place(t, "punchIns");
-        for (const t of edit.shakes ?? []) if (place(t, "shakes")) shakeTimes.push(t);
-        for (const h of edit.hits ?? []) {
+        for (const t of edit.punchIns ?? []) place(clock(t), "punchIns");
+        for (const t of edit.shakes ?? []) if (place(clock(t), "shakes")) shakeTimes.push(clock(t));
+        for (const written of edit.hits ?? []) {
+          const h = { ...written, at: clock(written.at) };
           const token = EDIT_SOUNDS[h.sound];
           if (!token || !(h.at >= s.start && h.at < s.end)) continue;
           const length = SOUND_SECONDS[token] ?? 1;
@@ -558,6 +645,9 @@ export function buildTimeline(o) {
     }
   }
   const frames = video.reduce((n, v) => n + v.frames, 0);
+  // The genre and level govern the loud moves: rationed flashes, no shakes where the genre never shakes.
+  const governed = governTransitions(video, profile, level);
+  if (level === "reduced" || !profile.allow.shake) shakeTimes.length = 0;
   // The edit's own sound design (synthesised by the renderer): whooshes, impacts, risers, booms.
   // A sound that starts before its moment's shot belongs to the scene on screen when it starts.
   for (const d of directed) d.scene = video.find((v) => d.start >= v.start && d.start < v.end)?.scene ?? d.scene;
@@ -570,8 +660,11 @@ export function buildTimeline(o) {
     const scene = video.find((v) => t >= v.start && t < v.end)?.scene ?? "";
     sfx.push({ token: "AUTO-IMPACT", kind: "hit", scene, start: round3(t), end: round3(t + SOUND_SECONDS["AUTO-IMPACT"]) });
   }
+  if (fit && (fit.report.stretched || fit.report.shortened)) notes.push(`timing: scenes fitted to the voice (${fit.report.stretched} longer, ${fit.report.shortened} shorter; ${fit.report.plannedSeconds} s planned, ${fit.report.fittedSeconds} s fitted). No take is sped up or cut.`);
   return {
     width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, look: o.look ?? "documentary", notes,
+    ...(fit ? { timing: fit.report } : {}),
+    motion: motionReport(moves, governed, profile, level),
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },
   };
 }
