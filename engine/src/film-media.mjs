@@ -175,7 +175,10 @@ function toPick(c) {
  * and only a clip it says fits is used; a shot where nothing fits gets no
  * clip rather than the wrong one. If the judge fails, the first free clip is
  * used and the shot is marked unreviewed, so the run never stops here.
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge }} o
+ * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
+ * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
+ * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia> }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -204,6 +207,12 @@ export async function chapterMedia(o) {
   for (const shot of stockShots(o.markdown)) {
     /** @type {ShotMedia} */
     const row = { ...shot, status: shot.queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
+    const earlier = o.done?.[shotKey(row)];
+    if (earlier) {
+      if (earlier.status === "found" && earlier.pick) history.add(earlier.pick.id, shot.start);
+      shots.push(earlier);
+      continue;
+    }
     search: for (const step of plan(shot.rung)) for (const query of shot.queries) {
       const found = await fetchShotMedia(
         { shotId: `${shot.scene}-${shot.shot}`, query, kind: step.kind },
@@ -274,6 +283,24 @@ export async function chapterMedia(o) {
       noQuery: shots.filter((s) => s.status === "no-query").length,
     },
   };
+}
+
+/**
+ * The key of a shot for resuming: scene, shot and description (a revised script gets a fresh search).
+ * @param {{ scene: string, shot: number, description: string }} row
+ */
+export function shotKey(row) {
+  return `${row.scene}-${row.shot}|${row.description}`;
+}
+
+/**
+ * Whether a shot's search is final: found, or missing although every source answered (a source that
+ * could not be reached, "unavailable", is asked again by the next attempt).
+ * @param {ShotMedia} row
+ */
+export function shotSettled(row) {
+  if (row.status === "found" || row.status === "no-query") return true;
+  return row.status === "missing" && !(row.trace ?? []).some((t) => t.outcome === "unavailable");
 }
 
 /**

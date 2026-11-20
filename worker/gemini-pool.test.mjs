@@ -60,3 +60,19 @@ test("a busy model hands over after two busy answers, and one call never makes m
   const p2 = geminiPool({ apiKey: "k", model: "gemini-b-flash", fetch: /** @type {any} */ (allBusy), sleep: async () => {} });
   await assert.rejects(p2.call({ system: [{ text: "s" }], messages: [{ role: "user", content: [{ text: "hi" }] }], maxTokens: 100 }), (e) => /tried gemini-b-flash \(busy\)$/.test(/** @type {any} */ (e).message), "a busy model is not asked again in the same call");
 });
+
+test("a listed model closed to this key (404) is skipped; when the others' days are spent the film still waits for midnight", async () => {
+  const calls = /** @type {string[]} */ ([]);
+  const gone404 = JSON.stringify({ error: { code: 404, message: "This model models/gemini-old-flash is no longer available to new users." } });
+  const fetch = async (/** @type {string} */ url) => {
+    if (url.includes("/models?")) return new Response(JSON.stringify({ models: ["gemini-old-flash", "gemini-new-flash-lite"].map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] })) }));
+    const model = decodeURIComponent(/models\/([^:]+):/.exec(url)?.[1] ?? "");
+    calls.push(model);
+    if (model === "gemini-old-flash") return new Response(gone404, { status: 404 });
+    return model === "gemini-a-flash" ? new Response(daily, { status: 429 }) : new Response(ok(model));
+  };
+  const pool = geminiPool({ apiKey: "k", model: "gemini-a-flash", fetch: /** @type {any} */ (fetch), sleep: async () => {} });
+  const r = await pool.call({ system: [{ text: "s" }], messages: [{ role: "user", content: [{ text: "hi" }] }], maxTokens: 100 });
+  assert.match(r.text, /gemini-new-flash-lite/);
+  assert.deepEqual(calls, ["gemini-a-flash", "gemini-old-flash", "gemini-new-flash-lite"]);
+});
