@@ -39,7 +39,7 @@ import { meaningTable, parseTanzilText, passageMeaning, planMeanings } from "../
 import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
-import { planVoiceVisuals, quranVisualAdabGuard } from "../engine/src/voice-visuals.mjs";
+import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 
 import { planVoice } from "../engine/src/voice-plan.mjs";
@@ -49,6 +49,21 @@ import { applyTighten, planTighten, remapWords } from "../engine/src/voice-tight
 import { encodeWav24 } from "../engine/src/wav.mjs";
 
 const run = promisify(execFile);
+
+/**
+ * Can this picture or clip be fetched? A ranged GET of its first bytes, with a User-Agent that names the tool (what
+ * the renderer will send). Only a real image or video answer counts: a 403, an HTML page or a timeout does not.
+ * @param {string} url @returns {Promise<boolean>}
+ */
+export async function fileReachable(url) {
+  try {
+    const res = await fetch(url, { headers: { range: "bytes=0-2047", "user-agent": "ZuponaStudio/1.0 (documentary renderer; https://github.com/sayedmuntasim3-cmd/ai.x.com)" }, redirect: "follow", signal: AbortSignal.timeout(20_000) });
+    await res.body?.cancel().catch(() => {});
+    return (res.status === 200 || res.status === 206) && /^(image|video)\//i.test(res.headers.get("content-type") ?? "");
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Pixabay through the studio's Worker (ZUPONA_STOCK_RELAY = its /api/voice/<id>/stock?ticket=... address): the
@@ -332,11 +347,14 @@ export async function pictures(o) {
     await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard, direction: { ok: direction.ok, shots: direction.shots.length, problems: direction.problems } }, null, 1));
     return { ok: guard.ok && direction.ok, messages: [...guard.messages, ...direction.messages], problems: [...guard.problems, ...direction.problems], gaps: guard.gaps };
   }
-  const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [] });
+  const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
-  await writeFile(join(o.out, "s5-C1.md"), r.markdown + "\n");
+  // A quiet score under a narration (never under a recitation): s4.md is the cue plan the free score composes.
+  const score = voiceScore(u.scenes, { kind: "narration" });
+  if (score) await writeFile(join(o.out, "s4.md"), score.s4);
+  await writeFile(join(o.out, "s5-C1.md"), (score ? withMusic(r.markdown, score.cueOf) : r.markdown) + "\n");
   if (r.chapterMedia) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
   return { ok: r.findings.length === 0, messages: r.messages, problems: r.findings.map((f) => f.detail), gaps: [] };

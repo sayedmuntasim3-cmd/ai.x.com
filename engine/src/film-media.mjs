@@ -192,7 +192,7 @@ function toPick(c) {
  * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
  * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
  * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean }} o
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean> }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -238,6 +238,17 @@ export async function chapterMedia(o) {
       if (!free.length) continue;
       row.query = query;
       if (o.judge) { pools.set(row, free); break search; }
+      // A file that cannot be fetched would become a text card in the film: try the next candidate instead.
+      if (o.reachable) {
+        let usable = -1;
+        for (let i = 0; i < Math.min(free.length, 4) && usable < 0; i += 1) {
+          const url = free[i].mediaUrl;
+          if (url && (await o.reachable(url).catch(() => false))) usable = i;
+          else row.trace.push({ query, provider: free[i].source, outcome: "unreachable", returned: 1, allowed: 0 });
+        }
+        if (usable < 0) continue;
+        free.unshift(...free.splice(usable, 1));
+      }
       const [best, ...rest] = free;
       row.status = "found";
       row.pick = toPick(best);
