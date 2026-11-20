@@ -485,3 +485,13 @@ test("one-track film (voice system): the recording is the narration, sample for 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("card text wraps in balanced lines, never leaves one word alone, and is never cut", async () => {
+  const { wrap } = await import("./render-film.mjs");
+  assert.equal(wrap("his mother leased it", 18), "his mother\nleased it");
+  assert.equal(wrap("NOBODY BELIEVED A BARBER COULD DO IT", 26), "NOBODY BELIEVED A\nBARBER COULD DO IT");
+  const long = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen";
+  assert.equal(wrap(long, 12).replace(/\n/g, " "), long, "every word is kept");
+  assert.ok(wrap(long, 12).split("\n").length <= 4);
+  assert.equal(wrap("short", 26), "short");
+});
