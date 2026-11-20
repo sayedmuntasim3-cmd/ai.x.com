@@ -22,6 +22,11 @@ goals and the code.
   `GET /api/films/<id>` (the studio key is saved as this environment's network secret for the site host).
   Watch for: "Too many subrequests" again (PR #19 should stop it; if not, add `step.sleep` between heavy stages
   so each runs in a fresh invocation), the daily limit of every model, then the GitHub render and the MP4.
+- **PR #19 did NOT fix "Too many subrequests":** film 70577b9b failed at s2 the same way (04:45 UTC), with
+  the pool's 30-request budget in place. So neither the pool's retries nor (likely) the earlier stages are the
+  whole cause. Find it with evidence: log the number of fetches per step (wrap `fetch` in the Workflow and
+  print counts), check whether R2 operations count toward Cloudflare's per-invocation limit on this plan, and
+  try `step.sleep` between stages so each stage runs in a fresh invocation. Never answer it with a paid plan.
 - Next, in order: (1) see that film to a rendered MP4 and inspect its frames and audio; (2) research rests on
   only 2 sites (engine marks a gap): improve the research desk's source spread; (3) owner's opinion pending on
   larger on-screen type for phones (now about 4-5 % of frame height).
@@ -162,6 +167,42 @@ field and "Make my film", `/studio/` motion choice and English/Arabic only, `/ap
 17 Nov 2026 (from PR #6's notes): Cloudflare secrets seen: `GEMINI_API_KEY`, `PIXABAY_API_KEY`,
 `STUDIO_TOKEN`, `GROQ_API_KEY`; `YOUTUBE_API_KEY` not seen by the Worker. `ai.zupona.com` cannot be
 reached from cloud sessions (proxy 502): ask the owner to paste `/api/health`.
+
+## 0b. Open items ledger (20 Nov 2026, from the whole long session; nothing below is done unless marked)
+
+Master mission (ChatGPT's brief, 19 Nov) and the owner's own asks, item by item:
+- **First real film end to end: NOT done.** Blocked at s2 by "Too many subrequests" (see handoff). Then:
+  render through GitHub (connected, never yet triggered by a real film), inspect the MP4 frames and audio.
+- **151 roles, report A-E** (defined / scheduled / invoked / doing real work / redundant): only ROLE_STATUS
+  counts were reported; no per-role check from real run logs. Do it after the first real film exists.
+- **Business plan (Part K): NOT done** - market for long-form documentary tools, first paying segment, pricing
+  from real per-film cost, first customers. Kutly was never studied. 7-day plan never written as such.
+- **Cost:** `BUDGET_USD` is still "60" (owner never answered the question to lower it; with free brains it does
+  nothing, with Claude it would allow $60 a film). Landing page "~N credits" is invented (1.25 a minute), not a
+  real cost: needs a pricing decision. Cost ledger never checked against a real run.
+- **Media sources (Part G): NOT audited** live (relevance, licence tiering, rate limits). Wikimedia answers 429 to
+  this container; NASA works. Research rests on 2 sites in both test films (engine marks a gap).
+- **Brain, zero cost:** Gemini free = 20 requests a day per model; the pool rotates models (works live).
+  Groq free = 1,000 a day but 8,000 tokens a minute; every stage sends the 73 KB manual (~23,000 tokens), so Groq
+  cannot run until a lean-manual mode sends only the sections a stage needs (also cuts Gemini usage). Not built.
+  Cloudflare Workers AI free allocation and the owner's own computer (local brain) not tried.
+- **Voice:** Zupona narrator (Kokoro, voice A, owner's choice) live; 40-minute test passed. Not done: NeuTTS
+  Air / VoxCPM benchmark, a consented own-voice clone option, Arabic narration voice (recitation is never
+  synthesized), filler-word and false-start removal in voiceovers.
+- **Voiceover mode from the landing page / studio: no upload route** (the CLI `local/voice-film.mjs` works).
+- **Quran:** nothing advanced beyond the Quran-safe pause tightening; blockers remain (scholar sign-off,
+  written rights with the friend's name, Ad-Duha timing FAIL).
+- **Film quality not yet evaluated on a real film:** picture relevance to narration, repeated images, map
+  accuracy, 9:16 Shorts, subtitles, thumbnails; the 12-point evaluation framework of the motion brief was never
+  built. On-screen type size for phones (4-5 % of frame height) awaits the owner's opinion.
+- **Timeline edits by the user persist / not overwritten by regeneration** (motion brief Part 7): not checked.
+- **PR #4's unique parts never brought in:** the `library.tsx` media library page and the free shot-list planner
+  (`worker/plan.ts`); its `worker/index.ts` must stay out (second Worker entry). The owner first said leave
+  PR #4/#6 alone, later said keep everything valuable: ask him before porting.
+- **Reference videos** (Yarnhub, Isaac, Knowspire): only titles read; never watched (no video access).
+Mistakes made in the session (so they are not repeated): said "starting" work several times before doing it;
+guessed a merge SHA (409, then corrected); claimed PR #19 would fix the subrequest error before a live run proved
+it (it did not); wrote the voiceover narration duration confusingly once.
 
 ## 1. Where the code is
 

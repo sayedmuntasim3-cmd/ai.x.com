@@ -1,12 +1,15 @@
 # Zupona AI Studio: working rules (read first, every session)
 
 Owner writes in Bangla: reply in Bangla, short and plain. Work continues on the
-branch you are on; never merge to `main`, deploy, spend money or add a paid API.
+branch you are on; never spend money or add a paid API.
+Merge and deploy: the owner gave written permission on 20 Nov 2026 ("মার্জের অনুমতি আমি দিছি, লিখিত অনুমতি
+দিয়ে দিয়েছি"). Do it only through a PR: CI green, Cloudflare preview checked in a browser, then merge and verify
+production. Never force-push, reset or delete branches; on a real conflict with the other session's work, ask him.
 
 ## Owner's decisions (newest first; never undo without him)
-- 19 Nov 2026: PR #5 is production. Content languages: American English documentaries and Arabic Quran
-  recitation only (Bangla/Hindi off: `ACTIVE_VERSION_IDS`). No merge, deploy, branch deletion, force push
-  or reset without his written OK; on any conflict, ask him first.
+- 20 Nov 2026: written permission to merge and deploy (see top). Zero cost, no Claude API: free brains only.
+- 19 Nov 2026: Content languages: American English documentaries and Arabic Quran recitation only
+  (Bangla/Hindi off: `ACTIVE_VERSION_IDS`). No branch deletion, force push or reset; on any conflict, ask him first.
 - 16 Nov 2026: the landing page design at `/` IS the product's face; future studio screens use it.
   Unmerged on purpose, never deleted: PR #4 and PR #6 (each sets a different Worker entry).
 
