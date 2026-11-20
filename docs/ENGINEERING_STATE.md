@@ -13,6 +13,21 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+**HANDOFF, 20 Nov 2026 (start here; the long chat was closed to save the owner's tokens):**
+- Everything is merged and live up to PR #19; branch `claude/zupona-studio-audit-stabilization-wrtgn1` = `main`.
+  The owner gave written permission to merge and deploy (open a PR, wait for CI and the Cloudflare preview,
+  merge, verify production with a browser). Another session works in parallel on `ccr-00e313f2-4u4e00`.
+- Running test film `70577b9b-d321-4a9f-aedd-446cedb2403d` (Panama Canal, 3 min, started 04:41 UTC): format
+  guess now none (PR #18 works), stages written by `gemini-3.6-flash` (pool works). Read it with
+  `GET /api/films/<id>` (the studio key is saved as this environment's network secret for the site host).
+  Watch for: "Too many subrequests" again (PR #19 should stop it; if not, add `step.sleep` between heavy stages
+  so each runs in a fresh invocation), the daily limit of every model, then the GitHub render and the MP4.
+- Next, in order: (1) see that film to a rendered MP4 and inspect its frames and audio; (2) research rests on
+  only 2 sites (engine marks a gap): improve the research desk's source spread; (3) owner's opinion pending on
+  larger on-screen type for phones (now about 4-5 % of frame height).
+- Owner's own tasks: Quran (written recording rights, a scholar's review); listen to the 40-minute narrator
+  sample if wanted. Done by the owner on 20 Nov: GITHUB_TOKEN runtime secret, repository made private.
+
 20 Nov 2026, first live test of the pool (film 94b951c2, Panama Canal, 3 min):
 - The pool works: 3.8-flash's day was used up, the research stage was written by `gemini-3.6-flash` (`servedBy`).
 - Then stage s2 failed with Cloudflare's "Too many subrequests" (50 per invocation on the free plan): each
