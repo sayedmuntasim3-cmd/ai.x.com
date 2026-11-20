@@ -495,3 +495,23 @@ test("card text wraps in balanced lines, never leaves one word alone, and is nev
   assert.ok(wrap(long, 12).split("\n").length <= 4);
   assert.equal(wrap("short", 26), "short");
 });
+
+test("throttling archives get one download at a time; other hosts run together; Retry-After is honoured", async () => {
+  const { politely, retryAfterSeconds } = await import("./render-film.mjs");
+  let running = 0;
+  let most = 0;
+  const job = () => politely("upload.wikimedia.org", async () => { running += 1; most = Math.max(most, running); await new Promise((r) => setTimeout(r, 20)); running -= 1; return 1; });
+  await Promise.all([job(), job(), job()]);
+  assert.equal(most, 1, "Wikimedia: one at a time");
+  let together = 0;
+  let peak = 0;
+  const other = () => politely("videos.pexels.com", async () => { together += 1; peak = Math.max(peak, together); await new Promise((r) => setTimeout(r, 20)); together -= 1; });
+  await Promise.all([other(), other(), other()]);
+  assert.equal(peak, 3);
+  // A failed download does not block the ones after it.
+  await assert.rejects(politely("upload.wikimedia.org", async () => { throw new Error("429"); }));
+  assert.equal(await politely("upload.wikimedia.org", async () => 2), 2);
+  assert.equal(retryAfterSeconds("30"), 30);
+  assert.equal(retryAfterSeconds("99999"), 300);
+  assert.equal(retryAfterSeconds("soon"), null);
+});

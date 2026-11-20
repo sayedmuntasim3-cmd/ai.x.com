@@ -21,7 +21,7 @@ import { checkVoiceChapter, restoreVoiceFields, voiceSkeleton } from "./voice-sc
 /** @typedef {ReturnType<typeof import("./voice-understand.mjs").voiceStructure>} Structure */
 
 const key = (/** @type {string} */ s) => s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, "");
-const STOP = new Set("a an the and or but of to in on at by for from with that this these those it its is are was were be been we us our you your he she they them their his her not no can will shall have has had who which what when where how all any so as than then there here what do did does".split(" "));
+const STOP = new Set("a an the and or but of to in on at by for from with that this these those it its is are was were be been we us our you your he she they them their his her not no can will shall have has had who which what when where how all any so as than then there here what do did does about above across against along among around into onto over under upon through throughout toward towards up down out off near past since until via within without if because while whether yet nor just too also very".split(" "));
 
 /** The brain's instructions. Short on purpose: the rules that matter are enforced in code. */
 export const VOICE_VISUALS_SYSTEM = [
@@ -36,29 +36,192 @@ export const VOICE_VISUALS_SYSTEM = [
   "Answer with the scene lines only, one per line, nothing else.",
 ].join("\n");
 
+/** Words a stock archive cannot picture: reporting, hedging, counting, filler. Searching them returns random pictures. */
+const VAGUE = new Set(("accounts account report reports reported reporting latest according said says say saying told tells nearly almost exchange rate rates figure figures " +
+  "number numbers note notes first second third last later before after still only just also even really very much many most more less " +
+  "hundred thousand million billion year years time times day days today way thing things something someone anyone everyone people person part " +
+  "kind lot back called call calls once again ever never always every each other another same such own made make makes making went goes going " +
+  "come came comes get got gets give gave take took taken know known knew think thought found find finds look looked looks seen want wanted " +
+  "need needed began begin begins started start starts became become becomes headlines headline filing could would should might must sure " +
+  "story stories question answer reason fact facts point case side end ends start version idea word words name named names hand hands follow " +
+  "agrees agree depends depend ended ends leaves leave seems seem means mean shows show appears appear remains remain matters matter happens happen keeps keep puts put sets lets tells asks gives " +
+  "adjusted adjust latest current currently recently today's whose while though although because however perhaps maybe likely").split(" "));
+
+/** h:mm:ss.mmm, the form scene lines use for shot times. @param {number} t */
+const clockText = (t) => { const ms = Math.round(Math.max(0, t) * 1000); const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); const sec = ((ms % 60000) / 1000).toFixed(3).padStart(6, "0"); return `${h}:${String(m).padStart(2, "0")}:${sec}`; };
+
+/** A word as written, without punctuation around it ("-Rice," -> "Rice"). @param {string} t */
+const bare = (t) => t.replace(/['’]s\b/gu, "").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+
+/**
+ * Proper-noun phrases said in the scene ("Brigade Road", "Rolls Royce Ghost"):
+ * runs of capitalised words, a lone capitalised word only when it does not
+ * start a sentence. @param {{ text: string }[]} words
+ */
+export function namePhrases(words) {
+  /** @type {string[]} */
+  const out = [];
+  /** @type {{ t: string, first: boolean }[]} */
+  let run = [];
+  const flush = () => {
+    const kept = run.filter((r) => !STOP.has(key(r.t)) && !VAGUE.has(key(r.t)));
+    if (kept.length >= 2 || (kept.length === 1 && !kept[0].first && kept[0].t.length > 2)) out.push(kept.map((r) => r.t).join(" "));
+    run = [];
+  };
+  words.forEach((w, i) => {
+    const t = bare(String(w.text));
+    const first = i === 0 || /[.!?:]["')\]]*$/.test(String(words[i - 1].text));
+    if (t && /^\p{Lu}/u.test(t) && !/^\d/.test(t)) {
+      run.push({ t, first: run.length ? run[0].first : first });
+      if (/[,.!?;:]["')\]]*$/.test(String(w.text))) flush();
+    } else flush();
+  });
+  flush();
+  return [...new Set(out)];
+}
+
+/**
+ * The subject of the film from the owner's topic, for the fallback search:
+ * after a colon or a spaced dash when there is one ("Ramesh Babu: from barber
+ * to Rolls-Royce", "Ramesh Babu - From Barber to Rolls-Royce" -> barber,
+ * Rolls-Royce), without small words. @param {string} topic
+ */
+export function topicSubjects(topic) {
+  const cut = /:|\s[-–—]\s/.exec(topic);
+  const tail = cut ? topic.slice(cut.index + cut[0].length) : topic;
+  const words = tail.split(/\s+/).map(bare).filter(Boolean);
+  // A title-case file name ("From Barber To Rolls-Royce") capitalises plain words: "Barber" would find a congressman.
+  const titleCase = words.length >= 2 && words.filter((w) => /^\p{Lu}/u.test(w)).length / words.length >= 0.6;
+  const plain = words.map((w) => (titleCase && /^\p{Lu}\p{Ll}+$/u.test(w) ? w.toLowerCase() : w));
+  return [...new Set(plain.filter((w) => w.length >= 3 && !STOP.has(key(w)) && !VAGUE.has(key(w)) && !["from", "into", "onto"].includes(key(w))))].slice(0, 4);
+}
+
+/** Words that make a capitalised phrase a place, a firm or a thing, not a person. */
+const THING_WORDS = /^(road|street|st|avenue|lane|square|city|town|village|river|lake|mountain|island|bay|park|bridge|tower|temple|church|mosque|palace|fort|station|airport|port|market|bazaar|mall|hall|museum|university|college|school|hospital|bank|company|corporation|inc|ltd|tours|travels|motors|airlines|railway|times|news|post|ghost|phantom|royce|benz|ford|valley|state|province|district|county|empire|kingdom|republic|ocean|sea|desert|canal)$/i;
+
+const CALENDAR = /^(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i;
+
+/** Words that announce a noun: "a pen", "the bundle", "his family", "one meal". */
+const DETERMINERS = new Set("a an the his her their our my its this that these those one two three four five six seven eight nine ten every each some no another several many few".split(" "));
+/** Endings of adjectives, adverbs and verb forms: a search on them finds random pictures. */
+const NOT_A_THING = /(ly|ful|less|ous|ish|ible|able)$/;
+/** Verb forms, refused only among the fallback words (after a determiner, "the building" is a thing). */
+const VERB_FORM = /(ed|ing)$/;
+
+/**
+ * The things named in a scene, found without a dictionary: the last plain word
+ * of a run that follows a determiner, before a small word, punctuation or the
+ * end ("a small object from school" -> object; "the bundle" -> bundle).
+ * @param {{ text: string }[]} words
+ * @returns {string[]}
+ */
+export function nounsAfterDeterminers(words) {
+  /** @type {string[]} */
+  const out = [];
+  for (let d = 0; d < words.length - 1; d += 1) {
+    if (!DETERMINERS.has(key(words[d].text)) || /[.,;:!?]["')\]]*$/.test(String(words[d].text))) continue;
+    let head = "";
+    for (let i = d + 1; i < Math.min(words.length, d + 4); i += 1) {
+      const raw = String(words[i].text);
+      const t = bare(raw);
+      const k = key(t);
+      if (!k || STOP.has(k) || DETERMINERS.has(k) || /^\p{Lu}/u.test(t) || /^\d/.test(t)) break;
+      // A filler word or a verb form ends the run; the noun before it stays ("the bundle went" -> bundle).
+      if (VAGUE.has(k) || (head && /(ed|ing)$/.test(k))) break;
+      head = t.toLowerCase();
+      if (/[.,;:!?]["')\]]*$/.test(raw)) break;
+    }
+    const k = key(head);
+    if (k.length >= 3 && !VAGUE.has(k) && !(NOT_A_THING.test(k) && k.length > 5)) out.push(head);
+  }
+  return out;
+}
+
+/**
+ * A name the speech-to-text misheard, put back in the owner's spelling: a
+ * phrase whose first word starts a capitalised name in the topic takes that
+ * name ("Rolls Rice" with the topic "... to Rolls-Royce" -> "Rolls-Royce").
+ * @param {string} phrase @param {string} topic
+ */
+export function topicSpelling(phrase, topic) {
+  const first = key(phrase.split(/\s+/)[0] ?? "");
+  if (first.length < 3) return phrase;
+  for (const name of topic.match(/\p{Lu}[\p{L}\p{N}'’.-]*(?:[\s-]\p{Lu}[\p{L}\p{N}'’.-]*)*/gu) ?? []) {
+    const k = key(name.split(/[\s-]/)[0]);
+    if (k === first && key(name) !== key(phrase)) return name.replace(/[.,;:]+$/, "");
+  }
+  return phrase;
+}
+
 /**
  * A plan from the scene's own words, for a scene the brain did not plan.
+ * Each search is a short concrete thing said in the scene: a name or place
+ * phrase first, then the most repeated picturable words; reporting and filler
+ * words ("reports", "nearly") are never searched. The owner's topic is the
+ * fallback search of every shot (its subject words, rotated), never glued in
+ * front: a long query finds nothing and the archive answers with random prints.
+ * A long scene gets a shot about every 6 seconds, each with its own search.
  * Names and dates said in the scene make it an evidence shot (R2).
- * topic: what the whole film is about, from the owner ("Gettysburg Address
- * 1863"), put in front of the first query so the archive search stays on it.
  * @param {VoiceScene} s @param {Structure | null} structure @param {string} [topic]
  */
 export function wordsPlan(s, structure, topic = "") {
   const names = (structure?.entities ?? []).filter((e) => e.scenes.includes(s.sc)).map((e) => e.name);
   const dated = (structure?.dates ?? []).some((d) => d.scene === s.sc);
-  /** @type {Map<string, number>} */
-  const n = new Map();
-  for (const w of s.words) { const k = key(w.text); if (k.length >= 4 && !STOP.has(k)) n.set(k, (n.get(k) ?? 0) + 1); }
-  const top = [...n.entries()].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length).slice(0, 3).map(([k]) => k);
-  const subject = names[0] ?? top[0] ?? "landscape";
+  const subjects = topicSubjects(topic);
+  const subjectKeys = new Set(subjects.map(key));
+  /** @type {Map<string, { text: string, score: number }>} */
+  const cand = new Map();
+  const add = (/** @type {string} */ text, /** @type {number} */ score) => { const k = key(text); if (!k) return; const c = cand.get(k); if (c) c.score += score; else cand.set(k, { text, score }); };
+  // People: a private person's name finds random portraits in the archives, so a person is the ANCHOR, never a search.
+  // A person here: two or more capitalised words that are not a place, not the topic's own name, with no thing word in
+  // them ("Brigade Road", "Ramesh Tours" stay), or a run of initials ("P E G O H Paul").
+  const places = new Set((structure?.entities ?? []).filter((e) => e.place).map((e) => key(e.name)));
+  for (const raw of namePhrases(s.words)) {
+    const p = topicSpelling(raw, topic);
+    const words = p.split(/\s+/);
+    const fromTopic = p !== raw || key(topic).includes(key(p));
+    // The topic's own subject before ":" or " - " is usually a private person ("Ramesh Babu - From Barber ...").
+    const topicHead = key(topic.split(/:|\s[-–—]\s/)[0] ?? "");
+    if (topicHead && key(p) === topicHead && !words.some((w) => THING_WORDS.test(w))) continue;
+    // Months, weekdays and short all-capital words (a misheard sound, a channel's initials) are not pictures.
+    if (words.length === 1 && (CALENDAR.test(p) || /^\p{Lu}{2,3}$/u.test(p))) continue;
+    const thing = words.some((w) => THING_WORDS.test(w));
+    const initials = /^(\p{Lu}\.?\s){2,}/u.test(p + " ");
+    const person = initials || (words.length >= 2 && !fromTopic && !thing && !places.has(key(p)));
+    if (!person) add(p, words.length > 1 ? 4 : 2.5);
+  }
+  // Things named in the scene (a noun after a determiner) first; other plain words only as a weak fallback.
+  for (const n of nounsAfterDeterminers(s.words)) add(n, 2 + (subjectKeys.has(key(n)) ? 1.5 : 0));
+  for (const w of s.words) {
+    const t = bare(String(w.text));
+    const k = key(t);
+    if (k.length < 4 || STOP.has(k) || VAGUE.has(k) || DETERMINERS.has(k) || /^\d+$/.test(k) || /^\p{Lu}/u.test(t) || NOT_A_THING.test(k) || VERB_FORM.test(k)) continue;
+    add(t.toLowerCase(), subjectKeys.has(k) ? 1.5 : 0.25);
+  }
+  // A word already inside a chosen phrase adds nothing of its own.
+  const ranked = [...cand.values()].sort((a, b) => b.score - a.score || b.text.length - a.text.length);
+  /** @type {string[]} */
+  const picks = [];
+  for (const c of ranked) { if (!picks.some((p) => key(p).includes(key(c.text)) || key(c.text).includes(key(p)))) picks.push(c.text); }
+  const seconds = Math.max(0.1, s.end - s.start);
+  const count = Math.max(1, Math.min(4, Math.round(seconds / 6), picks.length || 1));
+  const subject = names[0] ?? picks[0] ?? subjects[0] ?? "landscape";
   const rung = names.length || dated ? "R2" : "R3";
-  const q1 = [topic.trim(), ...[subject, ...top.filter((t) => key(t) !== key(subject))].slice(0, topic.trim() ? 2 : 3)].filter(Boolean).join(" ");
-  // With a topic, the fallback query is the topic itself: a broad but on-subject picture beats a wrong one.
-  const q2 = topic.trim() || top.slice(0, 2).join(" ") || subject;
+  const shots = [];
+  const groups = [];
+  for (let i = 0; i < count; i += 1) {
+    const from = s.start + (seconds * i) / count;
+    const to = i === count - 1 ? s.end : s.start + (seconds * (i + 1)) / count;
+    const q1 = picks[i] ?? subjects[i % Math.max(1, subjects.length)] ?? subject;
+    const fallback = subjects.length ? subjects[i % subjects.length] : picks[i + 1] ?? subject;
+    const q2 = key(fallback) === key(q1) ? (subjects[(i + 1) % Math.max(1, subjects.length)] ?? picks[i + 1] ?? "") : fallback;
+    shots.push(count === 1 ? `(1) ${rung} ${q1}` : `(${i + 1}) ${clockText(from)}-${clockText(to)} ${rung} ${q1}`);
+    groups.push(q2 && key(q2) !== key(q1) ? `${q1} · Q1 "${q1}" Q2 "${q2}"` : `${q1} · Q1 "${q1}"`);
+  }
   return {
     ANCHOR: subject,
-    SHOTS: `(1) ${rung} ${q1}`,
-    SRC: `Q1 "${q1}" Q2 "${q2}"`,
+    SHOTS: shots.join(" "),
+    SRC: groups.join("; "),
     LOOK: rung === "R2" ? "archival, slow push-in" : "natural light, slow drift",
   };
 }
@@ -120,7 +283,8 @@ export async function planVoiceVisuals(o) {
   });
   if (o.providers?.length) {
     const judge = o.brain && canSee(o.brain) ? o.judge : undefined;
-    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge });
+    // Voiceover films: a picture must name what was searched (the archives match "car" to "Carina Nebula").
+    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true });
     for (const shot of media.shots) {
       const p = plan.find((x) => x.sc === shot.scene);
       if (!p) continue;

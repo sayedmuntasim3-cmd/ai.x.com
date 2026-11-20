@@ -85,6 +85,8 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
   const [sent, setSent] = useState(0);
   const [error, setError] = useState("");
   const [film, setFilm] = useState<VoiceView | null>(null);
+  // Bumped when a stopped film is started again, so following it resumes.
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -124,7 +126,7 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
       stop = true;
       window.clearTimeout(timer);
     };
-  }, [open, film?.id]);
+  }, [open, film?.id, round]);
 
   const start = async () => {
     const studioKey = key.trim();
@@ -224,13 +226,33 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
           )}
           <button
             type="button"
-            onClick={() => {
-              remember(fileName, "");
-              setFilm(null);
+            disabled={busy}
+            onClick={async () => {
+              if (!stopped) {
+                remember(fileName, "");
+                setFilm(null);
+                return;
+              }
+              // A stopped film starts again from the recording already saved: nothing is uploaded twice.
+              setBusy(true);
+              setError("");
+              try {
+                const res = await fetch(`/api/voice/${film.id}/retry`, { method: "POST", headers: { authorization: `Bearer ${readStore(KEY_STORE)}` } });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.id) {
+                  setFilm(data as VoiceView);
+                  setRound((r) => r + 1);
+                }
+                else setError(String(data.error ?? "The film could not be started again. Try again in a minute."));
+              } catch {
+                setError("No connection. Check your internet and try again.");
+              } finally {
+                setBusy(false);
+              }
             }}
-            className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
           >
-            {stopped ? "Try again" : "Make another"}
+            {stopped ? (busy ? "Starting…" : "Try again") : "Make another"}
           </button>
         </div>
       </div>
