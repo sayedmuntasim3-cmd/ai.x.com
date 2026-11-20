@@ -45,6 +45,9 @@ export const PRICES = Object.freeze({
   "gemini-3.8-flash": { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 });
 
+/** Models used only on a free tier: Gemini flash (no billing account linked) and Groq's free models. */
+export const FREE_MODEL = /^(gemini-[\d.]+-flash|openai\/gpt-oss-|qwen\/)/;
+
 /** US dollars per web search (server tool). */
 export const WEB_SEARCH_USD = 0.01;
 
@@ -271,6 +274,9 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5", brain = 
  * @param {Price} [ownPrice]
  */
 export function costOf(u, model, ownPrice) {
+  // Free-tier models (every Gemini flash the pool may hand over to, Groq's free models) cost nothing;
+  // before this a pool model missing from PRICES was priced at the highest price (film 70577b9b: "$0.26").
+  if (!ownPrice && FREE_MODEL.test(model)) return 0;
   const p = ownPrice ?? PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? highestPrice();
   // The Batch API (half-price mode) bills every token at 50%.
   const tokens = ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6;

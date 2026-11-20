@@ -33,6 +33,18 @@ goals and the code.
 - Owner's own tasks: Quran (written recording rights, a scholar's review); listen to the 40-minute narrator
   sample if wanted. Done by the owner on 20 Nov: GITHUB_TOKEN runtime secret, repository made private.
 
+20 Nov 2026, lean manual + Groq as a second free brain (owner's order, workstream A):
+- `engine/src/lean-manual.mjs`: each stage gets only its manual sections. Measured (Groq's 4.27 characters a
+  token): whole manual 16,500 tokens; s5 6,144, s01 6,594, s3 5,112, s2 3,301, qa/s6 2,632, research 2,619.
+- Groq measured on the owner's key: gpt-oss-120b, qwen3.8-27b, gpt-oss-20b; each 1,000 requests a day, 8,000
+  tokens a minute; only the prompt counts up front (a 9,396-token prompt got 413; a 9,000-token reply allowance
+  did not). `worker/groq.mjs` + `withGroq` in `worker/brain.mjs`: when GROQ_API_KEY is set, Groq takes every call
+  whose prompt fits (about 7,200 tokens, no web search) first; anything else, or any Groq failure, goes to Gemini.
+  Honest limit: the chapter, ledger and bible stages carry long inputs (s2 needs s01 + research, ~10k tokens),
+  so they still need Gemini; Groq saves Gemini's requests on research, viewer, judges and small stages.
+- Cost fix: Gemini 3.6/3.5 flash were missing from PRICES and priced at the top price (film showed "$0.26");
+  free-tier models (`FREE_MODEL`) now cost $0.
+
 20 Nov 2026, film 70577b9b pictures: Bossism blocked the release ("C2: 10 of 10 shots have no fitting licensed
 picture") and sent s5 back. Cause: every archive answered "unavailable": the footage search hit the same 50-request
 limit and swallowed it. One chapter needs about 100 searches, more than one fresh run allows. Fixed: settled shots

@@ -13,7 +13,8 @@
  *                   million tokens, for a paid OpenAI-compatible service; default 0)
  *   claude          ANTHROPIC_API_KEY (secret), MODEL, ANTHROPIC_BASE_URL
  *   gemini          GEMINI_API_KEY (secret, free tier), GEMINI_MODEL, GEMINI_SEARCH ("off": no
- *                   Google Search; research through the code desk; Phase 0 arm B)
+ *                   Google Search; research through the code desk; Phase 0 arm B); with GROQ_API_KEY
+ *                   (secret, free) Groq takes the calls that fit its limit first (GROQ=off: never)
  *
  * The free brain comes first when it is set up: the owner does not want to
  * depend on paid APIs (docs/VISION.md, master list item 4). Gemini is used
@@ -22,6 +23,7 @@
 import { anthropicModel } from "./anthropic.mjs";
 import { geminiModel } from "./gemini.mjs";
 import { geminiPool } from "./gemini-pool.mjs";
+import { groqModel, withGroq } from "./groq.mjs";
 import { localBrain } from "./local-brain.mjs";
 
 /** @typedef {import("../engine/src/film-run.mjs").Model} Model */
@@ -74,9 +76,14 @@ export function brainFromEnv(env, o = {}) {
     const g = { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(String(env.GEMINI_SEARCH ?? "").toLowerCase() === "off" ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) };
     // Several Gemini models on the same key take turns when one model's free day is used up (gemini-pool.mjs);
     // GEMINI_POOL=off keeps one model, GEMINI_MODELS="a,b" names the models instead of asking Google.
-    if (String(env.GEMINI_POOL ?? "").toLowerCase() === "off") return { ok: true, kind: "gemini", model: geminiModel(g) };
     const models = String(env.GEMINI_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-    return { ok: true, kind: "gemini", model: geminiPool({ ...g, ...(models.length ? { models } : {}) }) };
+    const gemini = String(env.GEMINI_POOL ?? "").toLowerCase() === "off" ? geminiModel(g) : geminiPool({ ...g, ...(models.length ? { models } : {}) });
+    // Groq (free, GROQ_API_KEY) takes the calls whose prompt fits its limit, so Gemini's daily requests last
+    // for the chapters (worker/groq.mjs). GROQ=off turns it off; GROQ_MODELS="a,b" names its models.
+    if (!env.GROQ_API_KEY || String(env.GROQ ?? "").toLowerCase() === "off") return { ok: true, kind: "gemini", model: gemini };
+    const groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(groqModels.length ? { models: groqModels } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) });
+    return { ok: true, kind: "gemini", model: withGroq(gemini, groq, { log: (line) => console.log(line) }) };
   }
   const api = String(env.BRAIN_API ?? "").toLowerCase();
   const input = num(env.BRAIN_PRICE_INPUT) ?? 0;
