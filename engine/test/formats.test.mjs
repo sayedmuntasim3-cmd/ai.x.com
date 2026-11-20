@@ -41,3 +41,7 @@ test("every viral documentary type has a format, a Bangla name and a look; topic
   assert.equal(lookFor("war-battle"), "archive");
   assert.equal(lookFor("survival-story"), "cinematic");
 });
+
+test("a topic no format fits gets no preset, not a motivational life story", () => {
+  assert.equal(suggestFormat("How the Panama Canal was built: the French failure, the American engineers, and the fight against yellow fever"), null);
+});

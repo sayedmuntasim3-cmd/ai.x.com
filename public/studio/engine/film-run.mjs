@@ -80,7 +80,7 @@ export function newFilm(input, id) {
   const notes = typeof input.notes === "string" ? input.notes.trim().slice(0, 2000) : "";
   const asked = typeof input.formatId === "string" ? input.formatId.trim() : "";
   const format = asked === "auto" ? suggestFormat(topic) : asked ? getFormat(asked) : null;
-  if (asked && !format) return { ok: false, error: `Unknown format "${asked}".` };
+  if (asked && asked !== "auto" && !format) return { ok: false, error: `Unknown format "${asked}".` };
   // Invented stories use AI scenes with one cast unless the owner turns them off (owner's decision, 4 Nov 2026).
   const allowAi = typeof input.allowAi === "boolean" ? input.allowAi : format?.mode === "story";
   // Half-price mode (Batch API): same model and quality, slower; the owner chooses per film.
