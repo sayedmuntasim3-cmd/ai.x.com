@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { chapterMedia, createUseHistory, mediaProviders, pexelsProvider, pixabayProvider, stockShots } from "../src/film-media.mjs";
+import { chapterMedia, createUseHistory, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSettled, stockShots } from "../src/film-media.mjs";
 
 const USA_C1 = readFileSync(new URL("../../productions/ramesh-babu/USA/s5-C1.md", import.meta.url), "utf8");
 
@@ -284,4 +284,24 @@ test("one picture the judge cannot open costs only its own shot's review; museum
   ].join("\n");
   await chapterMedia({ chapter: "C1", markdown: both, providers: [museum], sleep: async () => {} });
   assert.deepEqual(searched, ["wheat field painting"], "the B-roll shot never searches the museum");
+});
+
+test("a second attempt keeps the shots the first settled and searches only those whose sources could not be reached", async () => {
+  // First attempt: every request after the 10th fails, as when Cloudflare's 50-request limit is hit.
+  const first = fakeFetch({ perQuery: 3 });
+  let n = 0;
+  const limited = async (/** @type {string} */ url, /** @type {any} */ init) => { n += 1; if (n > 10) throw new Error("Too many subrequests by single Worker invocation."); return first.f(url, init); };
+  const a = await chapterMedia({ chapter: "C1", markdown: USA_C1, providers: mediaProviders({ pexelsKey: "PX", pixabayKey: "PB", fetch: limited }), sleep: async () => {} });
+  const settled = a.shots.filter(shotSettled);
+  assert.ok(settled.length > 0 && settled.length < a.shots.length, `${settled.length} of ${a.shots.length}`);
+  const done = Object.fromEntries(settled.map((r) => [shotKey(r), r]));
+  // Second attempt, fresh run: the settled shots make no request; the rest are found.
+  const second = fakeFetch({ perQuery: 3 });
+  const b = await chapterMedia({ chapter: "C1", markdown: USA_C1, providers: mediaProviders({ pexelsKey: "PX", pixabayKey: "PB", fetch: second.f }), sleep: async () => {}, done });
+  assert.equal(b.shots.length, a.shots.length);
+  for (const r of settled) assert.equal(b.shots.find((x) => shotKey(x) === shotKey(r)), r);
+  assert.ok(b.stats.found > a.stats.found);
+  const full = fakeFetch({ perQuery: 3 });
+  await chapterMedia({ chapter: "C1", markdown: USA_C1, providers: mediaProviders({ pexelsKey: "PX", pixabayKey: "PB", fetch: full.f }), sleep: async () => {} });
+  assert.ok(second.calls.length < full.calls.length, `${second.calls.length} requests, a full search makes ${full.calls.length}`);
 });

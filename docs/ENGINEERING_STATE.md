@@ -33,6 +33,12 @@ goals and the code.
 - Owner's own tasks: Quran (written recording rights, a scholar's review); listen to the 40-minute narrator
   sample if wanted. Done by the owner on 20 Nov: GITHUB_TOKEN runtime secret, repository made private.
 
+20 Nov 2026, film 70577b9b pictures: Bossism blocked the release ("C2: 10 of 10 shots have no fitting licensed
+picture") and sent s5 back. Cause: every archive answered "unavailable": the footage search hit the same 50-request
+limit and swallowed it. One chapter needs about 100 searches, more than one fresh run allows. Fixed: settled shots
+are saved (`media-<chapter>.partial.json`) and the next fresh run searches only the rest (up to 13 fresh runs a
+stage, mostly 3-minute sleeps). For workstream B: picture relevance can only be judged once a chapter really searched.
+
 20 Nov 2026, film 70577b9b s7: the pool reached `gemini-2.5-flash` (listed by Google, but 404 "no longer available
 to new users") and the film stopped. Fixed: a listed model that answers 404 is skipped for the run (the configured
 model's 404 still stops the film, since that is a wrong MODEL setting).
