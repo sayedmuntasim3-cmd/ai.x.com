@@ -40,6 +40,10 @@
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
+import { quotaAwareStep } from "./quota-step.mjs";
+
+/** Nights a film may sleep for Gemini's free daily quota before it stops. */
+const MAX_QUOTA_NIGHTS = 7;
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { updatePictureLinks } from "../engine/src/picture-links.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
@@ -202,13 +206,16 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       log: (line) => console.log(`[${film.id}] ${line}`),
       // A long chapter (64k output tokens, up to four continued parts) can take well over 30 minutes; a timeout would pay for it twice.
       // In half-price mode a step can wait hours for its batch: each attempt polls for up to an hour, and a retry polls the same batch again.
-      step: (name, fn) => step.do(round ? `r${round}:${name}` : name, film.saving ? { retries: { limit: 30, delay: "1 minute", backoff: "constant" }, timeout: "1 hour" } : { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" }, async () => {
-        try {
-          return await fn();
-        } catch (error) {
-          const permanent = permanentError(error);
-          throw permanent ? new NonRetryableError(permanent) : error;
-        }
+      // A step stopped by Gemini's free daily limit sleeps until the quota resets and runs again
+      // (worker/quota-step.mjs, at most 7 nights); other stops end the film as before.
+      step: quotaAwareStep({
+        step,
+        prefix: round ? `r${round}:` : "",
+        options: film.saving ? { retries: { limit: 30, delay: "1 minute", backoff: "constant" }, timeout: "1 hour" } : { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "1 hour" },
+        permanent: permanentError,
+        stop: (message) => new NonRetryableError(message),
+        maxNights: MAX_QUOTA_NIGHTS,
+        log: (line) => console.log(`[${film.id}] ${line}`),
       }),
     });
     // Bossism reviews the evidence, sends what failed back (bounded), and decides the release.
