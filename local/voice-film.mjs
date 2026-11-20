@@ -50,6 +50,23 @@ import { encodeWav24 } from "../engine/src/wav.mjs";
 
 const run = promisify(execFile);
 
+/**
+ * Pixabay through the studio's Worker (ZUPONA_STOCK_RELAY = its /api/voice/<id>/stock?ticket=... address): the
+ * GitHub runner searches free stock with the Worker's own key, which never leaves Cloudflare. Other requests go out
+ * unchanged. @param {string | undefined} relay @returns {typeof fetch | undefined}
+ */
+export function stockRelayFetch(relay) {
+  if (!relay) return undefined;
+  return /** @type {typeof fetch} */ ((input, init) => {
+    const u = new URL(String(input));
+    if (u.host !== "pixabay.com" || !u.pathname.startsWith("/api/")) return fetch(input, init);
+    const to = new URL(relay);
+    to.searchParams.set("kind", u.pathname.startsWith("/api/videos") ? "video" : "image");
+    for (const [k, v] of u.searchParams) if (k !== "key") to.searchParams.set(k, v);
+    return fetch(to, init);
+  });
+}
+
 /** @param {string[]} argv */
 export function parseArgs(argv) {
   /** @type {Record<string, string | boolean>} */
@@ -315,7 +332,7 @@ export async function pictures(o) {
     await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard, direction: { ok: direction.ok, shots: direction.shots.length, problems: direction.problems } }, null, 1));
     return { ok: guard.ok && direction.ok, messages: [...guard.messages, ...direction.messages], problems: [...guard.problems, ...direction.problems], gaps: guard.gaps };
   }
-  const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || undefined, smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined }) : [] });
+  const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [] });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));

@@ -101,7 +101,7 @@ jobs:
           path: ~/.cache/huggingface
           key: whisper-${{ inputs.kind }}-v1
       - name: Fetch the recording (private, with this run's ticket)
-        run: echo intake > .stage && node render/voice-runner.mjs fetch --out "in.$EXT"
+        run: echo intake > .stage && node render/voice-runner.mjs fetch --out "in.$EXT" 2>&1 | tee step.log && test "${PIPESTATUS[0]}" = 0
       - name: Listen, write down every word, understand, master, find pictures
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -109,12 +109,14 @@ jobs:
           SMITHSONIAN_API_KEY: ${{ secrets.SMITHSONIAN_API_KEY }}
         run: |
           echo words > .stage
+          # Free modern stock (Pixabay) with the Worker's own key, relayed for this one recording.
+          export ZUPONA_STOCK_RELAY="$SITE/api/voice/$VOICE_ID/stock?ticket=$VOICE_TICKET"
           if [ "$KIND" = quran ]; then
             surah=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!Number.isInteger(q.surah)||q.surah<1||q.surah>114)process.exit(1);console.log(q.surah)') || { echo "::error::Quran needs the surah."; exit 1; }
             ayat=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");console.log(/^\d{1,3}(-\d{1,3})?$/.test(q.ayat||"")?q.ayat:"")')
-            node local/voice-film.mjs --audio "in.$EXT" --surah "$surah" ${ayat:+--ayat "$ayat"} --master mosque-hall --out run 2>&1 | tee voice-film.log
+            node local/voice-film.mjs --audio "in.$EXT" --surah "$surah" ${ayat:+--ayat "$ayat"} --master mosque-hall --out run 2>&1 | tee voice-film.log step.log
           else
-            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model small.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --out run 2>&1 | tee voice-film.log
+            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model small.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --out run 2>&1 | tee voice-film.log step.log
           fi
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
@@ -134,18 +136,21 @@ jobs:
           mkdir -p out
           if [ "$KIND" = quran ]; then
             reciter=$(node -e 'console.log(String(JSON.parse(process.env.QURAN||"{}").reciter||""))')
-            node render/quran-render.mjs --run run --audio run/master/mosque-hall.wav ${reciter:+--reciter "$reciter"} --out out/film.mp4
+            node render/quran-render.mjs --run run --audio run/master/mosque-hall.wav ${reciter:+--reciter "$reciter"} --out out/film.mp4 2>&1 | tee step.log
+            test "${PIPESTATUS[0]}" = 0
           else
             voice=$(sed -n 's/^Mastered voice: \(.*\) (use it.*/\1/p; s/^Tightened voice: \(.*\) (use it.*/\1/p' voice-film.log | head -n 1)
             voice=${voice:-in.$EXT}
             node render/render-film.mjs --run run --one-track "$voice" --words run/words.json \
-              --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out out/film.mp4
+              --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out out/film.mp4 2>&1 | tee step.log
+            test "${PIPESTATUS[0]}" = 0
           fi
       - name: Check the finished film
         if: inputs.kind == 'narration'
         run: |
           echo check > .stage
-          node render/release-gate.mjs --report out/film.report.json --file out/film.mp4
+          node render/release-gate.mjs --report out/film.report.json --file out/film.mp4 2>&1 | tee step.log
+          test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs progress --stage check
       - name: Send the film to the studio (private)
         run: |
@@ -159,7 +164,8 @@ jobs:
         if: failure()
         run: |
           stage=$(cat .stage 2>/dev/null || echo started)
-          why=$(tail -n 3 voice-film.log 2>/dev/null | tr '\n' ' ' | cut -c1-300)
+          # The failing step's own words: the gate's BLOCK lines first, else that step's last lines.
+          why=$( (grep -h '^BLOCK:' step.log 2>/dev/null || tail -n 3 step.log 2>/dev/null) | head -n 3 | tr '\n' ' ' | cut -c1-300)
           node render/voice-runner.mjs progress --stage "$stage" --error "The film machine stopped${why:+: $why}. Details: $RUN_URL" || true
       - uses: actions/upload-artifact@v4
         if: always()

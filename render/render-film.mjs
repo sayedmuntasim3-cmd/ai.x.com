@@ -194,20 +194,59 @@ async function downloadClip(url, dir) {
   const ext = /\.(jpe?g|png|webp|tiff?)(?:$|[?#])/i.exec(new URL(url).pathname)?.[1]?.toLowerCase() ?? "mp4";
   const file = join(dir, hash(url) + "." + ext);
   if (existsSync(file)) return file;
-  let lastError;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      const res = await fetch(url, { redirect: "follow" });
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-      writeFileSync(file + ".part", Buffer.from(await res.arrayBuffer()));
-      renameSync(file + ".part", file);
-      return file;
-    } catch (error) {
-      lastError = error;
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+  return politely(new URL(url).host, async () => {
+    if (existsSync(file)) return file;
+    let lastError;
+    for (let attempt = 0; attempt < DOWNLOAD_ATTEMPTS; attempt += 1) {
+      try {
+        const res = await fetch(url, { redirect: "follow", headers: { "user-agent": DOWNLOAD_UA }, signal: AbortSignal.timeout(180_000) });
+        if (!res.ok) {
+          const err = /** @type {Error & { wait?: number }} */ (new Error(`HTTP ${res.status} for ${url}`));
+          // A busy archive (429, 503) says how long to wait; otherwise wait longer each time.
+          if (res.status === 429 || res.status === 503) err.wait = retryAfterSeconds(res.headers.get("retry-after")) ?? Math.min(120, 5 * 2 ** attempt);
+          else if (res.status === 404 || res.status === 410) { lastError = err; break; }
+          throw err;
+        }
+        writeFileSync(file + ".part", Buffer.from(await res.arrayBuffer()));
+        renameSync(file + ".part", file);
+        return file;
+      } catch (error) {
+        lastError = error;
+        const wait = /** @type {any} */ (error)?.wait ?? 2 ** attempt;
+        await new Promise((r) => setTimeout(r, wait * 1000));
+      }
     }
-  }
-  throw lastError;
+    throw lastError;
+  });
+}
+
+/** Archives ask for a User-Agent that names the tool (Wikimedia answers 429 to anonymous bulk downloads). */
+const DOWNLOAD_UA = "ZuponaStudio/1.0 (documentary renderer; https://github.com/sayedmuntasim3-cmd/ai.x.com)";
+const DOWNLOAD_ATTEMPTS = 7;
+/** Hosts that throttle bulk downloads get one download at a time, with a short gap. */
+const POLITE_HOSTS = /(^|\.)(wikimedia\.org|wikipedia\.org|loc\.gov|si\.edu|artic\.edu|archive\.org)$/i;
+const POLITE_GAP_MS = 400;
+/** @type {Map<string, Promise<unknown>>} */
+const hostQueues = new Map();
+
+/**
+ * Run fn for host; for a throttling archive, one at a time per host.
+ * @template T @param {string} host @param {() => Promise<T>} fn @returns {Promise<T>}
+ */
+export function politely(host, fn) {
+  if (!POLITE_HOSTS.test(host)) return fn();
+  const before = hostQueues.get(host) ?? Promise.resolve();
+  const run = before.then(fn, fn);
+  hostQueues.set(host, run.then(() => new Promise((r) => setTimeout(r, POLITE_GAP_MS)), () => new Promise((r) => setTimeout(r, POLITE_GAP_MS))));
+  return run;
+}
+
+/** Seconds from a Retry-After header (a number of seconds or an HTTP date), capped at 5 minutes. @param {string | null} v */
+export function retryAfterSeconds(v, now = Date.now()) {
+  if (!v) return null;
+  const n = Number(v);
+  const s = Number.isFinite(n) ? n : (Date.parse(v) - now) / 1000;
+  return Number.isFinite(s) && s >= 0 ? Math.min(300, Math.ceil(s)) : null;
 }
 
 /**

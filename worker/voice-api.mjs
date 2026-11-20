@@ -14,6 +14,9 @@
  *   POST /api/voice/:id/film             { bytes } -> start the upload of the finished MP4 from the runner   (ticket)
  *   PUT  /api/voice/:id/film/parts/:n    one piece of the MP4   (ticket)
  *   POST /api/voice/:id/film/complete    { parts }   (ticket)
+ *   POST /api/voice/:id/retry            start a failed film again from the saved recording   (Bearer STUDIO_TOKEN)
+ *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
+ *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed for the runner with the Worker's own key (free; the key never leaves Cloudflare)   (ticket)
  *   GET  /api/voice/:id/film             the finished MP4   (?ticket= from GET /api/voice/:id, or Bearer STUDIO_TOKEN)
  *
  * The recording stays private in R2 (bucket FILMS, voice/<id>/...). Files go up in
@@ -95,7 +98,10 @@ export function checkVoiceRequest(body) {
   if (bytes > MAX_AUDIO_BYTES) return { ok: false, error: "The file is larger than 2 GB. Export it as MP3 or M4A (a 40-minute MP3 is about 40 MB)." };
   const kind = body?.kind === "quran" ? "quran" : body?.kind === "narration" || body?.kind === undefined ? "narration" : null;
   if (!kind) return { ok: false, error: "kind must be narration or quran." };
-  const topic = String(body?.topic ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 300);
+  // No topic typed: the file's own name says what the film is about ("Ramesh Babu - From Barber to Rolls-Royce.mp3").
+  const typed = String(body?.topic ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 300);
+  const fromName = fileName.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
+  const topic = typed || (/^(my narration|recording|voice|audio|untitled|new recording)\b/i.test(fromName) || !/\p{L}{3}/u.test(fromName) ? "" : fromName.slice(0, 300));
   let surah = null;
   let ayat = "";
   let reciter = "";
@@ -218,6 +224,22 @@ export async function handleVoice(request, env, url, deps = {}) {
   const rec = await load(bucket, id);
   if (!rec) return json({ error: "Not found." }, 404);
   const runner = !owner && (await checkTicket(env.STUDIO_TOKEN, id, ticket, ["runner"], now()));
+  /** Start (or start again) the film machine for this recording. @param {any} r */
+  const start = async (r) => {
+    if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
+      r.progress.push(progressEntry("queued", {}, "GitHub is not connected (GITHUB_TOKEN secret, GITHUB_REPO var), so the film cannot be made yet. The recording is saved."));
+      await save(bucket, r);
+      return json(publicView(r), 202);
+    }
+    const site = env.SITE_URL || url.origin;
+    const started = await dispatchVoiceFilm({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, rec: r, site, ticket: await makeTicket(env.STUDIO_TOKEN, id, "runner", RUNNER_TICKET_SECONDS, now()), ref: env.GITHUB_REF || "main", fetch: deps.fetch });
+    if (started.ok) {
+      r.run = { actionsUrl: started.actionsUrl };
+      r.progress.push(progressEntry("queued"));
+    } else r.progress.push(progressEntry("queued", {}, started.error));
+    await save(bucket, r);
+    return json(publicView(r), started.ok ? 202 : 502);
+  };
   const sub = parts.slice(1).join("/");
 
   // The creator's own upload of the recording.
@@ -256,19 +278,26 @@ export async function handleVoice(request, env, url, deps = {}) {
     rec.uploaded = true;
     delete rec.uploadId;
     rec.progress.push(progressEntry("uploaded", { mb: Math.round(rec.bytes / 1048576) }));
-    if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
-      rec.progress.push(progressEntry("queued", {}, "GitHub is not connected (GITHUB_TOKEN secret, GITHUB_REPO var), so the film cannot be made yet. The recording is saved."));
-      await save(bucket, rec);
-      return json(publicView(rec), 202);
-    }
-    const site = env.SITE_URL || url.origin;
-    const started = await dispatchVoiceFilm({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, rec, site, ticket: await makeTicket(env.STUDIO_TOKEN, id, "runner", RUNNER_TICKET_SECONDS, now()), ref: env.GITHUB_REF || "main", fetch: deps.fetch });
-    if (started.ok) {
-      rec.run = { actionsUrl: started.actionsUrl };
-      rec.progress.push(progressEntry("queued"));
-    } else rec.progress.push(progressEntry("queued", {}, started.error));
-    await save(bucket, rec);
-    return json(publicView(rec), started.ok ? 202 : 502);
+    return start(rec);
+  }
+
+  if (sub === "retry" && method === "POST") {
+    if (!owner) return json({ error: "Wrong studio token." }, 401);
+    if (!rec.uploaded) return json({ error: "The recording is not fully uploaded yet." }, 409);
+    if (statusOf(rec) !== "failed") return json({ error: "Only a stopped film can be started again." }, 409);
+    if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return json({ error: "GitHub is not connected (GITHUB_TOKEN secret, GITHUB_REPO var)." }, 503);
+    rec.retries = (rec.retries ?? 0) + 1;
+    delete rec.film;
+    delete rec.report;
+    return start(rec);
+  }
+
+  if (sub === "" && method === "DELETE") {
+    if (!owner) return json({ error: "Wrong studio token." }, 401);
+    if (rec.uploadId) await bucket.resumeMultipartUpload(rec.audioKey, rec.uploadId).abort().catch(() => {});
+    if (rec.filmUpload) await bucket.resumeMultipartUpload(rec.filmUpload.key, rec.filmUpload.uploadId).abort().catch(() => {});
+    await bucket.delete([rec.audioKey, `voice/${id}/film.mp4`, recordKey(id)]);
+    return json({ ok: true, deleted: id });
   }
 
   if (sub === "" && method === "GET") {
@@ -300,6 +329,24 @@ export async function handleVoice(request, env, url, deps = {}) {
     if (body?.report && typeof body.report === "object" && JSON.stringify(body.report).length <= 20000) rec.report = body.report;
     await save(bucket, rec);
     return json({ ok: true, status: statusOf(rec) });
+  }
+
+  if (sub === "stock" && method === "GET") {
+    if (!runner) return json({ error: "Wrong ticket." }, 401);
+    if (!env.PIXABAY_API_KEY) return json({ error: "No PIXABAY_API_KEY secret on the Worker." }, 503);
+    const kind = url.searchParams.get("kind") === "video" ? "video" : "image";
+    const q = String(url.searchParams.get("q") ?? "").slice(0, 100);
+    if (!q.trim()) return json({ error: "q is empty." }, 400);
+    const up = new URL(kind === "video" ? "https://pixabay.com/api/videos/" : "https://pixabay.com/api/");
+    up.searchParams.set("key", env.PIXABAY_API_KEY);
+    up.searchParams.set("q", q);
+    // Only Pixabay's own search options pass through.
+    for (const k of ["per_page", "safesearch", "video_type", "image_type", "orientation", "min_width", "min_height", "order", "page"]) {
+      const v = url.searchParams.get(k);
+      if (v && /^[\w-]{1,20}$/.test(v)) up.searchParams.set(k, v);
+    }
+    const res = await (deps.fetch ?? fetch)(up.toString(), { headers: { "user-agent": "zupona-studio" } });
+    return new Response(res.body, { status: res.status, headers: { "content-type": res.headers.get("content-type") ?? "application/json", "cache-control": "no-store" } });
   }
 
   if (sub === "film" && method === "POST") {
