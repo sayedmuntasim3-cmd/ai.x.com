@@ -201,7 +201,7 @@ export default function Landing() {
 
   const create = () => {
     if (draft.mode === "idea" && draft.idea.trim().length < 12) {
-      setError("Tell us a little more about your idea. One sentence is plenty.");
+      setError("Tell us a little more about your idea. One sentence with an angle (a question, a claim or a number) is plenty.");
       ideaRef.current?.focus();
       return;
     }
@@ -680,7 +680,7 @@ function IdeaPanel({ draft, update, error, setError, ideaRef }: ComposerProps) {
             update("idea", e.target.value);
             if (error) setError("");
           }}
-          placeholder="e.g. The life of a mountain lion in the wild, or the beauty of coral reefs…"
+          placeholder="e.g. Why the Panama Canal took three tries, and what the first two cost"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? "studio-error" : undefined}
           className="block max-h-64 min-h-[116px] w-full resize-none bg-transparent px-4 pb-4 pr-14 pt-3.5 text-[16px] leading-relaxed text-ink outline-none placeholder:text-muted [field-sizing:content] focus-visible:outline-none"
