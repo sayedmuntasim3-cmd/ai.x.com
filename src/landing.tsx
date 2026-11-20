@@ -980,7 +980,7 @@ function Preview({ category, title, subtitle, runtime, age, chapters, totalSecon
         <h2 id="preview-title" className="font-serif text-[23px] font-normal leading-[1.1] tracking-[-0.01em] text-ink min-[400px]:text-[26px] sm:text-[32px]">
           Your documentary preview
         </h2>
-        <a href="#explore" className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[14px] text-ink-2 sm:gap-1.5 sm:text-[15px] transition-colors hover:text-brand-ink">
+        <a href="#explore" className="group -mb-3 inline-flex shrink-0 items-center gap-1 pb-3.5 pt-3 text-[14px] text-ink-2 sm:gap-1.5 sm:text-[15px] transition-colors hover:text-brand-ink">
           View all <ArrowRightIcon size={18} className="transition-transform group-hover:translate-x-0.5" />
         </a>
       </div>
@@ -1203,14 +1203,14 @@ function Footer() {
           © <span suppressHydrationWarning>{new Date().getFullYear()}</span> Zupona AI. Made for imagination.
         </span>
       </div>
-      <nav aria-label="Footer" className="flex gap-5">
-        <a href="#studio" className="transition-colors hover:text-ink">
+      <nav aria-label="Footer" className="-my-3 flex gap-5">
+        <a href="#studio" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
           Studio
         </a>
-        <a href="#explore" className="transition-colors hover:text-ink">
+        <a href="#explore" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
           Explore
         </a>
-        <a href="https://zupona.com" className="transition-colors hover:text-ink">
+        <a href="https://zupona.com" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
           zupona.com
         </a>
       </nav>
