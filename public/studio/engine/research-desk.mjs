@@ -359,5 +359,7 @@ export function writeInstruction(story) {
       ? "Collect the real-world details the invented story needs (prices, wages, laws, jobs, places, distances, era), and the famous real people the invented characters must not be confused with."
       : "Collect the facts this film needs: who, what, where, when, how much, and the turning points. Where pages disagree, record the conflict instead of choosing.",
     "Each fact cites the documents that state it, by id. Output ONE fenced ```json block, and nothing after it, shaped as: {\"subject\": string, \"facts\": [{\"id\": \"F01\", \"claim\": string, \"value\": string, \"sources\": [\"D3\", \"D7\"], \"confidence\": \"high\"|\"medium\"|\"low\", \"conflict\": string|null}], \"unknowns\": [string], \"doNotConfuse\": [string]}. A fact no document states is left out and named in unknowns.",
+    // Two test films (20 Nov 2026) cited almost only Wikipedia although the desk had opened 7 sites.
+    "Cite every document that states a fact, not only the first: a fact stated on pages from two or more different sites cites all of them, and pages from sites other than Wikipedia come first. Across the file, use as many different sites as the corpus offers (at least four when it has them).",
   ].join(" ");
 }

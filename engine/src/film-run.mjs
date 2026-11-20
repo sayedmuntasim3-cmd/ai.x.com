@@ -45,6 +45,13 @@ export const PRICES = Object.freeze({
   "gemini-3.8-flash": { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 });
 
+/**
+ * With more than two research sources, fewer queries and fewer opened Wikipedia references: the pages come
+ * from more independent sites instead, and the stage stays inside Cloudflare's 50 requests a run
+ * (5 queries x 4 sources = 20 searches, up to 10 documents and 6 references).
+ */
+export const WIDE_DESK = Object.freeze({ queries: 5, references: 6 });
+
 /** Models used only on a free tier: Gemini flash (no billing account linked) and Groq's free models. */
 export const FREE_MODEL = /^(gemini-[\d.]+-flash|openai\/gpt-oss-|qwen\/)/;
 
@@ -532,7 +539,7 @@ export async function runFilm(o) {
       const asked = safeJson(await ask("research-plan", [{ text: ctx("S0_S1", s01) }, { text: queryInstruction(story) }], 4000, { system: deskSystem }));
       const listed = Array.isArray(asked?.queries) ? asked.queries.map(String).filter(Boolean) : [];
       const queries = listed.length ? listed : [film.topic];
-      const { docs, trace } = await gatherCorpus({ queries, providers: o.research.providers, fetch: o.research.fetch, limits: { corpusChars: corpusBudget(model.capabilities?.contextTokens) } });
+      const { docs, trace } = await gatherCorpus({ queries, providers: o.research.providers, fetch: o.research.fetch, limits: { corpusChars: corpusBudget(model.capabilities?.contextTokens), ...(o.research.providers.length > 2 ? WIDE_DESK : {}) } });
       await store.put("research-corpus.json", JSON.stringify({ queries, trace, docs }, null, 1));
       // Phase 0 fairness rule: a corpus thinned by a failed source is never written from; the run stops and is redone.
       const failed = trace.filter((t) => t.outcome.startsWith("failed") || t.outcome.startsWith("read failed"));
