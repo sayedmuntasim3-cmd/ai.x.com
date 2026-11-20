@@ -189,3 +189,36 @@ in one run: **39 min 46 s of speech, 0 failed scenes, 10 min 46 s of CPU (0.27 s
   thirds, so no degradation over length. Higher than the 1-5 % of the short passages: this film is full of names, money amounts and
   numerals, which a speech-to-text model also writes differently from the script, so part of it is the checker's. Not separated yet.
 - Not measured: whether it stays pleasant to listen to for 40 minutes (a person must listen to a stretch from the end).
+
+## Voiceover films from the studio (20 Nov 2026, workstream B)
+
+A creator uploads a finished voiceover and gets a film back; the recording's words are the script.
+
+| Piece | Where |
+|---|---|
+| Upload, private R2 storage, progress, download | `worker/voice-api.mjs` (routes `/api/voice...`, listed at the top of the file) |
+| Film machine (free GitHub runner) | `.github/workflows/voice-film.yml`: fetch, `voice-film.mjs` (faster-whisper small.en, tighten, master dry, keyless media), `render-film.mjs --one-track`, release gate, film back to R2 |
+| Runner helper (ticket, progress, film upload in pieces) | `render/voice-runner.mjs` |
+| Landing page Voiceover mode | `src/voice-film.tsx` (only the brief sheet's voice part; the landing design is unchanged) |
+| Studio Voiceover tab | `public/studio/voice-upload.js` |
+| Progress messages en + bn | `voice.stage.*` in `engine/src/messages.mjs` |
+
+How it is safe: the file goes up in 16 MiB pieces (R2 multipart, so a 2 GB WAV fits under Cloudflare's 100 MB
+request limit), stays under `voice/<id>/` in the private bucket, and every route needs the studio key. The runner
+never gets the studio key: the Worker gives it a ticket (HMAC of the key over the voice id, purpose and expiry, 7 h)
+good for this one recording only; the creator's download link carries a separate 2-hour download-only ticket.
+Quran: the surah must be given (never guessed), the recitation is aligned to the Tanzil text, mastered in a
+mosque hall without music, pictures pass the adab guard, and the finished film is marked "awaiting review": it is
+delivered privately and never published before a scholar's review.
+
+Verified (20 Nov 2026, this container, the real routes over a local R2 stand-in, the workflow's steps run by hand):
+a 1 min 42 s Zupona-narrator recording went up, was fetched by ticket byte for byte, 251 words heard by
+faster-whisper small.en, 13 scenes, mastered (-15 LUFS, timing within 0 ms), 13 licensed pictures, rendered
+1280x720, passed the final check, came back in pieces and downloaded identical (7.9 MB). Bug found and fixed: the
+final check blocked every one-recording film ("1 of 13 scenes have a voice"); the report now counts the one track
+as voicing every scene. Not verified yet: the workflow on GitHub itself (it runs only after merge to main), the
+Cloudflare R2 multipart calls live, the Quran path end to end.
+
+Seen in the frames, to fix next: without a brain and without Pexels/Pixabay keys on GitHub, pictures come from the
+keyless museum archives (old etchings and portraits) and do not match a modern story. No music under a narration
+voiceover yet.
