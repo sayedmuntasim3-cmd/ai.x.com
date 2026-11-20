@@ -255,7 +255,7 @@ export default function Landing() {
             <em className="font-normal italic">documentary</em>
           </h1>
           <p className="mt-5 max-w-[30rem] text-[17px] leading-[1.6] text-ink-2 motion-safe:animate-rise motion-safe:[animation-delay:90ms] sm:text-[19px]">
-            Turn your ideas into stunning, cinematic documentaries — in minutes.
+            Turn your ideas into stunning, cinematic documentaries — researched, sourced and ready to publish.
           </p>
         </section>
 
@@ -839,7 +839,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
   return (
     <div id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" className="mt-6">
       <p className="text-[17px] font-medium text-ink">Add your narration</p>
-      <p className="mt-1 text-[14px] leading-relaxed text-muted">Zupona builds the visuals around your voice, and the film runs as long as you speak.</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-muted">Zupona builds the visuals around your voice, and the film runs as long as you speak. Coming soon: for now you can plan the brief here, and Idea makes the film.</p>
 
       {voice ? (
         <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line-strong bg-canvas/50 p-3">
@@ -1690,7 +1690,7 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
             }}
             className="mt-2 h-12 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15"
           />
-          <span className="mt-1.5 block text-[12.5px] text-muted">Asked once, then saved on this device.</span>
+          <span className="mt-1.5 block text-[12.5px] text-muted">Asked once, then saved on this device. Zupona is in private beta: no key yet? Copy the brief and keep it.</span>
         </label>
       )}
       <button

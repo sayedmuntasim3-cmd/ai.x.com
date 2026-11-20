@@ -119,7 +119,7 @@ export function suggestCategory(text: string): CategoryId | null {
   const cues: [CategoryId, RegExp][] = [
     ["space", /\b(space|apollo|nasa|moon|mars|planets?|galax(y|ies)|stars?|astronauts?|rockets?|orbit|universe|black holes?|telescope|voyager|comets?|asteroids?|spacex)\b/g],
     ["ocean", /\b(oceans?|seas?|reefs?|coral|whales?|sharks?|deep sea|marine|tides?|dolphins?|octopus|jellyfish|underwater)\b/g],
-    ["history", /\b(war|wars|battles?|empires?|kings?|queens?|ancient|century|centuries|revolution|dynasty|pharaohs?|medieval|history|civili[sz]ations?|wwi+|world war|1[0-9]{3}s?)\b/g],
+    ["history", /\b(war|wars|battles?|empires?|kings?|queens?|ancient|century|centuries|revolution|dynasty|pharaohs?|medieval|history|civili[sz]ations?|wwi+|world war|1[0-9]{3}s?|canals?|pyramids?|castles?|cathedrals?|railways?|bridges?|dams?|colonial|ruins)\b/g],
     ["science", /\b(science|physics|chemistry|biology|brain|dna|quantum|atoms?|virus(es)?|robots?|technology|inventions?|medicine|climate|ai|computers?|engineering)\b/g],
     ["nature", /\b(wildlife|animals?|forests?|lions?|tigers?|elephants?|birds?|mountains?|jungles?|rivers?|deserts?|migration|insects?|nature|wolves|wolf|bears?|leopards?)\b/g],
     ["culture", /\b(cultures?|festivals?|music|food|traditions?|art|artists?|cities|city|religions?|languages?|fashion|sports?|football|cricket|people of)\b/g],
