@@ -43,14 +43,37 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
 const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/g;
 
+/** A source chip ("C06 · site.com"), already shown in the small source line. @param {string} q */
+const isChip = (q) => /^C\d{2,3}\s*·/.test(q);
+
 /**
  * The words a graphics card shows: the first quoted text of the on-screen
- * text field, else of the shot description, else nothing.
+ * text field, else of the shot description, else nothing. Quotes are paired in
+ * order, so a long quote is never skipped (skipping it once put the writer's own
+ * note between two quotes on screen: "(card, hold 8 s ...)"), and an escaped
+ * quote (\") becomes an inner quote mark, not a stray backslash. A source chip
+ * ("C06 · site.com") is the card's text only when nothing else is quoted.
  * @param {string} shotText @param {string} ost
  */
 export function cardText(shotText, ost) {
-  const quoted = (/** @type {string} */ s) => /["“]([^"”]{2,80})["”]/.exec(s)?.[1]?.trim() ?? "";
+  const chip = isChip;
+  const quoted = (/** @type {string} */ s) => {
+    const all = quotes(String(s ?? "").replace(/\\"/g, "'")).filter((q) => q.length >= 2 && q.length <= 160 && !DISCLOSURE.test(q));
+    return all.find((q) => !chip(q)) ?? all[0] ?? "";
+  };
   return quoted(ost) || quoted(shotText);
+}
+
+/** A disclosure label written under footage ("Illustrative", "Paraphrased"): a small tag, never a headline. */
+const DISCLOSURE = /^(?:illustrative|paraphrased(?: throughout)?|reconstruction|dramati[sz]ation|representative(?: footage| image)?|archive footage|file footage|stock footage)\.?$/i;
+
+/**
+ * The disclosure label of a scene's on-screen text, if it writes one; it goes
+ * into the small source line, so "Illustrative" never lands as a big title.
+ * @param {string} ost
+ */
+export function disclosureTag(ost) {
+  return quotes(String(ost ?? "")).find((q) => DISCLOSURE.test(q)) ?? "";
 }
 
 /**
@@ -75,7 +98,7 @@ export function splitPanels(text) {
 
 /** Quoted texts with at least one letter or digit, in order. @param {string} text */
 function quotes(text) {
-  return [...text.matchAll(/["“]([^"”]{1,160})["”]/g)].map((m) => m[1].trim()).filter((q) => /[\p{L}\p{N}]/u.test(q));
+  return [...text.matchAll(/["“]([^"”]*)["”]/g)].map((m) => m[1].trim()).filter((q) => q.length <= 160 && /[\p{L}\p{N}]/u.test(q));
 }
 
 /**
@@ -527,6 +550,7 @@ export function buildTimeline(o) {
       const ost = s.fields.OST ?? "";
       const push = /push|zoom in|push-in/i.test(s.fields.MOTION ?? "");
       const chip = sourceChip(ost);
+      const tag = disclosureTag(ost);
       const fx = s.fields.FX ?? "";
       const look = { style: /** @type {"plain" | "paper"} */ (/FX-PAPER/i.test(fx) ? "paper" : "plain"), kinetic: /FX-KINETIC/i.test(fx) };
       const speed = slowMotion(s.fields.MOTION ?? "");
@@ -586,10 +610,10 @@ export function buildTimeline(o) {
           // A still's move is decided from the scene (motion.mjs); footage keeps its own movement.
           const move = still ? decideMove({ intent: sceneIntent(s, { shotText: shot.text, chapterOpen: lead && opening, chapterClose: closing }), seconds: frames / fps, written: writtenMove(s.fields.MOTION ?? ""), profile, level, previous: moves, index: moves.length }) : null;
           if (move) moves.push(move);
-          video.push({ ...base, sourceIn: still ? 0 : sourceIn, ...(speed < 1 && !still ? { speed } : {}), ...(still ? { still: true } : {}), ...(move ? { move } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push || still ? "push" : "none", text: "", title: lead ? cardText("", ost) : "" });
+          video.push({ ...base, sourceIn: still ? 0 : sourceIn, ...(speed < 1 && !still ? { speed } : {}), ...(still ? { still: true } : {}), ...(move ? { move } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push || still ? "push" : "none", text: "", title: lead && !isChip(cardText("", ost)) ? cardText("", ost) : "", chip: [base.chip, tag].filter(Boolean).join(" · ") });
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
-          video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: cardText(shot.text, ost) });
+          video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: ((t) => (isChip(t) && tag ? tag : t))(cardText(shot.text, ost)) || tag });
         }
       }
 

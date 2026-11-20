@@ -47,13 +47,17 @@ model's 404 still stops the film, since that is a wrong MODEL setting).
 - `docs/MARKET.md` (Kutly and 4 competitors, read from their pages; feature table against the code; gaps ranked)
   and `docs/BUSINESS.md` (first segment: English history channels; credits from real cost; 30-day plan).
 - Measured: a 1080p render takes about 0.6 runner minutes per film minute (USA chapter 1, 510 s in 309 s on
-  2 cores, local test clips). Kokoro narration time not measured. The landing now shows 1 credit = 1 finished
+  2 cores, local test clips). Kokoro narration: 95 s in 28.6 s on 2 cores (about 0.3 runner minutes per film minute). The landing now shows 1 credit = 1 finished
   minute, rounded up, "no charge during the private beta" (`src/data.ts` `estimateCredits`, `CREDIT_NOTE`).
 - On-screen type for phones, decided with frames viewed at 390 px wide: source line 2.6 -> 3.4 %, chapter label
   2.4 -> 3.2 %, chapter title 5 -> 6 %, clip title 5.2 -> 5.8 % and anchored from the bottom (a 3-line title ran
   into the source line before), bar labels 3.5 -> 4.4 %, bar values 4.2 -> 5 %, map labels 4/4.5 -> 4.8/5.2 %,
   split panels 4.5/5.5 -> 5.4/6 %. Shot cache v9 -> v10.
-- Seen on the old USA production (for workstream A): an editing note on screen ("(card, hold 8 s ≥ ...)"), a stray
+- Fixed 20 Nov (`engine/src/timeline.mjs` `cardText`, `disclosureTag`): quotes are paired in order (a long quote let the writer's
+  note reach the screen), an escaped quote is no stray backslash, a source chip is the card's text only when nothing else
+  is quoted and never a clip title, and "Illustrative" goes into the small source line. USA film: notes 1 -> 0,
+  backslashes 2 -> 0, chips as card text 42 -> 21.
+- Seen on the old USA production: an editing note on screen ("(card, hold 8 s ≥ ...)"), a stray
   backslash ("billionaire barber\"), and source chips used as card text ("C14 · rtt.co.in"). Not checked on a new film.
 
 20 Nov 2026, film 70577b9b hit "Too many subrequests" again (PR #19 was not enough):
