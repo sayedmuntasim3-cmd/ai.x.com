@@ -117,3 +117,10 @@ test("a provider read that fails is written in the trace, not swallowed", async 
   assert.equal(docs.length, 0);
   assert.deepEqual(trace.map((t) => t.outcome), ["ok", "read failed: Wikipedia 429"]);
 });
+
+test("the research writer is asked to cite every site that states a fact, non-Wikipedia first, at least four sites", async () => {
+  const { writeInstruction } = await import("../src/research-desk.mjs");
+  for (const story of [false, true]) assert.match(writeInstruction(story), /at least four/);
+  const { WIDE_DESK } = await import("../src/film-run.mjs");
+  assert.ok(WIDE_DESK.queries * 4 + 10 + WIDE_DESK.references <= 45, "a four-source desk stays inside 50 requests a run");
+});

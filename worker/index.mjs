@@ -119,7 +119,9 @@ function sameToken(a, b) {
 const webFetch = (url, init) => fetch(url, init);
 
 /** The research desk for a brain that cannot search the web: Wikipedia, and the owner's SearXNG when set. @param {any} env */
-const researchDesk = (env) => ({ providers: researchProviders({ fetch: webFetch, searxngUrl: env.SEARXNG_URL || undefined }), fetch: webFetch });
+// Besides Wikipedia, the Library of Congress and the Internet Archive (free, no key): two test films rested on
+// two sites (20 Nov 2026). RESEARCH_SOURCES names others (crossref, europepmc, pubmed, archive, loc); "none": Wikipedia only.
+const researchDesk = (env) => ({ providers: researchProviders({ fetch: webFetch, searxngUrl: env.SEARXNG_URL || undefined, sources: env.RESEARCH_SOURCES === "none" ? undefined : env.RESEARCH_SOURCES || "loc,archive" }), fetch: webFetch });
 
 /**
  * Bossism's preflight for a new film with this deployment's connections.

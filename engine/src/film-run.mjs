@@ -45,6 +45,16 @@ export const PRICES = Object.freeze({
   "gemini-3.8-flash": { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 });
 
+/**
+ * With more than two research sources, fewer queries and fewer opened Wikipedia references: the pages come
+ * from more independent sites instead, and the stage stays inside Cloudflare's 50 requests a run
+ * (5 queries x 4 sources = 20 searches, up to 10 documents and 6 references).
+ */
+export const WIDE_DESK = Object.freeze({ queries: 5, references: 6 });
+
+/** Models used only on a free tier: Gemini flash (no billing account linked) and Groq's free models. */
+export const FREE_MODEL = /^(gemini-[\d.]+-flash|openai\/gpt-oss-|qwen\/)/;
+
 /** US dollars per web search (server tool). */
 export const WEB_SEARCH_USD = 0.01;
 
@@ -271,6 +281,9 @@ export function estimateRun(durationSeconds, model = "claude-opus-5-5", brain = 
  * @param {Price} [ownPrice]
  */
 export function costOf(u, model, ownPrice) {
+  // Free-tier models (every Gemini flash the pool may hand over to, Groq's free models) cost nothing;
+  // before this a pool model missing from PRICES was priced at the highest price (film 70577b9b: "$0.26").
+  if (!ownPrice && FREE_MODEL.test(model)) return 0;
   const p = ownPrice ?? PRICES[/** @type {keyof typeof PRICES} */ (model)] ?? highestPrice();
   // The Batch API (half-price mode) bills every token at 50%.
   const tokens = ((u.input_tokens ?? 0) * p.input + (u.output_tokens ?? 0) * p.output + (u.cache_read_input_tokens ?? 0) * p.cacheRead + (u.cache_creation_input_tokens ?? 0) * p.cacheWrite) / 1e6;
@@ -526,7 +539,7 @@ export async function runFilm(o) {
       const asked = safeJson(await ask("research-plan", [{ text: ctx("S0_S1", s01) }, { text: queryInstruction(story) }], 4000, { system: deskSystem }));
       const listed = Array.isArray(asked?.queries) ? asked.queries.map(String).filter(Boolean) : [];
       const queries = listed.length ? listed : [film.topic];
-      const { docs, trace } = await gatherCorpus({ queries, providers: o.research.providers, fetch: o.research.fetch, limits: { corpusChars: corpusBudget(model.capabilities?.contextTokens) } });
+      const { docs, trace } = await gatherCorpus({ queries, providers: o.research.providers, fetch: o.research.fetch, limits: { corpusChars: corpusBudget(model.capabilities?.contextTokens), ...(o.research.providers.length > 2 ? WIDE_DESK : {}) } });
       await store.put("research-corpus.json", JSON.stringify({ queries, trace, docs }, null, 1));
       // Phase 0 fairness rule: a corpus thinned by a failed source is never written from; the run stops and is redone.
       const failed = trace.filter((t) => t.outcome.startsWith("failed") || t.outcome.startsWith("read failed"));
