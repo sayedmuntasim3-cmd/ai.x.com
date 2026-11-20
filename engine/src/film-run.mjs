@@ -719,11 +719,8 @@ export async function runFilm(o) {
         const scenes = new Set(part.flatMap((c) => parseSceneLines(c.markdown).map((x) => x.sc)));
         const errors = whole ? machine.errors : machine.errors.filter((e) => !e.scene || scenes.has(e.scene));
         const partCraft = whole ? craft : craft.filter((x) => (x.code === "card-heavy" ? part.some((c) => x.detail.startsWith(`${c.id}:`)) : part[0]?.id === chapters[0]?.id));
-        // Read chapter by chapter, a call carries only the ledger rows its chapter cites (a small-prompt brain fits).
-        const ids = new Set(part.flatMap((c) => c.markdown.match(/\bC\d{2,3}\b/g) ?? []));
-        const ledger = whole ? s2 : s2.split("\n").filter((line) => { const cited = line.match(/\bC\d{2,3}\b/g); return !cited || cited.some((id) => ids.has(id)); }).join("\n");
         return ask(name, [
-          { text: ctx("S2", ledger) + "\n" + part.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
+          { text: ctx("S2", s2) + "\n" + part.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
           { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(errors.slice(0, 60)) + (partCraft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(partCraft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). " + (factual ? "Keep every claim tag ({C01}, {N}) in NARR and give each new sentence its own tag; a fix that drops or breaks a tag is reverted. " : "") + "Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
         ], 32000);
       };
@@ -731,13 +728,12 @@ export async function runFilm(o) {
       const window = model.capabilities?.contextTokens;
       const reserve = Math.min(32000, model.capabilities?.maxOutputTokens ?? 8192);
       const tokensFor = (/** @type {typeof chapters} */ part) => Math.ceil((manual.length + brief.length + s2.length + part.reduce((n, c) => n + c.markdown.length, 0) + 6000) / 3.2) + reserve;
-      // A brain that takes small prompts first (Groq, about 7,200 tokens: model.promptLimit) also gets one chapter a call.
-      const perChapter = chapters.length > 1 && ((Boolean(window) && tokensFor(chapters) > /** @type {number} */ (window)) || Boolean(/** @type {any} */ (model).promptLimit));
+      const perChapter = Boolean(window) && chapters.length > 1 && tokensFor(chapters) > /** @type {number} */ (window);
       /** @type {any} */
       let qa;
       if (!perChapter) qa = safeJson(await qaAsk("qa", chapters)) ?? { mustFix: [], passed: [], notChecked: ["The QA reply was not valid JSON."] };
       else {
-        qa = { mode: "per-chapter", mustFix: [], passed: [], notChecked: [`The model did not compare chapters with each other: ${window ? `the brain's window (${window} tokens) holds one chapter at a time` : `the free brain takes prompts of about ${/** @type {any} */ (model).promptLimit} tokens`}, so QA read each chapter on its own. Code still checked the clock and the open loops across the whole film.`] };
+        qa = { mode: "per-chapter", mustFix: [], passed: [], notChecked: [`The model did not compare chapters with each other: the brain's window (${window} tokens) holds one chapter at a time, so QA read each chapter on its own. Code still checked the clock and the open loops across the whole film.`] };
         for (const c of chapters) {
           const part = safeJson(await qaAsk(`qa:${c.id}`, [c]));
           if (!part) { qa.notChecked.push(`${c.id}: the QA reply was not valid JSON.`); continue; }

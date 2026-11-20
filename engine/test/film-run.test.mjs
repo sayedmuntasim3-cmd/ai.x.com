@@ -711,28 +711,3 @@ test("the channel's lessons reach S3, every S5 chapter and the Edit Director", a
   for (const st of ["s3", "s5:C1", "s5:C2", "edit:C1"]) assert.match(prompts[st], /CHANNEL_LESSONS[\s\S]*the law of 1972/, st);
   assert.ok(!/CHANNEL_LESSONS/.test(prompts.s01), "only where the film is shaped and cut");
 });
-
-test("a small-prompt brain (Groq first) gets QA chapter by chapter, each call with only its chapter's ledger rows", async () => {
-  const made = newFilm({ topic: "The old mill", minutes: 2 }, "qa-small");
-  assert.ok(made.ok);
-  const base = scriptedModel();
-  /** @type {string[]} */
-  const ledgers = [];
-  const model = {
-    ...base,
-    promptLimit: 7200,
-    async call(/** @type {import("../src/film-run.mjs").ModelRequest} */ r) {
-      if (r.stage.startsWith("qa:")) {
-        ledgers.push(r.messages[0].content[0].text.split("<S5_")[0]);
-        return { text: "```json\n" + JSON.stringify({ mustFix: [], passed: ["p"], notChecked: [] }) + "\n```", stopReason: "end_turn", usage: {} };
-      }
-      return base.call(r);
-    },
-  };
-  const store = memoryStore();
-  const state = await runFilm({ film: made.film, manual: "M", model, store });
-  assert.equal(state.qaMode, "per-chapter");
-  assert.equal(ledgers.length, 2);
-  const s2 = store.m.get("s2.md") ?? "";
-  for (const l of ledgers) assert.ok(l.length <= s2.length + 40, "a chapter's ledger is never more than the whole");
-});
