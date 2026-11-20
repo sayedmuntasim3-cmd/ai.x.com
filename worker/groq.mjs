@@ -99,6 +99,8 @@ export function groqModel(o) {
 export function withGroq(main, groq, o = {}) {
   return {
     ...main,
+    /** Read by the film run: stages that can be split (QA) send one chapter a call, so Groq can take them. */
+    promptLimit: GROQ_PROMPT_LIMIT,
     /** @param {any} req */
     async call(req) {
       if (groq.fits(req)) {
