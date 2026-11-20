@@ -45,7 +45,7 @@ test("GEMINI_SEARCH off (Phase 0 arm B): no Google Search tool is ever sent, the
 test("errors that waiting cannot fix (400, 403, 404) are not retried and say what Google answered", async () => {
   for (const [status, msg] of [[400, "API key not valid"], [403, "PERMISSION_DENIED"], [404, "models/gemini-x is not found"]]) {
     let calls = 0;
-    const m = geminiModel({ apiKey: "k", model: "gemini-x", fetch: /** @type {typeof fetch} */ (async () => { calls += 1; return new Response(JSON.stringify({ error: { message: msg } }), { status: /** @type {number} */ (status) }); }), sleep: async () => {} });
+    const m = geminiModel({ apiKey: "k", model: "gemini-x", rotate: false, fetch: /** @type {typeof fetch} */ (async () => { calls += 1; return new Response(JSON.stringify({ error: { message: msg } }), { status: /** @type {number} */ (status) }); }), sleep: async () => {} });
     await assert.rejects(m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 }), (/** @type {any} */ e) => e.status === status && String(e.message).includes(String(msg)));
     assert.equal(calls, 1, `${status} is not retried`);
   }
@@ -107,7 +107,49 @@ test("a 429 waits as long as Google asks; a daily or zero limit stops with the r
   assert.deepEqual(waits, [12000]);
 
   let dailyCalls = 0;
-  const d = geminiModel({ apiKey: "k", sleep: async () => {}, fetch: /** @type {typeof fetch} */ (async () => { dailyCalls += 1; return new Response(body([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "250" }], "3600s"), { status: 429 }); }) });
+  const d = geminiModel({ apiKey: "k", rotate: false, sleep: async () => {}, fetch: /** @type {typeof fetch} */ (async () => { dailyCalls += 1; return new Response(body([{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "250" }], "3600s"), { status: 429 }); }) });
   await assert.rejects(d.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 }), (/** @type {any} */ e) => /daily limit/.test(e.permanent));
   assert.equal(dailyCalls, 1, "a used-up day is not retried");
+});
+
+test("free-tier rotation: a used-up model hands over to the next free model Google lists; priced as the configured model", async () => {
+  const { rankWriters } = await import("./gemini.mjs");
+  const listed = { models: [
+    { name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"], inputTokenLimit: 1048576 },
+    { name: "models/gemini-3.8-flash-lite", supportedGenerationMethods: ["generateContent"], inputTokenLimit: 1048576 },
+    { name: "models/gemini-3.8-pro", supportedGenerationMethods: ["generateContent"], inputTokenLimit: 1048576 },
+    { name: "models/gemini-3.5-flash", supportedGenerationMethods: ["generateContent"], inputTokenLimit: 1048576 },
+    { name: "models/gemini-embedding-001", supportedGenerationMethods: ["embedContent"] },
+    { name: "models/gemini-3.8-flash-image", supportedGenerationMethods: ["generateContent"] },
+    { name: "models/gemini-3.8-flash-preview-tts", supportedGenerationMethods: ["generateContent"] },
+  ] };
+  assert.deepEqual(rankWriters(listed.models), ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.8-pro", "gemini-3.8-flash-lite"]);
+  const daily = (/** @type {string} */ v) => JSON.stringify({ error: { code: 429, details: [{ violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: v }] }, { retryDelay: "3600s" }] } });
+  /** @type {string[]} */
+  const asked = [];
+  const m = geminiModel({ apiKey: "k", sleep: async () => {}, fetch: /** @type {typeof fetch} */ (async (url) => {
+    const u = String(url);
+    if (u.includes("/models?")) return Response.json(listed);
+    const id = /models\/([^:]+):/.exec(u)?.[1] ?? "";
+    asked.push(id);
+    if (id === "gemini-3.8-flash") return new Response(daily("20"), { status: 429 });
+    if (id === "gemini-3.5-flash") return new Response(daily("0"), { status: 429 });
+    return Response.json({ candidates: [{ content: { parts: [{ text: `from ${id}` }] }, finishReason: "STOP" }] });
+  }) });
+  const r = await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 });
+  assert.equal(r.text, "from gemini-3.8-pro");
+  assert.equal(r.model, "gemini-3.8-flash", "priced as the configured (free) model");
+  assert.equal(r.servedBy, "gemini-3.8-pro");
+  assert.deepEqual(asked, ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.8-pro"]);
+  // The next call goes straight to the model that still has quota.
+  await m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 });
+  assert.equal(asked.at(-1), "gemini-3.8-pro");
+});
+
+test("when every free model is used up, the call stops with the daily limit (the film then sleeps)", async () => {
+  const m = geminiModel({ apiKey: "k", sleep: async () => {}, fetch: /** @type {typeof fetch} */ (async (url) => {
+    if (String(url).includes("/models?")) return Response.json({ models: [{ name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] }, { name: "models/gemini-3.8-pro", supportedGenerationMethods: ["generateContent"] }] });
+    return new Response(JSON.stringify({ error: { code: 429, details: [{ violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier", quotaValue: "20" }] }, { retryDelay: "100s" }] } }), { status: 429 });
+  }) });
+  await assert.rejects(m.call({ system: [], messages: [{ role: "user", content: [{ text: "q" }] }], maxTokens: 10 }), (/** @type {any} */ e) => /daily limit/.test(e.permanent) && /retry in 100s/.test(e.message));
 });
