@@ -220,7 +220,8 @@ Master mission (ChatGPT's brief, 19 Nov) and the owner's own asks, item by item:
 - **Voice:** Zupona narrator (Kokoro, voice A, owner's choice) live; 40-minute test passed. Not done: NeuTTS
   Air / VoxCPM benchmark, a consented own-voice clone option, Arabic narration voice (recitation is never
   synthesized), filler-word and false-start removal in voiceovers.
-- **Voiceover mode from the landing page / studio: no upload route** (the CLI `local/voice-film.mjs` works).
+- **Voiceover mode:** upload route, GitHub film machine, landing + studio upload and progress built 20 Nov
+  (`docs/VOICE_SYSTEM.md`, last section); verified locally on a short recording; the 40-minute live run is next.
 - **Quran:** nothing advanced beyond the Quran-safe pause tightening; blockers remain (scholar sign-off,
   written rights with the friend's name, Ad-Duha timing FAIL).
 - **Film quality not yet evaluated on a real film:** picture relevance to narration, repeated images, map

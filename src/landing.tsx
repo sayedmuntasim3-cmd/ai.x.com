@@ -59,6 +59,7 @@ import {
 } from "./icons";
 import { FoxMark, HeroMountains, PosterArt } from "./art";
 import { Select } from "./select";
+import { VoiceFilm } from "./voice-film";
 
 const DRAFT_KEY = "zupona:studio-draft:v1";
 const THEME_KEY = "zupona:theme";
@@ -220,6 +221,7 @@ export default function Landing() {
     mode: draft.mode,
     idea: draft.mode === "idea" ? draft.idea.trim() : draft.topic.trim(),
     voiceName: voice?.name,
+    voiceUrl: voice?.url,
     runtime: formatRuntime(totalSeconds),
     category: category.label,
     age: findOption(AGES, draft.age).label,
@@ -839,7 +841,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
   return (
     <div id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" className="mt-6">
       <p className="text-[17px] font-medium text-ink">Add your narration</p>
-      <p className="mt-1 text-[14px] leading-relaxed text-muted">Zupona builds the visuals around your voice, and the film runs as long as you speak. Coming soon: for now you can plan the brief here, and Idea makes the film.</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-muted">Zupona builds the visuals around your voice, and the film runs as long as you speak.</p>
 
       {voice ? (
         <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line-strong bg-canvas/50 p-3">
@@ -1287,6 +1289,7 @@ type Brief = {
   mode: Mode;
   idea: string;
   voiceName?: string;
+  voiceUrl?: string;
   runtime: string;
   category: string;
   age: string;
@@ -1608,10 +1611,11 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
   };
 
   if (brief.mode !== "idea") {
-    return (
-      <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">
-        Films from your own voiceover are coming next. For now, switch to Idea and describe your story in a sentence.
-      </p>
+    // Voiceover mode: the creator's own recording becomes the film (src/voice-film.tsx).
+    return brief.voiceUrl && brief.voiceName ? (
+      <VoiceFilm open={open} fileName={brief.voiceName} voiceUrl={brief.voiceUrl} topic={brief.idea} />
+    ) : (
+      <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">Add your voiceover first: upload a file or record it.</p>
     );
   }
 
