@@ -238,7 +238,7 @@ function fillLine(line, f) {
 
 /**
  * reachable: checks that a picture's file can be fetched before it is chosen (the runner can afford the request).
- * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean> }} o
+ * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
  */
 export async function planVoiceVisuals(o) {
   const chapter = o.chapter ?? "C1";
@@ -285,7 +285,7 @@ export async function planVoiceVisuals(o) {
   if (o.providers?.length) {
     const judge = o.brain && canSee(o.brain) ? o.judge : undefined;
     // Voiceover films: a picture must name what was searched (the archives match "car" to "Carina Nebula").
-    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable });
+    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency });
     for (const shot of media.shots) {
       const p = plan.find((x) => x.sc === shot.scene);
       if (!p) continue;

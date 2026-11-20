@@ -67,6 +67,8 @@ jobs:
       RESOLUTION: ${{ inputs.resolution }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ZUPONA_PYTHON: python
+      ZUPONA_STT_BATCH: "8"
+      ZUPONA_MEDIA_CONCURRENCY: "6"
     steps:
       - name: Check the inputs
         run: |
@@ -119,7 +121,7 @@ jobs:
             if node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!q.marks)process.exit(1);require("fs").writeFileSync("marks.json",JSON.stringify(q.marks))'; then marks="--marks marks.json --tighten off"; fi
             node local/voice-film.mjs --audio "in.$EXT" --surah "$surah" ${ayat:+--ayat "$ayat"} --master mosque-hall $marks --out run 2>&1 | tee voice-film.log step.log
           else
-            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model small.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --out run 2>&1 | tee voice-film.log step.log
+            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model base.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --out run 2>&1 | tee voice-film.log step.log
           fi
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
