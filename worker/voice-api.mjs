@@ -14,6 +14,7 @@
  *   POST /api/voice/:id/film             { bytes } -> start the upload of the finished MP4 from the runner   (ticket)
  *   PUT  /api/voice/:id/film/parts/:n    one piece of the MP4   (ticket)
  *   POST /api/voice/:id/film/complete    { parts }   (ticket)
+ *   POST /api/voice/:id/marks            { start, ends[], by } the reviewer's ayah times (Quran): the film is made again with them   (Bearer STUDIO_TOKEN)
  *   POST /api/voice/:id/retry            start a failed film again from the saved recording   (Bearer STUDIO_TOKEN)
  *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed for the runner with the Worker's own key (free; the key never leaves Cloudflare)   (ticket)
@@ -25,6 +26,7 @@
  * studio key over (voice id, purpose, expiry), good for one recording only.
  */
 import { msg } from "../engine/src/messages.mjs";
+import { checkMarks } from "../engine/src/quran-marks.mjs";
 
 /** Every piece except the last must be this size (R2 asks for at least 5 MiB, equal sizes). */
 export const PART_SIZE = 16 * 1024 * 1024;
@@ -40,7 +42,7 @@ export const DOWNLOAD_TICKET_SECONDS = 2 * 3600;
 const AUDIO_TYPES = /** @type {const} */ ({ mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac", flac: "audio/flac", ogg: "audio/ogg", opus: "audio/opus", webm: "audio/webm" });
 const ID = /^[0-9a-f-]{36}$/;
 /** The stages the runner reports, in order (each has a message voice.stage.<stage>). */
-export const VOICE_STAGES = /** @type {const} */ (["uploaded", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
+export const VOICE_STAGES = /** @type {const} */ (["uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
 
 /** @param {unknown} body @param {number} [status] */
 function json(body, status = 200) {
@@ -65,7 +67,7 @@ async function hmacHex(key, text) {
 /**
  * A ticket for one recording and one purpose ("runner" may read the audio and
  * report; "download" may only fetch the finished film).
- * @param {string} secret @param {string} id @param {"runner" | "download"} purpose @param {number} seconds @param {number} [now]
+ * @param {string} secret @param {string} id @param {"runner" | "download" | "listen"} purpose @param {number} seconds @param {number} [now]
  */
 export async function makeTicket(secret, id, purpose, seconds, now = Date.now()) {
   const exp = Math.floor(now / 1000) + seconds;
@@ -73,11 +75,11 @@ export async function makeTicket(secret, id, purpose, seconds, now = Date.now())
 }
 
 /**
- * @param {string} secret @param {string} id @param {string | null} ticket @param {Array<"runner" | "download">} purposes @param {number} [now]
+ * @param {string} secret @param {string} id @param {string | null} ticket @param {Array<"runner" | "download" | "listen">} purposes @param {number} [now]
  * @returns {Promise<boolean>}
  */
 export async function checkTicket(secret, id, ticket, purposes, now = Date.now()) {
-  const m = /^(runner|download)\.(\d{9,11})\.([0-9a-f]{64})$/.exec(ticket ?? "");
+  const m = /^(runner|download|listen)\.(\d{9,11})\.([0-9a-f]{64})$/.exec(ticket ?? "");
   if (!m || !purposes.includes(/** @type {any} */ (m[1]))) return false;
   if (Number(m[2]) * 1000 < now) return false;
   return same(m[3], await hmacHex(secret, `voice:${id}:${m[1]}:${m[2]}`));
@@ -166,7 +168,7 @@ function publicView(rec) {
 export async function dispatchVoiceFilm(o) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(o.repo)) return { ok: false, error: "GITHUB_REPO must look like owner/name." };
   if (!/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$/.test(o.site)) return { ok: false, error: "Bad site address." };
-  const inputs = { voice_id: o.rec.id, site: o.site, ticket: o.ticket, kind: o.rec.kind, ext: o.rec.ext, topic: o.rec.topic || "", quran: o.rec.kind === "quran" ? JSON.stringify({ surah: o.rec.surah, ayat: o.rec.ayat || "", reciter: o.rec.reciter || "" }) : "" };
+  const inputs = { voice_id: o.rec.id, site: o.site, ticket: o.ticket, kind: o.rec.kind, ext: o.rec.ext, topic: o.rec.topic || "", quran: o.rec.kind === "quran" ? JSON.stringify({ surah: o.rec.surah, ayat: o.rec.ayat || "", reciter: o.rec.reciter || "", ...(o.rec.marks ? { marks: o.rec.marks } : {}) }) : "" };
   const get = o.fetch ?? fetch;
   const res = await get(`https://api.github.com/repos/${o.repo}/actions/workflows/voice-film.yml/dispatches`, {
     method: "POST",
@@ -281,6 +283,23 @@ export async function handleVoice(request, env, url, deps = {}) {
     return start(rec);
   }
 
+  if (sub === "marks" && method === "POST") {
+    if (!owner) return json({ error: "Wrong studio token." }, 401);
+    if (rec.kind !== "quran") return json({ error: "Ayah marks are for a Quran recitation." }, 400);
+    const st = statusOf(rec);
+    if (st !== "awaiting-review" && st !== "failed") return json({ error: "Mark the ayat when the film is ready for review." }, 409);
+    const expected = Array.isArray(rec.report?.ayat) ? rec.report.ayat.length : null;
+    // The upload can be longer than the film (its pauses were shortened): the runner checks against the real length.
+    const checked = checkMarks(await request.json().catch(() => null), expected ?? 0, 36000);
+    if (!expected) return json({ error: "This film has no ayah list yet; start it again first." }, 409);
+    if (!checked.ok) return json({ error: checked.error }, 400);
+    rec.marks = checked.marks;
+    rec.retries = (rec.retries ?? 0) + 1;
+    delete rec.film;
+    rec.progress.push(progressEntry("marked", { count: checked.marks.ends.length, by: checked.marks.by }));
+    return start(rec);
+  }
+
   if (sub === "retry" && method === "POST") {
     if (!owner) return json({ error: "Wrong studio token." }, 401);
     if (!rec.uploaded) return json({ error: "The recording is not fully uploaded yet." }, 409);
@@ -303,12 +322,15 @@ export async function handleVoice(request, env, url, deps = {}) {
   if (sub === "" && method === "GET") {
     if (!owner) return json({ error: "Wrong studio token." }, 401);
     const view = /** @type {any} */ (publicView(rec));
-    if (rec.film) view.download = `/api/voice/${id}/film?ticket=${await makeTicket(env.STUDIO_TOKEN, id, "download", DOWNLOAD_TICKET_SECONDS, now())}`;
+    const dl = await makeTicket(env.STUDIO_TOKEN, id, "download", DOWNLOAD_TICKET_SECONDS, now());
+    if (rec.film) view.download = `/api/voice/${id}/film?ticket=${dl}`;
+    // Quran: the reviewer listens to the uploaded recording and taps each ayah end (POST /marks).
+    if (rec.kind === "quran" && rec.uploaded) view.listen = `/api/voice/${id}/audio?ticket=${await makeTicket(env.STUDIO_TOKEN, id, "listen", DOWNLOAD_TICKET_SECONDS, now())}`;
     return json(view);
   }
 
   if (sub === "audio" && method === "GET") {
-    if (!owner && !runner) return json({ error: "Wrong studio token." }, 401);
+    if (!owner && !runner && !(rec.kind === "quran" && (await checkTicket(env.STUDIO_TOKEN, id, ticket, ["listen"], now())))) return json({ error: "Wrong studio token." }, 401);
     if (!rec.uploaded) return json({ error: "The recording is not fully uploaded yet." }, 409);
     const o = await bucket.get(rec.audioKey);
     if (!o) return json({ error: "Not found." }, 404);

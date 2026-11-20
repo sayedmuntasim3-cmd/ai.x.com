@@ -5,6 +5,7 @@
  *        [--surah 93] [--ayat 1-11] [--passage "93, 94:1-8"] [--opening auto|none|basmala|istiadha|both] [--closing auto|none|sadaqa]
  *        [--adab strict|nature|people-distant]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media] [--tighten on|off]
+ *        [--marks marks.json]   (Quran: the reviewer's ayah times {start, ends[], by}; they become confirmed ends)
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
  * and channels, float, for the voice checks) and voice-16k.wav (16 kHz mono,
@@ -47,6 +48,7 @@ import { ayahEndsOf } from "../engine/src/voice-master.mjs";
 import { masterFile } from "./voice-master.mjs";
 import { applyTighten, planTighten, remapWords } from "../engine/src/voice-tighten.mjs";
 import { encodeWav24 } from "../engine/src/wav.mjs";
+import { applyMarks, checkMarks } from "../engine/src/quran-marks.mjs";
 
 const run = promisify(execFile);
 
@@ -316,6 +318,12 @@ export async function understand(o) {
     const voice = await readSpans(o.sttWav);
     const aligned = hasGiven && o.python ? await alignText({ index: q.index, given: o.given, surahNames: q.surahNames, wav: o.sttWav, out: o.out, python: o.python }) : null;
     location = locateRecitation({ index: q.index, surahNames: q.surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: hasGiven ? o.given : null, words: o.transcript?.words ?? null, opening: o.opening, closing: o.closing, aligned });
+    // The reviewer's marks (taps at each ayah end) are confirmed times: they replace the machine's guesses.
+    if (o.marks && location?.ok) {
+      const checked = checkMarks(o.marks, location.ayat.length, o.totalSeconds);
+      if (!checked.ok) throw new Error(checked.error);
+      location = applyMarks(location, checked.marks);
+    }
     await writeFile(join(o.out, "quran-location.json"), JSON.stringify({ ...location, stretches: voice.spans.length, recognizer: o.transcript?.engine ? { engine: o.transcript.engine, model: o.transcript.model ?? null, modelSource: o.transcript.modelSource ?? null, modelRevision: o.transcript.modelRevision ?? null, modelLicense: o.transcript.modelLicense ?? null } : null }, null, 1));
   }
   const u = understandVoice({ transcript: o.transcript ?? { words: [] }, totalSeconds: o.totalSeconds, kind: o.kind, quranIndex: q?.index ?? null, surahNames: q?.surahNames ?? [], location });
@@ -419,7 +427,8 @@ async function main() {
     }
     // With a given passage the text is aligned to the audio when Python can run it (--python, or ZUPONA_PYTHON).
     const python = typeof args.python === "string" ? args.python : process.env.ZUPONA_PYTHON;
-    const about = { sttWav: step1.sttWav, given: hasGiven ? given : null, opening: args.opening, closing: args.closing, python };
+    const marks = typeof args.marks === "string" ? JSON.parse(await readFile(resolve(args.marks), "utf8")) : null;
+    const about = { sttWav: step1.sttWav, given: hasGiven ? given : null, opening: args.opening, closing: args.closing, python, marks };
     const step3 = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);

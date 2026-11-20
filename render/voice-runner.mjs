@@ -130,6 +130,14 @@ async function main() {
     for (const s of summarizeRun(String(a.run))) if (!only || only.includes(s.stage)) await send(c, "/progress", s);
   } else if (a._ === "deliver") {
     const report = typeof a.report === "string" && existsSync(a.report) ? JSON.parse(readFileSync(a.report, "utf8")) : null;
+    // Quran: the located ayat, so the studio can ask the reviewer for one tap at each ayah end.
+    const located = typeof a.run === "string" && existsSync(join(a.run, "quran-location.json")) ? JSON.parse(readFileSync(join(a.run, "quran-location.json"), "utf8")) : null;
+    const ayat = located?.ayat?.map((/** @type {any} */ x) => ({ ref: `${x.surah}:${x.ayah}`, start: x.start, end: x.end, sure: Boolean(x.sure) }));
+    if (ayat && !report) {
+      await deliver(c, String(a.file), { seconds: Number(a.seconds) || null, review: a.review === true, report: { ayat, timing: located.timing ?? null } });
+      console.log("delivered");
+      return;
+    }
     const small = report ? { durationSeconds: report.durationSeconds ?? null, width: report.width ?? null, height: report.height ?? null, stats: report.stats ?? null, warnings: (report.warnings ?? []).slice(0, 20) } : undefined;
     await deliver(c, String(a.file), { seconds: report?.durationSeconds ?? (Number(a.seconds) || null), review: a.review === true, report: small });
     console.log("delivered");

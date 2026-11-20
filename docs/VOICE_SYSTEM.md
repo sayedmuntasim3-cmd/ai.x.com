@@ -286,3 +286,18 @@ film's length on a free runner.
   0 of 10 ayah ends with certainty (8 not at all), so the engine kept every unsure time off the screen, as the rule
   says. Still open: a recitation aligner that works on this recording, or a person marking the ayah ends.
 - Fixed: the progress showed "0 scenes" and "0 pictures" for a recitation (it read narration fields).
+
+### Quran ayah times marked by the reviewer (20 Nov 2026)
+
+Owner's choice (via the parent session): (c) a person marks the ayah ends first; (b) a Quran-tuned aligner is measured
+on Ad-Duha next; (a) published timings (cpfair/quran-align, quranlab, CC BY 4.0, credit kept) only when the upload is
+a known EveryAyah recording.
+- In the landing's voice sheet, a recitation awaiting review shows the uploaded recording (a `listen` ticket, Quran
+  only) and one button: tap when the first ayah begins, then at the end of each ayah (undo allowed), then the
+  reviewer's name. `POST /api/voice/:id/marks` checks the count against the ayat the run located and restarts the film.
+- `engine/src/quran-marks.mjs`: `checkMarks` (count, order, inside the recording, a name) and `applyMarks` (every
+  ayah gets the marked start and end and becomes sure; an opening phrase ends where ayah 1 begins).
+  `voice-film.mjs --marks` applies them right after locating, so cuts, scenes and the on-screen verbatim text follow
+  the person's times; the run keeps every pause (`--tighten off`) so the taps on the uploaded file stay exact.
+- Not verified live yet: a real reviewer pass on Ad-Duha (film e1484358 needs one retry first, so its delivery
+  carries the ayah list).
