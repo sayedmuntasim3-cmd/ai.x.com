@@ -36,7 +36,7 @@ export function rankModels(models) {
 }
 
 /**
- * @param {{ apiKey: string, model?: string, models?: string[], webSearch?: boolean, max?: number, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void> }} o
+ * @param {{ apiKey: string, model?: string, models?: string[], webSearch?: boolean, max?: number, budget?: number, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void> }} o
  */
 export function geminiPool(o) {
   const get = o.fetch ?? fetch;
@@ -47,8 +47,29 @@ export function geminiPool(o) {
   const spent = new Set();
   /** @type {Map<string, ReturnType<typeof geminiModel>>} */
   const brains = new Map();
+  // The requests of the call in progress. A Cloudflare Worker may make only 50 requests per invocation
+  // (free plan): a pool that let each model retry six times on a busy answer went past it ("Too many
+  // subrequests", film 94b951c2, 20 Nov 2026). So a call has a budget, a model that answers "busy" twice
+  // in a row hands over to the next, and what each model answered goes into the error.
+  const call = { requests: 0, busy: new Map(), tried: /** @type {string[]} */ ([]) };
+  const budget = o.budget ?? 30;
+  const guarded = (/** @type {string} */ id) => /** @type {typeof fetch} */ (async (url, init) => {
+    if (call.requests >= budget) throw Object.assign(new Error(`Gemini pool: ${budget} requests in one call; tried ${call.tried.join(", ")}`), { status: 0 });
+    call.requests += 1;
+    const res = await get(url, init);
+    if (res.status === 429) {
+      const n = (call.busy.get(id) ?? 0) + 1;
+      call.busy.set(id, n);
+      // A daily or zero quota is final at once (gemini.mjs reads it); a busy answer twice is enough for this call.
+      if (n >= 2) {
+        const text = await res.clone().text().catch(() => "");
+        if (!/PerDay|quotaValue"?\s*:\s*"?0\b/.test(text)) throw Object.assign(new Error(`Gemini ${id} is busy (429 twice)`), { status: 429, busy: true });
+      }
+    } else call.busy.delete(id);
+    return res;
+  });
   const brain = (/** @type {string} */ id) => {
-    if (!brains.has(id)) brains.set(id, geminiModel({ apiKey: o.apiKey, model: id, ...(o.webSearch === false ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}), ...(o.sleep ? { sleep: o.sleep } : {}) }));
+    if (!brains.has(id)) brains.set(id, geminiModel({ apiKey: o.apiKey, model: id, fetch: guarded(id), ...(o.webSearch === false ? { webSearch: false } : {}), ...(o.sleep ? { sleep: o.sleep } : {}) }));
     return /** @type {ReturnType<typeof geminiModel>} */ (brains.get(id));
   };
   const models = () => (order ??= (async () => {
@@ -57,6 +78,7 @@ export function geminiPool(o) {
     if (o.models?.length) found = o.models;
     else {
       try {
+        call.requests += 1;
         const res = await get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": o.apiKey } });
         if (res.ok) found = rankModels(/** @type {any} */ (await res.json()).models ?? []);
       } catch { /* no list: the configured model alone, as before */ }
@@ -71,13 +93,21 @@ export function geminiPool(o) {
     async call(req) {
       /** @type {any} */
       let last = null;
+      call.requests = 0;
+      call.busy.clear();
+      call.tried = [];
+      /** @type {any[]} */
+      const busy = [];
       // The configured model first, with no extra request; the list is asked for only once a model's day is spent.
       const tryModel = async (/** @type {string} */ id) => {
         try {
           return { done: true, reply: await brain(id).call(req) };
         } catch (error) {
-          // A used-up day or no free quota on this model: the next model takes the same request.
-          if (/** @type {any} */ (error)?.status === 429 && /** @type {any} */ (error)?.permanent) { spent.add(id); last = error; return { done: false, reply: null }; }
+          const e = /** @type {any} */ (error);
+          // A used-up day or no free quota on this model: spent for this run, the next model takes the request.
+          if (e?.status === 429 && e?.permanent) { spent.add(id); last = e; call.tried.push(`${id} (day used up)`); return { done: false, reply: null }; }
+          // Busy right now: the next model takes the request; this one may be asked again by a later call.
+          if (e?.status === 429 && e?.busy) { busy.push(e); call.tried.push(`${id} (busy)`); return { done: false, reply: null }; }
           throw error;
         }
       };
@@ -86,10 +116,14 @@ export function geminiPool(o) {
         if (r.done) return r.reply;
       }
       for (const id of await models()) {
-        if (spent.has(id)) continue;
+        if (spent.has(id) || busy.some((e) => e.message.includes(` ${id} `))) continue;
         const r = await tryModel(id);
         if (r.done) return r.reply;
       }
+      // Every day used up: the daily-limit error, so the film waits for midnight Pacific. Otherwise busy models:
+      // a retryable error naming what each model answered.
+      if (last && !busy.length) throw last;
+      if (busy.length) throw Object.assign(new Error(`Gemini: every model was busy or out of its day; tried ${call.tried.join(", ")}`), { status: 429 });
       throw last ?? new Error("Gemini: no model could take the request.");
     },
     /** For the report: which models the pool found and which are spent. */

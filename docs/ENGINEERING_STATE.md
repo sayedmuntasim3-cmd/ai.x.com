@@ -13,6 +13,13 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026, first live test of the pool (film 94b951c2, Panama Canal, 3 min):
+- The pool works: 3.8-flash's day was used up, the research stage was written by `gemini-3.6-flash` (`servedBy`).
+- Then stage s2 failed with Cloudflare's "Too many subrequests" (50 per invocation on the free plan): each
+  model in the pool could retry six times on a busy 429, so one call went past 50 requests. Fixed: a call has a
+  budget of 30 requests, a model that answers busy twice hands over, and the error names what each model said.
+- Also seen: research rested on 2 sites (the engine marks it as a gap); the format guess was wrong (fixed, PR #18).
+
 20 Nov 2026, Gemini model pool (`worker/gemini-pool.mjs`, on by default; `GEMINI_POOL=off` keeps one model):
 - The free key allows 20 requests a day **per model**; films stopped after one model's day. The brain now asks
   Google which models this key may use (models.list), ranks the writers (flash, then flash-lite, newest first,
