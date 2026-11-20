@@ -7,7 +7,7 @@ import { ayahText, buildQuranIndex, matchRecitation } from "../src/quran.mjs";
 import { planQuranFilm } from "../src/quran-film.mjs";
 import { alignScript, normalizeTranscript } from "../src/transcript.mjs";
 import { understandVoice } from "../src/voice-understand.mjs";
-import { namePhrases, nounsAfterDeterminers, planVoiceVisuals, quranVisualAdabGuard, topicSpelling, topicSubjects, wordsPlan } from "../src/voice-visuals.mjs";
+import { namePhrases, nounsAfterDeterminers, planVoiceVisuals, quranVisualAdabGuard, topicSpelling, topicSubjects, voiceScore, withMusic, wordsPlan } from "../src/voice-visuals.mjs";
 import { titleHasWords } from "../src/film-media.mjs";
 
 const fixture = (/** @type {string} */ name) => readFileSync(new URL("./fixtures/voice/" + name, import.meta.url), "utf8");
@@ -158,4 +158,28 @@ test("planner pieces: nouns after determiners, misheard names put back, title-ca
   assert.equal(titleHasWords("barber, salon, haircut", "barber"), true);
   assert.equal(titleHasWords("Vintage cars on display", "car"), true);
   assert.equal(titleHasWords("", "car"), true, "an untitled stock clip is not refused");
+});
+
+test("a picture whose file cannot be fetched is passed over for the next one", async () => {
+  // The live case: NASA's "~large" file answered 403 for some items while "~orig" existed.
+  const all = await planVoiceVisuals({ scenes: scenes.slice(0, 3), structure: u.structure, providers: [wikimediaProvider({ fetch: commonsFetch })] });
+  const first = all.plan.flatMap((p) => p.assets).map((a) => a.url);
+  assert.ok(first.length >= 1);
+  const refused = new Set(first);
+  const r = await planVoiceVisuals({ scenes: scenes.slice(0, 3), structure: u.structure, providers: [wikimediaProvider({ fetch: commonsFetch })], reachable: async (url) => !refused.has(url) });
+  for (const a of r.plan.flatMap((p) => p.assets)) assert.ok(!refused.has(a.url), "an unreachable file is never chosen");
+});
+
+test("a narration voiceover gets a quiet score plan; a recitation never does", () => {
+  const sc = Array.from({ length: 60 }, (_, i) => ({ sc: `SC${String(i + 1).padStart(4, "0")}`, start: i * 10, end: (i + 1) * 10 }));
+  const s = voiceScore(sc, { kind: "narration" });
+  assert.ok(s);
+  const rows = s.s4.split("\n").filter((l) => /^\| M\d{2} /.test(l));
+  assert.equal(rows.length, 3, "10 minutes: opening, one body cue, closing");
+  assert.match(rows[0], /^\| M01 \| C1 \| 0:00:00–/);
+  assert.match(rows.at(-1) ?? "", /resolve/);
+  assert.equal(s.cueOf.get("SC0001"), "M01");
+  assert.equal(s.cueOf.get("SC0060"), "M03");
+  assert.equal(withMusic("**SC0001** | 0:00:00-0:00:10 | NARR: x", s.cueOf), "**SC0001** | 0:00:00-0:00:10 | NARR: x | MUS: M01");
+  assert.equal(voiceScore(sc, { kind: "quran" }), null, "nothing is laid under a recitation");
 });

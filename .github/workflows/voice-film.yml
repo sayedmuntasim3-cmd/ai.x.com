@@ -141,7 +141,10 @@ jobs:
           else
             voice=$(sed -n 's/^Mastered voice: \(.*\) (use it.*/\1/p; s/^Tightened voice: \(.*\) (use it.*/\1/p' voice-film.log | head -n 1)
             voice=${voice:-in.$EXT}
-            node render/render-film.mjs --run run --one-track "$voice" --words run/words.json \
+            # The free score (original music made here, never under a recitation) as a quiet bed under the voice.
+            mkdir -p music
+            [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
+            node render/render-film.mjs --run run --one-track "$voice" --words run/words.json --music music \
               --width "${RESOLUTION%x*}" --height "${RESOLUTION#*x}" --fps 30 --work .render --out out/film.mp4 2>&1 | tee step.log
             test "${PIPESTATUS[0]}" = 0
           fi
