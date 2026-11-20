@@ -49,6 +49,7 @@ import {
   PlusIcon,
   RecordIcon,
   SparkleIcon,
+  ImageIcon,
   StopIcon,
   SunIcon,
   UploadIcon,
@@ -59,6 +60,7 @@ import {
 } from "./icons";
 import { FoxMark, HeroMountains, PosterArt } from "./art";
 import { Select } from "./select";
+import { Library } from "./library";
 import { VoiceFilm } from "./voice-film";
 
 const DRAFT_KEY = "zupona:studio-draft:v1";
@@ -291,6 +293,7 @@ export default function Landing() {
           />
         </section>
 
+        <Library idea={userText} topic={draft.category} request={null} />
         <Explore onPick={loadIdea} />
         <HowItWorks />
         <Closing />
@@ -317,6 +320,7 @@ function Header() {
       <nav aria-label="Primary" className="hidden items-center gap-1 rounded-full border border-line bg-surface/70 p-1 backdrop-blur md:flex">
         {[
           ["#studio", "Studio"],
+          ["#library", "Library"],
           ["#explore", "Explore"],
           ["#how", "How it works"],
         ].map(([href, label]) => (
@@ -1225,6 +1229,7 @@ function Footer() {
 const NAV = [
   { id: "top", label: "Home", Icon: HomeIcon },
   { id: "studio", label: "Create", Icon: SparkleIcon },
+  { id: "library", label: "Library", Icon: ImageIcon },
   { id: "explore", label: "Explore", Icon: CompassIcon },
   { id: "how", label: "Guide", Icon: LayersIcon },
 ] as const;
@@ -1254,7 +1259,7 @@ function MobileNav() {
       aria-label="Sections"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-4">
+      <ul className="mx-auto grid max-w-md grid-cols-5">
         {NAV.map(({ id, label, Icon }) => {
           const on = active === id;
           return (

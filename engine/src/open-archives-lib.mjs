@@ -1921,6 +1921,7 @@ function streamMedia(options, env = {}, deps = {}) {
 }
 export {
   RIGHTS,
+  terms,
   SOURCES,
   SOURCE_GROUPS,
   TOPICS,
