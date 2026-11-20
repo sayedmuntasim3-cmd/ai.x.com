@@ -178,3 +178,14 @@ No objective evidence that Chatterbox is better; the owner listens to A/B/C and 
 NeuTTS Air (Apache-2.0), VoxCPM-0.5B (Apache-2.0); GPU-only models (Orpheus, Higgs Audio, VibeVoice)
 cost money to host. UTMOS could not be run here (torch.hub blocked; the PyPI package needs fairseq,
 which fails on Python 3.11).
+
+### 40-minute stability test of the Zupona narrator (20 Nov 2026)
+
+The whole saved film `productions/ramesh-babu/USA` (6 chapters, 243 scenes, 6,127 words), voiced by `render/narrate.mjs`
+in one run: **39 min 46 s of speech, 0 failed scenes, 10 min 46 s of CPU (0.27 s per second of speech)**.
+- Level: speech level -22.21 / -22.21 / -22.19 dB in the first, middle and last third; the 243 takes differ by sd 0.34 dB. No drift.
+- Pace: 157.6 / 157.6 / 153.7 words a minute (whole film 154.1, inside the 140-160 band); no clipping (peak 0.94).
+- Words heard back by Whisper small.en, 14 takes from each third (about 360 words each): word error 6.3 / 8.6 / 6.8 %. The same in all
+  thirds, so no degradation over length. Higher than the 1-5 % of the short passages: this film is full of names, money amounts and
+  numerals, which a speech-to-text model also writes differently from the script, so part of it is the checker's. Not separated yet.
+- Not measured: whether it stays pleasant to listen to for 40 minutes (a person must listen to a stretch from the end).
