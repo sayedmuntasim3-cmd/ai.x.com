@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { buildTimeline } from "../engine/src/timeline.mjs";
-import { mediaDuration, renderFilm, run } from "./render-film.mjs";
+import { mediaDuration, partRange, renderFilm, run } from "./render-film.mjs";
 
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
 
@@ -514,4 +514,57 @@ test("throttling archives get one download at a time; other hosts run together; 
   assert.equal(retryAfterSeconds("30"), 30);
   assert.equal(retryAfterSeconds("99999"), 300);
   assert.equal(retryAfterSeconds("soon"), null);
+});
+
+test("parts are runs of whole shots, about equal in frames, covering the film once", () => {
+  const video = [30, 30, 60, 15, 45, 90, 30, 30].map((frames) => ({ frames }));
+  for (const count of [1, 2, 3, 5, 8, 12]) {
+    const parts = Array.from({ length: count }, (_, i) => partRange(video, i, count));
+    assert.equal(parts[0].start, 0);
+    assert.equal(parts.at(-1)?.end, video.length);
+    for (let i = 1; i < count; i += 1) assert.equal(parts[i].start, parts[i - 1].end, "no gap, no overlap");
+    assert.equal(parts.reduce((n, p) => n + p.frames, 0), 330);
+  }
+  assert.throws(() => partRange(video, 3, 3));
+});
+
+test("a chunked render (parts on separate runners, then a join) gives the same frames and sound as one render", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-parts-"));
+  try {
+    const clip = join(dir, "clip.mp4");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "testsrc=s=640x360:r=25:d=2", "-pix_fmt", "yuv420p", clip]);
+    const voice = join(dir, "voice.wav");
+    await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "sine=f=330:d=12", voice]);
+    const md = Array.from({ length: 6 }, (_, i) => `**SC000${i + 1}** | 0:00:${String(i * 2).padStart(2, "0")}-0:00:${String(i * 2 + 2).padStart(2, "0")} | C1 | b | E | — | NARR: Scene ${i + 1} of the mill. | W 5/5 | ANCHOR: x | SHOTS: (1) R3 mill ${i + 1} | LOOK: L`).join("\n");
+    const pick = (/** @type {string} */ scene) => ({ scene, shot: 1, start: 0, end: 2, rung: "R3", description: "", queries: ["q"], status: "found", query: "q", alternates: [], trace: [], pick: { id: scene, source: "pexels", mediaUrl: "https://videos.example/" + scene + ".mp4", previewUrl: null, sourcePageUrl: "https://www.pexels.com/video/" + scene, creator: null, durationSeconds: 2, width: 640, height: 360, licence: { licenseId: "PEXELS", name: "Pexels License", licenseUrl: null, attributionRequired: false, creator: null, sourcePageUrl: "" } } });
+    const media = { chapter: "C1", providers: ["pexels"], repeatWindowSeconds: 600, stats: { shots: 6, found: 6, missing: 0, noQuery: 0 }, shots: Array.from({ length: 6 }, (_, i) => pick(`SC000${i + 1}`)) };
+    const make = () => {
+      const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, media: /** @type {any} */ (media) }], width: 320, height: 180, fps: 15 });
+      // Moves from the shot before, two in a row across a part boundary: the hardest join.
+      for (const i of [2, 3, 4]) t.video[i].transition = "slide";
+      return t;
+    };
+    const common = { oneTrack: { file: voice }, fetchClip: async () => clip, concurrency: 2 };
+    const single = join(dir, "single.mp4");
+    await renderFilm({ ...common, timeline: make(), workDir: join(dir, "w-single"), outFile: single });
+    const count = 3;
+    const parts = [];
+    for (let i = 0; i < count; i += 1) {
+      const file = join(dir, `part${i + 1}.mp4`);
+      const r = /** @type {any} */ (await renderFilm({ ...common, timeline: make(), workDir: join(dir, `w-part${i + 1}`), outFile: file, part: { index: i, count } }));
+      assert.equal(r.part, i + 1);
+      parts.push(file);
+    }
+    const joined = join(dir, "joined.mp4");
+    const report = await renderFilm({ ...common, timeline: make(), workDir: join(dir, "w-join"), outFile: joined, joinParts: parts });
+    assert.equal(report.stats.segmentsRendered, 0, "the join renders no shot");
+    const hashes = async (/** @type {string} */ f, /** @type {string} */ stream) => (await run("ffmpeg", ["-v", "error", "-i", f, "-map", stream, "-f", "framemd5", "-"])).split("\n").filter((l) => l && !l.startsWith("#")).map((l) => l.split(",").at(-1)?.trim());
+    const a = await hashes(single, "0:v");
+    const b = await hashes(joined, "0:v");
+    assert.equal(b.length, a.length, "no frame missing or added at the joins");
+    assert.deepEqual(b, a, "every frame, the joins included, is the same as one render");
+    assert.deepEqual(await hashes(joined, "0:a"), await hashes(single, "0:a"), "the sound is mixed once over the whole film: the same samples, no click at a join");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
