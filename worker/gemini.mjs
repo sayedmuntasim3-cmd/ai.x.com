@@ -15,26 +15,13 @@
 export const GEMINI_DEFAULT = "gemini-3.8-flash";
 
 /**
- * @param {{ apiKey: string, model?: string, webSearch?: boolean, rotate?: boolean, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void }} o
+ * @param {{ apiKey: string, model?: string, webSearch?: boolean, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void> }} o
  * @returns {import("../engine/src/film-run.mjs").Model}
  */
 export function geminiModel(o) {
   const model = o.model || GEMINI_DEFAULT;
   const get = o.fetch ?? fetch;
   const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-  // Free-tier rotation: each Gemini model has its own free daily limit (20 a day on the owner's key).
-  // When one is used up (or has no free quota, or is closed), the next free model Google lists for
-  // this key answers instead; only when every one is used up does the call stop (and the film sleeps).
-  /** @type {Set<string>} */
-  const usedUp = new Set();
-  /** @type {string[] | null} */
-  let candidates = null;
-  const nextModel = async () => {
-    if (!usedUp.has(model)) return model;
-    if (o.rotate === false) return null;
-    if (candidates === null) candidates = await listFreeCandidates(o.apiKey, get).catch(() => []);
-    return candidates.find((m) => m !== model && !usedUp.has(m)) ?? null;
-  };
   return {
     name: model,
     capabilities: { vision: false, webSearch: o.webSearch !== false },
@@ -46,99 +33,41 @@ export function geminiModel(o) {
         generationConfig: { maxOutputTokens: Math.min(req.maxTokens, 65536) },
         ...(req.webSearch && o.webSearch !== false ? { tools: [{ google_search: {} }] } : {}),
       };
-      /** @type {any} */
-      let lastStop = null;
-      for (;;) {
-        const current = await nextModel();
-        if (!current) throw lastStop;
-        try {
-          const reply = await callOnce(current, body);
-          // Priced and reported as the configured model (its free tier); servedBy says who answered.
-          return { ...reply, model, ...(current !== model ? { servedBy: current } : {}) };
-        } catch (error) {
-          const e = /** @type {any} */ (error);
-          const closed = current !== model && (e?.status === 404 || (e?.status === 400 && /not (found|supported)|no longer available/i.test(String(e?.message))));
-          const freeLimit = e?.status === 429 && typeof e?.permanent === "string" && e.permanent;
-          if (!freeLimit && !closed && !(current === model && e?.status === 404 && o.rotate !== false)) throw error;
-          usedUp.add(current);
-          if (freeLimit || current === model) lastStop = error;
-          o.log?.(`gemini: ${current} ${freeLimit ? "free limit used up" : "not available"}; trying the next free model`);
+      let thoughts = true;
+      for (let attempt = 0; ; attempt += 1) {
+        // Streamed (server-sent events), with thought summaries switched on, so bytes keep flowing
+        // while the model thinks: a long silent wait was cut off as "Gemini 524" (Nov 2026).
+        const sent = thoughts ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: { includeThoughts: true } } } : body;
+        const res = await get(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": o.apiKey }, body: JSON.stringify(sent) });
+        if (res.ok) {
+          const chunks = parseChunks(await res.text());
+          const parts = chunks.flatMap((c) => c.candidates?.[0]?.content?.parts ?? []);
+          const out = parts.filter((/** @type {any} */ p) => !p.thought).map((/** @type {any} */ p) => p.text ?? "").join("");
+          const finish = [...chunks].reverse().map((c) => c.candidates?.[0]?.finishReason).find(Boolean);
+          const blocked = chunks.some((c) => c.promptFeedback?.blockReason);
+          const usage = [...chunks].reverse().map((c) => c.usageMetadata).find(Boolean) ?? {};
+          const responseId = chunks.map((c) => c.responseId).find(Boolean);
+          const modelVersion = chunks.map((c) => c.modelVersion).find(Boolean);
+          const reason = finish === "MAX_TOKENS" ? "max_tokens" : finish === "SAFETY" || blocked ? "refusal" : "end_turn";
+          return { text: out, stopReason: reason, model, ...(responseId ? { responseId: String(responseId) } : {}), ...(modelVersion ? { modelVersion: String(modelVersion) } : {}), usage: { input_tokens: usage.promptTokenCount ?? 0, output_tokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) } };
         }
+        const raw = await res.text();
+        const quota = quotaInfo(raw);
+        const detail = (quota.summary || raw).slice(0, 300);
+        // A model that refuses thought summaries: ask again without them (once).
+        if (res.status === 400 && thoughts && /thinking|thought/i.test(raw)) { thoughts = false; continue; }
+        if (res.status === 429 && quota.permanent) {
+          throw Object.assign(new Error(`Gemini 429: ${detail}`), { status: 429, permanent: quota.permanent });
+        }
+        // The free tier allows a few requests a minute: wait as long as Google asks, and try again.
+        if ((res.status === 429 || res.status >= 500) && attempt < 6) {
+          await sleep(quota.retryMs ? Math.min(90_000, Math.max(2000, quota.retryMs)) : Math.min(60_000, 5000 * 2 ** attempt));
+          continue;
+        }
+        throw Object.assign(new Error(`Gemini ${res.status}: ${detail}`), { status: res.status });
       }
     },
   };
-
-  /**
-   * One model, with the waits that minutes can fix (per-minute limit, outages).
-   * @param {string} name @param {any} body
-   */
-  async function callOnce(name, body) {
-    let thoughts = true;
-    for (let attempt = 0; ; attempt += 1) {
-      // Streamed (server-sent events), with thought summaries switched on, so bytes keep flowing
-      // while the model thinks: a long silent wait was cut off as "Gemini 524" (Nov 2026).
-      const sent = thoughts ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: { includeThoughts: true } } } : body;
-      const res = await get(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(name)}:streamGenerateContent?alt=sse`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": o.apiKey }, body: JSON.stringify(sent) });
-      if (res.ok) {
-        const chunks = parseChunks(await res.text());
-        const parts = chunks.flatMap((c) => c.candidates?.[0]?.content?.parts ?? []);
-        const out = parts.filter((/** @type {any} */ p) => !p.thought).map((/** @type {any} */ p) => p.text ?? "").join("");
-        const finish = [...chunks].reverse().map((c) => c.candidates?.[0]?.finishReason).find(Boolean);
-        const blocked = chunks.some((c) => c.promptFeedback?.blockReason);
-        const usage = [...chunks].reverse().map((c) => c.usageMetadata).find(Boolean) ?? {};
-        const responseId = chunks.map((c) => c.responseId).find(Boolean);
-        const modelVersion = chunks.map((c) => c.modelVersion).find(Boolean);
-        const reason = finish === "MAX_TOKENS" ? "max_tokens" : finish === "SAFETY" || blocked ? "refusal" : "end_turn";
-        return { text: out, stopReason: reason, ...(responseId ? { responseId: String(responseId) } : {}), ...(modelVersion ? { modelVersion: String(modelVersion) } : {}), usage: { input_tokens: usage.promptTokenCount ?? 0, output_tokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) } };
-      }
-      const raw = await res.text();
-      const quota = quotaInfo(raw);
-      const detail = (quota.summary || raw).slice(0, 300);
-      // A model that refuses thought summaries: ask again without them (once).
-      if (res.status === 400 && thoughts && /thinking|thought/i.test(raw)) { thoughts = false; continue; }
-      if (res.status === 429 && quota.permanent) {
-        throw Object.assign(new Error(`Gemini 429: ${detail}`), { status: 429, permanent: quota.permanent });
-      }
-      // The free tier allows a few requests a minute: wait as long as Google asks, and try again.
-      if ((res.status === 429 || res.status >= 500) && attempt < 6) {
-        await sleep(quota.retryMs ? Math.min(90_000, Math.max(2000, quota.retryMs)) : Math.min(60_000, 5000 * 2 ** attempt));
-        continue;
-      }
-      throw Object.assign(new Error(`Gemini ${res.status}: ${detail}`), { status: res.status });
-    }
-  }
-}
-
-/** Gemini models that are not text writers (embeddings, images, speech, live audio, agents). */
-const NOT_A_WRITER = /embedding|image|imagen|tts|audio|live|vision|robotics|computer-use|learnlm|aqa|veo|gemma/i;
-
-/**
- * The text models this key can call, best first for writing a film: flash, then pro, then
- * flash-lite, newest version first, stable before preview. At most eight.
- * @param {string} apiKey
- * @param {typeof fetch} get
- * @returns {Promise<string[]>}
- */
-export async function listFreeCandidates(apiKey, get) {
-  const res = await get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": apiKey } });
-  if (!res.ok) return [];
-  const data = /** @type {any} */ (await res.json());
-  return rankWriters(Array.isArray(data?.models) ? data.models : []);
-}
-
-/** @param {any[]} models */
-export function rankWriters(models) {
-  const rank = (/** @type {string} */ id) => (/flash-lite/.test(id) ? 2 : /flash/.test(id) ? 0 : /pro/.test(id) ? 1 : 3);
-  const version = (/** @type {string} */ id) => Number(/gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? 0);
-  const unstable = (/** @type {string} */ id) => (/preview|exp/.test(id) ? 1 : 0);
-  return models
-    .filter((m) => typeof m?.name === "string" && m.name.startsWith("models/gemini-"))
-    .filter((m) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
-    .filter((m) => !(Number(m.inputTokenLimit) > 0) || Number(m.inputTokenLimit) >= 32000)
-    .map((m) => String(m.name).slice("models/".length))
-    .filter((id) => !NOT_A_WRITER.test(id))
-    .sort((a, b) => rank(a) - rank(b) || version(b) - version(a) || unstable(a) - unstable(b) || a.localeCompare(b))
-    .slice(0, 8);
 }
 
 /**
