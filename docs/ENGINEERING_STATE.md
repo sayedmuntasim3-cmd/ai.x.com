@@ -28,6 +28,14 @@ goals and the code.
 - Owner's own tasks: Quran (written recording rights, a scholar's review); listen to the 40-minute narrator
   sample if wanted. Done by the owner on 20 Nov: GITHUB_TOKEN runtime secret, repository made private.
 
+20 Nov 2026, film 70577b9b hit "Too many subrequests" again (PR #19 was not enough):
+- Measured: research (~30 fetches) + sources (10) + s2 add up past 50 in one engine lifetime; s2's two retries
+  failed the same way (a 1-2 minute retry wait did not give a fresh count). A resume (new instance) ran s2-s4 at once.
+- Fixed (`worker/quota-step.mjs`): that error is not retried in the same run; the Workflow sleeps 3, then 15,
+  then 60 minutes and runs the stage again in a fresh lifetime. The global fetch is watched, so a stage whose
+  desk swallowed the error (pages "unreadable", fewer documents) is run again instead of passing on thin evidence.
+  Unverified live until the next film: that a 3-minute sleep hibernates (Cloudflare promises it only for a "long sleep").
+
 20 Nov 2026, first live test of the pool (film 94b951c2, Panama Canal, 3 min):
 - The pool works: 3.8-flash's day was used up, the research stage was written by `gemini-3.6-flash` (`servedBy`).
 - Then stage s2 failed with Cloudflare's "Too many subrequests" (50 per invocation on the free plan): each
