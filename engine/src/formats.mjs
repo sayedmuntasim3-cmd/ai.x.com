@@ -169,5 +169,7 @@ export function suggestFormat(text) {
     [/\bmotivat|struggle|never gave up|স্ট্রাগল|মোটিভেশন\b/, "motivational-life-story"],
   ];
   for (const [re, id] of cues) if (re.test(t)) return getFormat(id);
-  return getFormat("motivational-life-story");
+  // Nothing fits: no preset. A canal, a bridge or an invention is not a motivational life story
+  // (that fallback gave such films the wrong look, music and motion); the writers shape it.
+  return null;
 }
