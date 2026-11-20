@@ -13,7 +13,7 @@ const VOICE_STORE = "zupona:voice-films";
 const eyebrow = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brand-ink";
 
 type Progress = { at: string; stage: string; ok: boolean; message: { en: string; bn: string } };
-type VoiceView = { id: string; status: string; progress: Progress[]; download?: string; run?: { runUrl?: string } | null; kind?: string };
+type VoiceView = { id: string; status: string; progress: Progress[]; download?: string; listen?: string; run?: { runUrl?: string } | null; kind?: string; report?: { ayat?: { ref: string }[] } | null };
 
 function readStore(key: string) {
   try {
@@ -215,6 +215,20 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
         {film.status === "awaiting-review" && (
           <p className="mt-3 text-[13px] text-muted">A Quran film is never published before a qualified scholar has reviewed the text, the timing and every picture.</p>
         )}
+        {film.status === "awaiting-review" && film.listen && film.report?.ayat?.length ? (
+          <AyahMarker
+            listen={film.listen}
+            refs={film.report.ayat.map((a) => a.ref)}
+            onSend={async (marks) => {
+              const res = await fetch(`/api/voice/${film.id}/marks`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${readStore(KEY_STORE)}` }, body: JSON.stringify(marks) });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data.id) return String(data.error ?? "The marks could not be saved. Try again.");
+              setFilm(data as VoiceView);
+              setRound((r) => r + 1);
+              return "";
+            }}
+          />
+        ) : null}
         {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-3">
           {film.download ? (
@@ -321,6 +335,59 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * The reviewer listens to the recitation and taps once when the first ayah begins and once at the end of each ayah.
+ * The taps become confirmed ayah times: the film is made again and the verbatim text is shown on them.
+ */
+function AyahMarker({ listen, refs, onSend }: { listen: string; refs: string[]; onSend: (m: { start: number; ends: number[]; by: string }) => Promise<string> }) {
+  const [taps, setTaps] = useState<number[]>([]);
+  const [by, setBy] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const done = taps.length === refs.length + 1;
+  const next = taps.length === 0 ? `when ayah ${refs[0]} begins` : `at the end of ayah ${refs[taps.length - 1]}`;
+  return (
+    <div className="mt-4 rounded-2xl border border-line p-3">
+      <p className="text-[14px] font-medium text-ink">Mark the ayat (reviewer)</p>
+      <p className="mt-1 text-[12.5px] text-muted">Play the recitation and tap once when the first ayah begins, then once at the end of each ayah. The text is shown only on times a person confirmed.</p>
+      <audio ref={setAudio} src={listen} controls preload="none" className="mt-2 w-full" />
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={done}
+          onClick={() => audio && setTaps((t) => [...t, Math.round(audio.currentTime * 1000) / 1000])}
+          className="h-11 rounded-full bg-ink text-[14px] font-medium text-canvas disabled:opacity-50"
+        >
+          {done ? "All marked" : `Tap ${next}`}
+        </button>
+        <button type="button" onClick={() => setTaps((t) => t.slice(0, -1))} disabled={!taps.length} className="h-11 rounded-full border border-line-strong text-[14px] text-ink disabled:opacity-50">
+          Undo last tap
+        </button>
+      </div>
+      <p className="mt-2 text-[12.5px] text-muted">{taps.length} of {refs.length + 1} marks</p>
+      {done && (
+        <div className="mt-2 grid gap-2">
+          <input value={by} onChange={(e) => setBy(e.target.value.slice(0, 80))} placeholder="Reviewer's name" className="h-11 rounded-2xl border border-line bg-canvas/50 px-4 text-[15px] text-ink outline-none focus:border-brand" />
+          <button
+            type="button"
+            disabled={busy || !by.trim()}
+            onClick={async () => {
+              setBusy(true);
+              setNote(await onSend({ start: taps[0], ends: taps.slice(1), by: by.trim() }));
+              setBusy(false);
+            }}
+            className="h-11 rounded-full bg-brand-gradient text-[14px] font-semibold text-white disabled:opacity-60"
+          >
+            {busy ? "Saving…" : "Make the film with these times"}
+          </button>
+        </div>
+      )}
+      {note && <p role="alert" className="mt-2 text-[13px] text-[#c2410c]">{note}</p>}
     </div>
   );
 }
