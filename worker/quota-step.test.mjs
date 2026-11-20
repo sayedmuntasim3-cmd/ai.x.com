@@ -50,3 +50,33 @@ test("the wait: Google's delay when given, else the next Pacific midnight; never
   assert.equal(dailyLimitWait(new Error("Gemini's free daily limit is used up (x = 20)."), t), 3600_000 + 120_000);
   assert.equal(dailyLimitWait(new Error("Gemini's free daily limit is used up (x = 20; retry in 999999s)."), t), 26 * 3600_000);
 });
+
+test("Cloudflare's request limit: no retry in the same run; a long sleep, then the stage again in a fresh run", async () => {
+  const wf = fakeWorkflow();
+  let calls = 0;
+  const stop = (/** @type {string} */ m) => Object.assign(new Error(m), { name: "NonRetryableError" });
+  const step = quotaAwareStep({ step: wf.step, options: {}, permanent: permanentError, stop });
+  const out = await step("s2", async () => { calls += 1; if (calls < 3) throw new Error("Too many subrequests by single Worker invocation."); return "ledger"; });
+  assert.equal(out, "ledger");
+  assert.deepEqual(wf.steps, ["s2", "s2:fresh-1", "s2:fresh-2"]);
+  assert.deepEqual(wf.sleeps, [["s2:fresh-wait-1", 180_000], ["s2:fresh-wait-2", 900_000]]);
+});
+
+test("Cloudflare's request limit after every fresh run: the film stops with that reason", async () => {
+  const wf = fakeWorkflow();
+  const step = quotaAwareStep({ step: wf.step, options: {}, permanent: permanentError, stop: (m) => new Error(m) });
+  await assert.rejects(step("s2", async () => { throw new Error("Too many subrequests by single Worker invocation."); }), /Too many subrequests/);
+  assert.equal(wf.sleeps.length, 3);
+});
+
+test("a stage whose fetches met the limit but went on with less is run again in a fresh run", async () => {
+  const { watchFetch } = await import("./quota-step.mjs");
+  let n = 0;
+  const g = { fetch: async () => { n += 1; if (n === 1) throw new Error("Too many subrequests by single Worker invocation."); return "page"; } };
+  watchFetch(g);
+  const wf = fakeWorkflow();
+  const step = quotaAwareStep({ step: wf.step, options: {}, permanent: permanentError, stop: (m) => new Error(m) });
+  const out = await step("sources", async () => { const r = await g.fetch().catch(() => null); return r ?? "thin"; });
+  assert.equal(out, "page");
+  assert.deepEqual(wf.steps, ["sources", "sources:fresh-1"]);
+});

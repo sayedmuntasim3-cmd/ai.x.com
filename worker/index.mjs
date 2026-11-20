@@ -40,7 +40,7 @@
  */
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
-import { quotaAwareStep } from "./quota-step.mjs";
+import { quotaAwareStep, watchFetch } from "./quota-step.mjs";
 
 /** Nights a film may sleep for Gemini's free daily quota before it stops. */
 const MAX_QUOTA_NIGHTS = 7;
@@ -163,6 +163,8 @@ function estimateFor(env, seconds) {
 export class FilmRunWorkflow extends WorkflowEntrypoint {
   /** @param {any} event @param {any} step */
   async run(event, step) {
+    // Every fetch of this run reports Cloudflare's request limit to the step wrapper (worker/quota-step.mjs).
+    watchFetch();
     const /** @type {any} */ env = this.env;
     const film = event.payload.film;
     const brain = brainFromEnv(env);
