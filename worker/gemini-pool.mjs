@@ -98,6 +98,8 @@ export function geminiPool(o) {
       call.tried = [];
       /** @type {any[]} */
       const busy = [];
+      /** @type {any[]} */
+      const gone = [];
       // The configured model first, with no extra request; the list is asked for only once a model's day is spent.
       const tryModel = async (/** @type {string} */ id) => {
         try {
@@ -106,6 +108,9 @@ export function geminiPool(o) {
           const e = /** @type {any} */ (error);
           // A used-up day or no free quota on this model: spent for this run, the next model takes the request.
           if (e?.status === 429 && e?.permanent) { spent.add(id); last = e; call.tried.push(`${id} (day used up)`); return { done: false, reply: null }; }
+          // Listed by Google but closed to this key (404 "no longer available to new users", gemini-2.5-flash,
+          // film 70577b9b s7, 20 Nov 2026): never usable in this run, the next model takes the request.
+          if (e?.status === 404 && id !== first) { spent.add(id); gone.push(e); call.tried.push(`${id} (not available)`); return { done: false, reply: null }; }
           // Busy right now: the next model takes the request; this one may be asked again by a later call.
           if (e?.status === 429 && e?.busy) { busy.push(e); call.tried.push(`${id} (busy)`); return { done: false, reply: null }; }
           throw error;
@@ -124,7 +129,7 @@ export function geminiPool(o) {
       // a retryable error naming what each model answered.
       if (last && !busy.length) throw last;
       if (busy.length) throw Object.assign(new Error(`Gemini: every model was busy or out of its day; tried ${call.tried.join(", ")}`), { status: 429 });
-      throw last ?? new Error("Gemini: no model could take the request.");
+      throw last ?? gone[0] ?? new Error("Gemini: no model could take the request.");
     },
     /** For the report: which models the pool found and which are spent. */
     async pool() { return { models: await models(), spent: [...spent] }; },

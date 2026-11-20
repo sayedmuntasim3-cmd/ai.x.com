@@ -59,14 +59,14 @@ test("Cloudflare's request limit: no retry in the same run; a long sleep, then t
   const out = await step("s2", async () => { calls += 1; if (calls < 3) throw new Error("Too many subrequests by single Worker invocation."); return "ledger"; });
   assert.equal(out, "ledger");
   assert.deepEqual(wf.steps, ["s2", "s2:fresh-1", "s2:fresh-2"]);
-  assert.deepEqual(wf.sleeps, [["s2:fresh-wait-1", 180_000], ["s2:fresh-wait-2", 900_000]]);
+  assert.deepEqual(wf.sleeps, [["s2:fresh-wait-1", 180_000], ["s2:fresh-wait-2", 180_000]]);
 });
 
 test("Cloudflare's request limit after every fresh run: the film stops with that reason", async () => {
   const wf = fakeWorkflow();
   const step = quotaAwareStep({ step: wf.step, options: {}, permanent: permanentError, stop: (m) => new Error(m) });
   await assert.rejects(step("s2", async () => { throw new Error("Too many subrequests by single Worker invocation."); }), /Too many subrequests/);
-  assert.equal(wf.sleeps.length, 3);
+  assert.equal(wf.sleeps.length, 13);
 });
 
 test("a stage whose fetches met the limit but went on with less is run again in a fresh run", async () => {
