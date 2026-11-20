@@ -223,3 +223,29 @@ test("the runner searches Pixabay through the Worker; the key stays on the Worke
   assert.equal(up.searchParams.get("evil"), null, "only Pixabay's own options pass");
   assert.ok(!JSON.stringify(r.data).includes("pk-secret"));
 });
+
+test("Quran: the reviewer listens, taps each ayah end, and the film is made again with those times", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  const audio = new Uint8Array(5000).fill(2);
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "duha.mp3", bytes: audio.byteLength, kind: "quran", surah: 93 } });
+  const p = await call(env, "PUT", `/api/voice/${ID}/parts/1`, { headers: OWNER, body: audio });
+  /** @type {any[]} */
+  const sent = [];
+  const gh = async (/** @type {string} */ _u, /** @type {any} */ init) => { sent.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); };
+  await call(env, "POST", `/api/voice/${ID}/complete`, { headers: OWNER, body: { parts: [p.data] }, fetch: gh });
+  const t = sent[0].inputs.ticket;
+  // Not ready yet: no marks.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/marks`, { headers: OWNER, body: { start: 1, ends: [2], by: "A" }, fetch: gh })).status, 409);
+  await call(env, "POST", `/api/voice/${ID}/progress?ticket=${t}`, { body: { stage: "done", params: { minutes: 3, review: 1 }, report: { ayat: [{ ref: "93:1" }, { ref: "93:2" }, { ref: "93:3" }] } } });
+  const view = await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER });
+  assert.match(view.data.listen, /\/audio\?ticket=listen\./);
+  const heard = await call(env, "GET", view.data.listen);
+  assert.deepEqual(heard.data, audio, "the reviewer's player gets the uploaded recitation");
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/marks`, { headers: OWNER, body: { start: 1, ends: [4, 8], by: "Hafiz A" }, fetch: gh })).status, 400, "3 ayat need 3 ends");
+  const ok = await call(env, "POST", `/api/voice/${ID}/marks`, { headers: OWNER, body: { start: 1, ends: [4, 8, 12.5], by: "Hafiz A" }, fetch: gh });
+  assert.equal(ok.status, 202);
+  assert.equal(ok.data.status, "queued");
+  assert.match(ok.data.progress.at(-2).message.bn, /রিভিউয়ার/);
+  const quran = JSON.parse(sent.at(-1).inputs.quran);
+  assert.deepEqual(quran.marks, { start: 1, ends: [4, 8, 12.5], by: "Hafiz A" });
+});
