@@ -58,7 +58,9 @@ test("a worker killed mid-job: another worker takes over after the lease and con
   assert.equal(claims.length, 2);
   assert.match(claims[1].worker, /^B-/);
   assert.equal(claims[1].message.code, "job.reclaimed", "the takeover is said, in both languages");
-  assert.ok(!readdirSync(join(dir, "jobs")).some((f) => f.endsWith(".lock") || f.endsWith(".tmp")), "no lock or temporary file is left behind");
+  // Worker B writes "done" and then lets go of the lock: give it that moment before looking.
+  const leftovers = () => readdirSync(join(dir, "jobs")).filter((f) => f.endsWith(".lock") || f.endsWith(".tmp"));
+  await until(() => leftovers().length === 0, 5_000, "no lock or temporary file is left behind");
   b.p.kill("SIGINT");
   await b.exited;
 });
