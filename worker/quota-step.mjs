@@ -8,8 +8,11 @@ import { dailyLimitWait } from "./gemini.mjs";
 
 /** The stop message for Cloudflare's per-invocation request limit; the outer loop recognises it. */
 export const SUBREQUESTS = "Too many subrequests by single Worker invocation (Cloudflare's limit for one run).";
-/** Sleeps before a fresh run, longer each time (the docs promise hibernation only for a "long sleep"). */
-export const FRESH_WAITS = Object.freeze([3 * 60_000, 15 * 60_000, 60 * 60_000]);
+/**
+ * Sleeps before each fresh run (the docs promise hibernation only for a "long sleep"). A footage stage needs
+ * several runs (about 100 searches a chapter, 50 a run; settled shots are kept), so the first ones are short.
+ */
+export const FRESH_WAITS = Object.freeze([...Array(10).fill(3 * 60_000), 15 * 60_000, 15 * 60_000, 60 * 60_000]);
 /** @param {unknown} error */
 export function tooManySubrequests(error) {
   return /too many subrequests/i.test(error instanceof Error ? error.message : String(error));
