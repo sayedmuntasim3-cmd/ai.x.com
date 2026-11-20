@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildTimeline, captionLines, toSrt } from "../src/timeline.mjs";
+import { buildTimeline, captionLines, toSrt, cardText } from "../src/timeline.mjs";
 
 const USA = new URL("../../productions/ramesh-babu/USA/", import.meta.url);
 const plan = JSON.parse(readFileSync(new URL("s3-chapters.json", USA), "utf8"));
@@ -216,4 +216,23 @@ test("scene times follow the takes: a long take borrows the spare time of its ch
   assert.equal(tight.map(8), 8 + 1 + 2 * VOICE_TAIL);
   assert.equal(tight.report.grownChapters, 1);
   assert.equal(tight.map(20), 20 + 1 + 2 * VOICE_TAIL, "later chapters shift by the growth");
+});
+
+test("card text: quotes are paired in order, escaped quotes read as quotes, a source chip is the last choice", () => {
+  // A long first quote once made the parser pair its closing mark with the next quote, so the writer's note showed.
+  const long = "Dollar figures: rupees at that year's average rate (Federal Reserve Bank of St. Louis), then adjusted for US inflation to 2026 dollars (BLS CPI-U).";
+  assert.equal(cardText("", `"${long}" (card, hold 8 s ≥ (20 ÷ 3) + 1 = 7.7 s); second line "C10 · fred.stlouisfed.org"`), long);
+  assert.equal(cardText("", String.raw`"\"billionaire barber\" (headlines)" with chip "C06 · deccanchronicle.com 2016"`), "'billionaire barber' (headlines)");
+  assert.equal(cardText("", `chip "C14 · rtt.co.in" then "rtt.co.in · company site"`), "rtt.co.in · company site");
+  assert.equal(cardText("", `chip "C14 · rtt.co.in"`), "C14 · rtt.co.in");
+  assert.equal(cardText(`R1 card "THE SHOP STAYED OPEN."`, ""), "THE SHOP STAYED OPEN.");
+});
+
+test("a disclosure label (\"Illustrative\") is a small tag on footage, never the card's headline", async () => {
+  const { disclosureTag } = await import("../src/timeline.mjs");
+  assert.equal(cardText("", `"+ TAX" (red); "Illustrative" under the sedan`), "+ TAX");
+  assert.equal(cardText("", `"Illustrative"`), "");
+  assert.equal(disclosureTag(`"+ TAX"; "Illustrative" under the sedan`), "Illustrative");
+  assert.equal(disclosureTag(`"Paraphrased throughout"`), "Paraphrased throughout");
+  assert.equal(disclosureTag(`"Still cutting hair · 2025"`), "");
 });

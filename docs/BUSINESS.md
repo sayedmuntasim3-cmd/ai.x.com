@@ -53,9 +53,11 @@ Real cost of one finished minute today:
 |---|---|---|
 | Writing and research (free Gemini pool) | $0 | free key. **But capacity is the limit:** 20 requests a day per model, so a few short films a day for the whole platform (§0) |
 | Render at 1080p | **about 0.6 runner minutes per film minute** | measured 20 Nov: chapter 1 of the USA film (510 s) rendered in 309 s at 1920×1080, 30 fps, on 2 CPU cores (the size of GitHub's standard runner), with local test clips. Downloading the real clips is not included |
-| Narration (Kokoro, free) | runner minutes; **not measured** | Kokoro is not installed in this container |
+| Narration (Kokoro, free) | **about 0.3 runner minutes per film minute** | measured 20 Nov: 95 s of narration (12 scenes of the USA film) in 28.6 s on 2 CPU cores, model load included, with the workflow's kokoro-onnx 0.6.1 |
 | GitHub Actions (private repo) | $0 within the account's free minutes | GitHub Free gives 2,000 Linux minutes a month for private repos (CI uses part). That is roughly 1,000–1,500 film minutes a month for everyone together. Beyond it GitHub charges per minute, which is never allowed without the owner |
 | Storage | $0 | GitHub releases and the owner's R2 free allowance |
+
+Together: **about 0.9 runner minutes per finished minute**, plus a few minutes of setup per film and the clip downloads (not measured).
 
 So at zero cost Zupona can give away a small number of films. It cannot sell volume until the owner chooses a
 brain that can finish films (Gemini billing, a Claude key, or his own computer). That choice sets the real price:
