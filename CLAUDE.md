@@ -10,6 +10,12 @@ branch you are on; never merge to `main`, deploy, spend money or add a paid API.
 - 16 Nov 2026: the landing page design at `/` IS the product's face; future studio screens use it.
   Unmerged on purpose, never deleted: PR #4 and PR #6 (each sets a different Worker entry).
 
+- 19 Nov 2026 (measured, film aef9b9c1): the owner's free Gemini key allows **20 requests per day per
+  model** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier = 20`, resets at midnight Pacific). A film
+  needs far more, so no film can finish on it. The Worker now stops with that reason instead of retrying.
+  The earlier "Google Search has no quota" reading (PR #12) was wrong: it was this daily limit.
+  A brain that can finish a film needs the owner's choice (Gemini billing, a Claude key, or his own computer).
+
 ## Start of every session (cheap)
 1. `git fetch origin -q && git log --oneline -5 origin/main`; read `docs/ENGINEERING_STATE.md` section 0 and 6 only.
 2. Before building: `git grep -n -i "<feature word>" origin/main -- worker engine/src render public/studio`.
