@@ -13,6 +13,18 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026, graphics check and auto-render:
+- Auto-render connected: the owner set `GITHUB_TOKEN` (runtime secret, after first putting it in the Build
+  variables, where the running Worker cannot see it); PR #14 added `GITHUB_REPO` and `SITE_URL`; `/api/health`
+  shows `github: true`. The repository was made private by the owner afterwards; fetch and push still work.
+- Every graphic rendered at 1080p and checked frame by frame: route map (arc animates Bengaluru -> London),
+  bar chart (bars rise, values on top), counter (333 -> 400), kinetic type, paper card with highlighter,
+  split card. Found and fixed: card text left one lonely word on its last line ("his mother leased / it")
+  and cut text past four lines silently; `wrap` now balances lines and never drops a word. Found and fixed:
+  the shot cache key did not change when drawing changed, so old renders kept the old look (bumped v8 -> v9).
+- Not changed (my opinion, unmeasured): on-screen text is about 4-5 % of the frame height; top channels often
+  use larger type for phones.
+
 20 Nov 2026, dead air and genre (owner: "no second wasted, motion by the kind of video"):
 - `engine/src/voice-tighten.mjs` + `local/voice-film.mjs` (on by default, `--tighten off`): long stops in a
   voiceover are shortened only inside measured silence, crossfaded; narration: pauses over 1.2 s -> 0.7 s;

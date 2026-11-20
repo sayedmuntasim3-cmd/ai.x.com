@@ -118,17 +118,34 @@ export function counterParts(text) {
 const hash = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex").slice(0, 16);
 
 /**
- * Wrap card text to lines of at most n characters.
+ * Wrap card text to lines of at most n characters, balanced: the narrowest width that needs no
+ * more lines than the greedy wrap, so no line ends with one lonely word ("his mother leased / it"
+ * becomes "his mother / leased it"). Text that needs more than four lines is never cut: the width
+ * grows until it fits in four.
  * @param {string} text @param {number} n
  */
-function wrap(text, n) {
-  const lines = [];
-  let line = "";
-  for (const w of text.split(/\s+/).filter(Boolean)) {
-    if (line && (line + " " + w).length > n) { lines.push(line); line = w; } else line = line ? line + " " + w : w;
+export function wrap(text, n) {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  const greedy = (/** @type {number} */ width) => {
+    const lines = [];
+    let line = "";
+    for (const w of words) {
+      if (line && (line + " " + w).length > width) { lines.push(line); line = w; } else line = line ? line + " " + w : w;
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  let width = n;
+  while (greedy(width).length > 4) width += 2;
+  let best = greedy(width);
+  const longest = Math.max(...words.map((w) => w.length));
+  for (let w = width - 1; w >= longest; w -= 1) {
+    const l = greedy(w);
+    if (l.length > best.length) break;
+    best = l;
   }
-  if (line) lines.push(line);
-  return lines.slice(0, 4).join("\n");
+  return best.join("\n");
 }
 
 /**
@@ -371,7 +388,7 @@ export async function renderFilm(o) {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
     const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
-    const key = hash({ v: 8, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 9, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
