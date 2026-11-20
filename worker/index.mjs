@@ -66,6 +66,7 @@ import { radarSearch } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
 import { handleVoice } from "./voice-api.mjs";
+import { handleMedia } from "./media-api.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
@@ -246,10 +247,12 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
 
 export default {
   /** @param {Request} request @param {any} env */
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
+      const media = await handleMedia(request, url, env, { waitUntil: ctx?.waitUntil ? (p) => ctx.waitUntil(p) : undefined });
+      if (media) return media;
       const jobs = await handleJobs(request, env, url);
       if (jobs) return jobs;
       const voice = await handleVoice(request, env, url);

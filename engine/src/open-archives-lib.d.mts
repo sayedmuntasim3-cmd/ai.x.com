@@ -31,3 +31,10 @@ export function searchMedia(
     license: { code: string; label: string; url?: string; attribution: boolean };
   }[];
 }>;
+
+/** The library's routes use these (worker/media-api.mjs). */
+export function streamMedia(options: Record<string, unknown>, env: Record<string, string | undefined>): ReadableStream;
+export function sourceStates(env?: Record<string, string | undefined>): { id: string; name: string; enabled: boolean; missingKeys: string[]; [key: string]: unknown }[];
+export const SOURCE_GROUPS: string[];
+export function mergeResults(results: unknown[], limit: number): unknown[];
+export function terms(query: string): string[];

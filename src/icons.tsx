@@ -286,3 +286,25 @@ export function CategoryIcon({ id, ...p }: IconProps & { id: CategoryId }) {
       return <LanternIcon {...p} />;
   }
 }
+
+export const ImageIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <circle cx="9" cy="10" r="1.6" />
+    <path d="m4 17.5 4.6-4.6a1.5 1.5 0 0 1 2.1 0L16 18.2M14 15.6l1.6-1.6a1.5 1.5 0 0 1 2.1 0l2.6 2.6" />
+  </Icon>
+);
+
+export const DownloadIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Icon>
+);
+
+export const SearchIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m20 20-4.4-4.4" />
+  </Icon>
+);
+
