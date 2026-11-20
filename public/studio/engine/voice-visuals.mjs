@@ -237,7 +237,8 @@ function fillLine(line, f) {
 }
 
 /**
- * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, judge?: import("./film-media.mjs").MediaJudge }} o
+ * reachable: checks that a picture's file can be fetched before it is chosen (the runner can afford the request).
+ * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean> }} o
  */
 export async function planVoiceVisuals(o) {
   const chapter = o.chapter ?? "C1";
@@ -284,7 +285,7 @@ export async function planVoiceVisuals(o) {
   if (o.providers?.length) {
     const judge = o.brain && canSee(o.brain) ? o.judge : undefined;
     // Voiceover films: a picture must name what was searched (the archives match "car" to "Carina Nebula").
-    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true });
+    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable });
     for (const shot of media.shots) {
       const p = plan.find((x) => x.sc === shot.scene);
       if (!p) continue;
@@ -334,4 +335,45 @@ export function quranVisualAdabGuard(o) {
   if (meaningGap) { gaps.push("meaning: no licensed translation for some or all ayat; meanings are not shown and pictures cannot follow the meaning yet"); messages.push(msg("voice.meaningGap")); }
   gaps.push("pictures: titles and tags are checked, not the pictures themselves; a seeing check or the owner must look before release");
   return { ok: problems.length === 0, problems, gaps, messages };
+}
+
+/**
+ * A quiet score for a narration voiceover, so a long film does not sit in silence under the voice: an opening cue,
+ * steady cues about every 4 minutes (cut at a scene edge), and a closing cue. The free score
+ * (render/score-synth.mjs) composes them; the renderer lays them as a low bed under the voice. Never for the Quran:
+ * nothing is laid under a recitation (musicPlanFor refuses it too).
+ * @param {{ sc: string, start: number, end: number }[]} scenes
+ * @param {{ kind?: "narration" | "quran", everySeconds?: number }} [o]
+ * @returns {{ s4: string, cueOf: Map<string, string> } | null}
+ */
+export function voiceScore(scenes, o = {}) {
+  if (o.kind === "quran" || !scenes.length) return null;
+  const every = o.everySeconds ?? 240;
+  const total = scenes[scenes.length - 1].end;
+  /** @type {{ cue: string, start: number, end: number, sc: string[] }[]} */
+  const cues = [];
+  for (const s of scenes) {
+    const last = cues[cues.length - 1];
+    if (!last || (s.start - last.start >= every && total - s.start >= 60)) cues.push({ cue: `M${String(cues.length + 1).padStart(2, "0")}`, start: s.start, end: s.end, sc: [s.sc] });
+    else { last.end = s.end; last.sc.push(s.sc); }
+  }
+  const moods = (/** @type {number} */ i, /** @type {number} */ n) =>
+    i === 0 ? "Calm documentary opening, soft piano over low strings, curious; 84"
+      : i === n - 1 && n > 1 ? "Gentle resolve, warm strings and piano, unhurried ending; 72"
+        : ["Warm understated strings and piano, steady pulse; 80", "Light reflective piano, soft pads, forward motion; 88", "Quiet tension, low strings ostinato, restrained; 92"][(i - 1) % 3];
+  const clock = (/** @type {number} */ t) => `${Math.floor(t / 3600)}:${String(Math.floor((t % 3600) / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  const rows = cues.map((c, i) => `| ${c.cue} | C1 | ${clock(c.start)}–${clock(c.end)} | ${moods(i, cues.length)} |`);
+  /** @type {Map<string, string>} */
+  const cueOf = new Map();
+  for (const c of cues) for (const sc of c.sc) cueOf.set(sc, c.cue);
+  return { s4: ["## Music plan (voiceover: a quiet bed under the voice)", "", "| Cue | Chapter | Time | Mood |", "|---|---|---|---|", ...rows, ""].join("\n"), cueOf };
+}
+
+/** Each scene line with its music cue (MUS field), for the renderer. @param {string} markdown @param {Map<string, string>} cueOf */
+export function withMusic(markdown, cueOf) {
+  return markdown.split("\n").map((line) => {
+    const sc = /^\*\*(SC\d{4,5})\*\*/.exec(line)?.[1];
+    if (!sc || !cueOf.has(sc) || /\|\s*MUS:/.test(line)) return line;
+    return `${line} | MUS: ${cueOf.get(sc)}`;
+  }).join("\n");
 }

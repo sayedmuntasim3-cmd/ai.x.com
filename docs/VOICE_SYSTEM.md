@@ -262,3 +262,27 @@ Fixed after it (round 2):
 Still weak, honestly: the keyless archives are museum and space collections, so plain words still find old or
 off-topic pictures where Pixabay has nothing; no music under a narration voiceover; render takes about 2.9x the
 film's length on a free runner.
+
+### Round 3 (20 Nov 2026)
+
+- Music under a narration voiceover: `voiceScore` writes a cue plan (opening, a steady cue about every 4 minutes,
+  a closing cue) and a `MUS` field per scene; the free score (`render/score-synth.mjs`) composes it and the renderer
+  lays it under the voice. Short real run: 2 of 2 cues played, film -14.9 LUFS, true peak -1.3 dBTP. Never for the
+  Quran (no plan is written, and `musicPlanFor` refuses it too).
+- A picture is chosen only if its file can really be fetched (`reachable`, a ranged GET with the tool's
+  User-Agent; image or video answers only), else the next candidate. Found live: NASA's `~large` file answers 403
+  for some items while `~orig` exists, and an archive.org IIIF link answered 403; each became a text card.
+- The 40-minute re-run and a Quran-mode run (Ad-Duha, Qari Jawad Farogi, archive.org, uploader-marked CC0, test
+  only, kept private) were started on production through the landing page; results follow.
+
+### Live results of the round-2 code (20 Nov 2026, production)
+
+- 40-minute re-run (film 993f09ea, uploaded through the landing page; topic taken from the file name): 6,094 words,
+  312 scenes, **389 shots, 23 pictures failed (was 200 of 322)**; render 2 h 08 min. Still blocked by the gate,
+  mostly NASA `~large` 403s, which round 3's fetchability check removes.
+- Quran mode (film e1484358, Ad-Duha, Qari Jawad Farogi, 2 min 27 s): the whole path worked in 12 minutes; delivered
+  privately, "awaiting review"; 1920x1080, -14.0 LUFS, peak -4.0 dBFS, 0 black frames, 6 nature shots, no living
+  beings, no music, length equal to the voice. **The ayah text was not shown**: alignment to the Tanzil text placed
+  0 of 10 ayah ends with certainty (8 not at all), so the engine kept every unsure time off the screen, as the rule
+  says. Still open: a recitation aligner that works on this recording, or a person marking the ayah ends.
+- Fixed: the progress showed "0 scenes" and "0 pictures" for a recitation (it read narration fields).
