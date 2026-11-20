@@ -13,6 +13,18 @@ goals and the code.
 
 ## 0. Live facts (keep short; newest first)
 
+20 Nov 2026, Gemini model pool (`worker/gemini-pool.mjs`, on by default; `GEMINI_POOL=off` keeps one model):
+- The free key allows 20 requests a day **per model**; films stopped after one model's day. The brain now asks
+  Google which models this key may use (models.list), ranks the writers (flash, then flash-lite, newest first,
+  stable before preview; never image, audio, embedding, pro), and when a model's day is used up (or it has no
+  free quota) sends the same request to the next one. Only when all are spent does the film wait for
+  midnight Pacific (PR #15's wait). Same key and project: no extra accounts (Google's terms forbid that; the
+  owner proposed 4-5 Gmail keys and was advised against it). `GEMINI_MODELS="a,b"` names the models instead.
+- Tested with fakes only (the Gemini key cannot be stored here): which models the owner's key really lists, and
+  how much each adds, is unverified until the next film runs. Lighter models may write less well.
+- Groq measured on the owner's key: 1,000 requests a day but 8,000 tokens a minute; one stage sends the 73 KB
+  manual (~23,000 tokens), so Groq cannot run the film as built.
+
 20 Nov 2026, graphics check and auto-render:
 - Auto-render connected: the owner set `GITHUB_TOKEN` (runtime secret, after first putting it in the Build
   variables, where the running Worker cannot see it); PR #14 added `GITHUB_REPO` and `SITE_URL`; `/api/health`

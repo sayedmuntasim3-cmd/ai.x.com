@@ -21,6 +21,7 @@
  */
 import { anthropicModel } from "./anthropic.mjs";
 import { geminiModel } from "./gemini.mjs";
+import { geminiPool } from "./gemini-pool.mjs";
 import { localBrain } from "./local-brain.mjs";
 
 /** @typedef {import("../engine/src/film-run.mjs").Model} Model */
@@ -69,7 +70,14 @@ export function brainFromEnv(env, o = {}) {
   const chosen = chooseBrain(env);
   if (!chosen.ok) return chosen;
   if (chosen.kind === "claude") return { ok: true, kind: "claude", model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, ...(o.fetch ? { fetch: o.fetch } : {}) }) };
-  if (chosen.kind === "gemini") return { ok: true, kind: "gemini", model: geminiModel({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(String(env.GEMINI_SEARCH ?? "").toLowerCase() === "off" ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) }) };
+  if (chosen.kind === "gemini") {
+    const g = { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(String(env.GEMINI_SEARCH ?? "").toLowerCase() === "off" ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) };
+    // Several Gemini models on the same key take turns when one model's free day is used up (gemini-pool.mjs);
+    // GEMINI_POOL=off keeps one model, GEMINI_MODELS="a,b" names the models instead of asking Google.
+    if (String(env.GEMINI_POOL ?? "").toLowerCase() === "off") return { ok: true, kind: "gemini", model: geminiModel(g) };
+    const models = String(env.GEMINI_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    return { ok: true, kind: "gemini", model: geminiPool({ ...g, ...(models.length ? { models } : {}) }) };
+  }
   const api = String(env.BRAIN_API ?? "").toLowerCase();
   const input = num(env.BRAIN_PRICE_INPUT) ?? 0;
   const output = num(env.BRAIN_PRICE_OUTPUT) ?? 0;
