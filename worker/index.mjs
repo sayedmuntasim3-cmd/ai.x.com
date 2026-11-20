@@ -22,6 +22,7 @@
  *   POST /api/films/:id/resume       { budgetUsd? } -> continue a failed or budget-stopped film; finished stages are kept   (Bearer STUDIO_TOKEN)
  *   POST /api/films { ..., runOn: "worker" }   the film is made by one of the owner's machines (its own brain) instead of the Workflow
  *   POST /api/films/:id/render { on: "worker", resolution? }   a cleared film rendered on the owner's machine (nothing published)
+ *   /api/voice...                    voiceover films: upload a finished recording, get a film (worker/voice-api.mjs)
  *   /api/jobs..., /api/worker/...    the job queue for the owner's machines (worker/jobs-api.mjs)
  *
  * Needs (set by the owner when Cloudflare is connected):
@@ -64,6 +65,7 @@ import { listFilms } from "./films.mjs";
 import { radarSearch } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
+import { handleVoice } from "./voice-api.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
 const TYPES = { md: "text/markdown; charset=utf-8", json: "application/json; charset=utf-8" };
@@ -248,6 +250,8 @@ export default {
     try {
       const jobs = await handleJobs(request, env, url);
       if (jobs) return jobs;
+      const voice = await handleVoice(request, env, url);
+      if (voice) return voice;
       if (url.pathname === "/api/health") {
         const brain = brainHealth(env);
         return json({ brain, claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), localBrain: Boolean(env.BRAIN_URL), searxng: Boolean(env.SEARXNG_URL), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: brain.connected ? brain.model : null });
