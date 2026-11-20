@@ -388,7 +388,7 @@ export async function renderFilm(o) {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
     const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
-    const key = hash({ v: 9, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 10, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -497,7 +497,7 @@ export async function renderFilm(o) {
         input = ["-loop", "1", "-framerate", String(t.fps), "-i", basePng, "-loop", "1", "-framerate", String(t.fps), "-i", linePng];
         complex = true;
         chain.push(`[1]format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*lte(((X-${ax})*${dx}+(Y-${ay})*${dy})/${len2},T/${draw})'[rl];[0]format=rgba[rb];[rb][rl]overlay=format=auto,format=yuv420p`, "setsar=1", LOOK);
-        const label = (/** @type {string} */ words, /** @type {number} */ x, /** @type {number} */ y, /** @type {string} */ from, /** @type {string} */ name) => (words && font ? `drawtext=expansion=none:textfile='${escPath(writeText(words.toUpperCase(), name))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.04)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.012)}:x=${Math.min(W - Math.round(W * 0.25), x + Math.round(H * 0.04))}:y=${Math.max(Math.round(H * 0.04), y - Math.round(H * 0.09))}:alpha='min(1,max(0,(t-${from})/0.4))'` : "");
+        const label = (/** @type {string} */ words, /** @type {number} */ x, /** @type {number} */ y, /** @type {string} */ from, /** @type {string} */ name) => (words && font ? `drawtext=expansion=none:textfile='${escPath(writeText(words.toUpperCase(), name))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.048)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.012)}:x=${Math.min(W - Math.round(W * 0.25), x + Math.round(H * 0.04))}:y=${Math.max(Math.round(H * 0.04), y - Math.round(H * 0.09))}:alpha='min(1,max(0,(t-${from})/0.4))'` : "");
         chain.push(...[label(v.map.label, ax, ay, "0.15", "route-from"), label(v.map.to.label, bx, by, draw, "route-to")].filter(Boolean));
         mapped = true;
       } catch (error) {
@@ -514,7 +514,7 @@ export async function renderFilm(o) {
         }
         input = ["-loop", "1", "-framerate", String(t.fps), "-i", png];
         chain.push(`zoompan=z='1+0.14*on/${v.frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${t.width}x${t.height}:fps=${t.fps}`, "setsar=1", LOOK);
-        if (v.map.label && font) chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(v.map.label.toUpperCase(), "map-label"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.045)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.014)}:x=w/2+${Math.round(H * 0.06)}:y=h/2-${Math.round(H * 0.1)}:alpha='min(1,max(0,(t-0.35)/0.4))'`);
+        if (v.map.label && font) chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(v.map.label.toUpperCase(), "map-label"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.014)}:x=w/2+${Math.round(H * 0.06)}:y=h/2-${Math.round(H * 0.1)}:alpha='min(1,max(0,(t-0.35)/0.4))'`);
         mapped = true;
       } catch (error) {
         warnings.push(`${v.id}: the map could not be drawn (${error instanceof Error ? error.message : error}); a text card stands in.`);
@@ -537,7 +537,7 @@ export async function renderFilm(o) {
           for (let k = 1; k < n; k += 1) chain.push(`drawbox=x=iw*${(k / n).toFixed(4)}-1:y=ih*0.36:w=2:h=ih*0.46:color=${muted}@0.6:t=fill`);
           v.split.forEach((panel, k) => {
             const col = `w*${(k / n).toFixed(4)}+(w/${n}-text_w)/2`;
-            chain.push(text(wrap(panel, n === 2 ? 18 : 12), `panel${k}`, `fontfile='${face}':text_align=C:fontcolor=${muted}:fontsize=${Math.round(H * (n === 2 ? 0.055 : 0.045))}:line_spacing=${Math.round(H * 0.015)}:x=${col}:${rise(v.kinetic, "h*0.59-text_h/2")}`));
+            chain.push(text(wrap(panel, n === 2 ? 18 : 12), `panel${k}`, `fontfile='${face}':text_align=C:fontcolor=${muted}:fontsize=${Math.round(H * (n === 2 ? 0.06 : 0.054))}:line_spacing=${Math.round(H * 0.015)}:x=${col}:${rise(v.kinetic, "h*0.59-text_h/2")}`));
           });
         } else if (v.chart && font) {
           // An animated bar chart: bars grow from the baseline one after another, eased, their values land on top.
@@ -576,8 +576,8 @@ export async function renderFilm(o) {
               cmds.push(`${(from + f / t.fps).toFixed(3)} drawbox@bar${k} y ${base - hgt};`, `${(from + f / t.fps).toFixed(3)} drawbox@bar${k} h ${hgt};`);
             }
             const cx = x + bw / 2;
-            labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.label, `bar-label-${k}`))}':fontfile='${face}':fontcolor=${muted}:fontsize=${Math.round(H * 0.035)}:x=${Math.round(cx)}-text_w/2:y=${base + Math.round(H * 0.025)}:alpha='min(1,t/0.35)'`);
-            labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.text, `bar-value-${k}`))}':fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.042)}:x=${Math.round(cx)}-text_w/2:y=${base - full - Math.round(H * 0.065)}:alpha='min(1,max(0,(t-${(from + grow * 0.8).toFixed(3)})/0.25))'`);
+            labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.label, `bar-label-${k}`))}':fontfile='${face}':fontcolor=${muted}:fontsize=${Math.round(H * 0.044)}:x=${Math.round(cx)}-text_w/2:y=${base + Math.round(H * 0.025)}:alpha='min(1,t/0.35)'`);
+            labels.push(`drawtext=expansion=none:textfile='${escPath(writeText(b.text, `bar-value-${k}`))}':fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.05)}:x=${Math.round(cx)}-text_w/2:y=${base - full - Math.round(H * 0.065)}:alpha='min(1,max(0,(t-${(from + grow * 0.8).toFixed(3)})/0.25))'`);
           });
           if (v.text) chain.push(text(wrap(v.text, 34), "chart-title", `fontfile='${face}':fontcolor=${ink}:fontsize=${Math.round(H * 0.055)}:x=(w-text_w)/2:${rise(v.kinetic, String(titleY))}`));
           chain.push(commands(cmds), ...boxes, `drawbox=x=${Math.round(left)}:y=${base}:w=${Math.round(W * 0.68)}:h=${Math.max(2, Math.round(H * 0.004))}:color=${muted}:t=fill`, ...labels);
@@ -646,17 +646,17 @@ export async function renderFilm(o) {
     const motion = type === "black" ? "" : editMotion(v, t.width, t.height, t.fps);
     if (motion) chain.push(motion);
     // A title over the scene's first clip, as a lower third; the source chip with the scene's first shot.
-    if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.052)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:${rise(v.kinetic, "h*0.72")}`));
+    if (type === "clip" && v.title && font) chain.push(text(wrap(v.title, 34), "title", `fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.058)}:line_spacing=${Math.round(H * 0.012)}:box=1:boxcolor=black@0.45:boxborderw=${Math.round(H * 0.018)}:x=w*0.06:${rise(v.kinetic, "h*0.85-text_h")}`));
     if (BARS) chain.push(BARS);
-    if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.026))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
+    if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.034))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
     // A chapter opens with its number and title, top left, for about three seconds.
     if (v.chapterTitle && font && mono && type !== "black") {
       const show = Math.min(3.2, (v.frames / t.fps) * 0.8);
       const fadeAlpha = `alpha='min(1,max(0,(t-0.3)/0.4))*min(1,max(0,(${show.toFixed(2)}-t)/0.5))'`;
       const [label, ...rest] = v.chapterTitle.split(" · ");
       const top = Math.max(bar, 0) + Math.round(H * 0.07);
-      chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(label.toUpperCase(), "chapter-label"))}':fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.024))}:x=w*0.06:y=${top}:${fadeAlpha}`);
-      chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(wrap(rest.join(" · "), 30), "chapter-title"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.05)}:x=w*0.06:y=${top + Math.round(H * 0.04)}:shadowcolor=black@0.6:shadowx=2:shadowy=2:${fadeAlpha}`);
+      chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(label.toUpperCase(), "chapter-label"))}':fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.032))}:x=w*0.06:y=${top}:${fadeAlpha}`);
+      chain.push(`drawtext=expansion=none:textfile='${escPath(writeText(wrap(rest.join(" · "), 30), "chapter-title"))}':fontfile='${escPath(font)}':fontcolor=white:fontsize=${Math.round(H * 0.06)}:x=w*0.06:y=${top + Math.round(H * 0.05)}:shadowcolor=black@0.6:shadowx=2:shadowy=2:${fadeAlpha}`);
     }
     // Dips through black at chapter breaks and written dissolves: the shot fades out, the next fades in.
     const seconds = v.frames / t.fps;

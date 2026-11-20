@@ -195,8 +195,15 @@ export function planChapters(totalSeconds: number): Chapter[] {
   return chapters;
 }
 
+/**
+ * One credit is one finished minute, rounded up (docs/BUSINESS.md, "Credits").
+ * Measured 20 Nov 2026: a 1080p render takes about 0.6 runner minutes per film minute on a
+ * 2-core GitHub runner, and the free brains cost $0, so the minute is the honest unit.
+ */
+export const CREDIT_NOTE = "1 credit = 1 finished minute · no charge during the private beta";
+
 export function estimateCredits(minutes: number) {
-  return Math.max(2, Math.round(minutes * 1.25));
+  return Math.max(1, Math.ceil(minutes));
 }
 
 export function formatClock(seconds: number) {

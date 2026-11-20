@@ -9,6 +9,7 @@ import {
   MUSIC,
   STYLES,
   estimateCredits,
+  CREDIT_NOTE,
   findOption,
   formatClock,
   formatRuntime,
@@ -580,12 +581,12 @@ function Composer(props: ComposerProps) {
         <span className="ml-3 hidden h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-black/25 px-3 text-[13.5px] font-semibold text-white min-[360px]:flex sm:ml-5">
           <CoinsIcon size={17} />
           <span>
-            ~{credits} <span className="sr-only min-[400px]:not-sr-only">credits</span>
+            {credits} <span className="sr-only min-[400px]:not-sr-only">{credits === 1 ? "credit" : "credits"}</span>
           </span>
-          <span className="sr-only">estimated credits</span>
+          <span className="sr-only">{credits === 1 ? "credit" : "credits"}, one per finished minute</span>
         </span>
       </button>
-      <p className="mt-3 text-center text-[13px] text-muted">Your settings save automatically on this device.</p>
+      <p className="mt-3 text-center text-[13px] text-muted">{CREDIT_NOTE}. Your settings save automatically on this device.</p>
     </div>
   );
 }
@@ -1303,7 +1304,7 @@ function briefText(b: Brief) {
     b.mode === "idea" ? `Idea: ${b.idea}` : `Voiceover: ${b.voiceName ?? "—"}${b.idea ? ` (about: ${b.idea})` : ""}`,
     `Length: ${b.runtime} · Audience: ${b.age}`,
     `Idea system: ${b.category} · Style: ${b.style} · Music: ${b.music}`,
-    `Estimated cost: ~${b.credits} credits`,
+    `Cost: ${b.credits} credits (${CREDIT_NOTE})`,
     "",
     "Chapters:",
     ...b.chapters.map((c) => `${formatClock(c.start)}  ${c.title}`),
@@ -1347,7 +1348,7 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
     ["Starts from", brief.mode === "idea" ? "Your idea" : "Your voiceover"],
     ["Style", brief.style],
     ["Music", brief.music],
-    ["Estimated cost", `~${brief.credits} credits`],
+    ["Cost", `${brief.credits} ${brief.credits === 1 ? "credit" : "credits"}`],
   ];
 
   return (

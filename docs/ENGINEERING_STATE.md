@@ -33,6 +33,19 @@ goals and the code.
 - Owner's own tasks: Quran (written recording rights, a scholar's review); listen to the 40-minute narrator
   sample if wanted. Done by the owner on 20 Nov: GITHUB_TOKEN runtime secret, repository made private.
 
+20 Nov 2026, workstream C (product, pricing, business):
+- `docs/MARKET.md` (Kutly and 4 competitors, read from their pages; feature table against the code; gaps ranked)
+  and `docs/BUSINESS.md` (first segment: English history channels; credits from real cost; 30-day plan).
+- Measured: a 1080p render takes about 0.6 runner minutes per film minute (USA chapter 1, 510 s in 309 s on
+  2 cores, local test clips). Kokoro narration time not measured. The landing now shows 1 credit = 1 finished
+  minute, rounded up, "no charge during the private beta" (`src/data.ts` `estimateCredits`, `CREDIT_NOTE`).
+- On-screen type for phones, decided with frames viewed at 390 px wide: source line 2.6 -> 3.4 %, chapter label
+  2.4 -> 3.2 %, chapter title 5 -> 6 %, clip title 5.2 -> 5.8 % and anchored from the bottom (a 3-line title ran
+  into the source line before), bar labels 3.5 -> 4.4 %, bar values 4.2 -> 5 %, map labels 4/4.5 -> 4.8/5.2 %,
+  split panels 4.5/5.5 -> 5.4/6 %. Shot cache v9 -> v10.
+- Seen on the old USA production (for workstream A): an editing note on screen ("(card, hold 8 s ≥ ...)"), a stray
+  backslash ("billionaire barber\"), and source chips used as card text ("C14 · rtt.co.in"). Not checked on a new film.
+
 20 Nov 2026, film 70577b9b hit "Too many subrequests" again (PR #19 was not enough):
 - Measured: research (~30 fetches) + sources (10) + s2 add up past 50 in one engine lifetime; s2's two retries
   failed the same way (a 1-2 minute retry wait did not give a fresh count). A resume (new instance) ran s2-s4 at once.
@@ -183,7 +196,7 @@ Master mission (ChatGPT's brief, 19 Nov) and the owner's own asks, item by item:
   render through GitHub (connected, never yet triggered by a real film), inspect the MP4 frames and audio.
 - **151 roles, report A-E** (defined / scheduled / invoked / doing real work / redundant): only ROLE_STATUS
   counts were reported; no per-role check from real run logs. Do it after the first real film exists.
-- **Business plan (Part K): NOT done** - market for long-form documentary tools, first paying segment, pricing
+- **Business plan (Part K): drafted 20 Nov** (`docs/BUSINESS.md`, `docs/MARKET.md`); selling waits for a real film. Was: - market for long-form documentary tools, first paying segment, pricing
   from real per-film cost, first customers. Kutly was never studied. 7-day plan never written as such.
 - **Cost:** `BUDGET_USD` is still "60" (owner never answered the question to lower it; with free brains it does
   nothing, with Claude it would allow $60 a film). Landing page "~N credits" is invented (1.25 a minute), not a
