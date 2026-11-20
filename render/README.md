@@ -75,3 +75,7 @@ What it makes:
 Encoding is quality-led with a ceiling of about 6 Mbit/s at 1080p30 (scaled by frame size), so a 45-minute film stays near 2 GB at worst. The look is one gentle grade, with no synthetic grain: grain cannot be compressed and YouTube's encoder removes it anyway.
 
 Every shot and audio piece is cached in `--work` (default `.render/`) under a hash of what makes it, so a stopped render resumes and a changed scene re-renders only its own shots. `npm test` renders a 10-second film to check the whole path, and skips that check when ffmpeg is missing.
+
+### Chunked render (many runners at once)
+
+A long film's picture can be rendered in parts in parallel: `--part 3/8` renders only part 3 of 8 (a run of whole shots, the parts about equal in frames) to `--out`, picture only. `--join p1.mp4,...,p8.mp4` (same other arguments) joins the parts with concat `-c copy` and mixes the sound once over the whole film, so loudness is set on the whole exactly as in one render. A part whose first shot opens with a move from the shot before also redraws that shot (and its chain of moves), so the joins are frame-exact: `render/render.test.mjs` compares a 3-part render with one render frame by frame and sample by sample. `.github/workflows/render-chunked.yml` is the reusable workflow (`workflow_call`: an artifact with the prepared film, the render arguments, `parts`), a matrix of part jobs and one join job.
