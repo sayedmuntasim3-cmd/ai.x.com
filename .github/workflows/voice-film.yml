@@ -128,7 +128,7 @@ jobs:
         run: |
           echo pictures > .stage
           node local/quran-media.mjs --run run --detect python --clip 2>&1 | tail -n 20
-          node render/voice-runner.mjs progress --stage pictures --params '{"assets":0}'
+          node render/voice-runner.mjs summary --run run --stages pictures
       - name: Make the film from the one recording
         run: |
           echo render > .stage

@@ -274,3 +274,15 @@ film's length on a free runner.
   for some items while `~orig` exists, and an archive.org IIIF link answered 403; each became a text card.
 - The 40-minute re-run and a Quran-mode run (Ad-Duha, Qari Jawad Farogi, archive.org, uploader-marked CC0, test
   only, kept private) were started on production through the landing page; results follow.
+
+### Live results of the round-2 code (20 Nov 2026, production)
+
+- 40-minute re-run (film 993f09ea, uploaded through the landing page; topic taken from the file name): 6,094 words,
+  312 scenes, **389 shots, 23 pictures failed (was 200 of 322)**; render 2 h 08 min. Still blocked by the gate,
+  mostly NASA `~large` 403s, which round 3's fetchability check removes.
+- Quran mode (film e1484358, Ad-Duha, Qari Jawad Farogi, 2 min 27 s): the whole path worked in 12 minutes; delivered
+  privately, "awaiting review"; 1920x1080, -14.0 LUFS, peak -4.0 dBFS, 0 black frames, 6 nature shots, no living
+  beings, no music, length equal to the voice. **The ayah text was not shown**: alignment to the Tanzil text placed
+  0 of 10 ayah ends with certainty (8 not at all), so the engine kept every unsure time off the screen, as the rule
+  says. Still open: a recitation aligner that works on this recording, or a person marking the ayah ends.
+- Fixed: the progress showed "0 scenes" and "0 pictures" for a recitation (it read narration fields).

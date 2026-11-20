@@ -5,7 +5,7 @@
  *
  *   node render/voice-runner.mjs fetch --out in.mp3
  *   node render/voice-runner.mjs progress --stage words [--params '{"count":123}'] [--error "..."]
- *   node render/voice-runner.mjs summary --run voice-run      (intake, words, understand, master, pictures, from the run's files)
+ *   node render/voice-runner.mjs summary --run voice-run [--stages pictures]   (intake, words, understand, master, pictures, from the run's files)
  *   node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json [--review]
  *
  * Environment: SITE (https://...), VOICE_ID, VOICE_TICKET; RUN_URL (optional, the Actions run page).
@@ -69,11 +69,15 @@ export function summarizeRun(dir) {
   const words = read("words.json");
   if (words) out.push({ stage: "words", params: { count: (words.words ?? []).length } });
   const u = read("understanding.json");
-  if (u) out.push({ stage: "understand", params: { scenes: (u.scenes ?? u.quranPlan?.ayat ?? []).length } });
+  // A recitation's scenes are its ayat (quranPlan.scenes); a narration's are its own scenes.
+  if (u) out.push({ stage: "understand", params: { scenes: (u.scenes ?? u.quranPlan?.scenes ?? []).length } });
   if (existsSync(join(dir, "master"))) out.push({ stage: "master", params: {} });
   const pics = read("pictures.json");
   // Narration: media.found shots got a licensed picture or clip. Quran: the media step runs later (quran-media.mjs).
   if (pics && pics.kind !== "quran") out.push({ stage: "pictures", params: { assets: Number(pics.media?.found ?? 0) } });
+  // Quran: the adab-guarded media step writes manifest.json (each asset once); before it runs, nothing is reported.
+  const manifest = read("manifest.json");
+  if (pics?.kind === "quran" && manifest) out.push({ stage: "pictures", params: { assets: (manifest.assets ?? []).length } });
   return out;
 }
 
@@ -122,7 +126,8 @@ async function main() {
   } else if (a._ === "progress") {
     await send(c, "/progress", { stage: a.stage, params: typeof a.params === "string" ? JSON.parse(a.params) : {}, ...(typeof a.error === "string" ? { error: a.error } : {}), runUrl });
   } else if (a._ === "summary") {
-    for (const s of summarizeRun(String(a.run))) await send(c, "/progress", s);
+    const only = typeof a.stages === "string" ? a.stages.split(",") : null;
+    for (const s of summarizeRun(String(a.run))) if (!only || only.includes(s.stage)) await send(c, "/progress", s);
   } else if (a._ === "deliver") {
     const report = typeof a.report === "string" && existsSync(a.report) ? JSON.parse(readFileSync(a.report, "utf8")) : null;
     const small = report ? { durationSeconds: report.durationSeconds ?? null, width: report.width ?? null, height: report.height ?? null, stats: report.stats ?? null, warnings: (report.warnings ?? []).slice(0, 20) } : undefined;
