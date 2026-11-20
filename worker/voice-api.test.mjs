@@ -13,6 +13,7 @@ function fakeBucket() {
     files,
     async get(/** @type {string} */ k) { const b = files.get(k); return b ? obj(b) : null; },
     async put(/** @type {string} */ k, /** @type {string} */ v) { files.set(k, typeof v === "string" ? new TextEncoder().encode(v) : v); },
+    async delete(/** @type {string[]} */ keys) { for (const k of [keys].flat()) files.delete(k); },
     async list(/** @type {any} */ o) {
       const set = new Set();
       for (const k of files.keys()) if (k.startsWith(o.prefix)) { const rest = k.slice(o.prefix.length); const i = rest.indexOf("/"); if (i >= 0) set.add(o.prefix + rest.slice(0, i + 1)); }
@@ -170,4 +171,55 @@ test("without GitHub the recording is kept and the reason is said; Quran waits f
 test("other paths are not handled here", async () => {
   const url = new URL("https://x/api/films");
   assert.equal(await handleVoice(new Request(url), { FILMS: fakeBucket(), STUDIO_TOKEN: "t" }, url), null);
+});
+
+test("no topic typed: the file name is the topic, unless it is a generic name", () => {
+  assert.equal(/** @type {any} */ (checkVoiceRequest({ fileName: "Ramesh Babu - From Barber to Rolls-Royce.mp3", bytes: 5e6 })).value.topic, "Ramesh Babu - From Barber to Rolls-Royce");
+  assert.equal(/** @type {any} */ (checkVoiceRequest({ fileName: "My narration.webm", bytes: 5e6 })).value.topic, "");
+  assert.equal(/** @type {any} */ (checkVoiceRequest({ fileName: "20261120_0012.m4a", bytes: 5e6 })).value.topic, "");
+  assert.equal(/** @type {any} */ (checkVoiceRequest({ fileName: "a.mp3", bytes: 5e6, topic: "Gold rush" })).value.topic, "Gold rush");
+});
+
+test("a stopped film starts again from the saved recording; a film can be deleted", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  const audio = new Uint8Array(5000).fill(3);
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "story.mp3", bytes: audio.byteLength } });
+  const p = await call(env, "PUT", `/api/voice/${ID}/parts/1`, { headers: OWNER, body: audio });
+  /** @type {any[]} */
+  const sent = [];
+  const gh = async (/** @type {string} */ _u, /** @type {any} */ init) => { sent.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); };
+  await call(env, "POST", `/api/voice/${ID}/complete`, { headers: OWNER, body: { parts: [p.data] }, fetch: gh });
+  // Running: no retry.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/retry`, { headers: OWNER, fetch: gh })).status, 409);
+  const t = sent[0].inputs.ticket;
+  await call(env, "POST", `/api/voice/${ID}/progress?ticket=${t}`, { body: { stage: "check", error: "200 pictures could not be downloaded" } });
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/retry`, { fetch: gh })).status, 401);
+  const again = await call(env, "POST", `/api/voice/${ID}/retry`, { headers: OWNER, fetch: gh });
+  assert.equal(again.status, 202);
+  assert.equal(again.data.status, "queued");
+  assert.equal(sent.length, 2, "dispatched again with a fresh ticket");
+  // Delete removes the recording and the record.
+  assert.equal((await call(env, "DELETE", `/api/voice/${ID}`)).status, 401);
+  assert.equal((await call(env, "DELETE", `/api/voice/${ID}`, { headers: OWNER })).status, 200);
+  assert.equal(env.FILMS.files.size, 0);
+  assert.equal((await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER })).status, 404);
+});
+
+test("the runner searches Pixabay through the Worker; the key stays on the Worker", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", PIXABAY_API_KEY: "pk-secret" };
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "story.mp3", bytes: 5000 } });
+  /** @type {string[]} */
+  const asked = [];
+  const pixabay = async (/** @type {string} */ u) => { asked.push(u); return new Response(JSON.stringify({ hits: [{ id: 1, tags: "barber, salon" }] }), { headers: { "content-type": "application/json" } }); };
+  const t = await makeTicket("owner-token", ID, "runner", 60);
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/stock?q=barber`, { fetch: pixabay })).status, 401);
+  const r = await call(env, "GET", `/api/voice/${ID}/stock?ticket=${t}&kind=video&q=barber%20shop&per_page=20&safesearch=true&evil=1`, { fetch: pixabay });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.hits[0].tags, "barber, salon");
+  const up = new URL(asked[0]);
+  assert.equal(up.origin + up.pathname, "https://pixabay.com/api/videos/");
+  assert.equal(up.searchParams.get("key"), "pk-secret");
+  assert.equal(up.searchParams.get("q"), "barber shop");
+  assert.equal(up.searchParams.get("evil"), null, "only Pixabay's own options pass");
+  assert.ok(!JSON.stringify(r.data).includes("pk-secret"));
 });

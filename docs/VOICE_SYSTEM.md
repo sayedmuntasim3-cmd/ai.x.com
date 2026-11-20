@@ -222,3 +222,43 @@ Cloudflare R2 multipart calls live, the Quran path end to end.
 Seen in the frames, to fix next: without a brain and without Pexels/Pixabay keys on GitHub, pictures come from the
 keyless museum archives (old etchings and portraits) and do not match a modern story. No music under a narration
 voiceover yet.
+
+### First live 40-minute run (20 Nov 2026, production, film d7843edb)
+
+A 39 min 46 s Zupona-narrator reading of `productions/ramesh-babu/USA` (barber to Rolls-Royce, 38 MB MP3) was
+uploaded through the production landing page in a real browser, exactly as a creator does.
+
+| Stage | Time |
+|---|---|
+| Upload (3 pieces of 16 MiB, R2 multipart) and start | 12 s |
+| Waiting for the GitHub machine, installing | 10 s + 30 s |
+| Speech-to-text (faster-whisper small.en, 6,108 words) | 13 min |
+| Pause tightening + mastering (-15 LUFS, timing within 0 ms) | 2 min |
+| Understanding + pictures (323 scenes, keyless archives) | 31 min |
+| Render 1920x1080 | 1 h 55 min |
+| Total until the final check | 2 h 43 min |
+
+The MP4 itself measured 39 min 46 s, -14.8 LUFS, true peak -1.1 dBTP, 0 black frames, every scene voiced. The final
+check **blocked** it, correctly: 200 of 322 pictures could not be downloaded (Wikimedia answered HTTP 429) and
+became text cards. Also seen: every search was word salad ("little everything record", "particular described
+something"), the film had no topic (the creator typed none), and the stop message quoted the wrong log.
+
+Fixed after it (round 2):
+- Downloads: a User-Agent that names the tool, one download at a time for throttling archives (Wikimedia, LOC,
+  Smithsonian, Art Institute, archive.org), Retry-After honoured, up to 7 attempts (`render/render-film.mjs`).
+- Searches (`wordsPlan`): things named after a determiner ("a pen", "the bundle") and place or firm names
+  ("Brigade Road"); no adverbs, adjectives, reporting words, months or private persons' names; misheard names put
+  back from the topic ("Rolls Rice" -> "Rolls-Royce"); the topic's subject is the fallback, never glued on; a shot
+  about every 6 s. On the live transcript the most searched words became company, business, salon, shop, chair,
+  cars, Rolls-Royce, money, mirror (before: three-word strings that no archive matches).
+- A picture must name what was searched, as a whole word (`titleHasWords`; "car" no longer finds the Carina
+  Nebula). On for voiceover films only, so the idea system is unchanged until it is tried there.
+- Modern stock: the Worker relays Pixabay searches for the runner with its own key (`/api/voice/:id/stock`, ticket
+  only); the key never leaves Cloudflare. Unverified live until the next run.
+- Topic from the file name when none is typed; the stop message quotes the failing step (BLOCK lines first);
+  `POST /api/voice/:id/retry` starts a stopped film again without a new upload (the landing's "Try again" uses it);
+  `DELETE /api/voice/:id`.
+
+Still weak, honestly: the keyless archives are museum and space collections, so plain words still find old or
+off-topic pictures where Pixabay has nothing; no music under a narration voiceover; render takes about 2.9x the
+film's length on a free runner.

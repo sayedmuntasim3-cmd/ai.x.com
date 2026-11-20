@@ -7,7 +7,8 @@ import { ayahText, buildQuranIndex, matchRecitation } from "../src/quran.mjs";
 import { planQuranFilm } from "../src/quran-film.mjs";
 import { alignScript, normalizeTranscript } from "../src/transcript.mjs";
 import { understandVoice } from "../src/voice-understand.mjs";
-import { planVoiceVisuals, quranVisualAdabGuard, wordsPlan } from "../src/voice-visuals.mjs";
+import { namePhrases, nounsAfterDeterminers, planVoiceVisuals, quranVisualAdabGuard, topicSpelling, topicSubjects, wordsPlan } from "../src/voice-visuals.mjs";
+import { titleHasWords } from "../src/film-media.mjs";
 
 const fixture = (/** @type {string} */ name) => readFileSync(new URL("./fixtures/voice/" + name, import.meta.url), "utf8");
 const truth = JSON.parse(fixture("gettysburg-truth.json"));
@@ -57,8 +58,8 @@ test("no brain: every scene still gets a plan from its own words, and the words 
   assert.ok(r.messages.some((m) => m.code === "voice.noBrain"));
   assert.deepEqual(r.findings, []);
   assert.equal(r.plan.length, scenes.length);
-  assert.ok(r.plan.every((p) => /^\(1\) R[23] \S/.test(p.shots)));
-  assert.match(r.plan[0].shots, /^\(1\) R2/, "a date said in the scene makes it an evidence shot");
+  assert.ok(r.plan.every((p) => /^\(1\) (\d+:\d{2}:\d{2}\.\d{3}-\d+:\d{2}:\d{2}\.\d{3} )?R[23] \S/.test(p.shots)));
+  assert.match(r.plan[0].shots, /^\(1\) (\S+ )?R2/, "a date said in the scene makes it an evidence shot");
   assert.deepEqual(r.plan.flatMap((p) => p.narration.split(" ")), spoken);
 });
 
@@ -85,8 +86,24 @@ test("media from a keyless archive: licence recorded per asset, share-alike refu
 
 test("words plan: names and dates make evidence shots", () => {
   const p = wordsPlan(scenes[0], u.structure ?? null);
-  assert.match(p.SHOTS, /^\(1\) R2 /);
-  assert.match(p.SRC, /^Q1 "/);
+  assert.match(p.SHOTS, /^\(1\) (\S+ )?R2 /);
+  assert.match(p.SRC, /Q1 "/);
+});
+
+test("words plan: short concrete searches, filler never searched, the topic only as the fallback", () => {
+  // The real case that showed museum prints for a modern story: the whole title was glued to "Rolls nearly".
+  const said = "Reports give his father's name as Paul. A chair, a mirror, a strop, a razor, a pair of scissors on Brigade Road.";
+  let t = 0;
+  const words = said.split(" ").map((text) => { const w = { text, start: t, end: t + 0.4 }; t += 0.45; return w; });
+  const scene = { id: 1, sc: "SC0012", start: 0, end: 13, from: 0, to: words.length - 1, words, narration: said };
+  const p = wordsPlan(scene, null, "Ramesh Babu: from barber to Rolls-Royce");
+  const queries = [...p.SRC.matchAll(/Q\d "([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(queries.includes("Brigade Road"), p.SRC);
+  assert.ok(queries.every((q) => !/Ramesh Babu|from barber/.test(q)), "the title is never glued into a search");
+  assert.ok(queries.every((q) => !/\b(reports|nearly|name|give)\b/i.test(q)), p.SRC);
+  assert.ok(queries.some((q) => q === "barber" || q === "Rolls-Royce"), "the topic's subject is the fallback");
+  assert.equal((p.SHOTS.match(/\(\d\)/g) ?? []).length, 2, "13 s: a shot about every 6 s");
+  assert.match(p.SHOTS, /^\(1\) 0:00:00\.000-0:00:06\.500 R3 /);
 });
 
 const index = buildQuranIndex(JSON.parse(readFileSync(new URL("../data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
@@ -125,4 +142,20 @@ test("quran-visual-adab-guard: a changed ayah text is refused", () => {
   const s = plan.scenes.find((x) => x.kind === "ayah");
   if (s) s.text = s.text + " ";
   assert.ok(quranVisualAdabGuard({ plan, index }).problems.some((p) => /verbatim/.test(p)));
+});
+
+test("planner pieces: nouns after determiners, misheard names put back, title-case topics, whole-word titles", () => {
+  const w = (/** @type {string} */ t) => t.split(" ").map((text) => ({ text }));
+  // From the live 40-minute run (SC0046, SC0050, SC0051): adjectives and prepositions are not searched.
+  assert.deepEqual(nounsAfterDeterminers(w("The bundle went on a bicycle. And one small object from school.")), ["bundle", "bicycle", "object"]);
+  assert.deepEqual(nounsAfterDeterminers(w("He told the weekend leader about a pen he wasn't allowed")), ["leader", "pen"]);
+  assert.deepEqual(namePhrases(w("His father worked on Brigade Road, in Bengaluru.")), ["Brigade Road", "Bengaluru"]);
+  assert.equal(topicSpelling("Rolls Rice", "Ramesh Babu - From Barber to Rolls-Royce"), "Rolls-Royce");
+  assert.equal(topicSpelling("Brigade Road", "Ramesh Babu - From Barber to Rolls-Royce"), "Brigade Road");
+  assert.deepEqual(topicSubjects("Ramesh Babu - From Barber to Rolls-Royce"), ["barber", "Rolls-Royce"]);
+  assert.equal(titleHasWords("Carina Nebula", "car"), false);
+  assert.equal(titleHasWords("Long-billed Curlew", "bill"), false);
+  assert.equal(titleHasWords("barber, salon, haircut", "barber"), true);
+  assert.equal(titleHasWords("Vintage cars on display", "car"), true);
+  assert.equal(titleHasWords("", "car"), true, "an untitled stock clip is not refused");
 });

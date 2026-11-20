@@ -85,6 +85,20 @@ export function shotParts(field) {
 }
 
 /**
+ * Does a picture's title name every word searched, as whole words? ("car" is
+ * not in "Carina Nebula"; "bill" is not in "Long-billed Curlew".) An untitled
+ * candidate passes: some stock sites give no title. Plural and possessive
+ * forms count ("cars", "barber's").
+ * @param {string | null | undefined} title @param {string} query
+ */
+export function titleHasWords(title, query) {
+  const t = String(title ?? "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  if (!t.trim()) return true;
+  const words = query.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1);
+  return words.every((w) => new RegExp(`(^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(s|es|'s|’s)?($|[^\\p{L}\\p{N}])`, "u").test(t));
+}
+
+/**
  * The stock shots of a chapter, with their film times and search queries.
  * Graphics shots (rung R1) need no footage and are left out. Queries come
  * from the SRC field (Q1 "...", Q2 "..."), which holds one group per subject
@@ -178,7 +192,7 @@ function toPick(c) {
  * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
  * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
  * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia> }} o
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -220,7 +234,7 @@ export async function chapterMedia(o) {
       );
       row.trace.push(...found.trace.map((t) => ({ query, ...t })));
       // Every candidate here passed its item-level rights check inside fetchShotMedia.
-      const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId));
+      const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId) && (!o.wholeWord || titleHasWords(c.title, query)));
       if (!free.length) continue;
       row.query = query;
       if (o.judge) { pools.set(row, free); break search; }
