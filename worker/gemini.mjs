@@ -110,7 +110,33 @@ export function quotaInfo(raw) {
   const permanent = zero
     ? `This Gemini model has no free quota for this key (${limits.join("; ")}). Choose another model with the GEMINI_MODEL variable, then resume the film.`
     : daily
-      ? `Gemini's free daily limit is used up (${limits.join("; ")}). It resets at midnight Pacific time; resume the film after that.`
+      ? `Gemini's free daily limit is used up (${limits.join("; ")}${delay ? `; retry in ${delay}` : ""}). It resets at midnight Pacific time; the film waits and goes on by itself.`
       : "";
   return { summary, retryMs, permanent };
+}
+
+/** Longest wait for a daily limit: a day and two hours (the reset is at most 24 h away). */
+const MAX_DAILY_WAIT_MS = 26 * 3600_000;
+
+/**
+ * How long a film should sleep before trying again, when its step stopped on Gemini's free
+ * daily limit; null for any other error. Uses Google's own retry delay when the message has
+ * one, else the time to the next midnight in Pacific time; two minutes are added either way.
+ * @param {unknown} error
+ * @param {number} now epoch milliseconds
+ * @returns {number | null}
+ */
+export function dailyLimitWait(error, now) {
+  const msg = error instanceof Error ? error.message : String(error ?? "");
+  if (!/free daily limit is used up/.test(msg)) return null;
+  const given = /retry in (\d+(?:\.\d+)?)s/.exec(msg);
+  const base = given ? Math.round(parseFloat(given[1]) * 1000) : msUntilPacificMidnight(now);
+  return Math.min(MAX_DAILY_WAIT_MS, Math.max(60_000, base + 120_000));
+}
+
+/** @param {number} now */
+export function msUntilPacificMidnight(now) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(now)).map((x) => [x.type, x.value]));
+  const sinceMidnight = ((Number(parts.hour) % 24) * 3600 + Number(parts.minute) * 60 + Number(parts.second)) * 1000;
+  return 24 * 3600_000 - sinceMidnight;
 }

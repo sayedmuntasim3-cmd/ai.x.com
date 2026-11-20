@@ -1637,7 +1637,13 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
             ))}
           </ol>
         )}
-        {film.warning && <p className="mt-3 text-[13px] text-muted">Waiting and retrying: {film.warning}</p>}
+        {film.warning && (
+          <p className="mt-3 text-[13px] text-muted">
+            {/PerDay|daily limit/i.test(film.warning)
+              ? "Paused for today: the free AI limit is used up. The film goes on by itself when it resets at midnight California time (early afternoon in Bangladesh)."
+              : `Waiting and retrying: ${film.warning}`}
+          </p>
+        )}
         {stopped && film.error && <p className="mt-3 text-[14px] text-[#c2410c]">{film.error}</p>}
         {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-3">
