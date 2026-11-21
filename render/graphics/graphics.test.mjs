@@ -61,3 +61,22 @@ test("from-shot: the existing FX fields choose the template, everything else fal
   assert.equal(graphicFor({ type: "card", graphic: { template: "timeline", data: { items: [] } } })?.template, "timeline");
   assert.equal(graphicFor({ type: "card", graphic: { template: "nope", data: {} }, text: "a" }), null);
 });
+
+import { depthGraph, depthMoveFor } from "../depth/depth.mjs";
+
+test("depth: every move stays inside the photo (displacement + pan < overscan margin)", () => {
+  const maps = { dir: "/x", plate: /** @type {[number, number]} */ ([2150, 1210]), amount: 127 };
+  for (const kind of /** @type {const} */ (["dolly", "orbit", "rack"])) for (const dir of /** @type {const} */ ([1, -1])) for (const strength of [0.35, 1, 1.4]) {
+    const g = depthGraph(maps, { kind, dir, strength }, { width: 1920, height: 1080, fps: 30, frames: 150 });
+    assert.ok(g.safe, `${kind} ${dir} ${strength}: ${g.amp}+${g.pan} < ${g.margin}`);
+    assert.match(g.graph, /crop=1920:1080/);
+    assert.match(g.graph, /t\/4\.967/, "eased over the whole shot, frame-exact");
+  }
+  assert.match(depthGraph(maps, { kind: "rack", dir: 1, strength: 1 }, { width: 1920, height: 1080, fps: 30, frames: 150 }).graph, /maskedmerge/);
+});
+
+test("depth: the Edit Director's move picks the camera", () => {
+  assert.equal(depthMoveFor({ kind: "pan", dir: -1, amount: 0.09 }, 0).kind, "orbit");
+  assert.equal(depthMoveFor({ kind: "hold", amount: 0 }, 0).kind, "rack");
+  assert.deepEqual([0, 1, 2].map((i) => depthMoveFor(undefined, i).kind), ["dolly", "orbit", "rack"]);
+});
