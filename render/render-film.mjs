@@ -943,6 +943,20 @@ export async function renderFilm(o) {
   /** @type {Awaited<ReturnType<typeof measureMaster>> | null} */
   let master = null;
   try { master = await measureMaster(o.outFile, ffmpeg); } catch (error) { warnings.push(`The master could not be measured: ${error instanceof Error ? error.message : error}`); }
+  // One-pass loudnorm can land off target on short or quiet material (a rough own-voice take came out at -15.3 LUFS):
+  // a measured master more than 0.5 LU away gets one exact gain step on the audio only (the picture is copied), with a
+  // limiter only when the gain would lift the true peak above -1 dBTP; then it is measured again.
+  if (master && anySound && t.durationSeconds >= 3 && master.integratedLufs !== null && Math.abs(master.integratedLufs + 14) > 0.5) {
+    const gain = Math.round((-14 - master.integratedLufs) * 100) / 100;
+    const peak = (master.truePeakDbtp ?? -99) + gain;
+    const af = peak > -1.2 ? `volume=${gain}dB,alimiter=limit=${Math.pow(10, -1.5 / 20).toFixed(4)}:level=disabled` : `volume=${gain}dB`;
+    try {
+      await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
+      renameSync(o.outFile + ".gain.mp4", o.outFile);
+      master = await measureMaster(o.outFile, ffmpeg);
+      log(`master: loudness corrected by ${gain} dB to ${master.integratedLufs} LUFS`);
+    } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); }
+  }
   if (master) {
     const normalised = anySound && t.durationSeconds >= 3;
     if (normalised && master.integratedLufs !== null && Math.abs(master.integratedLufs + 14) > 1) warnings.push(`Master loudness is ${master.integratedLufs} LUFS; the target is -14 LUFS within 1 LU.`);
