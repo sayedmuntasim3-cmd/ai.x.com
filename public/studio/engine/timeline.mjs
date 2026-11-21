@@ -14,7 +14,7 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", move?: import("./motion.mjs").Move, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", move?: import("./motion.mjs").Move, shotType?: string, graphic?: { template: string, data: any }, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch" | "leak"} Transition
  *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera;
  *   highlight: words on a card swept by a highlighter (paper) or an underline (FX-HIGHLIGHT); chart: an animated bar chart (FX-CHART);
@@ -40,6 +40,8 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
  * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, motion?: ReturnType<typeof motionReport> }} Timeline
  */
 
+/** The shot plan's closed vocabulary (engine/src/shot-plan.mjs SHOT_TYPES; kept here so the timeline imports nothing from it). */
+const SHOT_TYPE_NAMES = new Set(["live-video", "archival-video", "photo-2.5D", "photo-designed", "title", "kinetic-type", "quote", "document", "timeline"]);
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
 const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/g;
 
@@ -557,6 +559,8 @@ export function buildTimeline(o) {
       // A chapter break dips through black; so does a dissolve or fade the script writes into this scene.
       const dip = chapterStart ? CHAPTER_DIP : /\b(cross[- ]?)?dissolve\b|\bdip\b|\bfade (to|from|in|out)\b/i.test(s.fields.TRANS ?? "") ? SCENE_DIP : 0;
       const edit = edits.get(s.sc);
+      // The shot plan's TYPE per shot (engine/src/shot-plan.mjs SHOT_TYPES), read by the renderer as v.shotType.
+      const types = String(s.fields.TYPE ?? "").split(/;\s*/).map((x) => x.trim());
       const firstSegment = video.length;
       let first = true;
       for (const shot of shots) {
@@ -568,6 +572,8 @@ export function buildTimeline(o) {
         const row = picks.get(`${s.sc}#${shot.index}`);
         /** @type {Omit<VideoSegment, "type" | "url" | "sourcePageUrl" | "licence" | "motion" | "text"> & Partial<VideoSegment>} */
         const base = { ...look, id: `${s.sc}-${shot.index}`, scene: s.sc, shot: shot.index, start: frameAt(start) / fps, end: frameAt(end) / fps, frames, brief: shot.text.slice(0, 240), title: "", chip: first ? chip : "" };
+        const shotType = types[shot.index - 1];
+        if (shotType && SHOT_TYPE_NAMES.has(shotType)) base.shotType = shotType;
         const lead = first;
         first = false;
         if (lead && dip) {
@@ -600,6 +606,9 @@ export function buildTimeline(o) {
           const counter = !black && !panels && !place && !chart && /COUNTER/i.test(fx) && /\d/.test(words);
           // A counter has its own landing (the number runs, then an impact); a highlighter would stop it running.
           const marked = !black && !panels && !place && !chart && !counter ? highlightFor(shot.text, ost, fx, words) : "";
+          // A TYPE timeline card ("2010 the chair · 2025 still cutting hair") is drawn by the timeline template.
+          const items = base.shotType === "timeline" ? [...words.matchAll(/(?:^|·)\s*(\d{4})\s+([^·]*)/g)].map((m) => ({ year: m[1], label: m[2].trim() })) : [];
+          if (items.length >= 2) base.graphic = { template: "timeline", data: { items, active: items.length - 1 } };
           video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: chart ? chart.title || words : words, counter, ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}), ...(chart ? { chart } : {}), ...(marked ? { highlight: marked } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
