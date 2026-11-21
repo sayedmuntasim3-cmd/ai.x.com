@@ -1,5 +1,8 @@
 # Road to #1: the plan the Boss session follows (21 Nov 2026)
 
+**Update, 21 Nov 2026:** steps 3–7 below are replaced by `docs/TRANSFORMATION.md` and the missions in
+`docs/missions/` (M1–M6). Read those first.
+
 The owner's target: the best long-form documentary tool in the world, polished down to the last detail,
 the way the GTA team polished their games. Every step must end in something measured, not something claimed.
 
