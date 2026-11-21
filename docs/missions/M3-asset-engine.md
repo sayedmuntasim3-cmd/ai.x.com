@@ -11,19 +11,21 @@ Must not touch: the planning in voice-visuals.mjs (M2) and the composition in re
 - [ ] Video-first providers: Pixabay video (key via the Worker relay), Pexels video (only if a key is ever set;
       never ask the owner), NASA, Internet Archive and Wikimedia video. Archives only when the shot's era is
       historical.
-- [ ] Queries from the shot plan's subject, era and place (M2's fields), never bare keywords. Gather 50–200
+- [x] Queries from the shot plan's subject, era and place (M2's fields), never bare keywords. Gather 50–200
       candidates per shot.
-- [ ] Hard filters: licence, video ≥1080p, stills ≥1600 px wide, aspect, watermark and duplicate detection.
+- [x] Hard filters: licence, video ≥1080p, stills ≥1600 px wide, aspect, watermark and duplicate detection.
 - [ ] OpenCLIP relevance to the shot text, plus the aesthetic score, plus era/place agreement. Cache the
       models between runs, CPU only, and measure the time.
 - [ ] Sequence choice per beat: continuity of colour and era, variety of scale, no repeats within 10 min.
-- [ ] For each pick, write why it was chosen (scores, provider, licence) for the critic and the studio.
+- [x] For each pick, write why it was chosen (scores, provider, licence) for the critic and the studio.
 
 ## Gate
 On the 3-minute slice: 0 off-era or off-place picks (checked by eye on the contact sheet), ≥ 70 % of shots
 are video, every shot is native ≥1080p, and the time taken is reported.
 
 ## Found for others
+- M2/M4: on a Bengaluru film the eyes still pick India-but-not-Bengaluru clips (Tirupati, Delhi, Odisha, Vrindavan) and never
+  show the Rolls-Royce: Pixabay has little Bengaluru video. A city check needs a city-level source (my opinion).
 - M2 (voice-visuals.mjs:209): a name alone, or any year ("Rolls-Royce", "in 2011"), makes a shot R2, so it searches the
   archive first. Only a historic date should do that (year < 2000, "century", "N years ago"). Tested code for this was in
   PR #39's first commit (`isHistoricDate`) and was taken back out: it is M2's file.
@@ -43,3 +45,19 @@ are video, every shot is native ≥1080p, and the time taken is reported.
   Sheets (t = 10/40/70/100/130/160 s): proof/M3/993f09ea-before.jpg, proof/M3/993f09ea-after.jpg.
   Still open: Internet Archive video, aspect/watermark/duplicate filters, 50-200 candidates, OpenCLIP. Gate not met:
   off-place picks (Amazon river for India; dollars for rupees).
+- 21 Nov 2026, the eyes (items 2, 3, 6 ticked; 4 partial): render/asset-rank/ (rerank.mjs + rank.py), a step in voice-film.yml
+  after the picture plan. Per shot: the shot's words + the film's country, plus a world pool (city, streets, topic words in
+  that country), Pixabay video and stills (Commons for R2), 412-531 candidates per shot on 993f09ea. Refused: licence, video
+  <1920 px, stills <1600 px, unknown size, not landscape (w/h <1.3), watermark (CLIP), tags naming another country,
+  near copies (perceptual hash). OpenCLIP ViT-B-32 (LAION) scores fit to the shot in its place and to the words heard,
+  place (India vs other regions), era and quality, and pushes down off-world prompts (other money, a blonde European,
+  the Amazon, abstract, film strip). Every pick has `why` (scores, provider, licence, counts) in media-C1.json; rank-C1.json.
+  Proof, 993f09ea 0:00-3:00 (M2's beats.json, no brain, same queries both sides): proof/M3/993f09ea-eyes-before.jpg and
+  -after.jpg (every shot's pick). Before: 19 of 29 off-topic by eye (Jupiter, waterfall, NASA, Pakistani notes, film strip,
+  abstract ink, a New Zealand fire brigade, a jungle river, beach chair...), 8 blank (Commons previews failed: fixed, 330 px).
+  After: 0 off-country, 0 dollars, 0 abstract or film strip, 0 Amazon, 0 blonde; 5 are India but not Bengaluru (above).
+  Video 13/29 (45 %) -> 21/29 (72 %); every pick >=1080p video or >=1600 px still by the provider's own size.
+  Time on 4 CPUs: 120 s cold (1968 thumbnails: search 29 s, seeing 91 s), 22 s with the cache. Model ~600 MB, cached.
+  Not done: a trained aesthetic head (GitHub raw is blocked here; a CLIP quality prompt stands in), Internet Archive video
+  (its public-domain films measured 640 px wide, 6 of 6 Prelinger items: they fail the 1080p gate), sequence continuity
+  (item 5). Unverified: the workflow step on a GitHub runner (run here in the cloud container).

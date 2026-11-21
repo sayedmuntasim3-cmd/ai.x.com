@@ -139,7 +139,7 @@ test("free archives: Commons and NASA results carry their own rights; share-alik
   assert.match(String(calls[0].headers["user-agent"]), /^ZuponaStudio/, "Commons is told who is asking");
   const pd = commons[1];
   assert.equal(pd.mediaUrl, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Apollo_11_launch.jpg/1920px-Apollo_11_launch.jpg");
-  assert.equal(pd.previewUrl, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Apollo_11_launch.jpg/320px-Apollo_11_launch.jpg", "the judge sees a 320 px preview");
+  assert.equal(pd.previewUrl, "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Apollo_11_launch.jpg/330px-Apollo_11_launch.jpg", "the judge sees a 330 px preview (a width Commons serves)");
   assert.equal(pd.creator, "NASA", "HTML is stripped from the author");
   const verdict = async (/** @type {any} */ c) => { const rights = classifyLicense(c); return rights.allowed && (await verifyArchiveItem({ ...c, layer: 1, rights })); };
   assert.deepEqual(await Promise.all(commons.map(verdict)), [false, true, false, true], "personality-restricted and share-alike files are refused; public domain and CC BY pass");
