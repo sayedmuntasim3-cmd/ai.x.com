@@ -2,8 +2,8 @@
 ["1.90","4.50","2011, by most accounts.","v","bangalore traffic|india city traffic"],
 ["4.50","7.70","A Rolls-Royce Ghost joins a rental fleet.","v","rolls royce|rolls royce ghost|luxury car driving"],
 ["7.70","10.90","Its buyer cuts hair,","v","barber cutting hair|haircut scissors"],
-["10.90","13.80","in 2025 he still does.","v","barber shop|barber trimming beard"],
-["13.80","16.30","A fleet owner behind a barber's chair,","v","barber chair close|salon chair|vintage barber chair"],
+["10.90","13.80","in 2025 he still does.","card","FX-KINETIC \"2025: still cutting hair\""],
+["13.80","16.30","A fleet owner behind a barber's chair,","card","FX-SPLIT \"Fleet owner / Barber\" header \"One man\""],
 ["16.30","18.90","but the car was only the first bill.","v","paying bills|bills calculator|electricity bill"],
 ["18.90","22.10","The tax after it, he has said, nearly broke him.","v","stressed man bills|worried man|tax"],
 ["22.10","25.00","So how does one used van become a Rolls-Royce?","v","old van|van driving road|minivan"],
@@ -59,4 +59,5 @@
 ["0","0","x","v","indian coins|rupee coins|one rupee coin"],
 ["0","0","x","v","indian woman shop|woman selling shop india|indian shopkeeper"],
 ["0","0","x","v","bangalore|karnataka|mg road bangalore"],
-["0","0","x","v","old india street|vintage india|kolkata old street"]]
+["0","0","x","v","old india street|vintage india|kolkata old street"],
+["0","0","x","v","clock time lapse|wall clock|clock ticking"]]

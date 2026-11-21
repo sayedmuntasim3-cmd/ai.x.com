@@ -5,16 +5,16 @@
  "height": 720,
  "fps": 30,
  "stats": {
-  "clips": 48,
-  "cards": 7,
+  "clips": 46,
+  "cards": 9,
   "black": 0,
   "scenes": 55,
-  "segmentsRendered": 1,
-  "segmentsCached": 54,
-  "audioRendered": 0,
+  "segmentsRendered": 5,
+  "segmentsCached": 50,
+  "audioRendered": 2,
   "clipsFailed": 0,
   "transitions": 0,
-  "designedShots": 0,
+  "designedShots": 1,
   "depthShots": 0,
   "edit": {
    "punchIns": 0,
@@ -61,16 +61,6 @@
    "licence": "Pixabay Content License"
   },
   {
-   "url": "https://cdn.pixabay.com/video/2020/05/21/39767-423345461_large.mp4",
-   "sourcePageUrl": "https://pixabay.com/videos/id-39767/",
-   "licence": "Pixabay Content License"
-  },
-  {
-   "url": "https://cdn.pixabay.com/video/2026/09/26/378905_large.mp4",
-   "sourcePageUrl": "https://pixabay.com/videos/id-378905/",
-   "licence": "Pixabay Content License"
-  },
-  {
    "url": "https://cdn.pixabay.com/video/2023/01/20/147270-791334047_large.mp4",
    "sourcePageUrl": "https://pixabay.com/videos/id-147270/",
    "licence": "Pixabay Content License"
@@ -86,8 +76,8 @@
    "licence": "Pixabay Content License"
   },
   {
-   "url": "https://cdn.pixabay.com/video/2026/09/26/378907_large.mp4",
-   "sourcePageUrl": "https://pixabay.com/videos/id-378907/",
+   "url": "https://cdn.pixabay.com/video/2020/09/03/48969-459186305_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-48969/",
    "licence": "Pixabay Content License"
   },
   {
@@ -111,8 +101,8 @@
    "licence": "Pixabay Content License"
   },
   {
-   "url": "https://cdn.pixabay.com/video/2020/05/21/39763-423345444_large.mp4",
-   "sourcePageUrl": "https://pixabay.com/videos/id-39763/",
+   "url": "https://cdn.pixabay.com/video/2021/01/10/61621-499906216_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-61621/",
    "licence": "Pixabay Content License"
   },
   {
@@ -171,8 +161,8 @@
    "licence": "Pixabay Content License"
   },
   {
-   "url": "https://cdn.pixabay.com/video/2021/12/19/101958-659549557_large.mp4",
-   "sourcePageUrl": "https://pixabay.com/videos/id-101958/",
+   "url": "https://cdn.pixabay.com/video/2017/01/27/7549-201442276_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-7549/",
    "licence": "Pixabay Content License"
   },
   {

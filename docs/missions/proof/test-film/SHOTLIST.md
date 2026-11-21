@@ -1,6 +1,6 @@
 # Test film: 993f09ea, 0:00-3:00, shot list
 
-Each line: time · sentence → chosen picture → why. Every line was checked by looking at the frame in the rendered film (contact-sheet.jpg). 55 shots, 48 footage clips (no picture twice, no stills), 7 designed cards.
+Each line: time · sentence → chosen picture → why. Every line was checked by looking at the frame in the rendered film (contact-sheet.jpg). 55 shots, 46 footage clips (no picture twice, no stills), 9 designed cards.
 
 | # | Time | Sentence | Picture | Why |
 |---|---|---|---|---|
@@ -8,21 +8,21 @@ Each line: time · sentence → chosen picture → why. Every line was checked b
 | 2 | 0:01.9-0:04.5 | 2011, by most accounts. | [Pixabay 343478](https://pixabay.com/videos/id-343478/) | Aerial of a dense South-Asian-looking city: wide establishing scale after the close street. |
 | 3 | 0:04.5-0:07.7 | A Rolls-Royce Ghost joins a rental fleet. | [Pixabay 44911](https://pixabay.com/videos/id-44911/) | A black Rolls-Royce Phantom-style 3D model, whole car (clip cut from 0:06 so no wireframe shows): the car, not a logo. |
 | 4 | 0:07.7-0:10.9 | Its buyer cuts hair, | [Pixabay 48968](https://pixabay.com/videos/id-48968/) | Close clipper cut: 'cuts hair' literally, extreme close scale. |
-| 5 | 0:10.9-0:13.8 | in 2025 he still does. | [Pixabay 39767](https://pixabay.com/videos/id-39767/) | Wide barber shop at work: he still does it, different scale and place. |
-| 6 | 0:13.8-0:16.3 | A fleet owner behind a barber's chair, | [Pixabay 378905](https://pixabay.com/videos/id-378905/) | Barber standing behind the chair cutting: 'behind a barber's chair'. |
+| 5 | 0:10.9-0:13.8 | in 2025 he still does. | card: FX-KINETIC "2025: still cutting hair" | Designed kinetic line: the sentence itself; replaces an Iranian barbershop with faces (wrong country). |
+| 6 | 0:13.8-0:16.3 | A fleet owner behind a barber's chair, | card: FX-SPLIT "Fleet owner / Barber" header "One man" | Designed split card Fleet owner / Barber: the contrast the sentence makes; replaces a foreign barber with a face. |
 | 7 | 0:16.3-0:18.9 | but the car was only the first bill. | [Pixabay 147270](https://pixabay.com/videos/id-147270/) | Pink rupee notes falling: a bill to pay, in rupees not dollars. |
 | 8 | 0:18.9-0:22.1 | The tax after it, he has said, nearly broke him. | [Pixabay 61290](https://pixabay.com/videos/id-61290/) | Man with hand on chin, dark: worry ('nearly broke him'); first pick was too dark to read, replaced. |
 | 9 | 0:22.1-0:25.0 | So how does one used van become a Rolls-Royce? | [Pixabay 7272](https://pixabay.com/videos/id-7272/) | Old white VW van on a road: 'one used van'. |
-| 10 | 0:25.0-0:27.4 | Scissors still in hand. | [Pixabay 378907](https://pixabay.com/videos/id-378907/) | Hands with scissors mid-cut: 'scissors still in hand'. |
+| 10 | 0:25.0-0:27.4 | Scissors still in hand. | [Pixabay 48969](https://pixabay.com/videos/id-48969/) | Close gloved hands combing and cutting hair, no face: hair work without showing a wrong-country barber. |
 | 11 | 0:27.4-0:30.1 | Follow the tax bill and what he put up. | [Pixabay 302977](https://pixabay.com/videos/id-302977/) | Pile of 2000-rupee notes: the money he put up, Indian currency. |
 | 12 | 0:30.1-0:32.7 | His name is Ramesh Babu. | card: FX-KINETIC "Ramesh Babu" | Designed kinetic name card: names him without showing a stranger as him. |
 | 13 | 0:32.7-0:35.9 | He founded Ramesh Tours and Travels, | [Pixabay 109674](https://pixabay.com/videos/id-109674/) | Row of vans/cars parked on a street: a small rental fleet. |
 | 14 | 0:35.9-0:38.8 | a car rental company in Bengaluru, | card: FX-MAP Bengaluru (12.97, 77.59) | Designed map pin on Bengaluru: 'a car rental company in Bengaluru'. |
 | 15 | 0:38.8-0:42.9 | a city once called Bangalore, one note before the numbers. | card: FX-KINETIC "From Barber to Rolls-Royce" | Designed title card at 0:38.8: the film's title before 0:40. |
-| 16 | 0:42.9-0:48.8 | Dollar figures here are rupees at that year's exchange rate, adjusted to today's money. | [Pixabay 171326](https://pixabay.com/videos/id-171326/) | 3D rupee symbol: 'rupees at that year's exchange rate'. |
+| 16 | 0:42.9-0:48.8 | Dollar figures here are rupees at that year's exchange rate, adjusted to today's money. | [Pixabay 171326](https://pixabay.com/videos/id-171326/) | 3D rupee symbol: rupees, held over the whole sentence (replaced Pakistani notes, then European-looking coins). |
 | 17 | 0:48.8-0:52.4 | First the car, a Rolls-Royce Ghost, | [Pixabay 98022](https://pixabay.com/videos/id-98022/) | Neon-lit Rolls-Royce front: 'First the car, a Rolls-Royce Ghost' (different clip from shot 3). |
 | 18 | 0:52.4-0:58.0 | bought in 2011 by most accounts. One report says 2010, | card: FX-SPLIT "2011 / 2010" header "The year he bought it" | Designed split card 2011 / 2010: the two years the sources give. |
-| 19 | 0:58.0-1:03.2 | Then the chair. In 2025, he was still cutting hair for the price on screen. | [Pixabay 39763](https://pixabay.com/videos/id-39763/) | Barber clipping a young man's hair: 'then the chair... still cutting hair'. |
+| 19 | 0:58.0-1:03.2 | Then the chair. In 2025, he was still cutting hair for the price on screen. | [Pixabay 61621](https://pixabay.com/videos/id-61621/) | Vintage alarm clock: years passing, "in 2025 he was still..."; replaces a foreign barber with a face. |
 | 20 | 1:03.2-1:06.0 | Headlines call him the billionaire barber. | card: "The billionaire barber" — the headlines | Designed quote card: the headline phrase, attributed to the headlines. |
 | 21 | 1:06.0-1:09.0 | No filing we could find backs that up. | [Pixabay 349087](https://pixabay.com/videos/id-349087/) | Hand searching through filed cards: 'no filing we could find'. |
 | 22 | 1:09.0-1:12.0 | So we follow the money to understand the car, | [Pixabay 133361](https://pixabay.com/videos/id-133361/) | 3D coin stacks rising: 'follow the money'. |
@@ -35,7 +35,7 @@ Each line: time · sentence → chosen picture → why. Every line was checked b
 | 29 | 1:31.5-1:33.6 | a chair, a mirror, | [Pixabay 130876](https://pixabay.com/videos/id-130876/) | An old chair by a window: 'a chair' (no mirror in frame). |
 | 30 | 1:33.6-1:37.0 | a strop, a razor, a pair of scissors. | [Pixabay 32057](https://pixabay.com/videos/id-32057/) | Razor shave with foam: 'a strop, a razor'. |
 | 31 | 1:37.0-1:39.8 | A barber shop is a trade done with the hands, | [Pixabay 378906](https://pixabay.com/videos/id-378906/) | Close hands working with comb/scissors: 'a trade done with the hands'. |
-| 32 | 1:39.8-1:42.1 | one customer at a time all day. | [Pixabay 101958](https://pixabay.com/videos/id-101958/) | Wide barber shop with several customers: 'one customer at a time all day'. |
+| 32 | 1:39.8-1:42.1 | one customer at a time all day. | [Pixabay 7549](https://pixabay.com/videos/id-7549/) | Wall clock: "one customer at a time, all day"; replaces a Western barbershop full of faces. |
 | 33 | 1:42.1-1:46.0 | Most of what we know about these years comes from interviews he gave decades later | [Pixabay 27465](https://pixabay.com/videos/id-27465/) | Studio microphone: 'interviews he gave'. |
 | 34 | 1:46.0-1:51.4 | to YourStory, The Better India and others. | [Pixabay 273927](https://pixabay.com/videos/id-273927/) | Man reading on a laptop: online news sites (YourStory, The Better India). |
 | 35 | 1:51.4-1:55.8 | On the basics, they mostly agree and then the record turns hard. | [Pixabay 41146](https://pixabay.com/videos/id-41146/) | Handwritten pages: 'the record'. |
@@ -86,8 +86,11 @@ Each line: time · sentence → chosen picture → why. Every line was checked b
   (the slice came out at -0.8 and the release gate blocked it). Release gate on the final file: passed.
 
 ## Owner's question (21 Nov): why so many haircut shots?
+- Fixed (second pass, owner asked to make it right): every shot of a foreign barber with a visible face is gone
+  (5 shots). Hair work now shows only as close hands and tools (4 shots) and one empty salon; the lines that only
+  say he still cuts hair became two designed cards and two clocks.
 - The words of 0:00-3:00 are about barbering: Ramesh is a barber, his father's barber shop, the chair, mirror, razor,
-  scissors. 10 of 55 shots show barbering (about 30 s), and each sits on a sentence that says hair, barber, chair or
+  scissors. Before this pass 10 of 55 shots showed barbering (about 30 s), and each sits on a sentence that says hair, barber, chair or
   scissors. No barber clip is used twice.
 - What was wrong: the free stock (Pixabay) has no Indian barber video at all (searched "indian barber", "roadside
   barber india", "street barber"), so these are Iranian and Western barbershops. That is a real mismatch of place.
