@@ -21,7 +21,7 @@ In the 3-minute slice render, there is at least 1 designed moment per 45 s, at m
 and no shot over 8 s without movement. Before/after frames are sent to the Boss.
 
 ## Found for others
-- package.json "test" does not list render/graphics/graphics.test.mjs (not my file); please add it.
+- package.json "test" did not list render/graphics/graphics.test.mjs; Boss allowed me to add that one line (done).
 
 ## Log
 - 2026-11-21: brand tokens in render/graphics/brand/brand.mjs (Fraunces + Inter, OFL, woff2 inlined; accent #F2A93B; one bezier ease family; warm/cool grade). Evidence: node --test render/graphics/graphics.test.mjs, 2 pass.
