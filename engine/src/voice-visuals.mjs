@@ -268,7 +268,8 @@ export function brainBatches(scenes, structure, size, batchChars = 14000) {
 
 /**
  * reachable: checks that a picture's file can be fetched before it is chosen (the runner can afford the request).
- * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, batchChars?: number, maxCalls?: number, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
+ * worldNote: the Director pass's world (shot-plan.mjs worldBrief), so every shot names the right place, era and money.
+ * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, worldNote?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, batchChars?: number, maxCalls?: number, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
  */
 export async function planVoiceVisuals(o) {
   const chapter = o.chapter ?? "C1";
@@ -279,7 +280,7 @@ export async function planVoiceVisuals(o) {
   let written = "";
   let brainUsed = false;
   if (o.brain) {
-    const brief = (o.topic ? `The film is about: ${o.topic}. ` : "") + (structure ? `Topic words: ${structure.topicWords.map((t) => t.word).join(", ")}. Names: ${structure.entities.map((e) => e.name).join(", ") || "none"}. Dates: ${structure.dates.map((d) => d.text).join("; ") || "none"}.` : "");
+    const brief = (o.topic ? `The film is about: ${o.topic}. ` : "") + (o.worldNote ? `${o.worldNote} ` : "") + (structure ? `Topic words: ${structure.topicWords.map((t) => t.word).join(", ")}. Names: ${structure.entities.map((e) => e.name).join(", ") || "none"}. Dates: ${structure.dates.map((d) => d.text).join("; ") || "none"}.` : "");
     const lineOf = new Map(skeleton.split("\n").map((l) => [/SC\d{4,5}/.exec(l)?.[0] ?? "", l]));
     const batches = brainBatches(scenes, structure, (sc) => (lineOf.get(sc) ?? "").length, o.batchChars);
     const maxCalls = o.maxCalls ?? 40;
