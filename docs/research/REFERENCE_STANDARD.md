@@ -1,6 +1,6 @@
 # Reference standard (DRAFT, 21 Nov 2026)
 
-Status: **draft.** Everything below is measured from YouTube metadata unless marked "my reading". The shot-length, motion-versus-stills, text-moment and transition numbers are **recording pending** (the owner's 3-5 phone recordings are not in yet). The Gate in `docs/missions/M1-reference-study.md` is therefore not met yet.
+Status: **draft.** Everything below is measured from YouTube metadata unless marked "my reading". The shot-length, motion-versus-stills, text-moment and transition numbers are **not measured yet**: the owner is not asked for recordings (mission rule), so they will come from public sources (creators' talks, behind-the-scenes posts, chapter timings, published analyses), each marked sourced or "my reading". The Gate in `docs/missions/M1-reference-study.md` is therefore not met yet.
 
 ## Sources (all metadata only, no video downloaded)
 | What | Where | Count |
@@ -54,5 +54,5 @@ Source: YouTube Help, "Audience retention", https://support.google.com/youtube/a
 - One film = one named person, place or secret, 13-25 min, chapters in the description, the promise paid inside 30 s.
 - Calm, sourced, no hype; the landing-page design is the product's face (owner decision 16 Nov).
 
-## Recording pending (needed for the Gate)
-From 3-5 phone recordings (1-2 min each, with the opening), measure with ffmpeg scene detection: median shot length, moving-footage versus stills share, text and graphic moments per minute, transitions, and when the title lands. Not measured yet; do not quote any such number until then.
+## Craft numbers still to source (needed for the Gate)
+Median shot length, moving-footage versus stills share, text and graphic moments per minute, transitions, and when the title lands. Not measured yet; do not quote any such number until each has a public source or is marked "my reading". The only timing measured so far is chapter spacing (chapters exist in 24 of the owner's 46 links), still to be computed from `data/owner-links.json`.
