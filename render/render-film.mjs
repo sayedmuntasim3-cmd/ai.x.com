@@ -208,6 +208,9 @@ async function downloadClip(url, dir) {
           else if (res.status === 404 || res.status === 410) { lastError = err; break; }
           throw err;
         }
+        // An archive master of several GB (seen: 3.6 GB) takes many minutes and cannot be held: a text card stands in at once.
+        const bytes = Number(res.headers.get("content-length"));
+        if (bytes > MAX_CLIP_BYTES) { await res.body?.cancel(); lastError = new Error(`the file is ${Math.round(bytes / 1e6)} MB, over the ${MAX_CLIP_BYTES / 1e6} MB limit`); break; }
         writeFileSync(file + ".part", Buffer.from(await res.arrayBuffer()));
         renameSync(file + ".part", file);
         return file;
@@ -224,6 +227,8 @@ async function downloadClip(url, dir) {
 /** Archives ask for a User-Agent that names the tool (Wikimedia answers 429 to anonymous bulk downloads). */
 const DOWNLOAD_UA = "ZuponaStudio/1.0 (documentary renderer; https://github.com/sayedmuntasim3-cmd/ai.x.com)";
 const DOWNLOAD_ATTEMPTS = 7;
+/** Larger clips are skipped (a text card stands in): one shot never needs more. */
+const MAX_CLIP_BYTES = 400e6;
 /** Hosts that throttle bulk downloads get one download at a time, with a short gap. */
 const POLITE_HOSTS = /(^|\.)(wikimedia\.org|wikipedia\.org|loc\.gov|si\.edu|artic\.edu|archive\.org)$/i;
 const POLITE_GAP_MS = 400;
