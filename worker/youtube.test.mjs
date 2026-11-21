@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isoSeconds, rankOutliers } from "../engine/src/topic-radar.mjs";
-import { findOutliers, radarSearch } from "./youtube.mjs";
+import { findOutliers, parseChapters, radarSearch, videoDetails } from "./youtube.mjs";
 
 const NOW = Date.parse("2026-11-04T00:00:00Z");
 
@@ -83,4 +83,23 @@ test("the ideas route checks its input, answers a repeated search from the one-d
   const down = /** @type {typeof fetch} */ (async () => { throw new Error("connect failed https://www.googleapis.com/youtube/v3/search?key=SECRET"); });
   const failed = await radarSearch({ apiKey: "SECRET", query: "motivation", fetch: down });
   assert.ok(!failed.ok && failed.status === 502 && !failed.error.includes("SECRET"), "a network error never shows the URL with the key");
+});
+
+test("video details: chapters are parsed from the description, ids are checked, the key never leaves", async () => {
+  assert.deepEqual(parseChapters("hi\n0:00 Intro\n1:05 - The plan\n1:02:03 End"), [{ at: 0, title: "Intro" }, { at: 65, title: "The plan" }, { at: 3723, title: "End" }]);
+  assert.deepEqual(parseChapters("0:00 only\n1:00 two"), []);
+  const calls = /** @type {string[]} */ ([]);
+  const fetch = /** @type {typeof globalThis.fetch} */ (async (u) => {
+    calls.push(String(u));
+    return Response.json({ items: [{ id: "aaaaaaaaaaa", snippet: { title: "T", channelId: "C", channelTitle: "Ch", publishedAt: "2026-01-01T00:00:00Z", description: "0:00 a\n1:00 b\n2:00 c", thumbnails: { high: { url: "https://i/x.jpg" } } }, statistics: { viewCount: "10" }, contentDetails: { duration: "PT3M" } }] });
+  });
+  const r = await videoDetails({ apiKey: "K", ids: "aaaaaaaaaaa", fetch });
+  assert.ok(r.ok);
+  assert.equal(r.ok && /** @type {any} */ (r.videos[0]).chapters.length, 3);
+  assert.equal(r.ok && /** @type {any} */ (r.videos[0]).durationSeconds, 180);
+  assert.equal((await videoDetails({ apiKey: "K", ids: "bad", fetch })).ok, false);
+  assert.equal((await videoDetails({ ids: "aaaaaaaaaaa", fetch })).ok, false);
+  const bad = await videoDetails({ apiKey: "SECRET", ids: "aaaaaaaaaaa", fetch: async () => new Response("x", { status: 403 }) });
+  assert.equal(bad.ok, false);
+  assert.ok(!JSON.stringify(bad).includes("SECRET"));
 });
