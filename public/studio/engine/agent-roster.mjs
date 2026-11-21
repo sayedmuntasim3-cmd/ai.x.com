@@ -332,7 +332,7 @@ export const ROLE_STATUS = Object.freeze({
   "story-ending": ["model", "S3 and S5 (payoff, last image and line)"],
   "story-script-coverage": ["code", "scene-lines.mjs: words against seconds for every scene"],
 
-  "cinematography-visual-director": ["model", "S5 shots: evidence or illustration rung per shot; voiceover: shot-plan.mjs Director pass (beats.json), a visual intent, rung and the film's world (place, era, money, people) per beat from a free brain or the words, repaired in code (no generic, foreign or wrong-currency picture)"],
+  "cinematography-visual-director": ["model", "S5 shots: evidence or illustration rung per shot; voiceover: shot-plan.mjs Director pass (beats.json), a visual intent, rung and the film's world (place, era, money, people) per beat from a free brain or the words, repaired in code (no generic, foreign or wrong-currency picture); shot plan: every shot typed (live-video, archival-video, photo-2.5D, photo-designed, title, kinetic-type, quote, document, timeline), designed moments only on the voice's own lines"],
   "cinematography-composition": ["planned", "picks are not judged for composition yet"],
   "cinematography-lens-language": ["model", "S4 look: lens kit"],
   "cinematography-camera-motion": ["code", "motion.mjs decides each still's move from the scene (MOTION locks, genre, purpose, shot length, a repeat budget), eased; the renderer draws it; slow motion from MOTION; the Edit Director's punch-ins and shakes"],
@@ -354,7 +354,7 @@ export const ROLE_STATUS = Object.freeze({
   "animation-transition-logic": ["code", "motion.mjs rations flashes and glitches by genre and level (reduced motion: none); renderer: whip pans, slides, zoom-throughs, flashes, glitches (torn colour and noise), light leaks, dips to black and chapter dips from the TRANS field and the Edit Director"],
   "animation-fx-qc": ["planned", "not built yet"],
 
-  "footage-asset-strategist": ["model", "S5: search queries per shot"],
+  "footage-asset-strategist": ["model", "S5: search queries per shot; voiceover: shot-plan.mjs planShots writes each picture's queries from its subject, the film's city and the archive decade (Q1 \"barber Bengaluru\", Q2 \"barber\"), weak words refused in code"],
   "footage-exact-match": ["model", "footage desk: the brain looks at the thumbnails of each shot's candidates; when the brain cannot see pictures the desk is skipped, the first search result is kept and it is listed as a gap"],
   "footage-provider-coverage": ["code", "media step: Pexels, Pixabay and the archives (Wikimedia Commons, NASA, Library of Congress, Smithsonian, the Met, Art Institute of Chicago, Openverse) searched per shot; archive (R2) shots look there first"],
   "footage-metadata": ["code", "media step: source page, creator and licence kept per clip"],
@@ -366,9 +366,9 @@ export const ROLE_STATUS = Object.freeze({
   "footage-rights-gate": ["code", "nothing without a licence record is rendered"],
 
   "editing-runtime": ["code", "scene-lines.mjs clock and the frame-exact timeline"],
-  "editing-pace": ["model", "S3 retention map; code checks words per scene; the Edit Director places punch-ins, shakes and sound hits, capped and spaced in code"],
+  "editing-pace": ["model", "S3 retention map; code checks words per scene; the Edit Director places punch-ins, shakes and sound hits, capped and spaced in code; voiceover: shot-plan.mjs planShots re-cuts every scene to the genre's shot length (≤4 s in the hook), and code checks the median, the longest hold, ≥6 picture changes in the first 30 s, the title by 0:40 and a designed moment every 45 s; the hook score is shown to the creator"],
   "editing-coverage": ["code", "media step lists every shot with no fitting clip as a GAP"],
-  "editing-cut-logic": ["model", "S5 transitions; the Edit Director stage (edit-C1.json per chapter) re-chooses each scene's transition, checked in code (known words, never two named in a row)"],
+  "editing-cut-logic": ["model", "S5 transitions; the Edit Director stage (edit-C1.json per chapter) re-chooses each scene's transition, checked in code (known words, never two named in a row); voiceover: local/voice-film.mjs runs the same Edit Director (directEdit, free brain in batches) and merges the shot plan's sound cues on designed moments"],
   "editing-timeline-integrity": ["code", "timeline.mjs: frame-exact edit list"],
   "editing-continuity-match": ["planned", "not built yet"],
   "editing-b-roll-balance": ["code", "QA is given each chapter's share of planned text cards; over 40% it must swap cards for real pictures"],

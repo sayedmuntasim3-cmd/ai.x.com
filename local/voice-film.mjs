@@ -43,7 +43,7 @@ import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
-import { planBeats, worldBrief } from "../engine/src/shot-plan.mjs";
+import { DESIGNED_TYPES, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
 import { groqModel } from "../worker/groq.mjs";
@@ -428,15 +428,30 @@ export async function pictures(o) {
   await writeFile(join(o.out, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: director.brainFindings }, null, 1));
   const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
+  // The shot plan (shots.json): every shot typed, re-cut to the genre's rhythm, designed moments on the voice's own lines.
+  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure });
+  const lens = plan.shots.map((x) => x.seconds).sort((a, b) => a - b);
+  const designed = plan.shots.filter((x) => DESIGNED_TYPES.includes(x.type));
+  const planMessages = [
+    msg("voice.shotPlan", { shots: plan.shots.length, designed: designed.length, kinds: [...new Set(designed.map((x) => x.type))].join(", ") || "—", median: lens[Math.floor(lens.length / 2)] ?? 0, problems: plan.findings.length }),
+    msg("voice.hook", { score: plan.hook.score, beats: plan.hook.beats, titleAt: plan.hook.titleAt === null ? null : Math.round(plan.hook.titleAt), designed: plan.hook.designed }),
+  ];
+  await writeFile(join(o.out, "shots.json"), JSON.stringify({ genre: director.genre, world: director.world, hook: plan.hook, shots: plan.shots, findings: plan.findings }, null, 1));
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
   // A quiet score under a narration (never under a recitation): s4.md is the cue plan the free score composes.
   const score = voiceScore(u.scenes, { kind: "narration" });
   if (score) await writeFile(join(o.out, "s4.md"), score.s4);
-  await writeFile(join(o.out, "s5-C1.md"), (score ? withMusic(r.markdown, score.cueOf) : r.markdown) + "\n");
+  const s5 = score ? withMusic(plan.markdown, score.cueOf) : plan.markdown;
+  await writeFile(join(o.out, "s5-C1.md"), s5 + "\n");
+  // The Edit Director stage on the voiceover chapter (edit-C1.json, the file the renderer reads).
+  const cut = await directEdit({ markdown: s5, chapter: "C1", genre: director.genre, brain, code: plan.edit });
+  await writeFile(join(o.out, "edit-C1.json"), JSON.stringify(cut.edit, null, 1));
+  planMessages.push(msg("voice.edit", { answered: cut.answered, calls: cut.calls, transitions: cut.stats.transitions, punchIns: cut.stats.punchIns, hits: cut.stats.hits, dropped: cut.stats.dropped }));
+  if (cut.stopped) planMessages.push(msg("voice.brainStopped", { reason: cut.stopped }));
   if (r.chapterMedia) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
-  return { ok: r.findings.length === 0 && director.findings.length === 0, messages: [...director.messages, ...r.messages], problems: [...director.findings.map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail)], gaps: [] };
+  return { ok: r.findings.length === 0 && director.findings.length === 0 && plan.findings.length === 0, messages: [...director.messages, ...r.messages, ...planMessages], problems: [...director.findings.map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail), ...plan.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`)], gaps: [] };
 }
 
 /**
