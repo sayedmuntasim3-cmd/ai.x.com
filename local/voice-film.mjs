@@ -43,6 +43,7 @@ import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
+import { planBeats, worldBrief } from "../engine/src/shot-plan.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
 import { groqModel } from "../worker/groq.mjs";
@@ -422,7 +423,10 @@ export async function pictures(o) {
     return { ok: guard.ok && direction.ok, messages: [...guard.messages, ...direction.messages], problems: [...guard.problems, ...direction.problems], gaps: guard.gaps };
   }
   const brain = o.brain ?? null;
-  const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
+  // The Director pass first (beats.json): the world, the genre and a beat sheet; the picture plan is told the world.
+  const director = await planBeats({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic });
+  await writeFile(join(o.out, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: director.brainFindings }, null, 1));
+  const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
@@ -432,7 +436,7 @@ export async function pictures(o) {
   await writeFile(join(o.out, "s5-C1.md"), (score ? withMusic(r.markdown, score.cueOf) : r.markdown) + "\n");
   if (r.chapterMedia) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
-  return { ok: r.findings.length === 0, messages: r.messages, problems: r.findings.map((f) => f.detail), gaps: [] };
+  return { ok: r.findings.length === 0 && director.findings.length === 0, messages: [...director.messages, ...r.messages], problems: [...director.findings.map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail)], gaps: [] };
 }
 
 /**

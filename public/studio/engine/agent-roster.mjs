@@ -328,11 +328,11 @@ export const ROLE_STATUS = Object.freeze({
   "story-exposition": ["planned", "no separate clarity pass yet"],
   "story-narration": ["model", "S5; code checks words per scene and banned phrases"],
   "story-continuity": ["model", "S4 continuity rules and the QA passes"],
-  "story-emotional-arc": ["model", "S3 emotion curve and the 'written to be felt' rule"],
+  "story-emotional-arc": ["model", "S3 emotion curve and the 'written to be felt' rule; voiceover: a goal (understand / feel) and an emotion from a closed list per beat in beats.json, checked in code"],
   "story-ending": ["model", "S3 and S5 (payoff, last image and line)"],
   "story-script-coverage": ["code", "scene-lines.mjs: words against seconds for every scene"],
 
-  "cinematography-visual-director": ["model", "S5 shots: evidence or illustration rung per shot"],
+  "cinematography-visual-director": ["model", "S5 shots: evidence or illustration rung per shot; voiceover: shot-plan.mjs Director pass (beats.json), a visual intent, rung and the film's world (place, era, money, people) per beat from a free brain or the words, repaired in code (no generic, foreign or wrong-currency picture)"],
   "cinematography-composition": ["planned", "picks are not judged for composition yet"],
   "cinematography-lens-language": ["model", "S4 look: lens kit"],
   "cinematography-camera-motion": ["code", "motion.mjs decides each still's move from the scene (MOTION locks, genre, purpose, shot length, a repeat budget), eased; the renderer draws it; slow motion from MOTION; the Edit Director's punch-ins and shakes"],
