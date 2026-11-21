@@ -12,11 +12,12 @@ Must not touch: other missions' files. Send weak-shot reports back through the B
 - [ ] Weak shots are returned to M3 (re-pick) or M4 (re-make), at most twice, and the reason is logged.
 - [ ] The release gate fails a film that misses the gates, with a clear en+bn reason.
 - [ ] The test-slice loop: render 0:00-3:00 of 993f09ea, measure it, and send the owner before/after frames
-      plus a side-by-side with a reference recording (M1). Iterate until the owner's verdict is "pass", then
-      render the full 40 minutes.
+      plus the measured comparison with M1's reference standard. Iterate internally until the Boss judges it
+      world-class; the owner sees it only then. Then render the full 40 minutes.
 
 ## Gate
-The owner's verdict on the 3-minute slice is "pass", and every measurable gate holds. Then the full film
+The Boss's written verdict on the 3-minute slice is "pass" (hook, rhythm, visuals, sound against the
+reference standard), and every measurable gate holds. Then the full film
 passes the same gates.
 
 ## Found for others

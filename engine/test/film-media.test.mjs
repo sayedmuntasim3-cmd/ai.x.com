@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { chapterMedia, createUseHistory, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSettled, stockShots } from "../src/film-media.mjs";
+import { chapterMedia, createUseHistory, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSearchPlan, shotSettled, stockShots } from "../src/film-media.mjs";
 
 const USA_C1 = readFileSync(new URL("../../productions/ramesh-babu/USA/s5-C1.md", import.meta.url), "utf8");
 
@@ -304,4 +304,30 @@ test("a second attempt keeps the shots the first settled and searches only those
   const full = fakeFetch({ perQuery: 3 });
   await chapterMedia({ chapter: "C1", markdown: USA_C1, providers: mediaProviders({ pexelsKey: "PX", pixabayKey: "PB", fetch: full.f }), sleep: async () => {} });
   assert.ok(second.calls.length < full.calls.length, `${second.calls.length} requests, a full search makes ${full.calls.length}`);
+});
+
+test("footage first: a shot takes full-frame video before any still; stills under 1600 px are refused", async () => {
+  /** @param {string} id @param {"video" | "image"} kind @param {number} width @param {boolean} archive */
+  const item = (id, kind, width, archive) => ({ id, source: archive ? "wikimedia" : "pixabay", mediaType: kind, title: "barber shop", previewUrl: null, mediaUrl: `https://x/${id}`, sourcePageUrl: `https://x/${id}.html`, creator: null, license: archive ? "CC0" : "Pixabay Content License", licenseUrl: null, durationSeconds: kind === "video" ? 10 : null, width, height: Math.round(width * 0.5625), attributionRequired: false });
+  /** @param {string} id @param {boolean} archive @param {Record<string, any[]>} byKind */
+  const provider = (id, archive, byKind) => ({ id, layer: archive ? 1 : 2, kinds: /** @type {("video" | "image")[]} */ (Object.keys(byKind)), cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search(/** @type {string} */ _q, /** @type {"video" | "image"} */ kind) { return byKind[kind] ?? []; } });
+  const stock = provider("pixabay", false, { video: [item("v1", "video", 1920, false)], image: [item("s1", "image", 4000, false)] });
+  const commons = provider("wikimedia", true, { image: [item("a1", "image", 3000, true)] });
+  // The order itself: stock video leads every shot but real history; history leads with the archive photo.
+  assert.deepEqual(shotSearchPlan("R3", [commons, stock]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["video:pixabay", "image:pixabay"], "no archive for a shot that is not history");
+  assert.deepEqual(shotSearchPlan("R2", [commons, stock]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["image:wikimedia", "video:pixabay", "image:pixabay"]);
+  assert.deepEqual(shotSearchPlan("R3", [commons]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["image:wikimedia"], "with no stock set, the archives stand in");
+  const md = "SC0001 | 0:00:00-0:00:06 | barber | SHOTS: (1) R3 barber shop | SRC: barber · Q1 \"barber shop\"";
+  const r = await chapterMedia({ chapter: "C1", markdown: md, providers: [commons, stock] });
+  assert.equal(r.shots[0].pick?.id, "v1", "video wins over a sharp archive photo");
+  // No video at all: a still under 1600 px is never used, even when it is the only one.
+  const small = provider("pixabay", false, { video: [], image: [item("s2", "image", 1280, false)] });
+  const tiny = provider("wikimedia", true, { image: [item("a2", "image", 1500, true)] });
+  const none = await chapterMedia({ chapter: "C1", markdown: md, providers: [tiny, small] });
+  // Video under 1080p is refused too.
+  const low = provider("pixabay", false, { video: [item("v2", "video", 1280, false)], image: [] });
+  assert.equal((await chapterMedia({ chapter: "C1", markdown: md, providers: [low] })).shots[0].status, "missing");
+  assert.equal(none.shots[0].status, "missing");
+  const sharp = provider("pixabay", false, { video: [], image: [item("s3", "image", 1600, false)] });
+  assert.equal((await chapterMedia({ chapter: "C1", markdown: md, providers: [tiny, sharp] })).shots[0].pick?.id, "s3");
 });

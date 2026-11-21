@@ -156,6 +156,30 @@ export function stockShots(markdown) {
 }
 
 /**
+ * Where a shot looks, in order: footage first (mission M3). Every shot but real history takes full-frame
+ * moving stock (Pixabay; Pexels when its key is set), then a stock still. The archives serve real history
+ * only (R2, the evidence rung, until M2's era field exists): the real archive photograph first, then
+ * archive video, then stock. When no stock provider is set at all, the archives stand in, so a film is
+ * never left without pictures. Stills under MIN_STILL_WIDTH and video under MIN_VIDEO_WIDTH are refused in
+ * fetchShotMedia. (Owner, 21 Nov 2026: film 993f09ea was "an old-era slideshow": 14 of its first 29 shots
+ * were archive stills.)
+ * @param {string | null} rung @param {MediaProvider[]} providers @param {MediaKind} [kind]
+ * @returns {{ kind: MediaKind, providers: MediaProvider[] }[]}
+ */
+export function shotSearchPlan(rung, providers, kind) {
+  if (kind) return [{ kind, providers }];
+  const archives = providers.filter((p) => ARCHIVE_SOURCES.includes(p.id));
+  const stock = providers.filter((p) => !ARCHIVE_SOURCES.includes(p.id));
+  /** @type {(k: MediaKind, list: MediaProvider[]) => { kind: MediaKind, providers: MediaProvider[] }} */
+  const step = (k, list) => ({ kind: k, providers: list });
+  const history = [step("image", archives), step("video", archives), step("video", stock), step("image", stock)];
+  const steps = rung === "R2" ? history
+    : stock.length ? [step("video", stock), step("image", stock)]
+    : [step("video", archives), step("image", archives.filter((p) => !EVIDENCE_SOURCES.includes(p.id)))];
+  return steps.filter((s) => s.providers.some((p) => p.kinds.includes(s.kind)));
+}
+
+/**
  * Clip use across the whole film, by film time, so a clip is never repeated
  * within the window. Earlier chapters' picks are loaded first on a resume.
  */
@@ -208,22 +232,7 @@ function toPick(c) {
 export async function chapterMedia(o) {
   const history = o.history ?? createUseHistory();
   const limiter = o.limiter ?? createRateLimiter();
-  const archives = o.providers.filter((p) => ARCHIVE_SOURCES.includes(p.id));
-  const stock = o.providers.filter((p) => !ARCHIVE_SOURCES.includes(p.id));
-  /**
-   * Where to look, in order. Evidence shots (R2) want the real thing, so
-   * archive photos come first; other shots want moving stock footage, then
-   * archive video, then a still photo animated in the edit.
-   * @param {string | null} rung
-   * @returns {{ kind: MediaKind, providers: MediaProvider[] }[]}
-   */
-  const plan = (rung) => {
-    if (o.kind) return [{ kind: o.kind, providers: o.providers }];
-    const steps = rung === "R2"
-      ? [{ kind: /** @type {MediaKind} */ ("image"), providers: o.providers }, { kind: /** @type {MediaKind} */ ("video"), providers: o.providers }]
-      : [{ kind: /** @type {MediaKind} */ ("video"), providers: stock }, { kind: /** @type {MediaKind} */ ("video"), providers: archives }, { kind: /** @type {MediaKind} */ ("image"), providers: o.providers.filter((p) => !EVIDENCE_SOURCES.includes(p.id)) }];
-    return steps.filter((s) => s.providers.some((p) => p.kinds.includes(s.kind)));
-  };
+  const plan = (/** @type {string | null} */ rung) => shotSearchPlan(rung, o.providers, o.kind);
   /** @type {ShotMedia[]} */
   const shots = [];
   /** @type {Map<ShotMedia, import("./documentary-media-fetch.mjs").MediaCandidate[]>} */
