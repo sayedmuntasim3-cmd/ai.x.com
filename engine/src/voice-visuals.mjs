@@ -237,8 +237,38 @@ function fillLine(line, f) {
 }
 
 /**
+ * The brain's work cut into batches: whole sections (structure.sections, about 90 s each) packed until a
+ * batch's lines reach batchChars, so one prompt fits a free brain's limit (Groq: about 7,200 tokens).
+ * @param {VoiceScene[]} scenes @param {Structure | null} structure @param {(sc: string) => number} size @param {number} [batchChars]
+ * @returns {VoiceScene[][]}
+ */
+export function brainBatches(scenes, structure, size, batchChars = 14000) {
+  const sectionOf = new Map();
+  for (const sec of structure?.sections ?? []) {
+    let inside = false;
+    for (const s of scenes) { if (s.sc === sec.from) inside = true; if (inside) sectionOf.set(s.sc, sec.id); if (s.sc === sec.to) inside = false; }
+  }
+  /** @type {VoiceScene[][]} */
+  const groups = [];
+  for (const s of scenes) {
+    const last = groups[groups.length - 1];
+    if (last && (sectionOf.get(last[0].sc) ?? "") === (sectionOf.get(s.sc) ?? "")) last.push(s); else groups.push([s]);
+  }
+  /** @type {VoiceScene[][]} */
+  const batches = [];
+  let cur = /** @type {VoiceScene[]} */ ([]), chars = 0;
+  for (const g of groups) {
+    const n = g.reduce((acc, s) => acc + size(s.sc) + 1, 0);
+    if (cur.length && chars + n > batchChars) { batches.push(cur); cur = []; chars = 0; }
+    cur.push(...g); chars += n;
+  }
+  if (cur.length) batches.push(cur);
+  return batches;
+}
+
+/**
  * reachable: checks that a picture's file can be fetched before it is chosen (the runner can afford the request).
- * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
+ * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, batchChars?: number, maxCalls?: number, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
  */
 export async function planVoiceVisuals(o) {
   const chapter = o.chapter ?? "C1";
@@ -250,11 +280,28 @@ export async function planVoiceVisuals(o) {
   let brainUsed = false;
   if (o.brain) {
     const brief = (o.topic ? `The film is about: ${o.topic}. ` : "") + (structure ? `Topic words: ${structure.topicWords.map((t) => t.word).join(", ")}. Names: ${structure.entities.map((e) => e.name).join(", ") || "none"}. Dates: ${structure.dates.map((d) => d.text).join("; ") || "none"}.` : "");
-    try {
-      const reply = await o.brain.call({ stage: "V4", system: [{ text: VOICE_VISUALS_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${skeleton}` }] }], maxTokens: Math.min(32000, 400 + scenes.length * 260), effort: "medium" });
-      written = reply.text ?? "";
-      brainUsed = true;
-    } catch { written = ""; }
+    const lineOf = new Map(skeleton.split("\n").map((l) => [/SC\d{4,5}/.exec(l)?.[0] ?? "", l]));
+    const batches = brainBatches(scenes, structure, (sc) => (lineOf.get(sc) ?? "").length, o.batchChars);
+    const maxCalls = o.maxCalls ?? 40;
+    /** @type {string[]} */
+    const parts = [];
+    let answered = 0, stopped = "";
+    for (const batch of batches) {
+      if (stopped || answered >= maxCalls) break;
+      try {
+        const text = batch.map((s) => lineOf.get(s.sc)).join("\n");
+        const reply = await o.brain.call({ stage: "V4", system: [{ text: VOICE_VISUALS_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: Math.min(32000, 400 + batch.length * 260), effort: "medium" });
+        parts.push(reply.text ?? "");
+        answered += 1;
+      } catch (e) {
+        // A used-up day (429) stops the brain for the rest of the film; those scenes are planned from their own words.
+        if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
+      }
+    }
+    written = parts.join("\n");
+    brainUsed = answered > 0;
+    if (brainUsed || stopped) messages.push(msg("voice.brainBatches", { done: answered, total: batches.length }));
+    if (stopped) messages.push(msg("voice.brainStopped", { reason: stopped }));
   }
   if (!brainUsed) messages.push(msg("voice.noBrain"));
 

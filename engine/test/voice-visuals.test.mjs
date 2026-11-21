@@ -7,7 +7,7 @@ import { ayahText, buildQuranIndex, matchRecitation } from "../src/quran.mjs";
 import { planQuranFilm } from "../src/quran-film.mjs";
 import { alignScript, normalizeTranscript } from "../src/transcript.mjs";
 import { understandVoice } from "../src/voice-understand.mjs";
-import { namePhrases, nounsAfterDeterminers, planVoiceVisuals, quranVisualAdabGuard, topicSpelling, topicSubjects, voiceScore, withMusic, wordsPlan } from "../src/voice-visuals.mjs";
+import { brainBatches, namePhrases, nounsAfterDeterminers, planVoiceVisuals, quranVisualAdabGuard, topicSpelling, topicSubjects, voiceScore, withMusic, wordsPlan } from "../src/voice-visuals.mjs";
 import { titleHasWords } from "../src/film-media.mjs";
 
 const fixture = (/** @type {string} */ name) => readFileSync(new URL("./fixtures/voice/" + name, import.meta.url), "utf8");
@@ -182,4 +182,34 @@ test("a narration voiceover gets a quiet score plan; a recitation never does", (
   assert.equal(s.cueOf.get("SC0060"), "M03");
   assert.equal(withMusic("**SC0001** | 0:00:00-0:00:10 | NARR: x", s.cueOf), "**SC0001** | 0:00:00-0:00:10 | NARR: x | MUS: M01");
   assert.equal(voiceScore(sc, { kind: "quran" }), null, "nothing is laid under a recitation");
+});
+
+test("free brain: whole sections are packed into batches under the size limit", () => {
+  const structure = /** @type {any} */ ({ sections: [{ id: "P1", from: scenes[0].sc, to: scenes[1].sc }, { id: "P2", from: scenes[2].sc, to: scenes[scenes.length - 1].sc }] });
+  const one = brainBatches(scenes, structure, () => 100, 100000);
+  assert.equal(one.length, 1);
+  const split = brainBatches(scenes, structure, () => 100, 250);
+  assert.deepEqual(split[0].map((s) => s.sc), [scenes[0].sc, scenes[1].sc], "a section is never split while it fits");
+  assert.deepEqual(split.flat().map((s) => s.sc), scenes.map((s) => s.sc), "every scene once, in order");
+});
+
+test("free brain: one call per batch; a used-up day stops it and the rest come from the words", async () => {
+  let calls = 0;
+  const dayOver = {
+    name: "fake-free", capabilities: { vision: false, webSearch: false },
+    /** @param {any} r */
+    async call(r) {
+      calls += 1;
+      if (calls > 1) throw Object.assign(new Error("Gemini 429: PerDay"), { status: 429, permanent: true });
+      return meddlingBrain.call(r);
+    },
+  };
+  const r = await planVoiceVisuals({ scenes, structure: u.structure, brain: dayOver, batchChars: 1 });
+  assert.equal(calls, 2, "no call after the day is over");
+  assert.equal(r.brainUsed, true);
+  const codes = r.messages.map((m) => m.code);
+  assert.ok(codes.includes("voice.brainBatches") && codes.includes("voice.brainStopped"), codes.join(","));
+  assert.equal(r.plan.length, scenes.length);
+  assert.ok(r.plan.every((p) => p.shots), "every scene has shots");
+  assert.ok(!r.findings.some((f) => f.code === "words-changed" || f.code === "time-changed"));
 });

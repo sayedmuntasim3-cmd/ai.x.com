@@ -9,7 +9,7 @@ Must not touch: render/, .github/workflows/ (M3, M4, M5 and King's 5 own them).
 ## Checklist
 - [x] Add a `--slice a-b` option to local/voice-film.mjs (for example 0:00-3:00). The whole pipeline runs on
       that slice only; it is the test bench for all missions.
-- [ ] Pass the free brain into planVoiceVisuals: Groq first, then the Gemini pool, one batch per chapter,
+- [x] Pass the free brain into planVoiceVisuals: Groq first, then the Gemini pool, one batch per chapter,
       within quota. Use canSee/canSearch; never assume Claude.
 - [ ] Director pass: a beat sheet per chapter (the viewer goal, the emotion, the reveals, the genre's visual
       language), stored as beats.json.
@@ -26,6 +26,8 @@ designed moments, every shot typed, and 0 code-check failures. Unit tests are ad
 are green.
 
 ## Found for others
+- Node's fetch ignores HTTPS_PROXY: in a cloud container Groq/Gemini answer 401 unless NODE_USE_ENV_PROXY=1 (not needed on the owner's machine or a plain runner).
 
 ## Log
 - 2026-11-21: `--slice a-b` in local/voice-film.mjs (cutSlice → slice.wav + slice.json; a --transcript is cut and moved to 0; refused with --script). Proof: 3 new tests in local/voice-film.test.mjs; a 20 s file sliced 0:05-0:15 ran intake→words→understanding→pictures (20 of 40 words, 0-9.9 s). Full checks green.
+- 2026-11-21: PR #41 merged (CI green, preview / and /studio/ 200, production /api/health ok). Free brain: local/voice-film.mjs voiceBrain (Groq, then the Gemini pool; BRAIN=claude refused), planVoiceVisuals brainBatches (whole sections per batch, ≤14k chars; a 429 day-over stops calls, rest from words). Proof: real Groq run on the Gettysburg fixture, 1/1 batch planned, words intact; 3 new tests; full checks green.
