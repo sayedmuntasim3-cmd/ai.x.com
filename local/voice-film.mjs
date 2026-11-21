@@ -6,6 +6,8 @@
  *        [--adab strict|nature|people-distant]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media] [--tighten on|off]
  *        [--marks marks.json]   (Quran: the reviewer's ayah times {start, ends[], by}; they become confirmed ends)
+ *        [--slice 0:00-3:00]    (the test bench: the whole pipeline runs on that stretch of the recording only;
+ *                                a --transcript is cut to it and moved to start at 0; slice.json says where it came from)
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
  * Two copies are made in the output folder: analysis.wav (the original rate
  * and channels, float, for the voice checks) and voice-16k.wav (16 kHz mono,
@@ -98,6 +100,47 @@ export function parseArgs(argv) {
   const kind = String(o.kind ?? "auto");
   if (!["narration", "quran", "auto"].includes(kind)) throw new Error(`--kind must be narration, quran or auto, not ${kind}.`);
   return { ...o, kind };
+}
+
+/** "1:30", "0:01:30" or "90" -> seconds; NaN when unreadable. @param {string} t */
+function clock(t) {
+  const parts = String(t).trim().split(":");
+  if (!parts.length || parts.length > 3 || parts.some((x) => !/^\d+(\.\d+)?$/.test(x))) return NaN;
+  return parts.reduce((acc, x) => acc * 60 + Number(x), 0);
+}
+
+/**
+ * Read --slice "a-b" (for example 0:00-3:00, 90-180, 1:00:00-1:03:00).
+ * @param {unknown} v @returns {{ start: number, end: number } | null}
+ */
+export function parseSlice(v) {
+  if (v === undefined || v === false) return null;
+  const m = /^\s*([\d:.]+)\s*-\s*([\d:.]+)\s*$/.exec(String(v));
+  const start = m ? clock(m[1]) : NaN, end = m ? clock(m[2]) : NaN;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error(`--slice must look like 0:00-3:00 (start before end), not ${v}.`);
+  return { start, end };
+}
+
+/**
+ * The words inside the slice, moved so the slice starts at 0. A word cut by an edge is dropped,
+ * so no word is heard half.
+ * @template {{ start: number, end: number }} W @param {W[]} words @param {{ start: number, end: number }} slice @returns {W[]}
+ */
+export function sliceWords(words, slice) {
+  const r3 = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
+  return words.filter((w) => w.start >= slice.start && w.end <= slice.end).map((w) => ({ ...w, start: r3(w.start - slice.start), end: r3(w.end - slice.start) }));
+}
+
+/**
+ * Cut the slice out of the recording into slice.wav (float, original rate); the original is never changed.
+ * @param {{ audio: string, out: string, slice: { start: number, end: number } }} o
+ */
+export async function cutSlice(o) {
+  await mkdir(o.out, { recursive: true });
+  const file = join(o.out, "slice.wav");
+  await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(o.slice.start), "-to", String(o.slice.end), "-i", o.audio, "-vn", "-map", "0:a:0", "-c:a", "pcm_f32le", file], { maxBuffer: 1 << 20 });
+  await writeFile(join(o.out, "slice.json"), JSON.stringify({ source: basename(o.audio), start: o.slice.start, end: o.slice.end, seconds: o.slice.end - o.slice.start }, null, 1));
+  return file;
 }
 
 /** True when ffmpeg runs. */
@@ -234,12 +277,14 @@ export async function speechToText(o) {
 
 /**
  * Step 2: the timed words, checked against the recording.
- * @param {{ out: string, totalSeconds: number, sttWav?: string, transcript?: string, stt?: string, model?: string, language?: string, script?: string, remap?: (t: number) => number }} o
+ * @param {{ out: string, totalSeconds: number, sttWav?: string, transcript?: string, stt?: string, model?: string, language?: string, script?: string, remap?: (t: number) => number, slice?: { start: number, end: number } | null }} o
  */
 export async function words(o) {
   let t;
   if (o.transcript) {
     t = normalizeTranscript(await readFile(o.transcript, "utf8"), { name: o.transcript });
+    // A transcript of the whole recording is cut to the slice first (its times are on the original).
+    if (o.slice) t = { ...t, words: sliceWords(t.words, o.slice) };
     // A transcript timed on the original recording moves onto the tightened one.
     if (o.remap) t = { ...t, words: remapWords(t.words, o.remap) };
   }
@@ -395,11 +440,17 @@ async function main() {
   }
   const out = resolve(typeof args.out === "string" ? args.out : join("voice-runs", basename(args.audio).replace(/\.[^.]+$/, "")));
   const lang = args.lang === "bn" ? "bn" : "en";
-  let step1 = await intake({ audio: resolve(args.audio), out });
+  const slice = parseSlice(args.slice);
+  if (slice && args.script) { console.error("--slice cannot be used with --script (the script is the whole film's words)."); process.exit(2); }
+  if (slice && !(await hasFfmpeg())) { console.error(msg("voice.noFfmpeg")[lang]); process.exit(1); }
+  // The test bench: from here on, the recording is the slice.
+  const source = slice ? await cutSlice({ audio: resolve(args.audio), out, slice }) : resolve(args.audio);
+  if (slice) console.log(`Slice ${args.slice}: ${slice.end - slice.start} s of ${basename(String(args.audio))} -> ${source}`);
+  let step1 = await intake({ audio: source, out });
   for (const m of step1.messages) console.log("- " + m[lang]);
   if (!step1.ok || !step1.report) process.exit(1);
   // Long silences out, so the film never holds on dead air (--tighten off keeps the recording as it is).
-  let voicePath = resolve(args.audio);
+  let voicePath = source;
   /** @type {((t: number) => number) | undefined} */
   let remap;
   if (args.tighten !== "off" && step1.analysisWav && step1.sttWav) {
@@ -423,7 +474,7 @@ async function main() {
     /** @type {any} */
     let step2 = { words: [], language: null };
     if (args.transcript || args.stt) {
-      step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), remap, stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
+      step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), remap, slice, stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
       for (const m of step2.messages) console.log("- " + m[lang]);
       if (!step2.check.ok) process.exit(1);
     }
@@ -457,7 +508,7 @@ async function main() {
     mastered = m.file;
   }
   if (mastered) console.log(`Mastered voice: ${mastered} (use it as --one-track for the film)`);
-  else if (voicePath !== resolve(args.audio)) console.log(`Tightened voice: ${voicePath} (use it as --one-track for the film; its words are timed on it)`);
+  else if (voicePath !== source) console.log(`Tightened voice: ${voicePath} (use it as --one-track for the film; its words are timed on it)`);
   console.log(`Saved in ${out}`);
 }
 

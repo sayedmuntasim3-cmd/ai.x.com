@@ -7,7 +7,7 @@ for roles you make live.
 Must not touch: render/, .github/workflows/ (M3, M4, M5 and King's 5 own them).
 
 ## Checklist
-- [ ] Add a `--slice a-b` option to local/voice-film.mjs (for example 0:00-3:00). The whole pipeline runs on
+- [x] Add a `--slice a-b` option to local/voice-film.mjs (for example 0:00-3:00). The whole pipeline runs on
       that slice only; it is the test bench for all missions.
 - [ ] Pass the free brain into planVoiceVisuals: Groq first, then the Gemini pool, one batch per chapter,
       within quota. Use canSee/canSearch; never assume Claude.
@@ -28,3 +28,4 @@ are green.
 ## Found for others
 
 ## Log
+- 2026-11-21: `--slice a-b` in local/voice-film.mjs (cutSlice → slice.wav + slice.json; a --transcript is cut and moved to 0; refused with --script). Proof: 3 new tests in local/voice-film.test.mjs; a 20 s file sliced 0:05-0:15 ran intake→words→understanding→pictures (20 of 40 words, 0-9.9 s). Full checks green.

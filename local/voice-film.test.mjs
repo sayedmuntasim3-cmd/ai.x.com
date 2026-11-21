@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { hasFfmpeg, intake, parseArgs, voiceReport } from "./voice-film.mjs";
+import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, sliceWords, voiceReport } from "./voice-film.mjs";
 
 const ffmpeg = await hasFfmpeg();
 
@@ -45,4 +45,27 @@ test("intake: a file that is not audio is refused with a message", { skip: !ffmp
   const bad = join(dir, "notes.mp3");
   execFileSync("sh", ["-c", `printf 'not audio' > '${bad}'`]);
   await assert.rejects(intake({ audio: bad, out: join(dir, "out") }), (e) => /** @type {any} */ (e).message_?.code === "voice.unreadable");
+});
+
+test("slice: a-b is read in clock or seconds, and a bad one is refused", () => {
+  assert.equal(parseSlice(undefined), null);
+  assert.deepEqual(parseSlice("0:00-3:00"), { start: 0, end: 180 });
+  assert.deepEqual(parseSlice("90-180.5"), { start: 90, end: 180.5 });
+  assert.deepEqual(parseSlice("1:00:00-1:03:00"), { start: 3600, end: 3780 });
+  for (const bad of ["3:00-1:00", "abc", "1:2:3:4-5", "5-5", true]) assert.throws(() => parseSlice(bad), /--slice/);
+});
+
+test("slice: only whole words inside it stay, moved to start at 0", () => {
+  const w = [{ text: "a", start: 9, end: 10.2 }, { text: "b", start: 10.5, end: 11 }, { text: "c", start: 19.8, end: 20.4 }];
+  assert.deepEqual(sliceWords(w, { start: 10, end: 20 }), [{ text: "b", start: 0.5, end: 1 }]);
+});
+
+test("slice: the recording is cut to the slice (ffmpeg)", { skip: !ffmpeg && "ffmpeg not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-slice-"));
+  const wav = join(dir, "tone.wav");
+  execFileSync("ffmpeg", ["-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=6", wav]);
+  const file = await cutSlice({ audio: wav, out: join(dir, "out"), slice: { start: 1, end: 3.5 } });
+  const r = await intake({ audio: file, out: join(dir, "out") });
+  assert.ok(r.report && Math.abs(r.report.durationSeconds - 2.5) < 0.05, String(r.report?.durationSeconds));
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, "out", "slice.json"), "utf8")), { source: "tone.wav", start: 1, end: 3.5, seconds: 2.5 });
 });
