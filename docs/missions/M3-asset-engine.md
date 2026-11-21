@@ -8,8 +8,8 @@ pull first.
 Must not touch: the planning in voice-visuals.mjs (M2) and the composition in render-film.mjs (M4).
 
 ## Checklist
-- [ ] Video-first providers: Pixabay video (key via the Worker relay), Pexels video (when the owner sets
-      PEXELS_API_KEY), NASA, Internet Archive and Wikimedia video. Archives only when the shot's era is
+- [ ] Video-first providers: Pixabay video (key via the Worker relay), Pexels video (only if a key is ever set;
+      never ask the owner), NASA, Internet Archive and Wikimedia video. Archives only when the shot's era is
       historical.
 - [ ] Queries from the shot plan's subject, era and place (M2's fields), never bare keywords. Gather 50–200
       candidates per shot.
