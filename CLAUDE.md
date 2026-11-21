@@ -20,7 +20,8 @@ production. Never force-push, reset or delete branches; on a real conflict with 
   A brain that can finish a film needs the owner's choice (Gemini billing, a Claude key, or his own computer).
 
 ## Start of every session (cheap)
-1. `git fetch origin -q && git log --oneline -5 origin/main`; read `docs/ENGINEERING_STATE.md` section 0 and 6 only.
+1. `git fetch origin -q && git log --oneline -5 origin/main`; read `docs/ROADMAP.md` (the plan, in order) first,
+   then `docs/ENGINEERING_STATE.md` section 0 and 6 only if needed.
 2. Before building: `git grep -n -i "<feature word>" origin/main -- worker engine/src render public/studio`.
    If it exists, extend it; never build a second copy (a session built a second script Worker on 16-17 Nov).
 3. Quote file and line for claims, or say "my opinion". Never assume a free tier works (Gemini's does not on his account).
