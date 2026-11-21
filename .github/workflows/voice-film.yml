@@ -142,6 +142,27 @@ jobs:
           fi
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
+      - name: Keep the picture-ranking model between runs (OpenCLIP, CPU)
+        if: inputs.kind == 'narration'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/zupona
+          key: asset-rank-v1
+      - name: Look at the pictures (OpenCLIP chooses on-topic, in the film's world)
+        if: inputs.kind == 'narration'
+        env:
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          echo pictures > .stage
+          [ -n "$VOICE_SELFTEST" ] || export ZUPONA_STOCK_RELAY="$SITE/api/voice/$VOICE_ID/stock?ticket=$VOICE_TICKET"
+          # The eyes never stop the film: if they cannot run, the plan's own picks stay (rerank.mjs prints why).
+          if pip install -q --index-url https://download.pytorch.org/whl/cpu torch==2.7.1 torchvision==0.22.1 && pip install -q open_clip_torch==2.29.0 pillow numpy; then
+            export HF_HOME="$HOME/.cache/zupona/hf" ZUPONA_RANK_CACHE="$HOME/.cache/zupona/asset-rank"
+            node render/asset-rank/rerank.mjs --run run 2>&1 | tee -a voice-film.log
+          else
+            echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
+          fi
       - name: Quran pictures (adab guard; no living beings, no AI pictures)
         if: inputs.kind == 'quran'
         env:
