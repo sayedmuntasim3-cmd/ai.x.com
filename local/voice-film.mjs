@@ -44,6 +44,8 @@ import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
+import { brainFromEnv } from "../worker/brain.mjs";
+import { groqModel } from "../worker/groq.mjs";
 
 import { planVoice } from "../engine/src/voice-plan.mjs";
 import { ayahEndsOf } from "../engine/src/voice-master.mjs";
@@ -141,6 +143,23 @@ export async function cutSlice(o) {
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(o.slice.start), "-to", String(o.slice.end), "-i", o.audio, "-vn", "-map", "0:a:0", "-c:a", "pcm_f32le", file], { maxBuffer: 1 << 20 });
   await writeFile(join(o.out, "slice.json"), JSON.stringify({ source: basename(o.audio), start: o.slice.start, end: o.slice.end, seconds: o.slice.end - o.slice.start }, null, 1));
   return file;
+}
+
+/**
+ * The free brain for the picture plan: Groq first, then the Gemini pool (worker/brain.mjs), or Groq alone.
+ * Never the paid brain: BRAIN=claude is refused here. Null when no free brain is set up.
+ * @param {Record<string, string | undefined>} env @param {{ fetch?: typeof fetch }} [o]
+ * @returns {{ model: import("../engine/src/film-run.mjs").Model | null, kind: string, refused?: boolean }}
+ */
+export function voiceBrain(env, o = {}) {
+  if (String(env.BRAIN ?? "").trim().toLowerCase() === "claude") return { model: null, kind: "none", refused: true };
+  const groqOn = env.GROQ_API_KEY && String(env.GROQ ?? "").toLowerCase() !== "off";
+  if (env.GEMINI_API_KEY || (env.BRAIN_URL && env.BRAIN_MODEL)) {
+    const b = brainFromEnv({ ...env, ANTHROPIC_API_KEY: undefined }, o);
+    if (b.ok) return { model: b.model, kind: b.kind === "gemini" && groqOn ? "groq+gemini" : b.kind };
+  }
+  if (groqOn) return { model: /** @type {any} */ (groqModel({ apiKey: String(env.GROQ_API_KEY), ...(o.fetch ? { fetch: o.fetch } : {}) })), kind: "groq" };
+  return { model: null, kind: "none" };
 }
 
 /** True when ffmpeg runs. */
@@ -379,9 +398,9 @@ export async function understand(o) {
 }
 
 /**
- * Step 4. No writer model is called from here yet: the plan comes from each
- * scene's own words (planVoiceVisuals takes any brain when one is given).
- * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant" }} o
+ * Step 4. With a free brain (voiceBrain: Groq, then the Gemini pool) the plan is written in batches of
+ * whole sections; without one, or for scenes past its quota, it comes from each scene's own words.
+ * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null }} o
  */
 export async function pictures(o) {
   const u = o.understanding;
@@ -402,7 +421,8 @@ export async function pictures(o) {
     await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "quran", guard, direction: { ok: direction.ok, shots: direction.shots.length, problems: direction.problems } }, null, 1));
     return { ok: guard.ok && direction.ok, messages: [...guard.messages, ...direction.messages], problems: [...guard.problems, ...direction.problems], gaps: guard.gaps };
   }
-  const r = await planVoiceVisuals({ scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
+  const brain = o.brain ?? null;
+  const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
@@ -497,7 +517,10 @@ async function main() {
       if (!understanding.ok) process.exit(1);
     }
     const adab = ["strict", "nature", "people-distant"].includes(String(args.adab)) ? /** @type {any} */ (args.adab) : "strict";
-    const step4 = await pictures({ out, understanding, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
+    const vb = voiceBrain(process.env);
+    if (vb.refused) console.log("- " + msg("voice.paidBrainRefused")[lang]);
+    else if (vb.model) console.log(`- Brain: ${vb.kind}`);
+    const step4 = await pictures({ out, understanding, brain: vb.model, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
     if (!step4.ok) process.exit(1);

@@ -69,3 +69,13 @@ test("slice: the recording is cut to the slice (ffmpeg)", { skip: !ffmpeg && "ff
   assert.ok(r.report && Math.abs(r.report.durationSeconds - 2.5) < 0.05, String(r.report?.durationSeconds));
   assert.deepEqual(JSON.parse(readFileSync(join(dir, "out", "slice.json"), "utf8")), { source: "tone.wav", start: 1, end: 3.5, seconds: 2.5 });
 });
+
+test("voice brain: free brains only, Groq first", async () => {
+  const { voiceBrain } = await import("./voice-film.mjs");
+  assert.equal(voiceBrain({}).model, null);
+  assert.equal(voiceBrain({ BRAIN: "claude", ANTHROPIC_API_KEY: "x" }).refused, true);
+  assert.equal(voiceBrain({ ANTHROPIC_API_KEY: "x" }).model, null, "a Claude key alone is never used");
+  assert.equal(voiceBrain({ GROQ_API_KEY: "g" }).kind, "groq");
+  assert.equal(voiceBrain({ GROQ_API_KEY: "g", GEMINI_API_KEY: "k", GEMINI_MODELS: "gemini-2.5-flash" }).kind, "groq+gemini");
+  assert.equal(voiceBrain({ GEMINI_API_KEY: "k", GEMINI_MODELS: "gemini-2.5-flash" }).kind, "gemini");
+});
