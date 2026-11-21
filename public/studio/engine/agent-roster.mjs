@@ -355,14 +355,14 @@ export const ROLE_STATUS = Object.freeze({
   "animation-fx-qc": ["planned", "not built yet"],
 
   "footage-asset-strategist": ["model", "S5: search queries per shot; voiceover: shot-plan.mjs planShots writes each picture's queries from its subject, the film's city and the archive decade (Q1 \"barber Bengaluru\", Q2 \"barber\"), weak words refused in code"],
-  "footage-exact-match": ["model", "footage desk: the brain looks at the thumbnails of each shot's candidates; when the brain cannot see pictures the desk is skipped, the first search result is kept and it is listed as a gap"],
+  "footage-exact-match": ["code", "voiceover films: render/asset-rank (OpenCLIP on the runner, CPU, cached) looks at 50-500 free candidates per shot, searched in the film's world (beats.json), and ranks them by fit, place, era and quality; each pick carries its scores in media-C1.json `why`. Script films: the footage desk (a brain that can see thumbnails), else the first search result, listed as a gap"],
   "footage-provider-coverage": ["code", "media step: Pexels, Pixabay and the archives (Wikimedia Commons, NASA, Library of Congress, Smithsonian, the Met, Art Institute of Chicago, Openverse) searched per shot; archive (R2) shots look there first"],
   "footage-metadata": ["code", "media step: source page, creator and licence kept per clip"],
   "footage-license": ["code", "media step: a clip is kept only when its item-level licence is Pexels, Pixabay, CC0, public domain, US-government public domain or CC BY (FREE_LICENCES); share-alike and non-commercial files are never kept"],
   "footage-attribution": ["code", "renderer licence report; S7 credits block"],
-  "footage-duplicate-assets": ["code", "media step: no clip twice within 10 minutes"],
-  "footage-scene-fit": ["model", "footage desk (only when the brain can see pictures)"],
-  "footage-release-risk": ["model", "footage desk rejects faces, brands, plates and watermarks where the shot avoids them (only when the brain can see pictures)"],
+  "footage-duplicate-assets": ["code", "media step: no clip twice within 10 minutes; voiceover films: no near copy either (perceptual hash of the thumbnail, render/asset-rank)"],
+  "footage-scene-fit": ["code", "voiceover films: OpenCLIP scores each candidate against the shot in its place and the words heard over it, and pushes down off-world pictures (another country's money, people or continent, abstract backgrounds, film strips) (render/asset-rank). Script films: footage desk, only when the brain can see pictures"],
+  "footage-release-risk": ["code", "voiceover films: watermarks refused by OpenCLIP, tags naming another country refused (render/asset-rank); faces, brands and plates are not checked there yet. Script films: footage desk, only when the brain can see pictures"],
   "footage-rights-gate": ["code", "nothing without a licence record is rendered"],
 
   "editing-runtime": ["code", "scene-lines.mjs clock and the frame-exact timeline"],

@@ -208,8 +208,8 @@ export const JUDGE_POOL = 4;
  *   returns, per shot key, the candidate indices that fit the shot, best first ([] = none fits)
  */
 
-/** @param {import("./documentary-media-fetch.mjs").MediaCandidate} c @returns {MediaPick} */
-function toPick(c) {
+/** The pick record of a candidate (also used by render/asset-rank). @param {import("./documentary-media-fetch.mjs").MediaCandidate} c @returns {MediaPick} */
+export function toPick(c) {
   return {
     id: c.id, source: c.source, kind: c.mediaType, title: c.title, mediaUrl: c.mediaUrl, previewUrl: c.previewUrl, sourcePageUrl: c.sourcePageUrl,
     creator: c.creator, durationSeconds: c.durationSeconds, width: c.width, height: c.height,
@@ -478,7 +478,8 @@ export function wikimediaProvider(o = {}) {
         const isVideo = /^video\//.test(info.mime ?? "");
         if ((kind === "video") !== isVideo || !(isVideo || /^image\/(jpeg|png|webp|tiff)$/.test(info.mime ?? ""))) return [];
         const thumb = typeof info.thumburl === "string" ? info.thumburl : null;
-        const small = thumb ? thumb.replace(/\/(\d+)px-/, "/320px-") : null;
+        // Commons serves only its listed thumbnail widths (320 px now answers 400 "Use thumbnail sizes listed"; 330 is listed).
+        const small = thumb ? thumb.replace(/\/(\d+)px-/, "/330px-") : null;
         const title = plain(meta.ObjectName?.value) || String(p.title ?? "").replace(/^File:/, "").replace(/\.[a-z0-9]+$/i, "");
         return [{
           id: `wikimedia:${p.pageid}`, source: "wikimedia", mediaType: kind, title,
