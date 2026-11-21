@@ -1,6 +1,6 @@
 # M1: Reference study (what the best long documentaries actually do)
 Goal: a measured, sourced reference standard that M2–M6 build against. Verified facts are kept apart from opinion.
-Owns: docs/research/ (new), docs/YOUTUBE_BENCHMARKS.md. No code outside tools/research/ (new).
+Owns: docs/research/ (new), docs/YOUTUBE_BENCHMARKS.md. No code outside tools/research/ (new). One exception (Boss, 21 Nov): the new read-only route GET /api/videos in worker/youtube.mjs + worker/index.mjs + its test, in its own PR (branch m1-videos-route).
 Must not touch: engine/, render/, worker/ (ask the Boss if an API route is missing).
 
 ## Checklist
