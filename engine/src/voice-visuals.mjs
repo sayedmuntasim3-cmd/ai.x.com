@@ -153,25 +153,6 @@ export function topicSpelling(phrase, topic) {
   return phrase;
 }
 
-/** Years from this one on are recent: modern footage shows them better than an archive print. */
-export const HISTORY_BEFORE_YEAR = 2000;
-
-/**
- * Whether a said date is real history, so the archive photograph is the right picture:
- * a year before HISTORY_BEFORE_YEAR ("around 1990", "April 12, 1865", "the 1920s"), a century,
- * or a long time ago ("four score and seven years ago", "40 years ago"). A date with no year
- * ("in April") or a recent one ("in 2011") is not.
- * @param {string} text
- */
-export function isHistoricDate(text) {
-  const t = String(text ?? "");
-  if (/\bcentur(?:y|ies)\b|\bscore\b.*\byears?\s+ago\b|\b(?:hundreds?|thousands?)\s+(?:of\s+)?years\b/i.test(t)) return true;
-  const ago = /\b(\d+)\s+years?\s+ago\b/i.exec(t);
-  if (ago && Number(ago[1]) >= 30) return true;
-  const years = [...t.matchAll(/\b(\d{3,4})s?\b/g)].map((m) => Number(m[1])).filter((y) => y >= 100 && y <= 2100);
-  return years.some((y) => y < HISTORY_BEFORE_YEAR);
-}
-
 /**
  * A plan from the scene's own words, for a scene the brain did not plan.
  * Each search is a short concrete thing said in the scene: a name or place
@@ -180,14 +161,12 @@ export function isHistoricDate(text) {
  * fallback search of every shot (its subject words, rotated), never glued in
  * front: a long query finds nothing and the archive answers with random prints.
  * A long scene gets a shot about every 6 seconds, each with its own search.
- * A historic date said in the scene (isHistoricDate) makes it an evidence
- * shot (R2: the real archive photograph first); a name or a recent year does
- * not ("Rolls-Royce in 2011" is footage, not a 1920s print).
+ * Names and dates said in the scene make it an evidence shot (R2).
  * @param {VoiceScene} s @param {Structure | null} structure @param {string} [topic]
  */
 export function wordsPlan(s, structure, topic = "") {
   const names = (structure?.entities ?? []).filter((e) => e.scenes.includes(s.sc)).map((e) => e.name);
-  const dated = (structure?.dates ?? []).some((d) => d.scene === s.sc && isHistoricDate(d.text));
+  const dated = (structure?.dates ?? []).some((d) => d.scene === s.sc);
   const subjects = topicSubjects(topic);
   const subjectKeys = new Set(subjects.map(key));
   /** @type {Map<string, { text: string, score: number }>} */
@@ -227,7 +206,7 @@ export function wordsPlan(s, structure, topic = "") {
   const seconds = Math.max(0.1, s.end - s.start);
   const count = Math.max(1, Math.min(4, Math.round(seconds / 6), picks.length || 1));
   const subject = names[0] ?? picks[0] ?? subjects[0] ?? "landscape";
-  const rung = dated ? "R2" : "R3";
+  const rung = names.length || dated ? "R2" : "R3";
   const shots = [];
   const groups = [];
   for (let i = 0; i < count; i += 1) {

@@ -290,51 +290,6 @@ function editMotionCount(v, fps) {
   return { punchIns: f.punches.length, shakes: f.shakes.length };
 }
 
-/**
- * Keep only the first `seconds` of a timeline (a test slice): whole shots up to the cut, the last one
- * shortened, and every sound, caption and cue that starts before it. The one recording is cut there too
- * (renderFilm trims the voice to the film's length). Changes the timeline in place.
- * @param {import("../engine/src/timeline.mjs").Timeline} t @param {number} seconds
- */
-export function sliceTimeline(t, seconds) {
-  const limit = Math.round(seconds * t.fps);
-  let frames = 0;
-  const video = [];
-  for (const v of t.video) {
-    if (frames >= limit) break;
-    const keep = Math.min(v.frames, limit - frames);
-    video.push(keep === v.frames ? v : { ...v, frames: keep, end: v.start + keep / t.fps, fadeOut: 0 });
-    frames += keep;
-  }
-  const end = frames / t.fps;
-  const before = (/** @type {{ start: number }} */ x) => x.start < end;
-  const cut = (/** @type {{ start: number, end: number }} */ x) => ({ ...x, end: Math.min(x.end, end) });
-  t.video = video;
-  t.frames = frames;
-  t.durationSeconds = end;
-  t.narration = t.narration.filter(before).map(cut);
-  t.captions = t.captions.filter(before).map(cut);
-  t.music = (t.music ?? []).filter(before).map(cut);
-  t.sfx = (t.sfx ?? []).filter(before).map(cut);
-  t.stats = { ...t.stats, clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length };
-  /** @type {any} */ (t).sliced = end;
-  return t;
-}
-
-/**
- * How a still photo is laid in the 16:9 frame. "cover": cropped to fill the whole frame (the default, so a
- * still reads as a shot, not a slide). "print": the Edit Director's framed print over its own blur.
- * "parallax": a portrait photo (taller than wide), whose cover crop would lose most of it, floats over its
- * blurred copy. The blurred frame is thus a rare, designed moment (owner, 21 Nov 2026).
- * @param {number} pw @param {number} ph the photo's size @param {string} [frame] @param {string} [focus]
- * @returns {"cover" | "print" | "parallax"}
- */
-export function stillFraming(pw, ph, frame, focus) {
-  if (frame === "print") return "print";
-  if (!focus && pw > 0 && ph > 0 && pw < ph) return "parallax";
-  return "cover";
-}
-
 /** Where a focus zoom heads, as a share of the free width and height. */
 const FOCUS = { left: [0, 0.5], right: [1, 0.5], top: [0.5, 0], bottom: [0.5, 1], center: [0.5, 0.5] };
 
@@ -526,7 +481,7 @@ export async function renderFilm(o) {
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
     const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
-    const key = hash({ v: 11, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 10, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -539,16 +494,15 @@ export async function renderFilm(o) {
     let complex = false;
     if (type === "clip" && v.url && v.still) {
       try {
-        // A photograph fills the frame (cover crop) and moves slowly, like footage. The blurred-copy frame is a
-        // rare designed moment only: a print the Edit Director asked for, or a portrait photo (stillFraming).
+        // A photograph: framed once over a blurred copy of itself (so a portrait or odd shape fills the frame),
+        // then moved slowly (push in, pull out or pan, in turn) so it lives on screen like footage.
         const src = await fetchClip(v.url);
         const n = v.frames;
         const W = t.width;
         const H = t.height;
         const [pw, ph] = (await run(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", src])).trim().split(",").map(Number);
         const plateKey = hash({ still: v.url, w: W, h: H });
-        const framing = stillFraming(pw, ph, v.frame, v.focus);
-        if (framing === "parallax") {
+        if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
           // A portrait or square photograph: 2.5D parallax. The sharp picture grows and drifts one way,
           // its blurred copy behind it the other way, so the photo seems to float in depth.
           const bg = join(dirs.cards, `${plateKey}-bg.png`);
@@ -573,10 +527,10 @@ export async function renderFilm(o) {
             "setsar=1", LOOK,
           );
         } else {
-          // A landscape photograph: cropped to fill the whole frame (a print: framed over its own blur),
-          // then moved slowly (push in, pull out or pan, in turn) so it lives on screen like footage.
-          const print = framing === "print";
-          const plate = join(dirs.cards, `${plateKey}${print ? "-print" : "-cover"}.png`);
+          // A landscape photograph: framed over a blurred copy of itself, then moved slowly
+          // (push in, pull out or pan, in turn) so it lives on screen like footage.
+          const print = v.frame === "print";
+          const plate = join(dirs.cards, `${plateKey}${print ? "-print" : ""}.png`);
           if (!existsSync(plate)) {
             const W2 = W * 2;
             const H2 = H * 2;
@@ -586,9 +540,8 @@ export async function renderFilm(o) {
             const border = Math.round(H2 * 0.016);
             const fg = print
               ? `[fg]scale=w='min(${Math.round(W2 * 0.8)},iw*${Math.round(H2 * 0.72)}/ih)':h=-2,pad=iw+${2 * border}:ih+${2 * border}:${border}:${border}:color=0xf4f1ea,format=rgba,rotate=${angle}:c=none:ow=rotw(${angle}):oh=roth(${angle}),split=2[p1][p2];[p2]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.55,boxblur=${Math.round(H2 * 0.012)}:2[sh];[bgb][sh]overlay=(W-w)/2+${Math.round(H2 * 0.012)}:(H-h)/2+${Math.round(H2 * 0.018)}[b2];[b2][p1]overlay=(W-w)/2:(H-h)/2,setsar=1`
-              : "";
-            if (print) await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-filter_complex", `[0]split=2[bg][fg];${bg};${fg}`, plate]);
-            else await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=${W2}:${H2}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W2}:${H2},setsar=1`, plate]);
+              : `[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`;
+            await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-filter_complex", `[0]split=2[bg][fg];${bg};${fg}`, plate]);
           }
           input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
           chain.push(`${stillMove(v.focus, print, i, n, v.move)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
@@ -855,7 +808,7 @@ export async function renderFilm(o) {
   const narrationFile = join(o.workDir, "narration.wav");
   if (o.oneTrack) {
     const spoken = await mediaDuration(o.oneTrack.file, ffprobe);
-    if (spoken > t.durationSeconds + 0.05 && !(/** @type {any} */ (t).sliced)) warnings.push(`The voice is ${spoken.toFixed(2)} s but the film is ${t.durationSeconds.toFixed(2)} s: its end would be cut. The scenes must be built on this recording.`);
+    if (spoken > t.durationSeconds + 0.05) warnings.push(`The voice is ${spoken.toFixed(2)} s but the film is ${t.durationSeconds.toFixed(2)} s: its end would be cut. The scenes must be built on this recording.`);
     const samples = Math.round(t.durationSeconds * SAMPLE_RATE);
     await run(ffmpeg, ["-v", "error", "-y", "-i", o.oneTrack.file, "-vn", "-af", `aresample=${SAMPLE_RATE},apad,atrim=end_sample=${samples}`, "-ac", "1", "-c:a", "pcm_s16le", narrationFile]);
     pieces.push({ start: 0, end: t.durationSeconds, file: o.oneTrack.file, scene: "voice" });
@@ -1146,7 +1099,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--part i/N | --join part1.mp4,part2.mp4,...] [--slice seconds] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--part i/N | --join part1.mp4,part2.mp4,...] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -1196,13 +1149,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     }
     const own = applyOwnPictures(timeline, ownPictureFolder(args.pictures));
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
-  }
-  // A test slice: --slice 180 renders only the first 180 s (whole shots, the last one cut), for a quick look.
-  if (args.slice !== undefined) {
-    const seconds = Number(args.slice);
-    if (!(seconds > 0)) throw new Error(`--slice must be a number of seconds, not "${args.slice}".`);
-    sliceTimeline(timeline, seconds);
-    console.log(`slice: the first ${timeline.durationSeconds.toFixed(1)} s (${timeline.video.length} shots)`);
   }
   const workDir = args.work ?? ".render";
   // Chunked render: --part i/N renders that part's picture only; --join a.mp4,b.mp4,... joins the parts and mixes the sound.

@@ -156,14 +156,13 @@ export function stockShots(markdown) {
 }
 
 /**
- * Where a shot looks, in order: footage first. Every shot but real history
- * wants full-frame moving stock (Pixabay, Pexels when its key is set), then
- * archive video, then a stock still. Real history (R2: a date said in the
- * scene, or the writer's evidence shot) wants the real archive photograph
- * first, then footage. An archive still is the last resort of any other shot,
- * so a scene is never a text card when a picture exists. Stills under
- * MIN_STILL_WIDTH are refused in fetchShotMedia (owner, 21 Nov 2026: "an
- * old-era slideshow", film 993f09ea had 14 stills in its first 29 shots).
+ * Where a shot looks, in order: footage first (mission M3). Every shot but real history takes full-frame
+ * moving stock (Pixabay; Pexels when its key is set), then a stock still. The archives serve real history
+ * only (R2, the evidence rung, until M2's era field exists): the real archive photograph first, then
+ * archive video, then stock. When no stock provider is set at all, the archives stand in, so a film is
+ * never left without pictures. Stills under MIN_STILL_WIDTH and video under MIN_VIDEO_WIDTH are refused in
+ * fetchShotMedia. (Owner, 21 Nov 2026: film 993f09ea was "an old-era slideshow": 14 of its first 29 shots
+ * were archive stills.)
  * @param {string | null} rung @param {MediaProvider[]} providers @param {MediaKind} [kind]
  * @returns {{ kind: MediaKind, providers: MediaProvider[] }[]}
  */
@@ -173,9 +172,10 @@ export function shotSearchPlan(rung, providers, kind) {
   const stock = providers.filter((p) => !ARCHIVE_SOURCES.includes(p.id));
   /** @type {(k: MediaKind, list: MediaProvider[]) => { kind: MediaKind, providers: MediaProvider[] }} */
   const step = (k, list) => ({ kind: k, providers: list });
-  const steps = rung === "R2"
-    ? [step("image", archives), step("video", stock), step("video", archives), step("image", stock)]
-    : [step("video", stock), step("video", archives), step("image", stock), step("image", archives.filter((p) => !EVIDENCE_SOURCES.includes(p.id)))];
+  const history = [step("image", archives), step("video", archives), step("video", stock), step("image", stock)];
+  const steps = rung === "R2" ? history
+    : stock.length ? [step("video", stock), step("image", stock)]
+    : [step("video", archives), step("image", archives.filter((p) => !EVIDENCE_SOURCES.includes(p.id)))];
   return steps.filter((s) => s.providers.some((p) => p.kinds.includes(s.kind)));
 }
 

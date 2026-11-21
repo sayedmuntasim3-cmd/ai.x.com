@@ -262,8 +262,8 @@ async function passesItemCheck(candidate, deps) {
 
 /** A still fills the 16:9 frame by a cover crop and a slow move, so it must be sharp at full width (owner, 21 Nov 2026). */
 export const MIN_STILL_WIDTH = 1600;
-/** Footage at 720p or better (it is scaled to the frame). */
-export const MIN_VIDEO_WIDTH = 1280;
+/** Footage is native 1080p or better (mission M3: every shot native ≥1080p). */
+export const MIN_VIDEO_WIDTH = 1920;
 
 /**
  * Find media for one shot. Layer 1 archives, then Layer 2 stock, stopping at

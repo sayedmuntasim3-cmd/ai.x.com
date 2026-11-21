@@ -314,8 +314,9 @@ test("footage first: a shot takes full-frame video before any still; stills unde
   const stock = provider("pixabay", false, { video: [item("v1", "video", 1920, false)], image: [item("s1", "image", 4000, false)] });
   const commons = provider("wikimedia", true, { image: [item("a1", "image", 3000, true)] });
   // The order itself: stock video leads every shot but real history; history leads with the archive photo.
-  assert.deepEqual(shotSearchPlan("R3", [commons, stock]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["video:pixabay", "image:pixabay", "image:wikimedia"]);
+  assert.deepEqual(shotSearchPlan("R3", [commons, stock]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["video:pixabay", "image:pixabay"], "no archive for a shot that is not history");
   assert.deepEqual(shotSearchPlan("R2", [commons, stock]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["image:wikimedia", "video:pixabay", "image:pixabay"]);
+  assert.deepEqual(shotSearchPlan("R3", [commons]).map((s) => `${s.kind}:${s.providers.map((p) => p.id)}`), ["image:wikimedia"], "with no stock set, the archives stand in");
   const md = "SC0001 | 0:00:00-0:00:06 | barber | SHOTS: (1) R3 barber shop | SRC: barber · Q1 \"barber shop\"";
   const r = await chapterMedia({ chapter: "C1", markdown: md, providers: [commons, stock] });
   assert.equal(r.shots[0].pick?.id, "v1", "video wins over a sharp archive photo");
@@ -323,6 +324,9 @@ test("footage first: a shot takes full-frame video before any still; stills unde
   const small = provider("pixabay", false, { video: [], image: [item("s2", "image", 1280, false)] });
   const tiny = provider("wikimedia", true, { image: [item("a2", "image", 1500, true)] });
   const none = await chapterMedia({ chapter: "C1", markdown: md, providers: [tiny, small] });
+  // Video under 1080p is refused too.
+  const low = provider("pixabay", false, { video: [item("v2", "video", 1280, false)], image: [] });
+  assert.equal((await chapterMedia({ chapter: "C1", markdown: md, providers: [low] })).shots[0].status, "missing");
   assert.equal(none.shots[0].status, "missing");
   const sharp = provider("pixabay", false, { video: [], image: [item("s3", "image", 1600, false)] });
   assert.equal((await chapterMedia({ chapter: "C1", markdown: md, providers: [tiny, sharp] })).shots[0].pick?.id, "s3");
