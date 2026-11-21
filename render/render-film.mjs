@@ -11,6 +11,7 @@
  *
  *   node render/render-film.mjs --run productions/x/USA --voice voice/ --out film.mp4
  *   node render/render-film.mjs --api https://ai.zupona.com --id <film id> --out film.mp4
+ *   chunked: --part 3/8 renders the picture of part 3 of 8; --join p1.mp4,...,p8.mp4 joins them and mixes the sound once
  *   options: --voice <SC0001.mp3 ...> --music <M01.mp3 ...> --sfx <SND-FX-01.mp3 ...> --width 1920 --height 1080 --fps 30 --work .render --font /path/font.ttf
  */
 import { mapSvg, routeSvgs } from "./maps.mjs";
@@ -253,7 +254,7 @@ export function retryAfterSeconds(v, now = Date.now()) {
  * @typedef {import("../engine/src/timeline.mjs").Timeline} Timeline
  * oneTrack: the voice system's path: one recording is the whole narration, laid from 0:00, never sped up,
  *   slowed, cut or re-ordered (the timeline was built on its own word times); per-scene voice is ignored.
- * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void }} RenderOptions
+ * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[] }} RenderOptions
  */
 
 /**
@@ -338,8 +339,36 @@ export function glitchIn(seconds, height) {
   ];
 }
 
+/** The transitions drawn from the previous shot's last frame (step 1b). */
+const XFADE = Object.freeze({ whip: ["slideleft", 0.25], slide: ["smoothleft", 0.4], zoom: ["zoomin", 0.35] });
+
+/**
+ * One part of a chunked render: a run of whole shots, the parts about equal in frames. Parts meet on shot
+ * boundaries, so joining their pictures with concat (-c copy) gives the same stream as one render.
+ * @param {{ frames: number }[]} video @param {number} index (0-based) @param {number} count
+ * @returns {{ start: number, end: number, frames: number }}
+ */
+export function partRange(video, index, count) {
+  if (!Number.isInteger(count) || count < 1 || !Number.isInteger(index) || index < 0 || index >= count) throw new Error(`Part ${index + 1}/${count} is not a valid part.`);
+  const total = video.reduce((n, v) => n + v.frames, 0);
+  // Part k starts at the first shot whose start reaches k/count of the film.
+  const startOf = (/** @type {number} */ k) => {
+    if (k === 0) return 0;
+    if (k >= count) return video.length;
+    let frames = 0;
+    for (let i = 0; i < video.length; i += 1) { if (frames >= (total * k) / count) return i; frames += video[i].frames; }
+    return video.length;
+  };
+  const start = startOf(index);
+  const end = Math.max(start, startOf(index + 1));
+  return { start, end, frames: video.slice(start, end).reduce((n, v) => n + v.frames, 0) };
+}
+
 /**
  * Render the timeline. Returns what was rendered and every warning.
+ * With `part`, only that part's picture is rendered to outFile (no sound): a chunked render's job.
+ * With `joinParts`, the parts' pictures are joined (no shot rendered) and the sound is mixed once over the
+ * whole film, so loudness is measured and set on the whole, exactly as in one render.
  * @param {RenderOptions} o
  */
 export async function renderFilm(o) {
@@ -423,7 +452,14 @@ export async function renderFilm(o) {
   // 1. Picture: one cached segment per shot, rendered in parallel.
   /** @type {string[]} */
   const segments = new Array(t.video.length);
-  await pool(t.video, limit, async (v, i) => {
+  const range = o.part ? partRange(t.video, o.part.index, o.part.count) : { start: 0, end: t.video.length, frames: 0 };
+  // A part's first shot that opens with a move from the shot before needs that shot too (its last frame), and
+  // that one the shot before it when it also opens with a move: the chain is redone so the frames are the same.
+  const needsBefore = (/** @type {number} */ i) => i > 0 && Boolean(t.video[i].transition && t.video[i].transition !== "flash" && XFADE[/** @type {keyof typeof XFADE} */ (t.video[i].transition)]) && t.video[i - 1].type !== "black";
+  let first = range.start;
+  while (first > 0 && needsBefore(first)) first -= 1;
+  await pool(o.joinParts ? [] : t.video, limit, async (v, i) => {
+    if (i < first || i >= range.end) return;
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
     const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
@@ -716,10 +752,9 @@ export async function renderFilm(o) {
   });
   // 1b. Transitions that need the shot before: a whip, a slide or a zoom from its last frame into this shot.
   // The shot keeps its length (the move happens over its first frames), so the film's clock never shifts.
-  const XFADE = { whip: ["slideleft", 0.25], slide: ["smoothleft", 0.4], zoom: ["zoomin", 0.35] };
-  for (let i = 1; i < t.video.length; i += 1) {
+  for (let i = Math.max(1, first); i < (o.joinParts ? 0 : range.end); i += 1) {
     const v = t.video[i];
-    const kind = v.transition && v.transition !== "flash" ? XFADE[v.transition] : null;
+    const kind = v.transition && v.transition !== "flash" ? XFADE[/** @type {keyof typeof XFADE} */ (v.transition)] : null;
     if (!kind || t.video[i - 1].type === "black") continue;
     const [name, wanted] = kind;
     const duration = Math.min(Number(wanted), v.frames / t.fps / 3);
@@ -734,10 +769,18 @@ export async function renderFilm(o) {
     segments[i] = out;
   }
   const videoList = join(o.workDir, "video.txt");
-  writeFileSync(videoList, segments.map((s) => `file '${resolve(s).replace(/'/g, "'\\''")}'`).join("\n") + "\n");
-  const videoFile = join(o.workDir, "video.mp4");
+  const pictures = o.joinParts ?? segments.slice(range.start, range.end);
+  writeFileSync(videoList, pictures.map((s) => `file '${resolve(s).replace(/'/g, "'\\''")}'`).join("\n") + "\n");
+  const videoFile = o.part ? o.outFile : join(o.workDir, "video.mp4");
   await run(ffmpeg, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", videoList, "-c", "copy", videoFile]);
-  log("picture: joined");
+  if (o.part) {
+    // A part is picture only: the join mixes the sound once over the whole film.
+    const report = { part: o.part.index + 1, of: o.part.count, shots: [range.start, range.end], frames: range.frames, stats, warnings };
+    writeFileSync(o.outFile.replace(/\.mp4$/i, "") + ".part.json", JSON.stringify(report, null, 1));
+    log(`picture: part ${o.part.index + 1}/${o.part.count} (shots ${range.start}-${range.end - 1}, ${range.frames} frames)`);
+    return /** @type {any} */ (report);
+  }
+  log(o.joinParts ? `picture: ${o.joinParts.length} parts joined` : "picture: joined");
 
   // 2. Narration: each scene's voice in its slot, sped up at most 15%, silence elsewhere.
   //    One-track films (the voice system): the recording itself, untouched in time.
@@ -1039,7 +1082,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--part i/N | --join part1.mp4,part2.mp4,...] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -1091,7 +1134,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
   }
   const workDir = args.work ?? ".render";
-  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l) });
+  // Chunked render: --part i/N renders that part's picture only; --join a.mp4,b.mp4,... joins the parts and mixes the sound.
+  const partArg = typeof args.part === "string" ? /^(\d+)\/(\d+)$/.exec(args.part) : null;
+  if (args.part && !partArg) throw new Error(`--part must look like 2/8, not "${args.part}".`);
+  const part = partArg ? { index: Number(partArg[1]) - 1, count: Number(partArg[2]) } : undefined;
+  const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
+  if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
   // The three A/B thumbnails from the S7 briefs, next to the film.
   const s7 = await loadRunText(from, "s7.md");
   if (s7) {
