@@ -23,4 +23,8 @@ Every worker chat is given exactly one file here. These rules hold for every mis
 - **Reporting:** report to the Zupona BOSS session (session_018ZdrYZ2w2t2RcK58Ch7YsV) in at most 5 Bangla
   lines, only when an item that has a proof is done.
 
+**The roster is the job description.** Before you build, read the roles your mission touches in
+`engine/src/agent-roster.mjs` (their mission, deliverable and ROLE_STATUS). Make those roles real and
+expert-grade on the voiceover path, and update their status honestly.
+
 Read `docs/TRANSFORMATION.md` once; the gates in its section 4 are the standard.

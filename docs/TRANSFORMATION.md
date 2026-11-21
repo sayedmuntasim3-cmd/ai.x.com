@@ -18,7 +18,8 @@ Because of that:
   Matchmaker and Edit Director.
 - The renderer's existing craft is never triggered: maps.mjs, FX-CHART, FX-KINETIC, FX-HIGHLIGHT,
   whip/slide/zoom-through transitions and parallax. All of these wait for FX/TRANS fields that nobody writes.
-- Nothing looks at a picture. There is no seeing model, and PEXELS_API_KEY is unset.
+- Nothing looks at a picture: there is no seeing model. Video comes from Pixabay video (key already on the
+  Worker) and the free archives. Pexels is optional and used only if a key ever appears.
 - The release gate checks that the film *exists* (no black frames, loudness), not that it is *good*.
 
 Roster truth (`engine/src/agent-roster.mjs` ROLE_STATUS): 151 roles = 65 code + 45 model + 6 built (not
@@ -39,8 +40,8 @@ wired) + 35 planned. Nothing is lost on older branches: every one is behind main
   Instead we use:
   - YouTube Data API metadata (views, duration, dates, chapters);
   - public writing about these creators;
-  - **the owner's own phone screen recordings of the references.** We measure these frame by frame: cut
-    rate, share of moving footage, text moments.
+  - public analyses of these creators' craft.
+  - We do **not** ask the owner for recordings or keys: he expects the work done without him.
   - 50+ reference links the owner already sent are waiting in `docs/YOUTUBE_BENCHMARKS.md` ("not analysed
     yet").
 - **Visuals cannot replace a weak voiceover hook.** In voiceover mode the words belong to the creator. The
@@ -83,7 +84,8 @@ wired) + 35 planned. Nothing is lost on older branches: every one is behind main
    - Automatic measures, per shot and per film (the gates below).
    - A contact sheet per chapter.
    - Weak shots are sent back to stage 4 or 5, at most twice.
-   - The owner judges the 3-minute test slice beside a reference recording; his verdict is the last gate.
+   - **The owner sees nothing until the Boss is sure.** The Boss judges the 3-minute test slice against the
+     reference standard (hook, rhythm, visuals, sound) and iterates internally until every gate holds.
 
 ## 4. Quality gates for the 3-minute test slice (the first 3:00 of 993f09ea, which includes the hook)
 | Measure | Target |
@@ -100,7 +102,7 @@ wired) + 35 planned. Nothing is lost on older branches: every one is behind main
 | Native resolution | ≥ 1080p |
 | First 30 s | ≥ 6 visual beats; the strongest shots front-loaded; title by 0:40 |
 | Sound | a cue on every designed moment; music ducked 8 dB or more under the voice; -14 ±1 LUFS |
-| Owner's side-by-side verdict against his chosen reference | "pass" |
+| The Boss's own side-by-side verdict against reference metrics (written evidence) | "pass", before the owner sees anything |
 
 ## 5. Visual identity: Zupona, not a copy of anyone
 One house look, used by every graphic:
