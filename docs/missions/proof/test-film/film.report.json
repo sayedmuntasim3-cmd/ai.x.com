@@ -5,16 +5,16 @@
  "height": 720,
  "fps": 30,
  "stats": {
-  "clips": 49,
+  "clips": 48,
   "cards": 7,
   "black": 0,
-  "scenes": 56,
-  "segmentsRendered": 56,
-  "segmentsCached": 0,
+  "scenes": 55,
+  "segmentsRendered": 1,
+  "segmentsCached": 54,
   "audioRendered": 0,
   "clipsFailed": 0,
   "transitions": 0,
-  "designedShots": 5,
+  "designedShots": 0,
   "depthShots": 0,
   "edit": {
    "punchIns": 0,
@@ -22,8 +22,8 @@
    "glitches": 0
   }
  },
- "voicedScenes": 56,
- "narratedScenes": 56,
+ "voicedScenes": 55,
+ "narratedScenes": 55,
  "oneTrack": "dry.wav",
  "musicCues": {
   "scripted": 0,
@@ -103,11 +103,6 @@
   {
    "url": "https://cdn.pixabay.com/video/2023/07/12/171326-845431824_large.mp4",
    "sourcePageUrl": "https://pixabay.com/videos/id-171326/",
-   "licence": "Pixabay Content License"
-  },
-  {
-   "url": "https://cdn.pixabay.com/video/2021/03/21/68559-528689157_large.mp4",
-   "sourcePageUrl": "https://pixabay.com/videos/id-68559/",
    "licence": "Pixabay Content License"
   },
   {

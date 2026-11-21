@@ -13,8 +13,8 @@
 ["32.70","35.90","He founded Ramesh Tours and Travels,","v","parking lot cars|white cars parked|taxi rank"],
 ["35.90","38.80","a car rental company in Bengaluru,","card","FX-MAP Bengaluru (12.97, 77.59)"],
 ["38.80","42.90","a city once called Bangalore, one note before the numbers.","card","FX-KINETIC \"From Barber to Rolls-Royce\""],
-["42.90","46.00","Dollar figures here are rupees at that year's exchange rate,","v","rupee|indian currency"],
-["46.00","48.80","adjusted to today's money.","v","calculator money|counting money"],
+["42.90","48.80","Dollar figures here are rupees at that year's exchange rate, adjusted to today's money.","v","rupee|indian currency"],
+["46.00","48.80","adjusted to today's money.","skip","calculator money|counting money"],
 ["48.80","52.40","First the car, a Rolls-Royce Ghost,","v","rolls-royce phantom|luxury sedan black|chauffeur car"],
 ["52.40","58.00","bought in 2011 by most accounts. One report says 2010,","card","FX-SPLIT \"2011 / 2010\" header \"The year he bought it\""],
 ["58.00","58.90","then the chair.","skip","hairdresser chair|barbershop interior empty|retro barbershop"],
@@ -54,4 +54,9 @@
 ["169.80","171.60","Buses, bicycles,","v","bus india|bus street"],
 ["171.60","172.90","hand carts,","v","hand cart|cart street india"],
 ["172.90","176.50","the steady noise of traffic on a busy commercial road in a growing city","v","traffic india|busy road traffic"],
-["176.50","180.00","and the shop stayed open.","v","indian shop night|street shop night|market night india"]]
+["176.50","180.00","and the shop stayed open.","v","indian shop night|street shop night|market night india"],
+["0","0","x","v","indian barber|roadside barber india|street barber"],
+["0","0","x","v","indian coins|rupee coins|one rupee coin"],
+["0","0","x","v","indian woman shop|woman selling shop india|indian shopkeeper"],
+["0","0","x","v","bangalore|karnataka|mg road bangalore"],
+["0","0","x","v","old india street|vintage india|kolkata old street"]]

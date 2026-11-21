@@ -9,7 +9,7 @@ const lines = [], media = [], plan = [];
 let n = 0;
 for (const [i, s] of shots.entries()) {
   const [a, b, sentence, kind, q] = s;
-  if (kind === "skip") continue;
+  if (kind === "skip" || a === b) continue;
   n += 1;
   const sc = `SC${String(n).padStart(4, "0")}`;
   let SHOTS, FX = "";
