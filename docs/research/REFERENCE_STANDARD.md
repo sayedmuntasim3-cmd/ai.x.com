@@ -56,3 +56,6 @@ Source: YouTube Help, "Audience retention", https://support.google.com/youtube/a
 
 ## Craft numbers still to source (needed for the Gate)
 Median shot length, moving-footage versus stills share, text and graphic moments per minute, transitions, and when the title lands. Not measured yet; do not quote any such number until each has a public source or is marked "my reading". The only timing measured so far is chapter spacing (chapters exist in 24 of the owner's 46 links), still to be computed from `data/owner-links.json`.
+
+## Viral study (21 Nov)
+36 videos of 10M+ views across niches, with title/thumbnail/chapter patterns and per-film rules for Zupona: see `VIRAL_STUDY.md` (gaps in space, nature, business, motivation listed there).
