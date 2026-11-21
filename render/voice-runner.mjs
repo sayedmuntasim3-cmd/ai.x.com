@@ -8,7 +8,8 @@
  *   node render/voice-runner.mjs summary --run voice-run [--stages pictures]   (intake, words, understand, master, pictures, from the run's files)
  *   node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json [--review]
  *
- * Environment: SITE (https://...), VOICE_ID, VOICE_TICKET; RUN_URL (optional, the Actions run page).
+ * Environment: SITE (https://...), VOICE_ID, VOICE_TICKET; RUN_URL (optional, the Actions run page);
+ * VOICE_SELFTEST=1 sends nothing (the workflow's self-test).
  */
 import { createWriteStream, existsSync, readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
@@ -115,6 +116,8 @@ export async function deliver(c, file, o) {
 
 async function main() {
   const a = parseArgs(process.argv.slice(2));
+  // The workflow's self-test (voice-film.yml, selftest: yes) has no studio recording: nothing is sent.
+  if (process.env.VOICE_SELFTEST === "1") { console.log(`self-test, not sent to the studio: ${a._}${a.stage ? ` ${a.stage}` : ""}${a.error ? `: ${a.error}` : ""}`); return; }
   const c = { site: String(process.env.SITE ?? ""), id: String(process.env.VOICE_ID ?? ""), ticket: String(process.env.VOICE_TICKET ?? "") };
   if (!/^https?:\/\/[\w.-]+(:\d+)?$/.test(c.site) || !/^[0-9a-f-]{36}$/.test(c.id) || !c.ticket) throw new Error("Set SITE, VOICE_ID and VOICE_TICKET.");
   const runUrl = process.env.RUN_URL || undefined;

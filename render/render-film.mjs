@@ -208,6 +208,9 @@ async function downloadClip(url, dir) {
           else if (res.status === 404 || res.status === 410) { lastError = err; break; }
           throw err;
         }
+        // An archive master of several GB (seen: 3.6 GB) takes many minutes and cannot be held: a text card stands in at once.
+        const bytes = Number(res.headers.get("content-length"));
+        if (bytes > MAX_CLIP_BYTES) { await res.body?.cancel(); lastError = new Error(`the file is ${Math.round(bytes / 1e6)} MB, over the ${MAX_CLIP_BYTES / 1e6} MB limit`); break; }
         writeFileSync(file + ".part", Buffer.from(await res.arrayBuffer()));
         renameSync(file + ".part", file);
         return file;
@@ -224,6 +227,8 @@ async function downloadClip(url, dir) {
 /** Archives ask for a User-Agent that names the tool (Wikimedia answers 429 to anonymous bulk downloads). */
 const DOWNLOAD_UA = "ZuponaStudio/1.0 (documentary renderer; https://github.com/sayedmuntasim3-cmd/ai.x.com)";
 const DOWNLOAD_ATTEMPTS = 7;
+/** Larger clips are skipped (a text card stands in): one shot never needs more. */
+const MAX_CLIP_BYTES = 400e6;
 /** Hosts that throttle bulk downloads get one download at a time, with a short gap. */
 const POLITE_HOSTS = /(^|\.)(wikimedia\.org|wikipedia\.org|loc\.gov|si\.edu|artic\.edu|archive\.org)$/i;
 const POLITE_GAP_MS = 400;
@@ -362,6 +367,19 @@ export function partRange(video, index, count) {
   const start = startOf(index);
   const end = Math.max(start, startOf(index + 1));
   return { start, end, frames: video.slice(start, end).reduce((n, v) => n + v.frames, 0) };
+}
+
+/**
+ * The one gain step that brings a measured master to -14 LUFS, or null when it is within 0.5 LU (or unmeasured).
+ * A limiter is added only when the gain would lift the true peak above -1.2 dBTP.
+ * @param {{ integratedLufs: number | null, truePeakDbtp: number | null }} master
+ * @returns {{ gain: number, af: string } | null}
+ */
+export function loudnessFix(master) {
+  if (master.integratedLufs === null || !Number.isFinite(master.integratedLufs) || Math.abs(master.integratedLufs + 14) <= 0.5) return null;
+  const gain = Math.round((-14 - master.integratedLufs) * 100) / 100;
+  const peak = (master.truePeakDbtp ?? -99) + gain;
+  return { gain, af: peak > -1.2 ? `volume=${gain}dB,alimiter=limit=${Math.pow(10, -1.5 / 20).toFixed(4)}:level=disabled` : `volume=${gain}dB` };
 }
 
 /**
@@ -986,6 +1004,19 @@ export async function renderFilm(o) {
   /** @type {Awaited<ReturnType<typeof measureMaster>> | null} */
   let master = null;
   try { master = await measureMaster(o.outFile, ffmpeg); } catch (error) { warnings.push(`The master could not be measured: ${error instanceof Error ? error.message : error}`); }
+  // One-pass loudnorm can land off target on short or quiet material (a rough own-voice take came out at -15.3 LUFS):
+  // a measured master more than 0.5 LU away gets one exact gain step on the audio only (the picture is copied), with a
+  // limiter only when the gain would lift the true peak above -1 dBTP; then it is measured again.
+  const fix = master && anySound && t.durationSeconds >= 3 ? loudnessFix(master) : null;
+  if (fix) {
+    const { gain, af } = fix;
+    try {
+      await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
+      renameSync(o.outFile + ".gain.mp4", o.outFile);
+      master = await measureMaster(o.outFile, ffmpeg);
+      log(`master: loudness corrected by ${gain} dB to ${master.integratedLufs} LUFS`);
+    } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); }
+  }
   if (master) {
     const normalised = anySound && t.durationSeconds >= 3;
     if (normalised && master.integratedLufs !== null && Math.abs(master.integratedLufs + 14) > 1) warnings.push(`Master loudness is ${master.integratedLufs} LUFS; the target is -14 LUFS within 1 LU.`);
