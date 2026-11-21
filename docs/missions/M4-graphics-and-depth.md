@@ -7,7 +7,7 @@ Must not touch: the audio mix (M5), the chunk and join logic (King's 5), and med
 
 ## Checklist
 - [x] Zupona identity tokens (two free fonts, accent colour, easing, grade pair) in render/graphics/brand.
-- [ ] Templates, each driven by the existing FX fields where they exist (FX-KINETIC, FX-CHART, maps.mjs):
+- [x] Templates, each driven by the existing FX fields where they exist (FX-KINETIC, FX-CHART, maps.mjs):
       kinetic line, number counter, lower third, quote card, chapter title, timeline, document or newspaper
       reveal. A short MP4 sample of each, with frames checked.
 - [ ] Depth 2.5D: a still gets a depth map and a real camera move (dolly, orbit, rack focus), with artefact
@@ -25,3 +25,4 @@ and no shot over 8 s without movement. Before/after frames are sent to the Boss.
 
 ## Log
 - 2026-11-21: brand tokens in render/graphics/brand/brand.mjs (Fraunces + Inter, OFL, woff2 inlined; accent #F2A93B; one bezier ease family; warm/cool grade). Evidence: node --test render/graphics/graphics.test.mjs, 2 pass.
+- 2026-11-21: 7 templates (render/graphics/templates.mjs), frame-exact Playwright renderer (render-graphic.mjs; lower third = ProRes 4444 alpha), FX-field mapping (from-shot.mjs). Samples via `node render/graphics/samples.mjs <dir>` (~10 fps at 1080p); frames checked by eye, sheets in render/graphics/samples/. Tests: 5 pass.

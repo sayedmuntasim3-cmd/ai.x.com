@@ -22,3 +22,42 @@ test("brand: one easing family, monotone from 0 to 1", () => {
   assert.ok(ease("out", 0.3) > 0.6, "ease-out arrives fast");
   assert.ok(Math.abs(ease("inOut", 0.5) - 0.5) < 0.02, "in-out is symmetric");
 });
+
+import { TEMPLATES, accentWord } from "./templates.mjs";
+import { graphicFor } from "./from-shot.mjs";
+import { counterParts } from "../render-film.mjs";
+import { SAMPLES } from "./samples.mjs";
+
+const F = { width: 1920, height: 1080, fps: 30, seconds: 4 };
+
+test("templates: every one makes a self-contained page with a seek function and no CSS animation", () => {
+  assert.equal(Object.keys(TEMPLATES).length, 7);
+  for (const [name, data] of SAMPLES) {
+    const html = /** @type {any} */ (TEMPLATES[name]).html(data, F);
+    assert.match(html, /window\.__seek=function\(t\)/, name);
+    assert.doesNotMatch(html, /@keyframes|transition:/, name);
+    assert.doesNotMatch(html, /src=["']https?:|url\(https?:/, `${name} needs no network`);
+  }
+});
+
+test("templates: text is escaped and never invented", () => {
+  const html = TEMPLATES.kinetic.html({ text: "<script>x</script> & more" }, F);
+  assert.doesNotMatch(html, /<script>x<\/script>/);
+  const doc = TEMPLATES.document.html({ text: "Only these words." }, F);
+  assert.doesNotMatch(doc, /class="mast"/, "no made-up masthead when none is given");
+  assert.equal(accentWord("The river that built an empire"), "empire");
+});
+
+test("from-shot: the existing FX fields choose the template, everything else falls back", () => {
+  assert.equal(graphicFor({ type: "card", counter: true, text: "2,300,000 people" }, { counterParts })?.data.value, 2300000);
+  assert.equal(graphicFor({ type: "card", kinetic: true, text: "The empire fell" })?.template, "kinetic");
+  assert.deepEqual(graphicFor({ type: "card", text: "“Veni, vidi, vici.” — Julius Caesar" })?.data, { quote: "Veni, vidi, vici.", by: "Julius Caesar" });
+  assert.equal(graphicFor({ type: "card", style: "paper", text: "Signed in 1215", highlight: "1215" })?.template, "document");
+  assert.equal(graphicFor({ type: "card", chapterTitle: "The Long Winter", text: "x" })?.template, "chapter");
+  assert.equal(graphicFor({ type: "clip", title: "Runnymede, 1215", url: "u" })?.alpha, true);
+  assert.equal(graphicFor({ type: "card", text: "plain words" }), null);
+  assert.equal(graphicFor({ type: "card", kinetic: true, text: "x", chart: { title: "", bars: [] } }), null);
+  assert.equal(graphicFor({ type: "black" }), null);
+  assert.equal(graphicFor({ type: "card", graphic: { template: "timeline", data: { items: [] } } })?.template, "timeline");
+  assert.equal(graphicFor({ type: "card", graphic: { template: "nope", data: {} }, text: "a" }), null);
+});
