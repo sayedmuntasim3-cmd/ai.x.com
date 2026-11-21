@@ -15,6 +15,7 @@
  *   GET  /api/films/:id/script       the narration script for recording it yourself (one line per scene file)
  *   POST /api/films/:id/scenes/:sc   { instruction } -> re-make one scene, checked in code, with fresh footage   (Bearer STUDIO_TOKEN)
  *   POST /api/films/:id/pictures     { shot: "SC0012-1", url } -> the owner's own picture for a shot (empty url removes it); the render downloads it   (Bearer STUDIO_TOKEN)
+ *   GET  /api/videos?ids=a,b | ?handle=@x  -> read-only video metadata with chapters (Bearer STUDIO_TOKEN)
  *   GET  /api/youtube/connect        -> { url } Google sign-in for read-only YouTube Analytics   (Bearer STUDIO_TOKEN)
  *   GET  /api/youtube/callback       Google returns here; the refresh token is kept in R2
  *   POST /api/films/:id/retention    { video } -> learn where viewers left the published film   (Bearer STUDIO_TOKEN)
@@ -62,7 +63,7 @@ import { anthropicBatchModel, permanentError, savingModel } from "./anthropic.mj
 import { brainFromEnv, brainHealth } from "./brain.mjs";
 import { dispatchRender } from "./github.mjs";
 import { listFilms } from "./films.mjs";
-import { radarSearch } from "./youtube.mjs";
+import { radarSearch, videoDetails } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
 import { handleVoice } from "./voice-api.mjs";
@@ -276,6 +277,13 @@ export default {
           put: async (key, text) => { await env.FILMS.put(key, text); },
         } : undefined;
         const result = await radarSearch({ apiKey: env.YOUTUBE_API_KEY, query: url.searchParams.get("q"), months: url.searchParams.get("months") ?? undefined, language: url.searchParams.get("lang") ?? undefined, cache });
+        return result.ok ? json(result) : json({ error: result.error }, result.status);
+      }
+      if (url.pathname === "/api/videos" && request.method === "GET") {
+        // Read-only video metadata (ids or a @handle), same key and same studio token as /api/ideas.
+        if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your YouTube quota." }, 503);
+        if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
+        const result = await videoDetails({ apiKey: env.YOUTUBE_API_KEY, ids: url.searchParams.get("ids") ?? undefined, handle: url.searchParams.get("handle") ?? undefined, max: url.searchParams.get("max") ?? undefined });
         return result.ok ? json(result) : json({ error: result.error }, result.status);
       }
       if (url.pathname === "/api/films" && request.method === "GET") {
