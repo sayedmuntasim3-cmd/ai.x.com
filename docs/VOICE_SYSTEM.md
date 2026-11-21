@@ -301,3 +301,15 @@ a known EveryAyah recording.
   the person's times; the run keeps every pause (`--tighten off`) so the taps on the uploaded file stay exact.
 - Not verified live yet: a real reviewer pass on Ad-Duha (film e1484358 needs one retry first, so its delivery
   carries the ayah list).
+
+### Speed, step 1 (20 Nov 2026; owner's target: a 40-minute voiceover to video in 10-20 minutes)
+
+Measured before: speech-to-text 13 min, pictures 31 min, render 1 h 55 min (2 h 43 min in all).
+- Speech-to-text: batched greedy decoding (`transcribe.py --batch`, faster-whisper `BatchedInferencePipeline`) with
+  base.en. Same 5 minutes of the real narration: small.en beam 5 75.2 s, word error 12.6 %; small.en batched 31.7 s,
+  12.6 %; **base.en batched 10.9 s, 12.9 %** (the error rate counts names and numbers written differently in the script,
+  the same for all). The film machine sets `ZUPONA_STT_BATCH=8` and base.en.
+- Pictures: shots are searched six at a time (`chapterMedia` `concurrency`, `runPool`), each provider's rate limiter
+  still paces its host. Same 17 shots of the 1:42 run, live archives: 123.6 s one at a time, **41.1 s** six at a time,
+  17 of 17 found both ways. Pictures cannot start before the words (the searches come from them).
+- Render: the chunked parallel render (matrix jobs) is being built by another session; wired in when it lands.

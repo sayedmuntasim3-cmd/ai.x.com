@@ -85,6 +85,16 @@ export function shotParts(field) {
 }
 
 /**
+ * Run fn over items, at most `limit` at a time, in order of start.
+ * @template T @param {T[]} items @param {number} limit @param {(item: T, index: number) => Promise<void>} fn
+ */
+export async function runPool(items, limit, fn) {
+  let next = 0;
+  const worker = async () => { while (next < items.length) { const i = next; next += 1; await fn(items[i], i); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+/**
  * Does a picture's title name every word searched, as whole words? ("car" is
  * not in "Carina Nebula"; "bill" is not in "Long-billed Curlew".) An untitled
  * candidate passes: some stock sites give no title. Plural and possessive
@@ -192,7 +202,7 @@ function toPick(c) {
  * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
  * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
  * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean> }} o
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -218,14 +228,16 @@ export async function chapterMedia(o) {
   const shots = [];
   /** @type {Map<ShotMedia, import("./documentary-media-fetch.mjs").MediaCandidate[]>} */
   const pools = new Map();
-  for (const shot of stockShots(o.markdown)) {
+  const list = stockShots(o.markdown);
+  /** One shot's search; shots[at] keeps the film order whatever finishes first. @param {StockShot} shot @param {number} at */
+  const one = async (shot, at) => {
     /** @type {ShotMedia} */
     const row = { ...shot, status: shot.queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
     const earlier = o.done?.[shotKey(row)];
     if (earlier) {
       if (earlier.status === "found" && earlier.pick) history.add(earlier.pick.id, shot.start);
-      shots.push(earlier);
-      continue;
+      shots[at] = earlier;
+      return;
     }
     search: for (const step of plan(shot.rung)) for (const query of shot.queries) {
       const found = await fetchShotMedia(
@@ -256,8 +268,10 @@ export async function chapterMedia(o) {
       history.add(best.id, shot.start);
       break search;
     }
-    shots.push(row);
-  }
+    shots[at] = row;
+  };
+  // Shots are searched a few at a time when asked (voiceover films); each provider's rate limiter still paces it.
+  await runPool(list, Math.max(1, o.concurrency ?? 1), one);
 
   if (o.judge && pools.size) {
     // Ask the judge, batch by batch; a failed batch falls back to search order.
