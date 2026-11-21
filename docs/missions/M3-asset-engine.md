@@ -55,9 +55,11 @@ are video, every shot is native ≥1080p, and the time taken is reported.
   Proof, 993f09ea 0:00-3:00 (M2's beats.json, no brain, same queries both sides): proof/M3/993f09ea-eyes-before.jpg and
   -after.jpg (every shot's pick). Before: 19 of 29 off-topic by eye (Jupiter, waterfall, NASA, Pakistani notes, film strip,
   abstract ink, a New Zealand fire brigade, a jungle river, beach chair...), 8 blank (Commons previews failed: fixed, 330 px).
-  After: 0 off-country, 0 dollars, 0 abstract or film strip, 0 Amazon, 0 blonde; 5 are India but not Bengaluru (above).
-  Video 13/29 (45 %) -> 21/29 (72 %); every pick >=1080p video or >=1600 px still by the provider's own size.
-  Time on 4 CPUs: 120 s cold (1968 thumbnails: search 29 s, seeing 91 s), 22 s with the cache. Model ~600 MB, cached.
+  After: 0 off-country, 0 dollars, 0 abstract or film strip, 0 Amazon, 0 blonde; 6 are India but not Bengaluru (above).
+  Video 13/29 (45 %) -> 25/29 (86 %); every pick >=1080p video or >=1600 px still by the provider's own size.
+  Time on 4 CPUs, pinned torch 2.7.1 + open_clip 2.29.0, cold cache: 205 s (1983 thumbnails, 7 unfetched; search 11 s,
+  seeing 193 s, with the test suite running beside it); 22 s with a warm cache. A first cold run without download retries
+  lost ~500 thumbnails and fell to 14/29 video: retries (3 tries) and a firmer video edge (0.5) fixed it. Model ~600 MB, cached.
   Not done: a trained aesthetic head (GitHub raw is blocked here; a CLIP quality prompt stands in), Internet Archive video
   (its public-domain films measured 640 px wide, 6 of 6 Prelinger items: they fail the 1080p gate), sequence continuity
   (item 5). Unverified: the workflow step on a GitHub runner (run here in the cloud container).
