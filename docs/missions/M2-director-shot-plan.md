@@ -28,6 +28,8 @@ are green.
 ## Found for others
 - Node's fetch ignores HTTPS_PROXY: in a cloud container Groq/Gemini answer 401 unless NODE_USE_ENV_PROXY=1 (not needed on the owner's machine or a plain runner).
 
+- voice-stt.yml runs local/voice-film.mjs without `npm ci`: red on main since #44 (`@anthropic-ai/sdk` not found). Needs an `npm ci` step (workflows are not M2's).
+
 ## Log
 - 2026-11-21: `--slice a-b` in local/voice-film.mjs (cutSlice → slice.wav + slice.json; a --transcript is cut and moved to 0; refused with --script). Proof: 3 new tests in local/voice-film.test.mjs; a 20 s file sliced 0:05-0:15 ran intake→words→understanding→pictures (20 of 40 words, 0-9.9 s). Full checks green.
 - 2026-11-21: PR #41 merged (CI green, preview / and /studio/ 200, production /api/health ok). Free brain: local/voice-film.mjs voiceBrain (Groq, then the Gemini pool; BRAIN=claude refused), planVoiceVisuals brainBatches (whole sections per batch, ≤14k chars; a 429 day-over stops calls, rest from words). Proof: real Groq run on the Gettysburg fixture, 1/1 batch planned, words intact; 3 new tests; full checks green.
