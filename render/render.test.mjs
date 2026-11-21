@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { buildTimeline } from "../engine/src/timeline.mjs";
-import { mediaDuration, partRange, renderFilm, run } from "./render-film.mjs";
+import { loudnessFix, measureMaster, mediaDuration, partRange, renderFilm, run } from "./render-film.mjs";
 
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
 
@@ -567,4 +567,24 @@ test("a chunked render (parts on separate runners, then a join) gives the same f
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a master off -14 LUFS gets one exact gain step; within 0.5 LU it is left alone", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+  assert.equal(loudnessFix({ integratedLufs: -14.4, truePeakDbtp: -3 }), null);
+  assert.equal(loudnessFix({ integratedLufs: null, truePeakDbtp: null }), null);
+  assert.deepEqual(loudnessFix({ integratedLufs: -20, truePeakDbtp: -12 }), { gain: 6, af: "volume=6dB" });
+  assert.match(String(loudnessFix({ integratedLufs: -15.3, truePeakDbtp: -0.5 })?.af), /^volume=1\.3dB,alimiter=/);
+  const dir = mkdtempSync(join(tmpdir(), "zupona-gain-"));
+  try {
+    // A quiet master (about -24 LUFS), as one-pass loudnorm can leave a rough take; one step brings it to -14.
+    const film = join(dir, "film.mp4");
+    await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=gray:s=160x90:r=30:d=8", "-f", "lavfi", "-i", "sine=f=440:d=8,volume=0.05", "-c:v", "libx264", "-c:a", "aac", "-shortest", film]);
+    const before = await measureMaster(film);
+    const fix = loudnessFix(before);
+    assert.ok(fix && fix.gain > 5, `a quiet master needs gain (${before.integratedLufs})`);
+    await run("ffmpeg", ["-v", "error", "-y", "-i", film, "-map", "0", "-c:v", "copy", "-af", fix.af, "-c:a", "aac", "-b:a", "192k", join(dir, "fixed.mp4")]);
+    const after = await measureMaster(join(dir, "fixed.mp4"));
+    assert.ok(Math.abs(/** @type {number} */ (after.integratedLufs) + 14) <= 0.5, `corrected to -14 within 0.5 LU (${after.integratedLufs})`);
+    assert.ok(/** @type {number} */ (after.truePeakDbtp) <= -1, `true peak at most -1 dBTP (${after.truePeakDbtp})`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

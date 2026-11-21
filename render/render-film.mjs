@@ -365,6 +365,19 @@ export function partRange(video, index, count) {
 }
 
 /**
+ * The one gain step that brings a measured master to -14 LUFS, or null when it is within 0.5 LU (or unmeasured).
+ * A limiter is added only when the gain would lift the true peak above -1.2 dBTP.
+ * @param {{ integratedLufs: number | null, truePeakDbtp: number | null }} master
+ * @returns {{ gain: number, af: string } | null}
+ */
+export function loudnessFix(master) {
+  if (master.integratedLufs === null || !Number.isFinite(master.integratedLufs) || Math.abs(master.integratedLufs + 14) <= 0.5) return null;
+  const gain = Math.round((-14 - master.integratedLufs) * 100) / 100;
+  const peak = (master.truePeakDbtp ?? -99) + gain;
+  return { gain, af: peak > -1.2 ? `volume=${gain}dB,alimiter=limit=${Math.pow(10, -1.5 / 20).toFixed(4)}:level=disabled` : `volume=${gain}dB` };
+}
+
+/**
  * Render the timeline. Returns what was rendered and every warning.
  * With `part`, only that part's picture is rendered to outFile (no sound): a chunked render's job.
  * With `joinParts`, the parts' pictures are joined (no shot rendered) and the sound is mixed once over the
@@ -989,10 +1002,9 @@ export async function renderFilm(o) {
   // One-pass loudnorm can land off target on short or quiet material (a rough own-voice take came out at -15.3 LUFS):
   // a measured master more than 0.5 LU away gets one exact gain step on the audio only (the picture is copied), with a
   // limiter only when the gain would lift the true peak above -1 dBTP; then it is measured again.
-  if (master && anySound && t.durationSeconds >= 3 && master.integratedLufs !== null && Math.abs(master.integratedLufs + 14) > 0.5) {
-    const gain = Math.round((-14 - master.integratedLufs) * 100) / 100;
-    const peak = (master.truePeakDbtp ?? -99) + gain;
-    const af = peak > -1.2 ? `volume=${gain}dB,alimiter=limit=${Math.pow(10, -1.5 / 20).toFixed(4)}:level=disabled` : `volume=${gain}dB`;
+  const fix = master && anySound && t.durationSeconds >= 3 ? loudnessFix(master) : null;
+  if (fix) {
+    const { gain, af } = fix;
     try {
       await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
       renameSync(o.outFile + ".gain.mp4", o.outFile);
