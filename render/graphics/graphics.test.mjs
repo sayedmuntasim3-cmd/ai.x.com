@@ -52,8 +52,12 @@ test("from-shot: the existing FX fields choose the template, everything else fal
   assert.equal(graphicFor({ type: "card", counter: true, text: "2,300,000 people" }, { counterParts })?.data.value, 2300000);
   assert.equal(graphicFor({ type: "card", kinetic: true, text: "The empire fell" })?.template, "kinetic");
   assert.deepEqual(graphicFor({ type: "card", text: "“Veni, vidi, vici.” — Julius Caesar" })?.data, { quote: "Veni, vidi, vici.", by: "Julius Caesar" });
-  assert.equal(graphicFor({ type: "card", style: "paper", text: "Signed in 1215", highlight: "1215" })?.template, "document");
-  assert.equal(graphicFor({ type: "card", chapterTitle: "The Long Winter", text: "x" })?.template, "chapter");
+  assert.equal(graphicFor({ type: "card", shotType: "document", style: "paper", text: "Signed in 1215", highlight: "1215" })?.template, "document");
+  assert.equal(graphicFor({ type: "card", style: "paper", text: "Signed in 1215", highlight: "1215" }), null);
+  assert.equal(graphicFor({ type: "card", chapterTitle: "Chapter 2 · The Long Winter", text: "" })?.data.kicker, "Chapter 2");
+  assert.notEqual(graphicFor({ type: "card", chapterTitle: "Chapter 2 · Winter", text: "The snow came early" })?.template, "chapter", "a card's own words are kept");
+  assert.equal(graphicFor({ type: "card", shotType: "kinetic-type", text: "The snow came early" })?.template, "kinetic");
+  assert.equal(graphicFor({ type: "card", shotType: "quote", text: "No surrender" })?.data.quote, "No surrender");
   assert.equal(graphicFor({ type: "clip", title: "Runnymede, 1215", url: "u" })?.alpha, true);
   assert.equal(graphicFor({ type: "card", text: "plain words" }), null);
   assert.equal(graphicFor({ type: "card", kinetic: true, text: "x", chart: { title: "", bars: [] } }), null);
