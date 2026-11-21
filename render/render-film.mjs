@@ -16,6 +16,9 @@
  */
 import { mapSvg, routeSvgs } from "./maps.mjs";
 import { synthSounds } from "./sfx-synth.mjs";
+import { graphicFor } from "./graphics/from-shot.mjs";
+import { renderGraphic, loadPlaywright } from "./graphics/render-graphic.mjs";
+import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 
 /** Levels of the synthesised edit sounds in the effects mix. */
 const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
@@ -399,7 +402,7 @@ export async function renderFilm(o) {
   const font = o.fontFile ?? FONT_CANDIDATES.find((f) => existsSync(f));
   /** @type {string[]} */
   const warnings = [...t.notes];
-  const stats = { segmentsRendered: 0, segmentsCached: 0, audioRendered: 0, clipsFailed: 0, transitions: 0 };
+  const stats = { segmentsRendered: 0, segmentsCached: 0, audioRendered: 0, clipsFailed: 0, transitions: 0, designedShots: 0, depthShots: 0 };
   const fetchClip = o.fetchClip ?? ((url) => downloadClip(url, dirs.clips));
   const limit = o.concurrency ?? Math.max(1, cpus().length - 1);
   // Quality-led encoding with a ceiling: about 6 Mbit/s at 1080p30 (scaled by frame size and rate),
@@ -476,12 +479,23 @@ export async function renderFilm(o) {
   const needsBefore = (/** @type {number} */ i) => i > 0 && Boolean(t.video[i].transition && t.video[i].transition !== "flash" && XFADE[/** @type {keyof typeof XFADE} */ (t.video[i].transition)]) && t.video[i - 1].type !== "black";
   let first = range.start;
   while (first > 0 && needsBefore(first)) first -= 1;
+  // M4: designed graphics (Playwright) and the depth camera (Depth Anything V2 small); either one switches
+  // itself off with one warning when its tools are missing, and the shot keeps its ffmpeg drawing.
+  const pw = o.graphics === false ? null : loadPlaywright();
+  let graphicsOn = Boolean(pw);
+  let depthOn = o.depth !== false;
+  /** @type {Promise<any> | null} */
+  let browser = null;
   await pool(o.joinParts ? [] : t.video, limit, async (v, i) => {
     if (i < first || i >= range.end) return;
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
     const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
-    const key = hash({ v: 10, ...moves, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const graphic = graphicsOn && v.type === "card" ? graphicFor(v, { counterParts }) : null;
+    const designed = graphic && !graphic.alpha ? graphic : null;
+    // The look of an M4 shot joins the key only for shots it draws, so every other cached shot stays valid.
+    const m4 = { ...(designed ? { graphic: [designed.template, designed.data, 1] } : {}), ...(depthOn && v.still && v.frame !== "print" && v.shotType !== "photo-designed" ? { depth: 1 } : {}) };
+    const key = hash({ v: 10, ...moves, ...m4, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -502,7 +516,29 @@ export async function renderFilm(o) {
         const H = t.height;
         const [pw, ph] = (await run(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", src])).trim().split(",").map(Number);
         const plateKey = hash({ still: v.url, w: W, h: H });
-        if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
+        // A photograph as a real camera move through its depth (dolly, orbit or rack focus). "photo-designed"
+        // and prints keep the designed photo-on-a-desk below; a flat picture or a missing tool falls through too.
+        let deep = false;
+        if (m4.depth) {
+          try {
+            const maps = await depthMaps({ src, dir: join(dirs.cards, `${plateKey}-depth`), width: W, height: H });
+            if (maps) {
+              const mv = depthMoveFor(v.move, i);
+              const shot = join(dirs.cards, `${hash({ plateKey, mv, n, fps: t.fps, v: 1 })}-depth.mp4`);
+              if (!existsSync(shot)) await renderDepthShot({ maps, move: mv, width: W, height: H, fps: t.fps, frames: n, out: shot + ".part.mp4", ffmpeg }).then(() => renameSync(shot + ".part.mp4", shot));
+              input = ["-i", shot];
+              chain.push("setsar=1", LOOK);
+              deep = true;
+              stats.depthShots += 1;
+            }
+          } catch (error) {
+            depthOn = false;
+            warnings.push(`depth camera off for this render (${error instanceof Error ? error.message.slice(0, 160) : error}); photos keep the still move.`);
+          }
+        }
+        if (deep) {
+          // drawn above
+        } else if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
           // A portrait or square photograph: 2.5D parallax. The sharp picture grows and drifts one way,
           // its blurred copy behind it the other way, so the photo seems to float in depth.
           const bg = join(dirs.cards, `${plateKey}-bg.png`);
@@ -611,6 +647,23 @@ export async function renderFilm(o) {
         mapped = true;
       } catch (error) {
         warnings.push(`${v.id}: the map could not be drawn (${error instanceof Error ? error.message : error}); a text card stands in.`);
+      }
+    }
+    if (designed && type === "card" && !mapped) {
+      try {
+        const shot = join(dirs.cards, `${hash({ g: designed, n: v.frames, w: t.width, h: t.height, fps: t.fps, v: 1 })}-graphic.mp4`);
+        if (!existsSync(shot)) {
+          browser ??= pw.chromium.launch();
+          await renderGraphic({ template: designed.template, data: designed.data, width: t.width, height: t.height, fps: t.fps, frames: v.frames, out: shot + ".part.mp4", ffmpeg, browser: await browser });
+          renameSync(shot + ".part.mp4", shot);
+        }
+        input = ["-i", shot];
+        chain.push("setsar=1");
+        mapped = true;
+        stats.designedShots += 1;
+      } catch (error) {
+        graphicsOn = false;
+        warnings.push(`designed graphics off for this render (${error instanceof Error ? error.message.slice(0, 160) : error}); cards keep the ffmpeg drawing.`);
       }
     }
     if ((type !== "clip" || !input.length) && !mapped) {
@@ -743,7 +796,7 @@ export async function renderFilm(o) {
     if (BARS) chain.push(BARS);
     if (v.chip && type !== "black" && mono) chain.push(text(v.chip, "chip", `fontfile='${escPath(mono)}':fontcolor=0xdbe7df:fontsize=${Math.max(10, Math.round(H * 0.034))}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(H * 0.01)}:x=w*0.06:y=h*0.9`));
     // A chapter opens with its number and title, top left, for about three seconds.
-    if (v.chapterTitle && font && mono && type !== "black") {
+    if (v.chapterTitle && font && mono && type !== "black" && designed?.template !== "chapter") {
       const show = Math.min(3.2, (v.frames / t.fps) * 0.8);
       const fadeAlpha = `alpha='min(1,max(0,(t-0.3)/0.4))*min(1,max(0,(${show.toFixed(2)}-t)/0.5))'`;
       const [label, ...rest] = v.chapterTitle.split(" · ");
@@ -768,6 +821,7 @@ export async function renderFilm(o) {
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
   });
+  if (browser) await (await browser).close();
   // 1b. Transitions that need the shot before: a whip, a slide or a zoom from its last frame into this shot.
   // The shot keeps its length (the move happens over its first frames), so the film's clock never shifts.
   for (let i = Math.max(1, first); i < (o.joinParts ? 0 : range.end); i += 1) {
