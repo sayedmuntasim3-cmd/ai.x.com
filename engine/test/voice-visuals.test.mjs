@@ -59,7 +59,7 @@ test("no brain: every scene still gets a plan from its own words, and the words 
   assert.deepEqual(r.findings, []);
   assert.equal(r.plan.length, scenes.length);
   assert.ok(r.plan.every((p) => /^\(1\) (\d+:\d{2}:\d{2}\.\d{3}-\d+:\d{2}:\d{2}\.\d{3} )?R[23] \S/.test(p.shots)));
-  assert.match(r.plan[0].shots, /^\(1\) (\S+ )?R2/, "a date said in the scene makes it an evidence shot");
+  assert.match(r.plan[0].shots, /^\(1\) (\S+ )?R2/, "a historic date said in the scene makes it an evidence shot");
   assert.deepEqual(r.plan.flatMap((p) => p.narration.split(" ")), spoken);
 });
 
@@ -84,7 +84,7 @@ test("media from a keyless archive: licence recorded per asset, share-alike refu
   }
 });
 
-test("words plan: names and dates make evidence shots", () => {
+test("words plan: a historic date makes an evidence shot", () => {
   const p = wordsPlan(scenes[0], u.structure ?? null);
   assert.match(p.SHOTS, /^\(1\) (\S+ )?R2 /);
   assert.match(p.SRC, /Q1 "/);
@@ -182,4 +182,18 @@ test("a narration voiceover gets a quiet score plan; a recitation never does", (
   assert.equal(s.cueOf.get("SC0060"), "M03");
   assert.equal(withMusic("**SC0001** | 0:00:00-0:00:10 | NARR: x", s.cueOf), "**SC0001** | 0:00:00-0:00:10 | NARR: x | MUS: M01");
   assert.equal(voiceScore(sc, { kind: "quran" }), null, "nothing is laid under a recitation");
+});
+
+test("only a historic date sends a shot to the archive first; a recent year or a name is footage", async () => {
+  const { isHistoricDate } = await import("../src/voice-visuals.mjs");
+  assert.equal(isHistoricDate("Around 1990"), true);
+  assert.equal(isHistoricDate("April 12, 1865"), true);
+  assert.equal(isHistoricDate("the 1920s"), true);
+  assert.equal(isHistoricDate("the nineteenth century"), true);
+  assert.equal(isHistoricDate("in 2011"), false);
+  assert.equal(isHistoricDate("In 2025"), false);
+  assert.equal(isHistoricDate("in April"), false);
+  assert.equal(isHistoricDate("Four score and seven years ago"), true);
+  assert.equal(isHistoricDate("40 years ago"), true);
+  assert.equal(isHistoricDate("5 years ago"), false);
 });

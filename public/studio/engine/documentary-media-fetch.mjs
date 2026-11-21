@@ -260,14 +260,19 @@ async function passesItemCheck(candidate, deps) {
   }
 }
 
+/** A still fills the 16:9 frame by a cover crop and a slow move, so it must be sharp at full width (owner, 21 Nov 2026). */
+export const MIN_STILL_WIDTH = 1600;
+/** Footage at 720p or better (it is scaled to the frame). */
+export const MIN_VIDEO_WIDTH = 1280;
+
 /**
  * Find media for one shot. Layer 1 archives, then Layer 2 stock, stopping at
  * the first layer that yields enough licence-cleared, unused candidates;
  * then the fallbacks in order. A busy provider is skipped, not waited for,
  * so the run keeps its time budget. Candidates whose licence needs an
  * item-page check are dropped unless deps.verifyItem clears them.
- * Images narrower than min(shot.minWidth ?? 1920, 1280) px are skipped;
- * items with no width reported are kept.
+ * Too-small items are skipped (shot.minWidth, else MIN_STILL_WIDTH for a
+ * still and MIN_VIDEO_WIDTH for footage); items with no width reported are kept.
  * @param {ShotRequest} shot
  * @param {FetchShotDeps} deps
  * @returns {Promise<FetchShotResult>}
@@ -277,7 +282,7 @@ export async function fetchShotMedia(shot, deps) {
   /** @type {FetchShotResult} */
   const result = { shotId: shot.shotId, candidates: [], layerUsed: null, trace: [] };
   const minCandidates = deps.minCandidates ?? 3;
-  const minWidth = Math.min(shot.minWidth ?? 1920, 1280);
+  const minWidth = shot.minWidth ?? (shot.kind === "image" ? MIN_STILL_WIDTH : MIN_VIDEO_WIDTH);
   const seen = new Set();
 
   if (query.length >= 2) {

@@ -588,3 +588,26 @@ test("a master off -14 LUFS gets one exact gain step; within 0.5 LU it is left a
     assert.ok(/** @type {number} */ (after.truePeakDbtp) <= -1, `true peak at most -1 dBTP (${after.truePeakDbtp})`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("a still fills the frame; the blurred frame is kept for prints and portrait photos only", async () => {
+  const { stillFraming } = await import("./render-film.mjs");
+  assert.equal(stillFraming(4000, 3000), "cover", "a 4:3 photo is cropped to fill 16:9");
+  assert.equal(stillFraming(1920, 1080), "cover");
+  assert.equal(stillFraming(1200, 1800), "parallax", "a portrait photo floats over its blur");
+  assert.equal(stillFraming(1200, 1800, undefined, "top"), "cover", "a focus zoom crops to its subject");
+  assert.equal(stillFraming(4000, 3000, "print"), "print");
+});
+
+test("--slice keeps the first seconds: whole shots, the last cut, sounds and captions before the cut", async () => {
+  const { sliceTimeline } = await import("./render-film.mjs");
+  const v = (/** @type {number} */ start, /** @type {number} */ frames) => ({ start, end: start + frames / 10, frames, type: "clip" });
+  const t = /** @type {any} */ ({ fps: 10, frames: 300, durationSeconds: 30, video: [v(0, 100), v(10, 100), v(20, 100)], narration: [{ start: 0, end: 30 }], captions: [{ start: 2, end: 4 }, { start: 16, end: 18 }], music: [{ cue: "M1", start: 0, end: 30 }], sfx: [{ token: "X", start: 12, end: 13 }], stats: { clips: 3, cards: 0, black: 0 } });
+  sliceTimeline(t, 15);
+  assert.equal(t.video.length, 2);
+  assert.equal(t.video[1].frames, 50);
+  assert.equal(t.durationSeconds, 15);
+  assert.equal(t.captions.length, 1);
+  assert.equal(t.music[0].end, 15);
+  assert.equal(t.sfx.length, 1);
+  assert.equal(t.stats.clips, 2);
+});
