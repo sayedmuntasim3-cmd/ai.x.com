@@ -17,7 +17,7 @@
  *   POST /api/voice/:id/marks            { start, ends[], by } the reviewer's ayah times (Quran): the film is made again with them   (Bearer STUDIO_TOKEN)
  *   POST /api/voice/:id/retry            start a failed film again from the saved recording   (Bearer STUDIO_TOKEN)
  *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
- *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed for the runner with the Worker's own key (free; the key never leaves Cloudflare)   (ticket)
+ *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed with the Worker's own key (free; the key never leaves Cloudflare)   (ticket, or Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/film             the finished MP4   (?ticket= from GET /api/voice/:id, or Bearer STUDIO_TOKEN)
  *
  * The recording stays private in R2 (bucket FILMS, voice/<id>/...). Files go up in
@@ -354,7 +354,8 @@ export async function handleVoice(request, env, url, deps = {}) {
   }
 
   if (sub === "stock" && method === "GET") {
-    if (!runner) return json({ error: "Wrong ticket." }, 401);
+    // The owner may search too (a picture test of an earlier film, made outside a runner).
+    if (!runner && !owner) return json({ error: "Wrong ticket." }, 401);
     if (!env.PIXABAY_API_KEY) return json({ error: "No PIXABAY_API_KEY secret on the Worker." }, 503);
     const kind = url.searchParams.get("kind") === "video" ? "video" : "image";
     const q = String(url.searchParams.get("q") ?? "").slice(0, 100);

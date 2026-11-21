@@ -222,6 +222,10 @@ test("the runner searches Pixabay through the Worker; the key stays on the Worke
   assert.equal(up.searchParams.get("q"), "barber shop");
   assert.equal(up.searchParams.get("evil"), null, "only Pixabay's own options pass");
   assert.ok(!JSON.stringify(r.data).includes("pk-secret"));
+  // The owner (studio key) may search too; a download ticket may not.
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/stock?kind=image&q=barber`, { headers: OWNER, fetch: pixabay })).status, 200);
+  const dl = await makeTicket("owner-token", ID, "download", 60);
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/stock?ticket=${dl}&q=barber`, { fetch: pixabay })).status, 401);
 });
 
 test("Quran: the reviewer listens, taps each ayah end, and the film is made again with those times", async () => {
