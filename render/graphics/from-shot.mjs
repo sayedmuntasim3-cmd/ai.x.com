@@ -18,8 +18,20 @@ export function graphicFor(v, helpers = {}) {
     return { template: /** @type {any} */ (g.template), data: g.data, alpha: g.template === "lowerThird" || (v.type === "clip" && g.template !== "document") };
   }
   const text = String(v.text ?? "").trim();
+  // "Chapter 2 · The Long Winter" -> kicker and title (the form timeline.mjs writes).
+  const chapter = (/** @type {string} */ c) => { const [a, ...b] = c.split(" · "); return b.length ? { kicker: a, title: b.join(" · ") } : { title: a }; };
+  // The shot plan's TYPE (docs/TRANSFORMATION.md section 3, M2), when present, names the template outright.
+  const st = v.shotType;
+  if (v.type === "card" && st === "title" && (v.chapterTitle || text)) return { template: "chapter", data: chapter(v.chapterTitle || text), alpha: false };
+  if (v.type === "card" && st === "kinetic-type" && text) return { template: "kinetic", data: { text }, alpha: false };
+  if (v.type === "card" && st === "document" && text) return { template: "document", data: { kind: v.style === "paper" ? "document" : "newspaper", text, highlight: v.highlight ?? "", masthead: v.chip ?? "" }, alpha: false };
+  if (v.type === "card" && st === "quote" && text) {
+    const q = QUOTE.exec(text);
+    return { template: "quote", data: q ? { quote: q[1].trim(), by: q[2].trim() } : { quote: text.replace(/^[“"]|[”"]$/g, "") }, alpha: false };
+  }
   if (v.type === "card") {
-    if (v.chapterTitle) return { template: "chapter", data: { title: v.chapterTitle }, alpha: false };
+    // Only a card that says nothing but the chapter becomes the chapter card; a card with its own words keeps them.
+    if (v.chapterTitle && (!text || text === v.chapterTitle)) return { template: "chapter", data: chapter(v.chapterTitle), alpha: false };
     if (!text || v.chart || v.map || v.split?.length) return null; // charts, maps and splits keep their own drawing
     if (v.counter && helpers.counterParts) {
       const c = helpers.counterParts(text);
@@ -27,14 +39,14 @@ export function graphicFor(v, helpers = {}) {
       const plain = (/** @type {string} */ s) => s.replace(/\\(.)/g, "$1").trim();
       if (c) return { template: "counter", data: { before: plain(c.before), value: c.value, after: plain(c.after) }, alpha: false };
     }
-    if (v.style === "paper") return { template: "document", data: { kind: "document", text, highlight: v.highlight ?? "", masthead: v.chip ?? "" }, alpha: false };
+    if (v.style === "paper") return null; // FX-PAPER keeps its tested ffmpeg highlighter; TYPE "document" asks for the reveal
     const q = QUOTE.exec(text);
     if (q) return { template: "quote", data: { quote: q[1].trim(), by: q[2].trim() }, alpha: false };
     if (v.kinetic) return { template: "kinetic", data: { text }, alpha: false };
     return null;
   }
   if (v.type === "clip") {
-    if (v.chapterTitle) return { template: "chapter", data: { title: v.chapterTitle }, alpha: true };
+    if (v.chapterTitle) return { template: "chapter", data: chapter(v.chapterTitle), alpha: true };
     if (v.title && String(v.title).length <= 60) return { template: "lowerThird", data: { name: String(v.title) }, alpha: true };
   }
   return null;
