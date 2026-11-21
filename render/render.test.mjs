@@ -574,6 +574,9 @@ test("a master off -14 LUFS gets one exact gain step; within 0.5 LU it is left a
   assert.equal(loudnessFix({ integratedLufs: null, truePeakDbtp: null }), null);
   assert.deepEqual(loudnessFix({ integratedLufs: -20, truePeakDbtp: -12 }), { gain: 6, af: "volume=6dB" });
   assert.match(String(loudnessFix({ integratedLufs: -15.3, truePeakDbtp: -0.5 })?.af), /^volume=1\.3dB,alimiter=/);
+  // On target but over the peak limit: a limiter only, no gain.
+  assert.deepEqual(loudnessFix({ integratedLufs: -14.2, truePeakDbtp: -0.8 }), { gain: 0, af: "alimiter=limit=0.7943:level=disabled" });
+  assert.equal(loudnessFix({ integratedLufs: -14.2, truePeakDbtp: -1.4 }), null);
   const dir = mkdtempSync(join(tmpdir(), "zupona-gain-"));
   try {
     // A quiet master (about -24 LUFS), as one-pass loudnorm can leave a rough take; one step brings it to -14.

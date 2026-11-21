@@ -379,7 +379,10 @@ export function partRange(video, index, count) {
  * @returns {{ gain: number, af: string } | null}
  */
 export function loudnessFix(master) {
-  if (master.integratedLufs === null || !Number.isFinite(master.integratedLufs) || Math.abs(master.integratedLufs + 14) <= 0.5) return null;
+  if (master.integratedLufs === null || !Number.isFinite(master.integratedLufs)) return null;
+  // On target but peaking above -1 dBTP (one-pass loudnorm and the AAC encoder can overshoot its TP=-1.5): a limiter
+  // alone, 2 dB under full scale so the encoded true peak lands under -1 (test film 993f09ea 0:00-3:00 came out at -0.8).
+  if (Math.abs(master.integratedLufs + 14) <= 0.5) return master.truePeakDbtp !== null && master.truePeakDbtp > -1 ? { gain: 0, af: `alimiter=limit=${Math.pow(10, -2 / 20).toFixed(4)}:level=disabled` } : null;
   const gain = Math.round((-14 - master.integratedLufs) * 100) / 100;
   const peak = (master.truePeakDbtp ?? -99) + gain;
   return { gain, af: peak > -1.2 ? `volume=${gain}dB,alimiter=limit=${Math.pow(10, -1.5 / 20).toFixed(4)}:level=disabled` : `volume=${gain}dB` };
@@ -1061,15 +1064,17 @@ export async function renderFilm(o) {
   // One-pass loudnorm can land off target on short or quiet material (a rough own-voice take came out at -15.3 LUFS):
   // a measured master more than 0.5 LU away gets one exact gain step on the audio only (the picture is copied), with a
   // limiter only when the gain would lift the true peak above -1 dBTP; then it is measured again.
-  const fix = master && anySound && t.durationSeconds >= 3 ? loudnessFix(master) : null;
-  if (fix) {
+  // At most two steps: a gain that lands on target can still lift the true peak over -1 dBTP; the second step limits it.
+  for (let step = 0; step < 2; step += 1) {
+    const fix = master && anySound && t.durationSeconds >= 3 ? loudnessFix(master) : null;
+    if (!fix) break;
     const { gain, af } = fix;
     try {
       await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
       renameSync(o.outFile + ".gain.mp4", o.outFile);
       master = await measureMaster(o.outFile, ffmpeg);
-      log(`master: loudness corrected by ${gain} dB to ${master.integratedLufs} LUFS`);
-    } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); }
+      log(gain ? `master: loudness corrected by ${gain} dB to ${master.integratedLufs} LUFS` : `master: peak limited to ${master.truePeakDbtp} dBTP`);
+    } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); break; }
   }
   if (master) {
     const normalised = anySound && t.durationSeconds >= 3;

@@ -1,0 +1,305 @@
+{
+ "file": "film-720p.mp4",
+ "durationSeconds": 180,
+ "width": 1280,
+ "height": 720,
+ "fps": 30,
+ "stats": {
+  "clips": 49,
+  "cards": 7,
+  "black": 0,
+  "scenes": 56,
+  "segmentsRendered": 56,
+  "segmentsCached": 0,
+  "audioRendered": 0,
+  "clipsFailed": 0,
+  "transitions": 0,
+  "designedShots": 5,
+  "depthShots": 0,
+  "edit": {
+   "punchIns": 0,
+   "shakes": 0,
+   "glitches": 0
+  }
+ },
+ "voicedScenes": 56,
+ "narratedScenes": 56,
+ "oneTrack": "dry.wav",
+ "musicCues": {
+  "scripted": 0,
+  "played": 0
+ },
+ "soundEffects": {
+  "scripted": 2,
+  "played": 2
+ },
+ "master": {
+  "integratedLufs": -14.4,
+  "truePeakDbtp": -1.4,
+  "loudnessRangeLu": 1.9,
+  "black": []
+ },
+ "licences": [
+  {
+   "url": "https://cdn.pixabay.com/video/2020/03/16/33800-398880341_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-33800/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2026/03/31/343478_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-343478/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "/tmp/claude-0/-home-user-ai-x-com/c402563e-563e-5294-a36e-03874a44dfa8/scratchpad/cur/rr-ghost-6s.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-44911/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/09/03/48968-459186304_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-48968/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/05/21/39767-423345461_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-39767/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2026/09/26/378905_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-378905/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2023/01/20/147270-791334047_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-147270/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2021/01/06/61290-498228525_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-61290/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2017/01/12/7272-199224775_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-7272/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2026/09/26/378907_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-378907/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2025/09/10/302977_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-302977/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/03/04/109674-685086225_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-109674/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2023/07/12/171326-845431824_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-171326/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2021/03/21/68559-528689157_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-68559/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2021/11/16/98022-646632858_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-98022/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/05/21/39763-423345444_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-39763/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2026/04/26/349087_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-349087/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/10/03/133361-756618034_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-133361/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2017/04/15/8698-213454544_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-8698/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/02/13/32287-391434445_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-32287/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/02/13/32288-391434448_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-32288/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/05/06/116192-707327017_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-116192/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2021/09/27/89880-616430908_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-89880/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/04/27/115324-704347593_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-115324/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/09/11/130876-748595913_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-130876/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/02/07/32057-390497805_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-32057/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2026/09/26/378906_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-378906/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2021/12/19/101958-659549557_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-101958/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2019/10/02/27465-363961181_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-27465/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2025/04/23/273927_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-273927/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/06/05/41146-428253129_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-41146/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/08/08/127176-738456789_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-127176/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/11/17/139428-772291281_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-139428/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2017/10/22/12564-240358890_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-12564/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/06/18/42439-431738756_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-42439/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/09/21/132069-752333849_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-132069/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2019/12/07/29916-378294445_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-29916/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2026/07/27/366775_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-366775/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2023/01/30/148542-794355635_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-148542/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/05/02/115792-705553545_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-115792/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2016/02/29/2340-157269921_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-2340/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2015/08/08/122-135736555_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-122/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2020/02/22/32701-393990219_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-32701/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2016/12/09/6714-195124800_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-6714/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2022/06/18/120678-721759752_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-120678/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2023/03/05/153283-804933523_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-153283/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2016/05/12/3175-166339863_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-3175/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2021/08/07/84224-586575102_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-84224/",
+   "licence": "Pixabay Content License"
+  },
+  {
+   "url": "https://cdn.pixabay.com/video/2015/08/08/113-135736259_large.mp4",
+   "sourcePageUrl": "https://pixabay.com/videos/id-113/",
+   "licence": "Pixabay Content License"
+  }
+ ],
+ "motion": {
+  "profile": "documentary",
+  "level": "balanced",
+  "stills": 0,
+  "byKind": {},
+  "locked": 0,
+  "longestRepeat": 0,
+  "governed": {
+   "flash": 0,
+   "glitch": 0,
+   "whip": 0,
+   "shakes": 0,
+   "punchIns": 0
+  }
+ },
+ "warnings": []
+}
