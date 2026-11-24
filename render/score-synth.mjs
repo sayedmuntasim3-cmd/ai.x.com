@@ -258,7 +258,12 @@ function master(/** @type {Float32Array[]} */ ch, /** @type {number} */ seconds)
  * @param {{ cues: import("../engine/src/score-plan.mjs").MusicCue[], lengths: Record<string, number>, outDir: string, policy: { policy: string }, log?: (l: string) => void }} o
  */
 export function scoreKit(o) {
-  const result = { made: /** @type {{ cue: string, seconds: number, why: string }[]} */ ([]), kept: 0, refused: /** @type {string | null} */ (null) };
+  const result = {
+    // The licence record the mission asks for: every track this makes is our own composition, so there is
+    // no third-party recording to credit and nothing for a content-ID system to match.
+    licence: "original: synthesised by render/score-synth.mjs from the cue's own brief (no third-party recording)",
+    made: /** @type {{ cue: string, seconds: number, why: string }[]} */ ([]), kept: 0, refused: /** @type {string | null} */ (null),
+  };
   if (!scoreAllowed(o.policy)) { result.refused = `music policy is "${o.policy.policy}": no instruments for this film`; return result; }
   mkdirSync(o.outDir, { recursive: true });
   for (const c of o.cues) {

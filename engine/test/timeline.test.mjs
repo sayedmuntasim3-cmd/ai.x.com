@@ -237,3 +237,47 @@ test("a disclosure label (\"Illustrative\") is a small tag on footage, never the
   assert.equal(disclosureTag(`"Paraphrased throughout"`), "Paraphrased throughout");
   assert.equal(disclosureTag(`"Still cutting hair · 2025"`), "");
 });
+
+test("a hit never lands on a spoken word: it moves to the gap after the word, or is left out", async () => {
+  const { keepOffSpeech } = await import("../src/timeline.mjs");
+  const words = [{ text: "He", start: 1, end: 1.3 }, { text: "kept", start: 1.35, end: 1.8 }, { text: "the", start: 2.2, end: 2.4 }, { text: "shop", start: 2.45, end: 2.9 }];
+  const sounds = [
+    { token: "AUTO-IMPACT", kind: "hit", scene: "S", start: 1.6, end: 5 },
+    { token: "AUTO-BOOM", kind: "hit", scene: "S", start: 2.6, end: 5 },
+    { token: "AUTO-WHOOSH", kind: "hit", scene: "S", start: 3.4, end: 5 },
+    { token: "AUTO-RISER", kind: "hit", scene: "S", start: 1.2, end: 2.8 },
+    { token: "SND-AMB-01", kind: "bed", scene: "S", start: 0, end: 5 },
+  ];
+  const r = keepOffSpeech(sounds, words);
+  assert.deepEqual(r.moved.map((m) => [m.token, m.from, m.to]), [["AUTO-IMPACT", 1.6, 1.728], ["AUTO-BOOM", 2.6, 2.828]]);
+  assert.equal(r.dropped.length, 0);
+  assert.deepEqual(r.sounds.map((x) => [x.token, x.start]), [["AUTO-IMPACT", 1.728], ["AUTO-BOOM", 2.828], ["AUTO-WHOOSH", 3.4], ["AUTO-RISER", 1.2], ["SND-AMB-01", 0]], "the whoosh in the pause, the riser and the bed stay");
+  const vowel = (w) => [w.start + 0.15 * (w.end - w.start), w.start + 0.75 * (w.end - w.start)];
+  assert.ok(r.sounds.filter((x) => x.kind === "hit" && x.token !== "AUTO-RISER").every((x) => words.every((w) => { const [a, b] = vowel(w); return x.start <= a || x.start >= b; })), "no hit begins on a vowel (a riser ends on the cut, so it is exempt)");
+
+  // Two hits inside one vowel: the first takes the release after it, the second has nowhere to go and is left out.
+  const packed = keepOffSpeech([
+    { token: "AUTO-IMPACT", kind: "hit", scene: "S", start: 1.6, end: 5 },
+    { token: "AUTO-CLICK", kind: "hit", scene: "S", start: 1.62, end: 5 },
+  ], [{ text: "He", start: 1, end: 1.3 }, { text: "kept", start: 1.35, end: 2.0 }]);
+  assert.deepEqual(packed.dropped.map((d) => [d.token, d.start]), [["AUTO-CLICK", 1.62]]);
+  assert.deepEqual(packed.sounds.map((s) => [s.token, s.start]), [["AUTO-IMPACT", 1.878]], "the second hit cannot share the release after the word");
+});
+
+test("ambience follows the place a shot shows, and the room empties before a reveal", async () => {
+  const { AMBIENCE, ambienceFor, breathWindows } = await import("../src/timeline.mjs");
+  assert.equal(ambienceFor("R3 STK-01: a crowded marketplace at noon, stalls and bicycles"), AMBIENCE.crowd);
+  assert.equal(ambienceFor("R1: a bare interrogation room, one table and two chairs"), AMBIENCE.room);
+  assert.equal(ambienceFor("the courtroom in Delhi, the judge's bench"), AMBIENCE.hall);
+  assert.equal(ambienceFor("open sea under a grey sky, wind and spray"), AMBIENCE.wind);
+  assert.equal(ambienceFor("R1 card: \"$4 BILLION\" in white type on black"), null, "nothing is guessed where no place is written");
+  assert.deepEqual(breathWindows([
+    { token: "AUTO-BOOM", kind: "hit", start: 20, end: 22.4 },
+    { token: "AUTO-IMPACT", kind: "hit", start: 30, end: 31 },
+  ]), [{ start: 19.1, end: 20 }], "a beat of held breath before the flash, nothing before an impact");
+
+  // The ambience of a scene the script left without one comes from its own shots.
+  const line = (n, a, b, rest) => `**SC000${n}** | 0:00:0${a}-0:00:0${b} | C1 | b | E | C01 | NARR: There is one street | W 0/0 | ANCHOR: x | ${rest} | LOOK: L`;
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: [line(1, 0, 3, "SHOTS: (1) R3 a crowd of pilgrims at the festival gate"), line(2, 4, 7, "SFX: SND-AMB-02 shop room tone; SHOTS: (1) R1 the room")].join("\n") }] });
+  assert.deepEqual(t.sfx.filter((e) => e.kind === "bed").map((e) => [e.token, e.scene]), [["AUTO-AMB-CROWD", "SC0001"], ["SND-AMB-02", "SC0002"]], "the script's own ambience wins");
+});

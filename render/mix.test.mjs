@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { curtainWindows, deepestDuckDb, gainPlan, MIX, mergeWindows, musicGainAt, musicGainExpression, voiceWindows } from "./mix.mjs";
+import { curtainWindows, deepestDuckDb, gainPlan, MIX, mergeWindows, musicGainAt, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 
 test("windows that touch merge, so one duck is one ramp", () => {
   assert.deepEqual(mergeWindows([{ start: 1, end: 2 }, { start: 2.05, end: 3 }, { start: 6, end: 7 }]), [{ start: 1, end: 3 }, { start: 6, end: 7 }]);
@@ -58,4 +58,25 @@ test("the plan becomes one ffmpeg volume expression, and an empty plan is the pl
   assert.match(expr, /^0\.3\*/);
   assert.equal((expr.match(/clip\(/g) ?? []).length, 4, "a ramp down and a ramp up for each window");
   assert.ok(!/NaN|undefined/.test(expr));
+});
+
+test("the score follows the cut: a chapter turn is marked by a new cue or a riser, and the report says where it is not", () => {
+  const video = [{ start: 0, chapterTitle: "One" }, { start: 40 }, { start: 80, chapterTitle: "Two" }, { start: 120, chapterTitle: "Three" }];
+  const music = [{ cue: "M01", start: 0, end: 40 }, { cue: "M02", start: 40, end: 80 }, { cue: "M03", start: 80, end: 118 }];
+  const sfx = [{ token: "AUTO-RISER", kind: "hit", start: 118.4, end: 120 }];
+  const r = scoreReport({ music, video, sfx });
+  assert.equal(r.cues, 3);
+  assert.deepEqual(r.turns.map((t) => [t.at, t.marked]), [[0, true], [80, true], [120, true]], "the first cue opens it, the third cue and the riser each mark their turn");
+  assert.deepEqual(r.unmarked, []);
+  assert.ok(r.coveredShare > 0.9);
+  const bare = scoreReport({ music: [{ cue: "M01", start: 0, end: 60 }], video });
+  assert.deepEqual(bare.unmarked, [80, 120], "a chapter that only has the same cue running is reported");
+});
+
+test("the ambience of a scene is one level with a hole where the film holds its breath", () => {
+  const expr = quietExpression([{ start: 19.1, end: 20 }], 0.12, { offset: 10 });
+  assert.match(expr, /^0\.12\*/);
+  assert.ok(expr.includes("(t-9.1)") && expr.includes("(10.15-t)"), "counted from the piece's own first sample: " + expr);
+  assert.equal(quietExpression([], 0.12), "0.12");
+  assert.equal(quietExpression([{ start: 0, end: 5 }], 0.12, { offset: 9 }), "0.12", "a hole before the piece starts is not in it");
 });

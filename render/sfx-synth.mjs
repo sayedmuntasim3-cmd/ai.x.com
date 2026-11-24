@@ -26,6 +26,13 @@ export const SYNTH = Object.freeze({
   // Room tone: the quiet air of a room, for an ambience the script asks for (SND-AMB-*) when no
   // recording of it exists, so a "music out" moment is a held breath, not dead digital silence.
   "AUTO-ROOM": { seconds: 20, src: "anoisesrc=c=brown:a=0.5:s=48000", chain: "highpass=f=45,lowpass=f=700,volume=0.35" },
+  // Ambience by the place a shot shows (engine/src/timeline.mjs AMBIENCE), for a scene the script left
+  // without a bed: each is shaped noise that loops without a seam, so a scene has the air of its location.
+  "AUTO-AMB-ROOM": { seconds: 20, src: "anoisesrc=c=brown:a=0.5:s=48000", chain: "highpass=f=45,lowpass=f=650,volume='0.34*(0.9+0.1*sin(2*PI*0.03*t))':eval=frame" },
+  "AUTO-AMB-STREET": { seconds: 24, src: "anoisesrc=c=pink:a=0.45:s=48000", chain: "highpass=f=70,lowpass=f=1500,volume='0.4*(0.72+0.28*sin(2*PI*0.07*t))':eval=frame" },
+  "AUTO-AMB-WIND": { seconds: 24, src: "anoisesrc=c=brown:a=0.55:s=48000", chain: "highpass=f=160,lowpass=f=1900,volume='0.42*(0.6+0.4*sin(2*PI*0.045*t))':eval=frame" },
+  "AUTO-AMB-CROWD": { seconds: 24, src: "anoisesrc=c=pink:a=0.5:s=48000", chain: "highpass=f=220,lowpass=f=2600,volume='0.34*(0.65+0.35*sin(2*PI*0.11*t))':eval=frame" },
+  "AUTO-AMB-HALL": { seconds: 24, src: "anoisesrc=c=brown:a=0.45:s=48000", chain: "highpass=f=55,lowpass=f=900,aecho=0.8:0.5:170:0.35,volume=0.3" },
   // A digital stutter.
   "AUTO-GLITCH": { seconds: 0.4, expr: "(random(0)*2-1)*gt(sin(2*PI*28*t),0.2)*exp(-t*5)", chain: "acrusher=bits=6:mode=lin:samples=6,highpass=f=500" },
 });

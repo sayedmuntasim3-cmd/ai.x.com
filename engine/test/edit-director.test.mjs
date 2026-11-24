@@ -71,10 +71,10 @@ test("the timeline merges the edit: transitions, punch-ins and shakes on their s
   assert.equal(seg("SC0003-1")?.transition, "glitch");
   assert.deepEqual(seg("SC0003-1")?.shakes, [5]);
   const at = (/** @type {string} */ token) => t.sfx.filter((e) => e.token === token).map((e) => e.start);
-  assert.ok(at("AUTO-GLITCH").includes(20), "a glitch transition brings its sound");
+  assert.ok(at("AUTO-GLITCH").some((t) => Math.abs(t - 20) <= 0.3), "a glitch transition brings its sound, laid into the cut, off the first word");
   assert.ok(at("AUTO-IMPACT").includes(25), "a shake is an impact");
   assert.ok(at("AUTO-RISER").includes(26.4), "a riser ends on its moment");
-  assert.ok(at("AUTO-WHOOSH").includes(43.8), "a whoosh leads into its moment");
+  assert.ok(at("AUTO-WHOOSH").some((t) => Math.abs(t - 43.8) <= 0.3), "a whoosh leads into its moment, nudged only enough to clear the word it lands on");
   // Without an edit the script's whip stays and nothing is punched.
   const plain = buildTimeline({ chapters: [{ id: "C1", markdown: CHAPTER }] });
   assert.equal(plain.video.find((v) => v.id === "SC0002-1")?.transition, "whip");

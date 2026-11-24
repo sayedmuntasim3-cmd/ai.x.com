@@ -38,7 +38,7 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
  * @typedef {{ token: string, kind: "bed" | "hit", scene: string, start: number, end: number }} SoundEvent
  *   bed: ambience under the whole scene; hit: a one-shot from start (end is the scene's end)
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, motion?: ReturnType<typeof motionReport> }} Timeline
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, sound?: { moved: { token: string, from: number, to: number }[], dropped: { token: string, at: number }[] }, motion?: ReturnType<typeof motionReport> }} Timeline
  */
 
 /** The shot plan's closed vocabulary (engine/src/shot-plan.mjs SHOT_TYPES; kept here so the timeline imports nothing from it). */
@@ -383,6 +383,125 @@ export function autoSounds(video, placed = []) {
 /** How long each synthesised sound lasts (render/sfx-synth.mjs). @type {Record<string, number>} */
 export const SOUND_SECONDS = Object.freeze({ "AUTO-WHOOSH": 0.55, "AUTO-IMPACT": 1.1, "AUTO-BOOM": 2.4, "AUTO-RISER": 1.6, "AUTO-CLICK": 0.18, "AUTO-GLITCH": 0.4 });
 
+/** The ambience each kind of place sounds like (the tokens are synthesised by render/sfx-synth.mjs). */
+export const AMBIENCE = Object.freeze({
+  room: "AUTO-AMB-ROOM",
+  street: "AUTO-AMB-STREET",
+  wind: "AUTO-AMB-WIND",
+  crowd: "AUTO-AMB-CROWD",
+  hall: "AUTO-AMB-HALL",
+});
+
+/** What a place sounds like, most specific first: a courtroom is a hall, not a room. */
+const PLACE_SOUND = /** @type {[string, RegExp][]} */ ([
+  [AMBIENCE.hall, /\b(courtroom|court house|court|cathedral|church|temple|mosque|parliament|council chamber|lecture hall|concert hall|opera house|museum hall|station hall|airport terminal)\b/i],
+  [AMBIENCE.crowd, /\b(crowd|protest|rally|march(es|ing)?|stadium|audience|spectators|festival|carnival|procession|queue|busy market|bazaar|marketplace)\b/i],
+  [AMBIENCE.street, /\b(street|road|alley|lane|pavement|sidewalk|traffic|junction|crossing|station platform|platform|harbour|harbor|dock|pier|parking|garage|shopfront|high street|market)\b/i],
+  [AMBIENCE.wind, /\b(sea|ocean|coast|shore|beach|cliff|mountain|hill|ridge|valley|field|farm|forest|jungle|desert|river|lake|storm|rain|snow|wind|rooftop|open water|ship|boat|deck)\b/i],
+  [AMBIENCE.room, /\b(room|interior|indoors|office|kitchen|bedroom|living room|classroom|library|hospital|ward|studio|workshop|shop|cafe|restaurant|hotel|cell|prison|corridor|hallway|stairwell|basement|attic|laboratory|lab)\b/i],
+]);
+
+/**
+ * The ambience a shot's own words call for, by the kind of place it shows
+ * (a street is traffic and air, a room is a room). Null when the shot names no
+ * place, so nothing is guessed on top of a picture nobody described.
+ * @param {string} text
+ * @returns {string | null}
+ */
+export function ambienceFor(text) {
+  const t = String(text ?? "");
+  for (const [token, re] of PLACE_SOUND) if (re.test(t)) return token;
+  return null;
+}
+
+/** The held breath before a reveal: how long the room goes quiet before the hit. */
+export const BREATH = Object.freeze({ lead: 0.9, least: 0.2 });
+
+/**
+ * Where everything goes quiet before a reveal: the ambience empties for a beat
+ * before a flash's boom, so the reveal arrives out of silence instead of on a
+ * wall. The music's own holes are the curtains (render/mix.mjs); these are the
+ * room's.
+ * @param {{ token: string, start: number, end: number }[]} sounds
+ * @returns {{ start: number, end: number }[]}
+ */
+export function breathWindows(sounds) {
+  /** @type {{ start: number, end: number }[]} */
+  const out = [];
+  for (const s of sounds) {
+    if (s.token !== "AUTO-BOOM") continue;
+    const start = Math.max(0, s.start - BREATH.lead);
+    if (s.start - start < BREATH.least) continue;
+    const last = out[out.length - 1];
+    if (last && start <= last.end + 0.1) last.end = Math.max(last.end, s.start);
+    else out.push({ start: round3(start), end: round3(s.start) });
+  }
+  return out;
+}
+
+/** How far a hit may move to get off a word, and how much room it needs. */
+export const SPEECH = Object.freeze({ attack: 0.22, after: 0.04, maxShift: 0.75, crowding: 0.35 });
+
+/**
+ * The words of the film as one sorted list of what is spoken when, from the
+ * captions' own word timings (the voice's alignment where it exists, an even
+ * pace across the scene where it does not).
+ * @param {{ words?: TimedWord[] }[]} captions
+ * @returns {TimedWord[]}
+ */
+export function spokenWords(captions) {
+  return captions.flatMap((c) => c.words ?? []).filter((w) => w.end > w.start).sort((a, b) => a.start - b.start);
+}
+
+/**
+ * Never on top of a spoken word: a hit whose attack lands in a word (or right
+ * on one) moves into the gap after that word, or — where the word runs to the
+ * next one — leads it, a beat earlier, the way a whoosh is laid into a cut. It
+ * is dropped when neither place is free: a masked word is worse than no sound.
+ * A riser is left alone: its climax is the cut, where the words pause anyway.
+ * @param {SoundEvent[]} sounds @param {TimedWord[]} words @param {{ attack?: number, after?: number, maxShift?: number, crowding?: number }} [o]
+ * @returns {{ sounds: SoundEvent[], moved: { token: string, from: number, to: number }[], dropped: SoundEvent[] }}
+ */
+export function keepOffSpeech(sounds, words, o = {}) {
+  const attack = o.attack ?? SPEECH.attack;
+  const after = o.after ?? SPEECH.after;
+  const maxShift = o.maxShift ?? SPEECH.maxShift;
+  const crowding = o.crowding ?? SPEECH.crowding;
+  // The peak of a word is its vowel, not its edges: a sound may sit in the release of a word (that is what
+  // "on the word" means in an edit), never over the middle of it.
+  const peakiest = (/** @type {TimedWord} */ w) => {
+    const d = w.end - w.start;
+    return { start: w.start + 0.15 * d, end: w.start + 0.75 * d };
+  };
+  const spoken = [...words].filter((w) => w.end > w.start).sort((a, b) => a.start - b.start).map((w) => ({ w, peak: peakiest(w) }));
+  /** @type {SoundEvent[]} */
+  const kept = [];
+  /** @type {{ token: string, from: number, to: number }[]} */
+  const moved = [];
+  /** @type {SoundEvent[]} */
+  const dropped = [];
+  for (const e of sounds) {
+    if (e.kind === "bed" || e.token === "AUTO-RISER") { kept.push(e); continue; }
+    const at = e.start;
+    const under = spoken.find((x) => at > x.peak.start && at < x.peak.end);
+    if (!under) { kept.push(e); continue; }
+    // Out of the vowel, into the release after it: a word starts softly, so a hit may meet the first
+    // consonants of the next one, but its own attack may never begin on a vowel.
+    const forward = round3(under.peak.end + after);
+    const leading = round3(under.peak.start - attack - after);
+    const clear = (/** @type {number} */ from) => from >= 0 && !spoken.some((x) => from > x.peak.start && from < x.peak.end) && !kept.some((k) => k.kind !== "bed" && Math.abs(k.start - from) < crowding);
+    const ahead = forward - at <= maxShift && clear(forward);
+    const canLead = at - leading <= maxShift * 1.5 && clear(leading);
+    // A transition sound belongs to its cut, so it leads the word; an impact waits for the release.
+    const preferLead = e.token === "AUTO-WHOOSH" || e.token === "AUTO-GLITCH";
+    const to = preferLead ? (canLead ? leading : ahead ? forward : null) : ahead ? forward : canLead ? leading : null;
+    if (to === null) { dropped.push(e); continue; }
+    moved.push({ token: e.token, from: at, to });
+    kept.push({ ...e, start: to, end: round3(Math.max(e.end, to + (SOUND_SECONDS[/** @type {keyof typeof SOUND_SECONDS} */ (e.token)] ?? 1))) });
+  }
+  return { sounds: kept, moved, dropped };
+}
+
 /** Seconds of the dip through black at a chapter break, and at a written dissolve or fade. */
 export const CHAPTER_DIP = 0.4;
 export const SCENE_DIP = 0.25;
@@ -655,6 +774,12 @@ export function buildTimeline(o) {
       }
 
       sfx.push(...sceneSounds(s.fields.SFX ?? "", s, shots.map((x) => x.start ?? s.start)));
+      // Ambience by location (S5): a scene the script left without a bed still sounds like the place its
+      // shots show (a street has traffic under it, a room has a room). Never over an ambience the script wrote.
+      if (o.autoSound !== false && !/SND-AMB-\d/.test(s.fields.SFX ?? "")) {
+        const token = ambienceFor(shots.map((x) => x.text).join(" "));
+        if (token) sfx.push({ token, kind: "bed", scene: s.sc, start: s.start, end: s.end });
+      }
 
       const cue = sceneMusic(s.fields.MUS ?? "", s.start, s.end);
       if (cue) {
@@ -696,9 +821,14 @@ export function buildTimeline(o) {
     const scene = video.find((v) => t >= v.start && t < v.end)?.scene ?? "";
     sfx.push({ token: "AUTO-IMPACT", kind: "hit", scene, start: round3(t), end: round3(t + SOUND_SECONDS["AUTO-IMPACT"]) });
   }
+  // Nothing lands on a spoken word: a hit that would mask a word moves to the gap after it, or is left out.
+  const clear = keepOffSpeech(sfx, spokenWords(captions));
+  if (clear.moved.length) notes.push(`sound: ${clear.moved.length} hit(s) moved off a spoken word (${clear.moved.map((m) => `${m.token} ${m.from}s to ${m.to}s`).join(", ")}).`);
+  if (clear.dropped.length) notes.push(`sound: ${clear.dropped.length} hit(s) left out, no gap to move to off the words (${clear.dropped.map((d) => `${d.token} at ${d.start}s`).join(", ")}).`);
   if (fit && (fit.report.stretched || fit.report.shortened)) notes.push(`timing: scenes fitted to the voice (${fit.report.stretched} longer, ${fit.report.shortened} shorter; ${fit.report.plannedSeconds} s planned, ${fit.report.fittedSeconds} s fitted). No take is sped up or cut.`);
   return {
-    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx, look: o.look ?? "documentary", notes,
+    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx: clear.sounds, look: o.look ?? "documentary", notes,
+    ...(clear.moved.length || clear.dropped.length ? { sound: { moved: clear.moved, dropped: clear.dropped.map((d) => ({ token: d.token, at: d.start })) } } : {}),
     ...(fit ? { timing: fit.report } : {}),
     motion: motionReport(moves, governed, profile, level),
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },

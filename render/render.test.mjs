@@ -53,9 +53,10 @@ test("a film renders to MP4 with picture, voice in its slots, captions and a rep
     const silent = await level(8.6, 9.6);
     assert.ok(musicOnly > -40, `music plays where nobody speaks (${musicOnly} dB)`);
     assert.ok(silent > -60 && silent < -25, `the black now holds only the scripted room tone and snip, quietly (${silent} dB)`);
-    assert.deepEqual(report.soundEffects, { scripted: 3, played: 2 });
+    assert.equal(report.soundEffects.played, report.soundEffects.scripted - 1, "only the effect with no file is not played");
+    assert.deepEqual(timeline.sfx.filter((e) => e.kind === "bed").map((e) => [e.token, e.scene]), [["AUTO-AMB-WIND", "SC0002"], ["SND-AMB-01", "SC0003"]], "the river sounds like wind; the room tone the script wrote stays");
     assert.ok(report.warnings.some((w) => w.includes("SND-FX-99")), "a missing effect is reported");
-    assert.deepEqual(timeline.sfx.map((e) => [e.token, e.kind, e.start]), [["SND-AMB-01", "bed", 8], ["SND-FX-05", "hit", 8], ["SND-FX-99", "hit", 8]]);
+    assert.deepEqual(timeline.sfx.filter((e) => e.token.startsWith("SND-")).map((e) => [e.token, e.kind, e.start]), [["SND-AMB-01", "bed", 8], ["SND-FX-05", "hit", 8], ["SND-FX-99", "hit", 8]]);
     assert.match(readFileSync(join(dir, "out", "film.srt"), "utf8"), /^1\n00:00:00,000 --> 00:00:04,000\nThe mill opens at dawn\.\n/);
     assert.ok(existsSync(join(dir, "out", "film.report.json")));
     assert.ok(report.master && report.master.integratedLufs !== null && report.master.truePeakDbtp !== null, "the master's loudness is measured, not assumed");

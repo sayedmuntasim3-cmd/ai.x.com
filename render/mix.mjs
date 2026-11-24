@@ -130,6 +130,58 @@ export function musicGainAt(t, plan, o = {}) {
   return gain;
 }
 
+/**
+ * Whether the music follows the cut (M5): a chapter's turn is marked by a new
+ * cue, or by a riser that lands on it, and the score covers most of the film.
+ * Measured, not assumed, so the report can say where it does not.
+ * @param {{ music?: { cue: string, start: number, end: number }[], video?: { start: number, chapterTitle?: string }[], sfx?: { token: string, start: number, end: number }[] }} t
+ * @returns {{ cues: number, coveredShare: number, turns: { at: number, marked: boolean }[], unmarked: number[] }}
+ */
+export function scoreReport(t = {}) {
+  const music = [...(t.music ?? [])].sort((a, b) => a.start - b.start);
+  const total = Math.max(0, ...music.map((m) => m.end), ...(t.video ?? []).map((v) => v.start));
+  const covered = music.reduce((n, m) => n + Math.max(0, m.end - m.start), 0);
+  const changes = music.slice(1).map((m) => m.start).concat(music.length ? [music[0].start] : []);
+  // A riser ends on its moment, so its start is its landing time minus its own length.
+  const landings = (t.sfx ?? []).filter((s) => s.token === "AUTO-RISER").map((s) => s.end);
+  const turns = (t.video ?? []).filter((v) => v.chapterTitle).map((v) => v.start).map((at) => ({
+    at,
+    marked: changes.some((c) => Math.abs(c - at) < 1.5) || landings.some((l) => Math.abs(l - at) < 1.5),
+  }));
+  return {
+    cues: music.length,
+    coveredShare: total ? Math.round((covered / total) * 100) / 100 : 0,
+    turns,
+    unmarked: turns.filter((x) => !x.marked).map((x) => x.at),
+  };
+}
+
+/** How fast the room empties into a breath and comes back out of it. */
+export const SILENCE = Object.freeze({ ramp: 0.15 });
+
+/**
+ * A steady level with holes in it, as an ffmpeg expression for
+ * `volume=...:eval=frame`: the ambience of a scene, emptied for the breath
+ * before a reveal. Windows are film seconds; `offset` is where the piece
+ * itself starts, so the expression counts from the piece's own first sample.
+ * @param {Window[]} windows @param {number} [level] @param {{ offset?: number, ramp?: number }} [o]
+ * @returns {string}
+ */
+export function quietExpression(windows, level = 1, o = {}) {
+  const offset = o.offset ?? 0;
+  const ramp = o.ramp ?? SILENCE.ramp;
+  const r = (/** @type {number} */ n) => String(Math.round(n * 10000) / 10000);
+  let expr = String(level);
+  for (const w of windows) {
+    const a = Math.max(0, w.start - offset);
+    const b = Math.max(0, w.end - offset);
+    if (b - a <= 0) continue;
+    // Down into the hole on the way in, back out of it after the hit.
+    expr += `*(1-clip((t-${r(a)})/${r(ramp)},0,1)*clip((${r(b + ramp)}-t)/${r(ramp)},0,1))`;
+  }
+  return expr;
+}
+
 /** The quietest point of the plan, in dB below the music's own level; 0 when nothing ducks. */
 export function deepestDuckDb(plan, o = {}) {
   const music = o.music ?? MIX.music;

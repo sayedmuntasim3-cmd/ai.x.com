@@ -126,7 +126,9 @@ export async function renderCuts(o) {
         `,subtitles='${esc(ass)}'[v]`,
     ].join(";");
     const file = `${o.outBase}.${b.id}.mp4`;
-    const args = (/** @type {string} */ g) => ["-v", "error", "-y", "-ss", b.start.toFixed(3), "-t", seconds.toFixed(3), "-i", o.film, "-filter_complex", g, "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "8000k", "-bufsize", "16000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", file + ".part.mp4"];
+    // The input's own -t trims the read; the output one is what guarantees the length. Without it a cut of a film
+    // whose frames run past the read window came out at 25 s for a 20 s brief (the video stream kept encoding).
+    const args = (/** @type {string} */ g) => ["-v", "error", "-y", "-ss", b.start.toFixed(3), "-t", seconds.toFixed(3), "-i", o.film, "-filter_complex", g, "-map", "[v]", "-map", "0:a?", "-t", seconds.toFixed(3), "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "8000k", "-bufsize", "16000k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", file + ".part.mp4"];
     // Centred hook lines need ffmpeg 6.1+; older builds get the block centred instead.
     try { await run(ffmpeg, args(graph)); } catch { await run(ffmpeg, args(graph.replace(":text_align=C", ""))); }
     renameSync(file + ".part.mp4", file);

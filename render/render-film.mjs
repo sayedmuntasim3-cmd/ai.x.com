@@ -24,7 +24,7 @@ import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
 /** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
-import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, voiceWindows } from "./mix.mjs";
+import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 import { critique, measureFilm, measurePicture } from "./critic.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -33,7 +33,7 @@ import { cpus } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lookFor } from "../engine/src/formats.mjs";
-import { buildTimeline, MAX_VOICE_TEMPO, toSrt } from "../engine/src/timeline.mjs";
+import { breathWindows, buildTimeline, MAX_VOICE_TEMPO, toSrt } from "../engine/src/timeline.mjs";
 import { easeExpr, moveFilter, profileFor } from "../engine/src/motion.mjs";
 import { parseSceneLines } from "../engine/src/scene-lines.mjs";
 import { cutBriefs, renderCuts } from "./cuts.mjs";
@@ -994,6 +994,8 @@ export async function renderFilm(o) {
   for (const token of roomTone) sfxFiles[token] = synth["AUTO-ROOM"];
   if (roomTone.length) warnings.push(`Ambience without a recording, played as synthesised room tone: ${roomTone.sort().join(", ")}.`);
   const sounds = (t.sfx ?? []).filter((e) => sfxFiles[e.token]);
+  // The room empties before a reveal (the music's own holes are the curtains): the hit lands in a silence.
+  const silences = breathWindows(sounds);
   const missingSfx = new Set((t.sfx ?? []).filter((e) => !sfxFiles[e.token]).map((e) => e.token));
   if (missingSfx.size && sounds.length) warnings.push(`Sound effects without a file: ${[...missingSfx].sort().join(", ")}.`);
   if (sounds.length) {
@@ -1034,7 +1036,7 @@ export async function renderFilm(o) {
    * @param {typeof sounds} events @param {number} start @param {number} samples
    */
   async function scenePiece(events, start, samples) {
-    const key = hash({ sfx: events.map((e) => [e.token, resolve(String(sfxFiles[e.token])), e.kind, Math.round((e.start - start) * 1000)]), samples });
+    const key = hash({ sfx: events.map((e) => [e.token, resolve(String(sfxFiles[e.token])), e.kind, Math.round((e.start - start) * 1000)]), quiet: silences.map((w) => [w.start, w.end]), samples });
     const out = join(dirs.audio, `s-${key}.wav`);
     if (existsSync(out)) return out;
     /** @type {string[]} */
@@ -1045,7 +1047,11 @@ export async function renderFilm(o) {
       const file = /** @type {string} */ (sfxFiles[e.token]);
       // Synthesised edit sounds sit a little lower than the script's own effects, so they support rather than shout.
       const gain = AUTO_GAIN[/** @type {keyof typeof AUTO_GAIN} */ (e.token)] ?? 0.45;
-      if (e.kind === "bed") { inputs.push("-stream_loop", "-1", "-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},aformat=channel_layouts=stereo,volume=0.12[s${i}]`); }
+      if (e.kind === "bed") {
+        // The bed runs at a low level, and goes quiet where the film holds its breath before a reveal.
+        inputs.push("-stream_loop", "-1", "-i", file);
+        chains.push(`[${i}:a]aresample=${SAMPLE_RATE},aformat=channel_layouts=stereo,volume='${quietExpression(silences, 0.12, { offset: start })}':eval=frame[s${i}]`);
+      }
       else {
         const ms = Math.max(0, Math.round((e.start - start) * 1000));
         const [l, r] = SFX_PAN[/** @type {keyof typeof SFX_PAN} */ (e.token)] ?? [1, 1];
@@ -1071,6 +1077,10 @@ export async function renderFilm(o) {
   const duckPlan = gainPlan({ voice: voiceWindows(pieces), curtains: curtainWindows(sounds) });
   // The duck is what the voice does to the music; the curtains are separate holes in the plan.
   const duckDb = deepestDuckDb(duckPlan.filter((w) => w.gain > 0));
+  // Does the score follow the cut? A chapter's turn is marked by a new cue or a riser; where neither is,
+  // the music is not following the story there, and the report says so.
+  const score = scoreReport({ music: t.music, video: t.video, sfx: t.sfx });
+  if (score.unmarked.length) warnings.push(`Music does not mark ${score.unmarked.length} chapter turn(s) at ${score.unmarked.map((x) => `${x.toFixed(1)} s`).join(", ")}: no new cue and no riser.`);
   const parts = [];
   const layers = [];
   if (musicIn > 0) {
@@ -1142,6 +1152,7 @@ export async function renderFilm(o) {
   // What the Edit Director's plan put on screen (punch-ins and shakes drawn, glitches into scenes).
   const edit = { punchIns: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).punchIns), 0), shakes: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).shakes), 0), glitches: t.video.filter((v) => v.transition === "glitch" && !v.fadeIn).length };
   const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, // One recording (the voice system) voices every scene: it is laid from 0:00 under the whole film.
+    score,
     voicedScenes: o.oneTrack ? t.narration.length : pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, ...(o.oneTrack ? { oneTrack: basename(o.oneTrack.file) } : {}), musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, mix: { stereo: true, channels, duckDb, curtains: duckPlan.filter((w) => w.gain === 0).length, music: musicFile !== null, effects: sfxFile !== null }, master: mixed, critic, licences, ...(t.timing ? { timing: t.timing } : {}), ...(t.motion ? { motion: t.motion } : {}), warnings };
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);

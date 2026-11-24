@@ -92,7 +92,7 @@ test("topic in, MP4 out: run, footage, page, timeline, render, thumbnail and Sho
     const sc3 = timeline.video.find((v) => v.id === "SC0003-1");
     assert.equal(sc3?.transition, "whip");
     assert.deepEqual(sc3?.punchIns, [2]);
-    assert.ok(timeline.sfx.some((e) => e.token === "AUTO-IMPACT" && e.start === 27));
+    assert.ok(timeline.sfx.some((e) => e.token === "AUTO-IMPACT" && Math.abs(e.start - 27) < 1), "the counter's impact, moved only where it would sit on a word");
     const clip = join(dir, "clip.mp4");
     await run("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "testsrc=s=320x180:r=10:d=6", "-pix_fmt", "yuv420p", clip]);
     const out = join(dir, "out", "film.mp4");
