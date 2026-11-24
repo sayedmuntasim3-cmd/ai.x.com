@@ -14,7 +14,7 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
 
 /**
  * @typedef {import("./film-media.mjs").ChapterMedia} ChapterMedia
- * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", move?: import("./motion.mjs").Move, shotType?: string, graphic?: { template: string, data: any }, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
+ * @typedef {{ id: string, scene: string, shot: number, start: number, end: number, frames: number, type: "clip" | "card" | "black", url: string | null, sourcePageUrl: string | null, licence: string | null, motion: "push" | "none", text: string, title: string, chip: string, brief: string, sourceIn?: number, relevance?: number, counter?: boolean, style?: "plain" | "paper", kinetic?: boolean, split?: string[], fadeIn?: number, fadeOut?: number, speed?: number, chapterTitle?: string, still?: boolean, transition?: Transition, punchIns?: number[], shakes?: number[], fileHash?: string, highlight?: string, chart?: Chart, frame?: "print", focus?: "left" | "right" | "top" | "bottom" | "center", move?: import("./motion.mjs").Move, shotType?: string, graphic?: { template: string, data: any }, map?: { lat: number, lon: number, label: string, to?: { lat: number, lon: number, label: string } } }} VideoSegment
  * @typedef {"whip" | "slide" | "zoom" | "flash" | "glitch" | "leak"} Transition
  *   punchIns / shakes (on a segment): seconds from the segment's start where the Edit Director punches in or shakes the camera;
  *   highlight: words on a card swept by a highlighter (paper) or an underline (FX-HIGHLIGHT); chart: an animated bar chart (FX-CHART);
@@ -26,6 +26,7 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
  *   split: the panels of an FX-SPLIT card ("A / B"), shown side by side, often two versions sources disagree on;
  *   fadeIn / fadeOut: seconds of dip through black at a chapter break or a written dissolve or fade;
  *   speed: below 1 for slow motion written in MOTION; chapterTitle: shown on a chapter's first shot;
+ *   relevance: the eyes' CLIP relevance of the picked picture (0-1), so the critic can gate on it;
  *   sourceIn: where in the clip the shot starts (the steady middle, never the clip's first frames when it is long enough)
  * @typedef {{ title: string, bars: { label: string, value: number, text: string }[] }} Chart
  * @typedef {{ scene: string, start: number, end: number, text: string, placeholders: string[] }} NarrationItem
@@ -619,7 +620,9 @@ export function buildTimeline(o) {
           // A still's move is decided from the scene (motion.mjs); footage keeps its own movement.
           const move = still ? decideMove({ intent: sceneIntent(s, { shotText: shot.text, chapterOpen: lead && opening, chapterClose: closing }), seconds: frames / fps, written: writtenMove(s.fields.MOTION ?? ""), profile, level, previous: moves, index: moves.length }) : null;
           if (move) moves.push(move);
-          video.push({ ...base, sourceIn: still ? 0 : sourceIn, ...(speed < 1 && !still ? { speed } : {}), ...(still ? { still: true } : {}), ...(move ? { move } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push || still ? "push" : "none", text: "", title: lead && !isChip(cardText("", ost)) ? cardText("", ost) : "", chip: [base.chip, tag].filter(Boolean).join(" · ") });
+          // The eyes' relevance travels with the shot: the critic gates on it and the contact sheet prints it.
+          const relevance = Number(row.why?.relevance ?? row.pick?.relevance);
+          video.push({ ...base, ...(Number.isFinite(relevance) ? { relevance } : {}), sourceIn: still ? 0 : sourceIn, ...(speed < 1 && !still ? { speed } : {}), ...(still ? { still: true } : {}), ...(move ? { move } : {}), type: "clip", url: row.pick.mediaUrl, sourcePageUrl: row.pick.sourcePageUrl, licence: row.pick.licence?.name ?? row.pick.licence?.licenseId ?? null, motion: push || still ? "push" : "none", text: "", title: lead && !isChip(cardText("", ost)) ? cardText("", ost) : "", chip: [base.chip, tag].filter(Boolean).join(" · ") });
         } else {
           notes.push(`${base.id}: no clip picked, a text card stands in.`);
           video.push({ ...base, type: "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: ((t) => (isChip(t) && tag ? tag : t))(cardText(shot.text, ost)) || tag });

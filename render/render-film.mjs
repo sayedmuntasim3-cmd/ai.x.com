@@ -25,7 +25,7 @@ const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45,
 /** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
 import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, voiceWindows } from "./mix.mjs";
-import { critique, measureFilm } from "./critic.mjs";
+import { critique, measureFilm, measurePicture } from "./critic.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -1129,7 +1129,12 @@ export async function renderFilm(o) {
   let channels = null;
   try { channels = (await measureFilm(o.outFile, { ffmpeg, ffprobe, freezes: false })).channels; } catch { /* the report says null */ }
   const mixed = master ? { ...master, channels } : null;
-  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [] });
+  // Blurred copies and flicker are measured on the picture itself, one pass at two frames a second.
+  /** @type {{ blurred: any[], flicker: any[] } | null} */
+  let picture = null;
+  try { picture = await measurePicture(o.outFile, t, { ffmpeg }); } catch { /* the report says null */ }
+  // The eyes' per-shot relevance (M3) reaches the gate too, not only the `why` field of a media file.
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(picture ? { blurred: picture.blurred, flicker: picture.flicker } : {}) });
   if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
@@ -1263,6 +1268,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
   const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
   if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
+  // M6: the timeline (shot times, types, scene ids) is written next to the film, so the contact sheets
+  // and the weak-shot loop are drawn from what was actually rendered, not from a second reading of the script.
+  writeFileSync(args.out.replace(/\.mp4$/i, "") + ".timeline.json", JSON.stringify(timeline));
   // The three A/B thumbnails from the S7 briefs, next to the film.
   const s7 = await loadRunText(from, "s7.md");
   if (s7) {

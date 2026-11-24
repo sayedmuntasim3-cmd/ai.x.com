@@ -58,6 +58,15 @@ export const STANDARD = Object.freeze({
   relevanceMin: 0.25,
   /** The same footage used more than this many times is a repeat. */
   repeatLimit: 3,
+  /**
+   * A shot whose median blur score (ffmpeg's `blurdetect`, higher = blurrier) is above this is a
+   * blurred copy, not a soft-focus choice: a sharp test picture measures 4-5, a 10 px box blur 33.
+   */
+  blurMax: 20,
+  /** Above this share of blurred shots the picture is out of focus as a whole, not once. */
+  blurShare: 0.15,
+  /** A jump of this much average luma between two samples inside one shot is a flicker. */
+  flickerJump: 28,
 });
 
 /** Moving picture types: real footage, or a still with a designed move. */
@@ -86,7 +95,7 @@ export function designedMoments(video) {
  * Read a timeline and the render's report and return every finding.
  * @param {any} timeline
  * @param {any} report
- * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null }} [evidence]
+ * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null }} [evidence]
  * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any> }}
  */
 export function critique(timeline, report = {}, evidence = {}) {
@@ -195,6 +204,16 @@ export function critique(timeline, report = {}, evidence = {}) {
   if (freezes.length) {
     add({ ...msg("critic.frozen", { count: freezes.length }), severity: "warn", value: freezes.length });
   }
+  // Blurred copies and flicker, measured on the picture itself (measurePicture), not declared.
+  const blurred = (evidence.blurred ?? []);
+  if (blurred.length) {
+    const share = video.length ? blurred.length / video.length : 0;
+    add({ ...msg("critic.blurred", { count: blurred.length, share: round(share * 100, 0) }), severity: share > STANDARD.blurShare ? "block" : "warn", value: blurred.length });
+  }
+  const flickers = (evidence.flicker ?? []);
+  if (flickers.length) {
+    add({ ...msg("critic.flicker", { count: flickers.length }), severity: flickers.length > 2 ? "block" : "warn", value: flickers.length });
+  }
 
   const measures = {
     seconds: round(seconds, 1), shots: lengths.length, avgShot: round(avg), longestShot: round(longest),
@@ -203,8 +222,97 @@ export function critique(timeline, report = {}, evidence = {}) {
     cutsIn30: cuts30, momentsIn30: moments30, lufs: Number.isFinite(lufs) ? lufs : null,
     truePeak: Number.isFinite(peak) ? peak : null, lra: Number.isFinite(lra) ? lra : null,
     channels: Number.isFinite(channels) ? channels : null, fps,
+    blurredShots: blurred.length, flicker: flickers.length,
   };
   return { verdict: verdictOf(findings), findings, measures };
+}
+
+/**
+ * Samples of the picture from ffmpeg's metadata print: time, blur score
+ * (higher is blurrier) and average luma.
+ * @param {string} text
+ * @returns {{ t: number, blur: number, luma: number }[]}
+ */
+export function parsePicture(text) {
+  /** @type {{ t: number, blur: number, luma: number }[]} */
+  const out = [];
+  /** @type {{ t: number, blur: number, luma: number } | null} */
+  let cur = null;
+  for (const line of text.split("\n")) {
+    const f = /pts_time:([\d.]+)/.exec(line);
+    if (f) { if (cur) out.push(cur); cur = { t: Number(f[1]), blur: NaN, luma: NaN }; continue; }
+    const b = /lavfi\.blur=([\d.]+)/.exec(line);
+    if (b && cur) cur.blur = Number(b[1]);
+    const y = /signalstats\.YAVG=([\d.]+)/.exec(line);
+    if (y && cur) cur.luma = Number(y[1]);
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** @param {number[]} xs */
+function median(xs) {
+  if (!xs.length) return NaN;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/**
+ * Blurred shots and flicker, from the samples and the shot times. A shot is
+ * blurred when its median blur score passes the standard (a soft background is
+ * not a blurred copy: the median, not the worst frame); flicker is a jump of
+ * average luma inside one shot, so a cut into a dark scene is not counted.
+ * @param {{ t: number, blur: number, luma: number }[]} samples @param {any[]} video @param {{ blurMax?: number, flickerJump?: number }} [o]
+ */
+export function blurAndFlicker(samples, video, o = {}) {
+  const blurMax = o.blurMax ?? STANDARD.blurMax;
+  const flickerJump = o.flickerJump ?? STANDARD.flickerJump;
+  const shots = (video ?? []).filter((v) => v.type !== "black");
+  /** @type {Map<string, { id: string, start: number, end: number, blur: number[], luma: { t: number, y: number }[] }>} */
+  const byShot = new Map();
+  for (const s of shots) byShot.set(String(s.id), { id: String(s.id), start: Number(s.start), end: Number(s.end), blur: [], luma: [] });
+  for (const sample of samples) {
+    const shot = shots.find((/** @type {any} */ v) => sample.t >= Number(v.start) && sample.t < Number(v.end));
+    if (!shot) continue;
+    const acc = byShot.get(String(shot.id));
+    if (!acc) continue;
+    if (Number.isFinite(sample.blur)) acc.blur.push(sample.blur);
+    if (Number.isFinite(sample.luma)) acc.luma.push({ t: sample.t, y: sample.luma });
+  }
+  /** @type {{ id: string, start: number, end: number, value: number }[]} */
+  const blurred = [];
+  /** @type {{ id: string, at: number, from: number, to: number }[]} */
+  const flicker = [];
+  for (const acc of byShot.values()) {
+    if (acc.blur.length) {
+      const value = median(acc.blur);
+      if (Number.isFinite(value) && value > blurMax) blurred.push({ id: acc.id, start: acc.start, end: acc.end, value: round(value, 1) });
+    }
+    for (let k = 1; k < acc.luma.length; k += 1) {
+      const jump = Math.abs(acc.luma[k].y - acc.luma[k - 1].y);
+      if (jump > flickerJump) flicker.push({ id: acc.id, at: round(acc.luma[k].t, 2), from: round(acc.luma[k - 1].y, 1), to: round(acc.luma[k].y, 1) });
+    }
+  }
+  return { blurred, flicker, samples: samples.length, shots: shots.length };
+}
+
+/**
+ * Measure the picture of a finished film: blur and flicker, one pass at two
+ * frames a second (the samples land inside their own shot).
+ * @param {string} file @param {any} timeline @param {{ ffmpeg?: string, blurMax?: number, flickerJump?: number }} [o]
+ */
+export async function measurePicture(file, timeline, o = {}) {
+  const ffmpeg = o.ffmpeg ?? "ffmpeg";
+  const text = await new Promise((ok) => {
+    const p = spawn(ffmpeg, ["-hide_banner", "-nostats", "-i", file, "-vf", "fps=2,scale=320:-2,blurdetect,signalstats,metadata=print:file=-", "-an", "-f", "null", "-"], { stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    p.stdout.on("data", (d) => { out += d; });
+    p.stderr.on("data", (d) => { out += d; });
+    p.on("error", () => ok(""));
+    p.on("close", () => ok(out));
+  });
+  return blurAndFlicker(parsePicture(text), timeline?.video ?? [], o);
 }
 
 /**

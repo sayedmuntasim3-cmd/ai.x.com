@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { critique, designedMoments, STANDARD, verdictOf } from "./critic.mjs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { blurAndFlicker, critique, designedMoments, measurePicture, parsePicture, STANDARD, verdictOf } from "./critic.mjs";
 
 /** A timeline of equal shots, as the renderer builds one (only the fields the critic reads). */
 function timeline(shots, extra = {}) {
@@ -64,6 +68,43 @@ test("irrelevant footage and a mono, clipped master block too; a warning only no
   assert.deepEqual([...codes].sort(), ["critic.black", "critic.loudness", "critic.peak", "critic.relevance"]);
   assert.equal(verdictOf(r.findings), "block");
   assert.equal(verdictOf([{ code: "x", severity: "warn", en: "a", bn: "খ" }]), "pass");
+});
+
+test("a blurred shot and a brightness jump inside a shot are measured, not declared", () => {
+  const text = [
+    "frame:0 pts:0 pts_time:0", "lavfi.blur=4.5", "lavfi.signalstats.YAVG=80",
+    "frame:1 pts:1 pts_time:0.5", "lavfi.blur=5.1", "lavfi.signalstats.YAVG=82",
+    "frame:2 pts:2 pts_time:1", "lavfi.blur=5.0", "lavfi.signalstats.YAVG=140",
+    "frame:4 pts:4 pts_time:2", "lavfi.blur=34.0", "lavfi.signalstats.YAVG=60",
+    "frame:5 pts:5 pts_time:2.5", "lavfi.blur=33.1", "lavfi.signalstats.YAVG=61",
+  ].join("\n");
+  const samples = parsePicture(text);
+  assert.equal(samples.length, 5);
+  const video = [{ id: "SC1-1", start: 0, end: 2, type: "clip" }, { id: "SC1-2", start: 2, end: 4, type: "clip" }, { id: "SC1-3", start: 4, end: 5, type: "black" }];
+  const r = blurAndFlicker(samples, video);
+  assert.deepEqual(r.blurred.map((b) => b.id), ["SC1-2"], "the box-blurred shot is the blurred one");
+  assert.ok(r.blurred[0].value > STANDARD.blurMax);
+  assert.deepEqual(r.flicker.map((f) => Math.round(f.at)), [1], "a cut into a dark scene is not flicker; a jump inside a shot is");
+  assert.equal(r.shots, 2, "black is not a shot the critic measures");
+});
+
+test("the picture of a rendered film is measured: a blurred second shot is found in the file", async () => {
+  const probe = spawnSync("ffprobe", ["-version"]);
+  if (probe.error || probe.status !== 0) return;
+  const dir = mkdtempSync(join(tmpdir(), "blur-"));
+  try {
+    const film = join(dir, "film.mp4");
+    const made = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=4",
+      "-filter_complex", "[0:v]split[a][b];[a]trim=start=0:end=2,setpts=PTS-STARTPTS[s];[b]trim=start=2:end=4,setpts=PTS-STARTPTS,boxblur=10:2[bl];[s][bl]concat=n=2:v=1:a=0",
+      "-pix_fmt", "yuv420p", film]);
+    assert.equal(made.status, 0, String(made.stderr));
+    const timeline = { video: [{ id: "SC1-1", start: 0, end: 2, type: "clip" }, { id: "SC1-2", start: 2, end: 4, type: "clip" }] };
+    const r = await measurePicture(film, timeline);
+    assert.deepEqual(r.blurred.map((b) => b.id), ["SC1-2"]);
+    assert.ok(r.blurred[0].value > STANDARD.blurMax);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("what counts as a designed moment: a number, a kinetic line, a chart, a map, a chapter title", () => {

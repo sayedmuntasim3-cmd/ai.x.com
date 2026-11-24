@@ -5,11 +5,11 @@ Owns: render/release-gate.mjs, render/critic.mjs (new), contact sheets, and docs
 Must not touch: other missions' files. Send weak-shot reports back through the Boss.
 
 ## Checklist
-- [ ] Automatic measures: moving share, still share, blurred-copy count, shot lengths, designed moments per
+- [x] Automatic measures: moving share, still share, blurred-copy count, shot lengths, designed moments per
       minute, OpenCLIP relevance per shot (M3's scores), repeats, resolution, first-30 s beats, sound cues
       on moments, loudness and true peak, and black, frozen or flickering frames.
-- [ ] A contact sheet per chapter (1 frame per shot, with the shot TYPE and score).
-- [ ] Weak shots are returned to M3 (re-pick) or M4 (re-make), at most twice, and the reason is logged.
+- [x] A contact sheet per chapter (1 frame per shot, with the shot TYPE and score).
+- [x] Weak shots are returned to M3 (re-pick) or M4 (re-make), at most twice, and the reason is logged.
 - [x] The release gate fails a film that misses the gates, with a clear en+bn reason.
 - [ ] The test-slice loop: render 0:00-3:00 of 993f09ea, measure it, and send the owner before/after frames
       plus the measured comparison with M1's reference standard. Iterate internally until the Boss judges it
@@ -33,6 +33,26 @@ passes the same gates.
   silence or a lift under it.
 
 ## Log
+- 2026-11-24: the contact sheets and the weak-shot loop exist (`render/contact-sheet.mjs`, 7 tests). A sheet per
+  chapter, drawn from the rendered film at each shot's midpoint, six tiles a row: the shot id, its TYPE (the
+  shot plan's type when it has one, else clip/card) and the eyes' relevance score, the chapter's title on the
+  file name, and a weak shot framed in red. The same run names every weak shot with its reason and its owner:
+  low relevance, an off-world prompt that won, footage used too often and a still chapter go back to **M3**; an
+  empty card, a shot too short to read and a missing picture go back to **M4**. The return is capped at two
+  rounds per shot (`out/<film>.returns.json` keeps the rounds), after which the shot is escalated to the Boss
+  instead of being bounced a third time. The renderer now writes `<film>.timeline.json` beside the film, so the
+  sheets and the loop read what was actually rendered rather than a second reading of the script. Tested on a
+  synthetic film: the sheet's pixel size is asserted, so a cropped tile or a missing caption bar fails the test.
+  **Not yet exercised on real footage** — the same blocker as the slice (see below): no stock key, no OpenCLIP,
+  no Chromium on this machine.
+- 2026-11-24: the measures that were listed but unbuilt are built. *Blurred copies*: one pass of `blurdetect`
+  over the film at two frames a second, the median per shot (a soft background is not a blurred copy), a shot
+  over 20 is blurred — 15% or more of the film blurred is a block, one or two is a warning. *Flicker*: a jump
+  of average luma above 28 between two samples **inside one shot**, so a cut into a dark scene is not counted.
+  Both are measured on the file (`measurePicture`) and travel into `report.critic`, so the release gate sees
+  them. Measured proof: a synthetic film whose second half is box-blurred is caught on that half only. Also
+  **relevance now reaches the gate**: `buildTimeline` copies `why.relevance` onto the shot and the renderer
+  passes the list to the critic, so M3's eyes can block a film instead of only explaining a pick in a JSON.
 - 2026-11-24: every finding's wording moved out of `critic.mjs` into the message catalog (`engine/src/messages.mjs`,
   `critic.short` … `critic.frozen`), with the thresholds passed as parameters. `critic.mjs` now calls `msg(code,
   params)`, so the English and Bengali sentences cannot drift apart, the studio page can show a finding in the
@@ -47,7 +67,7 @@ passes the same gates.
   English and Bengali; `render/release-gate.mjs --report` prints them and returns 1 when the critic blocks, so a film
   that is complete but not good cannot be published. Its own test replays the owner's film as measured today (2.9 s
   stock shots, no design, no beat in the first 30 s, mono, LRA 1.9 LU): every one of those is caught by name. The
-  contact sheets and the automatic re-pick loop are still to build.
+  contact sheets and the automatic re-pick loop are still to build. (Both built later the same day, above.)
 - 2026-11-24: measured the owner's own 3-minute film (files/test-film-3min-720p.mp4) with ffmpeg, not by eye:
   1280x720, 30 fps, 3:00; cuts at 0, 1.9, 4.5, 7.7, 10.9, 13.8, 16.3, 18.9, 22.1, 25 s (2.5-2.9 s a shot, a
   stock montage rhythm), then a burst of cuts at 27-28 s; no black or frozen stretch over the thresholds; audio
@@ -56,3 +76,10 @@ passes the same gates.
   chairs, hands on notebooks, a matchstick, candles, a Spanish letter; the cards read "2025: ..." cut off, a
   bare "2010 / 2011" list, and a clipped "20". The two mechanical causes (no browser for the designed graphics, no
   font on the render machine) are fixed under M4; the measured gate itself is still to be built.
+- 2026-11-24: item 4 is the only one still open, and it is open on the machine, not in the code.
+  `docs/research/TEST_SLICE_LOG.md` is new: the slice's protocol (four commands), the owner's film as the
+  measured "before" frame, the comparison against the reference standard and its draft caveat, and the
+  rounds table, which has round 0 (the baseline) and nothing after it. A real 0:00–3:00 slice of `993f09ea`
+  needs three things this machine does not have: a stock key or `ZUPONA_STOCK_RELAY`, OpenCLIP (~600 MB) for
+  the relevance scores, and Chromium for the designed graphics. Without them a slice would measure text cards
+  standing in for footage, which is not the film; so no slice was rendered and none is claimed.

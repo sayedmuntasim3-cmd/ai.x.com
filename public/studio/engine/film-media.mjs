@@ -59,8 +59,8 @@ export async function verifyArchiveItem(c) {
  * @typedef {import("./documentary-media-fetch.mjs").MediaKind} MediaKind
  * @typedef {{ scene: string, shot: number, start: number, end: number, rung: string | null, description: string, queries: string[] }} StockShot
  * @typedef {{ licenseId: string, name: string, licenseUrl: string | null, attributionRequired: boolean, creator: string | null, sourcePageUrl: string }} LicenceRecord
- * @typedef {{ id: string, source: string, kind?: MediaKind, title?: string, mediaUrl: string | null, previewUrl: string | null, sourcePageUrl: string, creator: string | null, durationSeconds: number | null, width: number | null, height: number | null, licence: LicenceRecord }} MediaPick
- * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], review?: "fit" | "none-fit" | "unreviewed", trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[] }} ShotMedia
+ * @typedef {{ id: string, source: string, kind?: MediaKind, title?: string, mediaUrl: string | null, previewUrl: string | null, sourcePageUrl: string, creator: string | null, durationSeconds: number | null, width: number | null, height: number | null, licence: LicenceRecord, relevance?: number }} MediaPick
+ * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], review?: "fit" | "none-fit" | "unreviewed", trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[], why?: { by?: string, relevance?: number, total?: number, offWhy?: string, scale?: string | null, provider?: string, licence?: string | null, candidates?: number, passed?: number, refused?: number, before?: string | null, sequence?: any } }} ShotMedia
  * @typedef {{ chapter: string, providers: string[], repeatWindowSeconds: number, shots: ShotMedia[], stats: { shots: number, found: number, missing: number, noQuery: number } }} ChapterMedia
  * @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike
  */
