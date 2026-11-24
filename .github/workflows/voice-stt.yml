@@ -36,6 +36,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # local/voice-film.mjs loads the engine, whose packages live in the root lockfile.
+      - run: npm ci --no-audit --no-fund
       - name: Install ffmpeg and faster-whisper
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg

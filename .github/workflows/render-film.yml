@@ -75,6 +75,10 @@ jobs:
             render-${{ inputs.film_id }}-${{ inputs.resolution }}-
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null && ffmpeg -version | head -1
+      # The designed graphics (M4) are drawn by a real browser; without it every card falls back to plain
+      # ffmpeg text and the film loses its motion design, so the browser is part of the render machine.
+      - name: Install the graphics engine (Playwright Chromium)
+        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
       - name: Narration (your own recordings first, then ElevenLabs or the free narrator)
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}

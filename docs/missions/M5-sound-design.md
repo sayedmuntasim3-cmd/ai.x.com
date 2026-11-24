@@ -21,5 +21,10 @@ On the 3-minute slice, every designed moment has a cue, the loudness targets are
 no clash. The own-voice film passes.
 
 ## Found for others
+- The owner's film (24 Nov 2026): the master is mono 48 kHz, -14.4 LUFS, true peak -1.4 dBTP, LRA 1.9 LU — on
+  the loudness target but completely flat, so no reveal has a silence or a lift under it. The cause of the mono
+  is here: render-film.mjs pans every bed and one-shot to mono (`pan=mono|c0=c0`), the scene pieces are written
+  `-ac 1`, the silent fillers are `anullsrc=...:cl=mono`, and the mix ends without a channel layout. A stereo
+  mix means changing that whole path once, not one filter.
 
 ## Log

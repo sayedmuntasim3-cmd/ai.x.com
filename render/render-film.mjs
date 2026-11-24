@@ -37,17 +37,29 @@ import { renderThumbnails, thumbnailBriefs } from "./thumbnails.mjs";
 
 const SAMPLE_RATE = 48000;
 const MAX_TEMPO = MAX_VOICE_TEMPO;
+// The house faces travel with the film (render/assets/fonts, both SIL OFL): Fraunces for display type and
+// Inter for text, so a card looks the same on a runner with no system fonts as it does on the owner's
+// computer. A missing system font is only ever a last resort now; before, a render machine without
+// fonts drew its cards in the system's own face or not at all.
+const FONT_DIR = join(dirname(fileURLToPath(import.meta.url)), "assets", "fonts");
 const SERIF_CANDIDATES = [
+  join(FONT_DIR, "Fraunces-Bold.ttf"),
   "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
   "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
   "/System/Library/Fonts/Supplemental/Georgia Bold.ttf",
   "C:\\Windows\\Fonts\\georgiab.ttf",
 ];
 const FONT_CANDIDATES = [
+  join(FONT_DIR, "Inter-Bold.ttf"),
   "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
   "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
   "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
   "C:\\Windows\\Fonts\\arialbd.ttf",
+];
+const MONO_CANDIDATES = [
+  join(FONT_DIR, "JetBrainsMono-Bold.ttf"),
+  "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+  "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
 ];
 
 /**
@@ -403,6 +415,17 @@ export async function renderFilm(o) {
   /** @type {string[]} */
   const warnings = [...t.notes];
   const stats = { segmentsRendered: 0, segmentsCached: 0, audioRendered: 0, clipsFailed: 0, transitions: 0, designedShots: 0, depthShots: 0 };
+  // A card is a designed graphic (M4), drawn by a real browser. When that browser is missing the render
+  // used to fall back to the plain ffmpeg card without saying so, which is how a whole film came out as
+  // text on a dark screen with no motion design at all. Say it in the report, and stop when asked.
+  if (o.graphics !== false && !loadPlaywright()) {
+    const designed = t.video.filter((v) => graphicFor(v, { counterParts })).length;
+    if (designed) {
+      const why = `${designed} of ${t.video.length} shots are designed graphics, but Playwright is not installed, so they render as plain text cards: run "npm ci && npx playwright install --with-deps chromium".`;
+      if (o.requireGraphics) throw new Error(why);
+      warnings.push(why);
+    }
+  }
   const fetchClip = o.fetchClip ?? ((url) => downloadClip(url, dirs.clips));
   const limit = o.concurrency ?? Math.max(1, cpus().length - 1);
   // Quality-led encoding with a ceiling: about 6 Mbit/s at 1080p30 (scaled by frame size and rate),
@@ -427,7 +450,7 @@ export async function renderFilm(o) {
   const bar = filmLook === "cinematic" ? Math.max(0, Math.round((t.height - t.width / 2.39) / 2)) : 0;
   const BARS = bar ? `drawbox=x=0:y=0:w=iw:h=${bar}:color=black:t=fill,drawbox=x=0:y=ih-${bar}:w=iw:h=${bar}:color=black:t=fill` : "";
   const CARD_BG = (/** @type {number} */ frames) => `vignette=PI/4,fade=t=in:st=0:d=${Math.min(0.25, frames / t.fps / 4).toFixed(3)}`;
-  const mono = FONT_CANDIDATES.map((f) => f.replace("DejaVuSans-Bold", "DejaVuSansMono")).find((f) => existsSync(f) && /Mono/.test(f)) ?? font;
+  const mono = MONO_CANDIDATES.find((f) => existsSync(f)) ?? font;
   const escPath = (/** @type {string} */ p) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
   /**
    * A drawtext filter reading its words from a file (no escaping of the text itself), fading in.
@@ -1153,7 +1176,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = /** @type {Record<string, string>} */ ({});
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
-    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--part i/N | --join part1.mp4,part2.mp4,...] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf]");
+    console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--part i/N | --join part1.mp4,part2.mp4,...] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf] [--require-graphics]");
     process.exit(2);
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
@@ -1210,7 +1233,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (args.part && !partArg) throw new Error(`--part must look like 2/8, not "${args.part}".`);
   const part = partArg ? { index: Number(partArg[1]) - 1, count: Number(partArg[2]) } : undefined;
   const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
-  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
   if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
   // The three A/B thumbnails from the S7 briefs, next to the film.
   const s7 = await loadRunText(from, "s7.md");

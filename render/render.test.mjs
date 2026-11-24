@@ -240,7 +240,8 @@ test("kinetic type rises in line by line; a landscape photo keeps the Ken Burns 
     const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md, media }], width: 320, height: 180, fps: 10 });
     assert.equal(timeline.video[0].kinetic, true);
     const out = join(dir, "k.mp4");
-    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, fetchClip: async () => wide });
+    // The ffmpeg card is measured here, so the designed-graphic browser is kept out of it (M4 draws its own page).
+    const report = await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, fetchClip: async () => wide, graphics: false });
     assert.equal(report.stats.clipsFailed, 0, report.warnings.join("\n"));
     const bright = (/** @type {number} */ s) => { const f = spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout; let n = 0; for (const b of f) if (b > 160) n += 1; return n; };
     const early = bright(0.2);
@@ -319,7 +320,8 @@ test("motion graphics: a bar chart grows from the shot's own numbers, a highligh
     assert.deepEqual(timeline.video[0].chart?.bars.map((b) => b.value), [1, 4]);
     assert.equal(timeline.video[1].highlight, "guilty");
     const out = join(dir, "t.mp4");
-    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    // A chart and a highlighter are the ffmpeg drawing (from-shot.mjs keeps them off the templates).
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, graphics: false });
     const row = (/** @type {number} */ s, /** @type {number} */ y) => [...spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-vf", `crop=320:2:0:${y}`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout.subarray(0, 320 * 3)];
     // The taller bar (2020) stands in the right half; at 0.1 s nothing has grown yet, by 2.5 s it is up.
     const gold = (/** @type {number[]} */ r) => { let n = 0; for (let i = 0; i < r.length; i += 3) if (r[i] > 180 && r[i + 1] > 130 && r[i + 2] < 120) n += 1; return n; };
@@ -327,10 +329,13 @@ test("motion graphics: a bar chart grows from the shot's own numbers, a highligh
     assert.ok(gold(row(2.5, 100)) > 20, `the bar has grown (${gold(row(2.5, 100))} gold pixels)`);
     // The marker band sits behind "guilty" only: the right part of the line, not "Found".
     const yellow = (/** @type {number[]} */ r, /** @type {number} */ from, /** @type {number} */ to) => { let n = 0; for (let i = from * 3; i < to * 3; i += 3) if (r[i] > 200 && r[i + 1] > 170 && r[i + 2] < 140) n += 1; return n; };
-    const line = row(5.5, 90);
-    assert.ok(yellow(line, 160, 260) > 15, "the marked word is highlighted");
-    assert.equal(yellow(line, 60, 140), 0, "the word before it is not");
-    assert.equal(yellow(row(3.2, 90), 0, 320), 0, "the sweep starts after the words land");
+    // The band sits behind "guilty" only. Seven rows around the middle are read rather than one: where
+    // the line sits follows the typeface, and the houses faces (Fraunces, Inter) sit a few pixels off the
+    // system serif this was written against.
+    const inBand = (/** @type {number} */ s, /** @type {number} */ from, /** @type {number} */ to) => [80, 85, 90, 95, 100, 105, 110].reduce((n, y) => n + yellow(row(s, y), from, to), 0);
+    assert.ok(inBand(5.5, 160, 260) > 15, "the marked word is highlighted");
+    assert.equal(inBand(5.5, 60, 140), 0, "the word before it is not");
+    assert.equal(inBand(3.2, 0, 320), 0, "the sweep starts after the words land");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -369,7 +374,8 @@ test("words with a percent sign are drawn, on cards and on counters (drawtext wo
     const timeline = buildTimeline({ chapters: [{ id: "C1", markdown: md }], width: 320, height: 180, fps: 10 });
     assert.equal(timeline.video[1].counter, true);
     const out = join(dir, "t.mp4");
-    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out });
+    // drawtext is what the percent sign has to survive, so this card stays on the ffmpeg drawing.
+    await renderFilm({ timeline, workDir: join(dir, "w"), outFile: out, graphics: false });
     const lit = (/** @type {number} */ s) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout.filter((b) => b > 140).length;
     assert.ok(lit(1.5) > 150, `the card's words are on screen (${lit(1.5)} lit pixels)`);
     assert.ok(lit(2.6) > 100, `the counter runs with its % (${lit(2.6)})`);
