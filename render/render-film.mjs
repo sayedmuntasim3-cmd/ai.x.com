@@ -22,6 +22,10 @@ import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 
 /** Levels of the synthesised edit sounds in the effects mix. */
 const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
+/** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
+const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
+import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, voiceWindows } from "./mix.mjs";
+import { critique, measureFilm } from "./critic.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -81,29 +85,33 @@ export function run(bin, args) {
 
 /**
  * Measure a finished master instead of assuming it: integrated loudness and
- * true peak (EBU R128) and stretches of black picture of 1.5 s or more
- * (deliberate dips are shorter; a card with text is never "black").
+ * true peak (EBU R128), stretches of black picture of 1.5 s or more
+ * (deliberate dips are shorter; a card with text is never "black") and
+ * stretches of frozen picture of 2 s or more (a still that pretends to move).
  * @param {string} file @param {string} [ffmpeg]
- * @returns {Promise<{ integratedLufs: number | null, truePeakDbtp: number | null, loudnessRangeLu: number | null, black: { start: number, end: number, duration: number }[] }>}
+ * @returns {Promise<{ integratedLufs: number | null, truePeakDbtp: number | null, loudnessRangeLu: number | null, black: { start: number, end: number, duration: number }[], freezes: { start: number, end: number }[] }>}
  */
 export function measureMaster(file, ffmpeg = "ffmpeg") {
   return new Promise((ok, fail) => {
-    const p = spawn(ffmpeg, ["-nostats", "-hide_banner", "-i", file, "-filter_complex", "[0:a]ebur128=peak=true:framelog=quiet[a];[0:v]scale=160:-2,blackdetect=d=1.5:pix_th=0.05:pic_th=0.999[v]", "-map", "[v]", "-map", "[a]", "-f", "null", "-"], { stdio: ["ignore", "ignore", "pipe"] });
+    const p = spawn(ffmpeg, ["-nostats", "-hide_banner", "-i", file, "-filter_complex", "[0:a]ebur128=peak=true:framelog=quiet[a];[0:v]scale=160:-2,blackdetect=d=1.5:pix_th=0.05:pic_th=0.999,freezedetect=n=-60dB:d=2[v]", "-map", "[v]", "-map", "[a]", "-f", "null", "-"], { stdio: ["ignore", "ignore", "pipe"] });
     /** @type {string[]} */
     const kept = [];
     let rest = "";
     p.stderr.on("data", (d) => {
       const lines = (rest + d).split("\n");
       rest = lines.pop() ?? "";
-      for (const l of lines) if (/black_start|^\s+(I|Peak|LRA):/.test(l)) kept.push(l);
+      for (const l of lines) if (/black_start|freeze_start|freeze_end|^\s+(I|Peak|LRA):/.test(l)) kept.push(l);
     });
     p.on("error", fail);
     p.on("close", (code) => {
-      if (rest && /black_start|^\s+(I|Peak|LRA):/.test(rest)) kept.push(rest);
+      if (rest && /black_start|freeze_start|freeze_end|^\s+(I|Peak|LRA):/.test(rest)) kept.push(rest);
       if (code !== 0) { fail(new Error(`${ffmpeg} exited ${code} while measuring the master`)); return; }
       const last = (/** @type {RegExp} */ re) => { const hits = kept.map((l) => re.exec(l)).filter(Boolean); const v = hits.length ? Number(/** @type {RegExpExecArray} */ (hits[hits.length - 1])[1]) : NaN; return Number.isFinite(v) ? v : null; };
       const black = kept.map((l) => /black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/.exec(l)).filter(Boolean).map((m) => ({ start: Number(/** @type {RegExpExecArray} */ (m)[1]), end: Number(/** @type {RegExpExecArray} */ (m)[2]), duration: Number(/** @type {RegExpExecArray} */ (m)[3]) }));
-      ok({ integratedLufs: last(/^\s+I:\s+(-?[\d.]+) LUFS/), truePeakDbtp: last(/^\s+Peak:\s+(-?[\d.]+) dBFS/), loudnessRangeLu: last(/^\s+LRA:\s+(-?[\d.]+) LU/), black });
+      const freezeStarts = kept.map((l) => /freeze_start:\s*([\d.]+)/.exec(l)).filter(Boolean).map((m) => Number(/** @type {RegExpExecArray} */ (m)[1]));
+      const freezeEnds = kept.map((l) => /freeze_end:\s*([\d.]+)/.exec(l)).filter(Boolean).map((m) => Number(/** @type {RegExpExecArray} */ (m)[1]));
+      const freezes = freezeStarts.map((start, i) => ({ start, end: freezeEnds[i] ?? start }));
+      ok({ integratedLufs: last(/^\s+I:\s+(-?[\d.]+) LUFS/), truePeakDbtp: last(/^\s+Peak:\s+(-?[\d.]+) dBFS/), loudnessRangeLu: last(/^\s+LRA:\s+(-?[\d.]+) LU/), black, freezes });
     });
   });
 }
@@ -966,9 +974,9 @@ export async function renderFilm(o) {
     const out = join(dirs.audio, `m-${key}.wav`);
     if (existsSync(out)) return out;
     const seconds = samples / SAMPLE_RATE;
-    const input = file ? [...(loop ? ["-stream_loop", "-1"] : []), "-i", file] : ["-f", "lavfi", "-i", `anullsrc=r=${SAMPLE_RATE}:cl=mono`];
+    const input = file ? [...(loop ? ["-stream_loop", "-1"] : []), "-i", file] : ["-f", "lavfi", "-i", `anullsrc=r=${SAMPLE_RATE}:cl=stereo`];
     const fade = file ? `,afade=t=in:d=${Math.min(1, seconds / 4).toFixed(3)},afade=t=out:st=${Math.max(0, seconds - Math.min(1.5, seconds / 4)).toFixed(3)}:d=${Math.min(1.5, seconds / 4).toFixed(3)}` : "";
-    await run(ffmpeg, ["-v", "error", "-y", ...input, "-af", `aresample=${SAMPLE_RATE},apad,atrim=end_sample=${samples}${fade}`, "-ac", "1", "-c:a", "pcm_s16le", out + ".part.wav"]);
+    await run(ffmpeg, ["-v", "error", "-y", ...input, "-af", `aresample=${SAMPLE_RATE},aformat=channel_layouts=stereo,apad,atrim=end_sample=${samples}${fade}`, "-ac", "2", "-c:a", "pcm_s16le", out + ".part.wav"]);
     renameSync(out + ".part.wav", out);
     stats.audioRendered += 1;
     return out;
@@ -1037,34 +1045,46 @@ export async function renderFilm(o) {
       const file = /** @type {string} */ (sfxFiles[e.token]);
       // Synthesised edit sounds sit a little lower than the script's own effects, so they support rather than shout.
       const gain = AUTO_GAIN[/** @type {keyof typeof AUTO_GAIN} */ (e.token)] ?? 0.45;
-      if (e.kind === "bed") { inputs.push("-stream_loop", "-1", "-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},pan=mono|c0=c0,volume=0.12[s${i}]`); }
-      else { const ms = Math.max(0, Math.round((e.start - start) * 1000)); inputs.push("-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},pan=mono|c0=c0,volume=${gain},adelay=${ms}:all=1[s${i}]`); }
+      if (e.kind === "bed") { inputs.push("-stream_loop", "-1", "-i", file); chains.push(`[${i}:a]aresample=${SAMPLE_RATE},aformat=channel_layouts=stereo,volume=0.12[s${i}]`); }
+      else {
+        const ms = Math.max(0, Math.round((e.start - start) * 1000));
+        const [l, r] = SFX_PAN[/** @type {keyof typeof SFX_PAN} */ (e.token)] ?? [1, 1];
+        inputs.push("-i", file);
+        chains.push(`[${i}:a]aresample=${SAMPLE_RATE},aformat=channel_layouts=stereo,pan=stereo|c0=${l}*c0|c1=${r}*c1,volume=${gain},adelay=${ms}:all=1[s${i}]`);
+      }
     });
     const graph = `${chains.join(";")};${events.map((_, i) => `[s${i}]`).join("")}amix=inputs=${events.length}:normalize=0:duration=longest,apad,atrim=end_sample=${samples}[out]`;
-    await run(ffmpeg, ["-v", "error", "-y", ...inputs, "-filter_complex", graph, "-map", "[out]", "-ac", "1", "-c:a", "pcm_s16le", out + ".part.wav"]);
+    await run(ffmpeg, ["-v", "error", "-y", ...inputs, "-filter_complex", graph, "-map", "[out]", "-ac", "2", "-c:a", "pcm_s16le", out + ".part.wav"]);
     renameSync(out + ".part.wav", out);
     stats.audioRendered += 1;
     return out;
   }
 
-  // 5. Mux: the music sits low and ducks further whenever the narrator speaks; the mix is normalised to the platform loudness.
+  // 5. Mux, in stereo: the voice is centred, the music ducks under every spoken piece and leaves for the
+  //    breath before a designed reveal, the effects sit where an editor put them. The mix is normalised to
+  //    the platform loudness with a wide loudness range kept (a film is not a flat wall of sound).
   mkdirSync(dirname(resolve(o.outFile)), { recursive: true });
   // Inputs: 0 picture, 1 voice, then music and effects when present.
   const extra = [musicFile, sfxFile].filter((f) => f !== null);
   const musicIn = musicFile ? 2 : -1;
   const sfxIn = sfxFile ? (musicFile ? 3 : 2) : -1;
+  const duckPlan = gainPlan({ voice: voiceWindows(pieces), curtains: curtainWindows(sounds) });
+  // The duck is what the voice does to the music; the curtains are separate holes in the plan.
+  const duckDb = deepestDuckDb(duckPlan.filter((w) => w.gain > 0));
   const parts = [];
-  const layers = ["[voice]"];
+  const layers = [];
   if (musicIn > 0) {
-    parts.push(`[1:a]asplit=2[voice][key]`, `[${musicIn}:a]volume=0.3[bed]`, `[bed][key]sidechaincompress=threshold=0.02:ratio=10:attack=15:release=350[ducked]`);
-    layers.push("[ducked]");
-  } else parts.push(`[1:a]anull[voice]`);
-  if (sfxIn > 0) layers.push(`[${sfxIn}:a]`);
-  parts.push(`${layers.join("")}amix=inputs=${layers.length}:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]`);
+    parts.push(`[1:a]aformat=channel_layouts=stereo,asplit=2[voice][key]`);
+    parts.push(`[${musicIn}:a]aformat=channel_layouts=stereo,volume='${musicGainExpression(duckPlan)}':eval=frame[bed]`);
+    parts.push(`[bed][key]sidechaincompress=threshold=0.03:ratio=12:attack=8:release=320:makeup=1[ducked]`);
+    layers.push("[voice]", "[ducked]");
+  } else { parts.push(`[1:a]aformat=channel_layouts=stereo[voice]`); layers.push("[voice]"); }
+  if (sfxIn > 0) { parts.push(`[${sfxIn}:a]aformat=channel_layouts=stereo[fx]`); layers.push("[fx]"); }
+  parts.push(`${layers.join("")}amix=inputs=${layers.length}:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=15[a]`);
   const mix = extra.length
     ? [...extra.flatMap((f) => ["-i", /** @type {string} */ (f)]), "-filter_complex", parts.join(";"), "-map", "0:v", "-map", "[a]"]
-    : ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"];
-  const mux = (/** @type {string[]} */ m) => run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, ...m, "-c:v", "copy", "-ar", String(SAMPLE_RATE), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
+    : ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-14:TP=-1.5:LRA=15"];
+  const mux = (/** @type {string[]} */ m) => run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, ...m, "-c:v", "copy", "-ar", String(SAMPLE_RATE), "-ac", "2", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
   // Loudness normalisation needs sound and at least 3 s; on pure digital silence it yields NaN and the encoder stops.
   const anySound = pieces.some((p) => p.file) || extra.length > 0;
   const plain = ["-map", "0:v", "-map", "1:a"];
@@ -1073,7 +1093,7 @@ export async function renderFilm(o) {
     try { await mux(mix); } catch (error) {
       if (!/NaN|Inf/.test(String(error))) throw error;
       warnings.push("Loudness normalisation failed on this soundtrack (near-silent); the mix was written without it.");
-      await mux(extra.length ? [...extra.flatMap((f) => ["-i", /** @type {string} */ (f)]), "-filter_complex", parts.join(";").replace(",loudnorm=I=-14:TP=-1.5:LRA=11", ""), "-map", "0:v", "-map", "[a]"] : plain);
+      await mux(extra.length ? [...extra.flatMap((f) => ["-i", /** @type {string} */ (f)]), "-filter_complex", parts.join(";").replace(",loudnorm=I=-14:TP=-1.5:LRA=15", ""), "-map", "0:v", "-map", "[a]"] : plain);
     }
   }
   renameSync(o.outFile + ".part.mp4", o.outFile);
@@ -1103,13 +1123,21 @@ export async function renderFilm(o) {
     const covered = (/** @type {{ start: number, end: number, duration: number }} */ b) => scripted.reduce((sum, v) => sum + Math.max(0, Math.min(v.end, b.end) - Math.max(v.start, b.start)), 0) >= b.duration - 0.5;
     for (const b of master.black) if (!covered(b)) warnings.push(`Black picture for ${b.duration.toFixed(1)} s from ${b.start.toFixed(1)} s that the script does not ask for.`);
   }
+  // 7. The critic (M6): the film is measured against the house standard, and its verdict travels with the
+  //    report, so the release gate blocks a film that is complete but not good.
+  /** @type {number | null} */
+  let channels = null;
+  try { channels = (await measureFilm(o.outFile, { ffmpeg, ffprobe, freezes: false })).channels; } catch { /* the report says null */ }
+  const mixed = master ? { ...master, channels } : null;
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [] });
+  if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
   // What the Edit Director's plan put on screen (punch-ins and shakes drawn, glitches into scenes).
   const edit = { punchIns: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).punchIns), 0), shakes: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).shakes), 0), glitches: t.video.filter((v) => v.transition === "glitch" && !v.fadeIn).length };
   const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, // One recording (the voice system) voices every scene: it is laid from 0:00 under the whole film.
-    voicedScenes: o.oneTrack ? t.narration.length : pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, ...(o.oneTrack ? { oneTrack: basename(o.oneTrack.file) } : {}), musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, master, licences, ...(t.timing ? { timing: t.timing } : {}), ...(t.motion ? { motion: t.motion } : {}), warnings };
+    voicedScenes: o.oneTrack ? t.narration.length : pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, ...(o.oneTrack ? { oneTrack: basename(o.oneTrack.file) } : {}), musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, mix: { stereo: true, channels, duckDb, curtains: duckPlan.filter((w) => w.gain === 0).length, music: musicFile !== null, effects: sfxFile !== null }, master: mixed, critic, licences, ...(t.timing ? { timing: t.timing } : {}), ...(t.motion ? { motion: t.motion } : {}), warnings };
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;

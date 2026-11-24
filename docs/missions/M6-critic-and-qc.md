@@ -10,7 +10,7 @@ Must not touch: other missions' files. Send weak-shot reports back through the B
       on moments, loudness and true peak, and black, frozen or flickering frames.
 - [ ] A contact sheet per chapter (1 frame per shot, with the shot TYPE and score).
 - [ ] Weak shots are returned to M3 (re-pick) or M4 (re-make), at most twice, and the reason is logged.
-- [ ] The release gate fails a film that misses the gates, with a clear en+bn reason.
+- [x] The release gate fails a film that misses the gates, with a clear en+bn reason.
 - [ ] The test-slice loop: render 0:00-3:00 of 993f09ea, measure it, and send the owner before/after frames
       plus the measured comparison with M1's reference standard. Iterate internally until the Boss judges it
       world-class; the owner sees it only then. Then render the full 40 minutes.
@@ -33,6 +33,15 @@ passes the same gates.
   silence or a lift under it.
 
 ## Log
+- 2026-11-24: the measured gate exists (`render/critic.mjs`, run on every render, embedded as `report.critic`). It reads
+  the timeline and the master: average and longest shot, the share of shots under 1.5 s, moving picture, designed
+  moments a minute, sound cue on each designed moment, the first shot and the cuts in the first 30 s, resolution,
+  repeats of one piece of footage, relevance when scores are passed in, loudness, true peak and loudness range, mono,
+  black picture and frozen stretches (`freezedetect` now runs in the one master measurement pass). Every finding is
+  English and Bengali; `render/release-gate.mjs --report` prints them and returns 1 when the critic blocks, so a film
+  that is complete but not good cannot be published. Its own test replays the owner's film as measured today (2.9 s
+  stock shots, no design, no beat in the first 30 s, mono, LRA 1.9 LU): every one of those is caught by name. The
+  contact sheets and the automatic re-pick loop are still to build.
 - 2026-11-24: measured the owner's own 3-minute film (files/test-film-3min-720p.mp4) with ffmpeg, not by eye:
   1280x720, 30 fps, 3:00; cuts at 0, 1.9, 4.5, 7.7, 10.9, 13.8, 16.3, 18.9, 22.1, 25 s (2.5-2.9 s a shot, a
   stock montage rhythm), then a burst of cuts at 27-28 s; no black or frozen stretch over the thresholds; audio

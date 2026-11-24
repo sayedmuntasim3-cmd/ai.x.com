@@ -47,10 +47,15 @@ export async function main(argv, deps = {}) {
     const report = existsSync(values.report) ? JSON.parse(readFileSync(values.report, "utf8")) : null;
     const measuredSeconds = values.file && existsSync(values.file) ? await (deps.probe ?? probeSeconds)(values.file) : null;
     const g = masterGate(report, { measuredSeconds });
-    writeFileSync(values.report.replace(/\.report\.json$/, "") + ".master-gate.json", JSON.stringify({ ...g, measuredSeconds, at: new Date().toISOString() }, null, 1));
+    // M6: the critic's verdict is part of the release, not decoration. A film that is complete but not
+    // good (a flat wall of sound, a stock montage rhythm, a slideshow, black picture) does not go out.
+    const critic = report?.critic ?? null;
+    writeFileSync(values.report.replace(/\.report\.json$/, "") + ".master-gate.json", JSON.stringify({ ...g, critic: critic ? { verdict: critic.verdict, measures: critic.measures } : null, measuredSeconds, at: new Date().toISOString() }, null, 1));
     for (const f of g.findings) print(`${f.severity.toUpperCase()}: ${both(f.message)}`);
-    print(both({ code: `gate.${g.verdict}`, params: { gate: "master" } }));
-    return g.verdict === "block" ? 1 : 0;
+    for (const f of critic?.findings ?? []) print(`${f.severity.toUpperCase()} ${f.code}: ${f.en}\n${f.bn}`);
+    if (critic) print(`Critic: ${String(critic.verdict).toUpperCase()}\nক্রিটিক: ${critic.verdict === "pass" ? "পাস" : "ব্লক"}`);
+    print(both({ code: `gate.${g.verdict === "block" || critic?.verdict === "block" ? "block" : "pass"}`, params: { gate: "master" } }));
+    return g.verdict === "block" || critic?.verdict === "block" ? 1 : 0;
   }
 
   /** @param {string} name @returns {Promise<any>} */
