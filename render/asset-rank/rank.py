@@ -13,6 +13,7 @@ rerank.mjs, where it is tested. Thumbnails and their embeddings are cached under
 import hashlib
 import io
 import json
+import math
 import os
 import sys
 import time
@@ -64,6 +65,33 @@ def phash(img):
     return "%016x" % int("".join("1" if b else "0" for b in bits), 2)
 
 
+def colour(img):
+    """The picture's average hue (degrees), chroma and lightness: the cut's colour continuity."""
+    small = img.convert("RGB").resize((24, 24))
+    px = list(small.getdata())
+    x = y = chroma = light = 0.0
+    for r, g, b in px:
+        r, g, b = r / 255.0, g / 255.0, b / 255.0
+        mx, mn = max(r, g, b), min(r, g, b)
+        light += (mx + mn) / 2
+        ch = mx - mn
+        chroma += ch
+        if ch == 0:
+            continue
+        if mx == r:
+            h = ((g - b) / ch) % 6
+        elif mx == g:
+            h = (b - r) / ch + 2
+        else:
+            h = (r - g) / ch + 4
+        rad = math.radians(h * 60)
+        x += ch * math.cos(rad)
+        y += ch * math.sin(rad)
+    n = float(len(px))
+    hue = math.degrees(math.atan2(y, x)) % 360 if abs(x) + abs(y) > 1e-6 else 0.0
+    return [round(hue, 1), round(chroma / n, 3), round(light / n, 3)]
+
+
 def score(req_path, out_path):
     import numpy as np
     import open_clip
@@ -109,7 +137,7 @@ def score(req_path, out_path):
             img = Image.open(f).convert("RGB")
         except Exception:
             continue
-        info[u] = {"phash": phash(img), "w": img.width, "h": img.height}
+        info[u] = {"phash": phash(img), "w": img.width, "h": img.height, "col": colour(img)}
         todo.append((u, img, cached, meta))
     for i in range(0, len(todo), 64):
         batch = todo[i:i + 64]
@@ -125,7 +153,7 @@ def score(req_path, out_path):
     for im in images:
         u = im.get("url")
         if u in vec:
-            out["images"][im["id"]] = {"ok": True, "phash": info[u]["phash"]}
+            out["images"][im["id"]] = {"ok": True, "phash": info[u]["phash"], "col": info[u].get("col")}
             out["sim"][im["id"]] = [round(float(x), 4) for x in (t @ vec[u])]
         else:
             out["images"][im["id"]] = {"ok": False}

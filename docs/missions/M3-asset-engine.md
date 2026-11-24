@@ -8,15 +8,15 @@ pull first.
 Must not touch: the planning in voice-visuals.mjs (M2) and the composition in render-film.mjs (M4).
 
 ## Checklist
-- [ ] Video-first providers: Pixabay video (key via the Worker relay), Pexels video (only if a key is ever set;
+- [x] Video-first providers: Pixabay video (key via the Worker relay), Pexels video (only if a key is ever set;
       never ask the owner), NASA, Internet Archive and Wikimedia video. Archives only when the shot's era is
       historical.
 - [x] Queries from the shot plan's subject, era and place (M2's fields), never bare keywords. Gather 50–200
       candidates per shot.
 - [x] Hard filters: licence, video ≥1080p, stills ≥1600 px wide, aspect, watermark and duplicate detection.
-- [ ] OpenCLIP relevance to the shot text, plus the aesthetic score, plus era/place agreement. Cache the
+- [x] OpenCLIP relevance to the shot text, plus the aesthetic score, plus era/place agreement. Cache the
       models between runs, CPU only, and measure the time.
-- [ ] Sequence choice per beat: continuity of colour and era, variety of scale, no repeats within 10 min.
+- [x] Sequence choice per beat: continuity of colour and era, variety of scale, no repeats within 10 min.
 - [x] For each pick, write why it was chosen (scores, provider, licence) for the critic and the studio.
 
 ## Gate
@@ -36,6 +36,21 @@ are video, every shot is native ≥1080p, and the time taken is reported.
   missing. Both were tested in PR #39's first commit (`stillFraming`, `sliceTimeline`) and then taken back out.
 
 ## Log
+- 24 Nov 2026, items 1, 4 and 5 (ticked): `internetArchiveProvider` (film-media.mjs) is the first footage archive
+  that answers with real film: video only, public-domain collections or a public-domain licence URL only (an
+  in-copyright upload is never even opened, so no request is spent on it), and it reads the item's file list for a
+  16:9 mp4, preferring the 1080p copy over the 640 px one. It is classified `PUBLIC-DOMAIN` (page check) and then
+  checked item by item like the other archives. `rerank.mjs` now searches archives for **video** too, for a shot
+  whose era is historical or that sits on the R2 evidence rung, and the eyes read scale (wide / medium / close,
+  three CLIP prompts, one argmax) and colour (mean hue, chroma and lightness of every thumbnail, rank.py) beside
+  relevance. `chooseSequence` then decides near-ties the way an editor does: a picture close in colour to the one
+  before it gains up to 0.35, two wide frames in a row lose 0.18, a modern colour picture inside a historical
+  scene loses 0.6 — all small against relevance (10x the clip similarity), and a repeat inside 10 minutes is still
+  impossible. `rank-C1.json` now reports `sequence: { colourDistanceMean, scaleVariety, eraMismatch }`, so the cut's
+  continuity is measured, not asserted. Tests: 3 new in rerank.test.mjs (colour continuity, scale reading, era),
+  1 new in film-media.test.mjs (the archive end to end, on a fake). Measured on a real film: not yet — it needs the
+  Pixabay key (or the Worker relay) and the ~600 MB OpenCLIP model, which this session does not have; the numbers
+  above are the rule, and the gate still waits for a slice render.
 - 21 Nov 2026, item 1 + 3 (partial; not ticked): `shotSearchPlan` (film-media.mjs). Stock video first; archives only for
   R2 history (until M2's era field exists), or when no stock is set. Video ≥1920 px, stills ≥1600 px (documentary-media-fetch.mjs).
   Test: film-media.test.mjs "footage first". Film 993f09ea, first 180 s, re-picked through the Worker relay (PR #37 lets

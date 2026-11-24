@@ -19,6 +19,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { msg } from "../engine/src/messages.mjs";
 
 /**
  * The house standard. Numbers, not taste: each one is a failure the owner's
@@ -103,52 +104,52 @@ export function critique(timeline, report = {}, evidence = {}) {
   const longest = lengths.length ? Math.max(...lengths) : 0;
   const shortShare = total ? lengths.filter((n) => n < 1.5).reduce((a, b) => a + b, 0) / total : 0;
   if (seconds && seconds < STANDARD.minSeconds) {
-    add({ code: "critic.short", severity: "block", value: round(seconds, 1), en: `The film is ${round(seconds, 1)} s; a documentary is at least ${STANDARD.minSeconds} s.`, bn: `ফিল্মটি ${round(seconds, 1)} সেকেন্ড; ডকুমেন্টারি কমপক্ষে ${STANDARD.minSeconds} সেকেন্ড হওয়া দরকার।` });
+    add({ ...msg("critic.short", { value: round(seconds, 1), min: STANDARD.minSeconds }), severity: "block", value: round(seconds, 1) });
   }
   if (lengths.length && (avg < STANDARD.avgShot[0] || avg > STANDARD.avgShot[1])) {
-    add({ code: "critic.shotLength", severity: "block", value: round(avg), en: `The average shot is ${round(avg)} s; a documentary stays between ${STANDARD.avgShot[0]} and ${STANDARD.avgShot[1]} s (a stock montage or a slideshow fails here).`, bn: `গড় শট ${round(avg)} সেকেন্ড; ডকুমেন্টারিতে ${STANDARD.avgShot[0]}–${STANDARD.avgShot[1]} সেকেন্ড থাকা উচিত (স্টক মন্টাজ বা স্লাইডশো এখানেই আটকাবে)।` });
+    add({ ...msg("critic.shotLength", { value: round(avg), low: STANDARD.avgShot[0], high: STANDARD.avgShot[1] }), severity: "block", value: round(avg) });
   }
   if (longest > STANDARD.maxShot) {
-    add({ code: "critic.longShot", severity: "block", value: round(longest), en: `One shot holds ${round(longest)} s on screen; nothing should sit longer than ${STANDARD.maxShot} s.`, bn: `একটি শট ${round(longest)} সেকেন্ড স্থির থাকে; ${STANDARD.maxShot} সেকেন্ডের বেশি কোনো শট থাকা উচিত নয়।` });
+    add({ ...msg("critic.longShot", { value: round(longest), max: STANDARD.maxShot }), severity: "block", value: round(longest) });
   }
   if (seconds > 60 && shortShare > STANDARD.shortShare) {
-    add({ code: "critic.burst", severity: "block", value: round(shortShare * 100, 0), en: `${round(shortShare * 100, 0)}% of the film is shots under 1.5 s: that is a burst of cuts, not an edit.`, bn: `ফিল্মের ${round(shortShare * 100, 0)}% শট ১.৫ সেকেন্ডের কম: এটা কাটের বিস্ফোরণ, সম্পাদনা নয়।` });
+    add({ ...msg("critic.burst", { value: round(shortShare * 100, 0) }), severity: "block", value: round(shortShare * 100, 0) });
   }
 
   // --- picture ----------------------------------------------------------
   const moving = video.filter((/** @type {any} */ v) => MOVING.has(String(v.type)) || (v.type === "card" && v.motion === "push"));
   const movingShare = total ? moving.reduce((/** @type {number} */ a, /** @type {any} */ v) => a + (Number(v.end) - Number(v.start)), 0) / total : 0;
   if (total && movingShare < STANDARD.movingShare) {
-    add({ code: "critic.still", severity: "block", value: round(movingShare * 100, 0), en: `Only ${round(movingShare * 100, 0)}% of the film moves; at least ${round(STANDARD.movingShare * 100, 0)}% must be footage or a designed move.`, bn: `ফিল্মের মাত্র ${round(movingShare * 100, 0)}% নড়ছে; অন্তত ${round(STANDARD.movingShare * 100, 0)}% ফুটেজ বা ডিজাইন করা মুভমেন্ট হওয়া দরকার।` });
+    add({ ...msg("critic.still", { value: round(movingShare * 100, 0), min: round(STANDARD.movingShare * 100, 0) }), severity: "block", value: round(movingShare * 100, 0) });
   }
   const width = Number(timeline?.width ?? report?.width ?? 0);
   const height = Number(timeline?.height ?? report?.height ?? 0);
   if (height && height < STANDARD.minHeight) {
-    add({ code: "critic.resolution", severity: "warn", value: `${width}x${height}`, en: `The picture is ${width}×${height}; publish at ${STANDARD.minHeight}p or more.`, bn: `ছবি ${width}×${height}; অন্তত ${STANDARD.minHeight}p-তে প্রকাশ করুন।` });
+    add({ ...msg("critic.resolution", { width, height, min: STANDARD.minHeight }), severity: "warn", value: `${width}x${height}` });
   }
 
   // --- design -----------------------------------------------------------
   const designed = designedMoments(video);
   const perMinute = seconds ? (designed.length * 60) / seconds : 0;
   if (seconds >= 30 && perMinute < STANDARD.designedPerMinute) {
-    add({ code: "critic.designed", severity: "block", value: round(perMinute, 1), en: `Only ${round(perMinute, 1)} designed moments a minute; the house style needs ${STANDARD.designedPerMinute}.`, bn: `মিনিটে মাত্র ${round(perMinute, 1)}টি ডিজাইন করা মুহূর্ত; ঘরানার নিয়মে ${STANDARD.designedPerMinute}টি দরকার।` });
+    add({ ...msg("critic.designed", { value: round(perMinute, 1), need: STANDARD.designedPerMinute }), severity: "block", value: round(perMinute, 1) });
   }
   const sounds = (timeline?.sfx ?? []).filter((/** @type {any} */ s) => s.kind !== "bed");
   const covered = designed.filter((/** @type {any} */ v) => sounds.some((/** @type {any} */ s) => Math.abs(Number(s.start) - Number(v.start)) <= 1.5 || (Number(s.start) <= Number(v.start) + 0.2 && Number(s.end) >= Number(v.start))));
   const coverage = designed.length ? covered.length / designed.length : 1;
   if (designed.length && coverage < STANDARD.cueCoverage) {
-    add({ code: "critic.cues", severity: "block", value: round(coverage * 100, 0), en: `${round(coverage * 100, 0)}% of the designed moments have a sound cue; the target is ${round(STANDARD.cueCoverage * 100, 0)}%.`, bn: `ডিজাইন করা মুহূর্তের ${round(coverage * 100, 0)}%তে সাউন্ড কিউ আছে; লক্ষ্য ${round(STANDARD.cueCoverage * 100, 0)}%.` });
+    add({ ...msg("critic.cues", { value: round(coverage * 100, 0), target: round(STANDARD.cueCoverage * 100, 0) }), severity: "block", value: round(coverage * 100, 0) });
   }
 
   // --- the hook ---------------------------------------------------------
   const firstShot = lengths.length ? lengths[0] : 0;
   if (firstShot > STANDARD.firstShotMax) {
-    add({ code: "critic.firstShot", severity: "block", value: round(firstShot), en: `The first shot holds ${round(firstShot)} s; the hook must turn within ${STANDARD.firstShotMax} s.`, bn: `প্রথম শট ${round(firstShot)} সেকেন্ড চলে; প্রথম ${STANDARD.firstShotMax} সেকেন্ডের মধ্যে মোড় আসা দরকার।` });
+    add({ ...msg("critic.firstShot", { value: round(firstShot), max: STANDARD.firstShotMax }), severity: "block", value: round(firstShot) });
   }
   const cuts30 = video.filter((/** @type {any} */ v) => Number(v.end) > 0 && Number(v.end) <= 30).length;
   const moments30 = designed.filter((/** @type {any} */ v) => Number(v.start) < 30).length;
   if (seconds > 30 && (cuts30 < STANDARD.first30Cuts || moments30 < 1)) {
-    add({ code: "critic.opening", severity: "block", value: { cuts: cuts30, moments: moments30 }, en: `The first 30 s has ${cuts30} shots and ${moments30} designed moments; the opening needs ${STANDARD.first30Cuts} shots and at least one designed moment.`, bn: `প্রথম ৩০ সেকেন্ডে ${cuts30}টি শট আর ${moments30}টি ডিজাইন করা মুহূর্ত; দরকার ${STANDARD.first30Cuts}টি শট ও অন্তত একটি ডিজাইন করা মুহূর্ত।` });
+    add({ ...msg("critic.opening", { cuts: cuts30, moments: moments30, need: STANDARD.first30Cuts }), severity: "block", value: { cuts: cuts30, moments: moments30 } });
   }
 
   // --- relevance and repeats --------------------------------------------
@@ -157,7 +158,7 @@ export function critique(timeline, report = {}, evidence = {}) {
     const weak = scores.filter((n) => n < STANDARD.relevanceMin).length;
     const share = 1 - weak / scores.length;
     if (share < STANDARD.relevanceShare) {
-      add({ code: "critic.relevance", severity: "block", value: round(share * 100, 0), en: `${round(share * 100, 0)}% of the shots are relevant to the words; ${round(STANDARD.relevanceShare * 100, 0)}% is the floor.`, bn: `শটের ${round(share * 100, 0)}% কথার সঙ্গে প্রাসঙ্গিক; ন্যূনতম ${round(STANDARD.relevanceShare * 100, 0)}% দরকার।` });
+      add({ ...msg("critic.relevance", { value: round(share * 100, 0), floor: round(STANDARD.relevanceShare * 100, 0) }), severity: "block", value: round(share * 100, 0) });
     }
   }
   /** @type {Map<string, number>} */
@@ -165,34 +166,34 @@ export function critique(timeline, report = {}, evidence = {}) {
   for (const v of video) if (v.url) uses.set(String(v.url), (uses.get(String(v.url)) ?? 0) + 1);
   const repeated = [...uses].filter(([, n]) => n > STANDARD.repeatLimit);
   if (repeated.length) {
-    add({ code: "critic.repeats", severity: "warn", value: repeated.length, en: `${repeated.length} pieces of footage appear more than ${STANDARD.repeatLimit} times.`, bn: `${repeated.length}টি ফুটেজ ${STANDARD.repeatLimit} বারের বেশি ব্যবহার হয়েছে।` });
+    add({ ...msg("critic.repeats", { count: repeated.length, limit: STANDARD.repeatLimit }), severity: "warn", value: repeated.length });
   }
 
   // --- the sound --------------------------------------------------------
   const m = report?.master ?? {};
   const lufs = Number(m.integratedLufs);
   if (Number.isFinite(lufs) && (lufs < STANDARD.lufs[0] || lufs > STANDARD.lufs[1])) {
-    add({ code: "critic.loudness", severity: "block", value: lufs, en: `The master is ${lufs} LUFS; the platform target is ${STANDARD.lufs[0]} to ${STANDARD.lufs[1]} LUFS.`, bn: `মাস্টার ${lufs} LUFS; প্ল্যাটফর্মের লক্ষ্য ${STANDARD.lufs[0]}–${STANDARD.lufs[1]} LUFS।` });
+    add({ ...msg("critic.loudness", { value: lufs, low: STANDARD.lufs[0], high: STANDARD.lufs[1] }), severity: "block", value: lufs });
   }
   const peak = Number(m.truePeakDbtp);
   if (Number.isFinite(peak) && peak > STANDARD.truePeak) {
-    add({ code: "critic.peak", severity: "block", value: peak, en: `The true peak is ${peak} dBTP; above ${STANDARD.truePeak} dBTP clips on playback.`, bn: `ট্রু পিক ${peak} dBTP; ${STANDARD.truePeak} dBTP-এর উপরে গেলে প্লেব্যাকে কেটে যায়।` });
+    add({ ...msg("critic.peak", { value: peak, max: STANDARD.truePeak }), severity: "block", value: peak });
   }
   const lra = Number(m.loudnessRangeLu);
   if (Number.isFinite(lra) && seconds > 60 && lra < STANDARD.lraMin) {
-    add({ code: "critic.flat", severity: lra < STANDARD.lraBlock ? "block" : "warn", value: lra, en: `The loudness range is ${lra} LU: a narrow wall of sound, with little silence or lift under a reveal (the target is ${STANDARD.lraMin} LU or more).`, bn: `লাউডনেস রেঞ্জ ${lra} LU: শব্দের সরু দেয়াল, রিভিলের নিচে নীরবতা বা উত্থান কম (লক্ষ্য ${STANDARD.lraMin} LU বা বেশি)।` });
+    add({ ...msg("critic.flat", { value: lra, min: STANDARD.lraMin }), severity: lra < STANDARD.lraBlock ? "block" : "warn", value: lra });
   }
   const channels = Number(evidence.channels);
   if (Number.isFinite(channels) && channels === 1 && seconds > 60) {
-    add({ code: "critic.mono", severity: "warn", value: channels, en: "The master is mono; publish a stereo mix (the voice centred, music and effects placed).", bn: "মাস্টার মনো; স্টেরিও মিক্স প্রকাশ করুন (কণ্ঠ মাঝে, মিউজিক ও এফেক্ট দুই পাশে)।" });
+    add({ ...msg("critic.mono"), severity: "warn", value: channels });
   }
   const black = (report?.master?.black ?? []).length;
   if (black) {
-    add({ code: "critic.black", severity: "block", value: black, en: `${black} stretch(es) of black picture the script does not ask for.`, bn: `স্ক্রিপ্টে না থাকা ${black}টি কালো ফ্রেম-স্ট্রেচ আছে।` });
+    add({ ...msg("critic.black", { count: black }), severity: "block", value: black });
   }
   const freezes = (evidence.freezes ?? []).filter((f) => f.end - f.start >= 2);
   if (freezes.length) {
-    add({ code: "critic.frozen", severity: "warn", value: freezes.length, en: `${freezes.length} frozen stretch(es) of 2 s or more in the picture.`, bn: `ছবিতে ২ সেকেন্ড বা বেশি সময়ের ${freezes.length}টি জমে যাওয়া অংশ আছে।` });
+    add({ ...msg("critic.frozen", { count: freezes.length }), severity: "warn", value: freezes.length });
   }
 
   const measures = {

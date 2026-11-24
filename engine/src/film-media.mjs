@@ -28,7 +28,7 @@ export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0", "PDM
  * Archives: real, historical, scientific and museum pictures, free for
  * commercial use. All but the Smithsonian are searched without a key.
  */
-export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa", "loc", "smithsonian", "met", "artic", "openverse", "open-archives"]);
+export const ARCHIVE_SOURCES = Object.freeze(["wikimedia", "nasa", "loc", "smithsonian", "met", "artic", "openverse", "open-archives", "internet-archive"]);
 
 /**
  * Archives of historical evidence and museum objects: searched for evidence
@@ -49,7 +49,7 @@ export async function verifyArchiveItem(c) {
   // NASA: third-party credits refused by classifyLicense. The Library of Congress, the Met, the
   // Art Institute and the Smithsonian: each provider keeps only items whose own record says
   // "no known restrictions", public domain or CC0. Openverse: CC0, PDM and CC BY only, as the source states them.
-  if (["nasa", "loc", "smithsonian", "met", "artic", "openverse", "open-archives"].includes(c.source)) return c.rights.allowed && !c.restrictions;
+  if (["nasa", "loc", "smithsonian", "met", "artic", "openverse", "open-archives", "internet-archive"].includes(c.source)) return c.rights.allowed && !c.restrictions;
   return false;
 }
 
@@ -537,6 +537,68 @@ export function nasaProvider(o = {}) {
   };
 }
 
+/**
+ * Internet Archive: public-domain films (the Prelinger collection and its public-domain siblings). The only
+ * free archive with real moving footage of the 20th century, so the history rung gets 
+ * century footage, not only photographs. No key, video only. The search result carries no frame size, so the
+ * file list of the first few hits is read (one request each) and a 16:9-ish mp4 is picked; items whose frame
+ * is under 1080p are still returned and refused by the shared filters, so the report shows why.
+ * @param {{ fetch?: FetchLike, perPage?: number, details?: number }} [o]
+ * @returns {MediaProvider}
+ */
+export function internetArchiveProvider(o = {}) {
+  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  const perPage = o.perPage ?? 12;
+  const details = o.details ?? 4;
+  /** Collections the archive itself says are public domain (Prelinger = "films from the Prelinger Archives"). */
+  const PUBLIC = ["prelinger", "publicmovies", "public_domain_movies", "publicdomainmovies", "feature_films", "classic_tv", "film_noir", "avgeeks"];
+  /** @type {Map<string, any>} */
+  const metaCache = new Map();
+  return {
+    id: "internet-archive", layer: 1, kinds: ["video"], cacheTtlSeconds: 86_400, rate: { capacity: 30, windowSeconds: 60 },
+    async search(query, kind, signal) {
+      if (kind !== "video") return [];
+      const publicQ = PUBLIC.map((c) => `collection:(${c})`).join(" OR ");
+      const params = new URLSearchParams();
+      params.set("q", `(${query.slice(0, 160)}) AND mediatype:(movies) AND (${publicQ} OR licenseurl:(*publicdomain*))`);
+      for (const fl of ["identifier", "title", "year", "description", "licenseurl", "collection", "creator"]) params.append("fl[]", fl);
+      params.set("rows", String(perPage)); params.set("page", "1"); params.set("output", "json");
+      const res = await get(`https://archive.org/advancedsearch.php?${params}`, { headers: { "user-agent": COMMONS_UA }, signal });
+      if (!res.ok) throw httpError(res);
+      const data = /** @type {any} */ (await res.json());
+      const docs = (Array.isArray(data?.response?.docs) ? data.response.docs : []).filter((/** @type {any} */ d) => typeof d?.identifier === "string");
+      const publicDocs = docs.filter((/** @type {any} */ d) => {
+        const cols = (Array.isArray(d.collection) ? d.collection : [d.collection]).filter(Boolean).map((/** @type {string} */ c) => String(c).toLowerCase());
+        return cols.some((/** @type {string} */ c) => PUBLIC.includes(c)) || /publicdomain|public domain/i.test(String(d.licenseurl ?? d.license ?? ""));
+      });
+      const items = await Promise.all(publicDocs.slice(0, details).map(async (/** @type {any} */ d) => {
+        if (!metaCache.has(d.identifier)) metaCache.set(d.identifier, await jsonOrNull(get, `https://archive.org/metadata/${encodeURIComponent(d.identifier)}`, { headers: { "user-agent": COMMONS_UA }, signal }));
+        return [d, metaCache.get(d.identifier)];
+      }));
+      return items.flatMap(([d, meta]) => {
+        const files = (Array.isArray(meta?.files) ? meta.files : []).filter((/** @type {any} */ f) => typeof f?.name === "string" && /\.mp4$/i.test(f.name) && /mpeg4|h\.264/i.test(String(f.format ?? "mp4")));
+        const file = files.filter((/** @type {any} */ f) => Number(f.width) >= 1280 && Number(f.width) / Number(f.height || 1) >= 1.3).sort((/** @type {any} */ a, /** @type {any} */ b) => Number(b.width) - Number(a.width))[0]
+          ?? files.sort((/** @type {any} */ a, /** @type {any} */ b) => Number(b.width ?? 0) - Number(a.width ?? 0))[0];
+        if (!file) return [];
+        const length = Number(file.length ?? meta?.metadata?.runtime ?? 0);
+        return [{
+          id: `internet-archive:${d.identifier}`, source: "internet-archive", mediaType: "video",
+          title: plain(d.title) || String(d.identifier),
+          previewUrl: `https://archive.org/services/img/${encodeURIComponent(d.identifier)}`,
+          mediaUrl: `https://archive.org/download/${encodeURIComponent(d.identifier)}/${encodeURIComponent(file.name)}`,
+          sourcePageUrl: `https://archive.org/details/${encodeURIComponent(d.identifier)}`,
+          creator: plain(str(d.creator)) || "Internet Archive",
+          license: `Public Domain (Internet Archive collection: ${[d.collection].flat().filter(Boolean).slice(0, 2).join(", ") || "public domain"})`,
+          licenseUrl: typeof d.licenseurl === "string" ? d.licenseurl : `https://archive.org/details/${encodeURIComponent(d.identifier)}`,
+          attributionRequired: false, durationSeconds: Number.isFinite(length) && length > 0 ? length : null,
+          width: Number(file.width) || null, height: Number(file.height) || null,
+          tags: [d.year ? String(d.year) : "", plain(d.description).slice(0, 200)].filter(Boolean),
+        }];
+      });
+    },
+  };
+}
+
 /** Fetch JSON, or null on any failure (a detail request that fails drops one item, never the search). @param {FetchLike} get @param {string} url @param {RequestInit} init */
 async function jsonOrNull(get, url, init) {
   try { const r = await get(url, init); return r.ok ? /** @type {any} */ (await r.json()) : null; } catch { return null; }
@@ -731,7 +793,7 @@ export function mediaProviders(keys) {
   /** @type {MediaProvider[]} */
   const out = [];
   if (keys.archives !== false) {
-    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }), openArchivesProvider({ fetch: keys.fetch }));
+    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), internetArchiveProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }), openArchivesProvider({ fetch: keys.fetch }));
     if (keys.smithsonianKey) out.push(smithsonianProvider({ apiKey: keys.smithsonianKey, fetch: keys.fetch }));
   }
   if (keys.pexelsKey) out.push(pexelsProvider({ apiKey: keys.pexelsKey, fetch: keys.fetch }));

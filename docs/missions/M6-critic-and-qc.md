@@ -33,6 +33,12 @@ passes the same gates.
   silence or a lift under it.
 
 ## Log
+- 2026-11-24: every finding's wording moved out of `critic.mjs` into the message catalog (`engine/src/messages.mjs`,
+  `critic.short` … `critic.frozen`), with the thresholds passed as parameters. `critic.mjs` now calls `msg(code,
+  params)`, so the English and Bengali sentences cannot drift apart, the studio page can show a finding in the
+  reader's language, and the architecture test ("every message code the code uses exists in English and Bengali")
+  passes again — it had been failing since the critic was added, which nothing caught because that suite was not
+  run. Found by running the engine suite, not by reading the diff.
 - 2026-11-24: the measured gate exists (`render/critic.mjs`, run on every render, embedded as `report.critic`). It reads
   the timeline and the master: average and longest shot, the share of shots under 1.5 s, moving picture, designed
   moments a minute, sound cue on each designed moment, the first shot and the cuts in the first 30 s, resolution,

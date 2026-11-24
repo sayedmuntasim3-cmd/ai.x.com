@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { beatAt, chooseSequence, hamming, historicEra, namesOtherCountry, offPrompts, placePrompts, refusal, scoreOf, shotPrompts, shotQueries, worldQueries } from "./rerank.mjs";
+import { SCALE_PROMPTS, beatAt, chooseSequence, colourDistance, hamming, historicEra, namesOtherCountry, offPrompts, placePrompts, refusal, scaleOf, scoreOf, sequenceBonus, shotPrompts, shotQueries, worldQueries } from "./rerank.mjs";
 
 const INDIA = { country: "India", city: "Bengaluru", demonym: "Indian", currency: "rupees", era: "2010s–2020s" };
 
@@ -70,4 +70,37 @@ test("eyes: the sequence never repeats a clip or a near copy within the window",
   const picks = chooseSequence(shots, 600);
   assert.deepEqual(picks.map((p) => p?.c.id), ["a", "b", "a"], "c is a near copy of a (4 bits); a may return after 10 minutes");
   assert.equal(hamming("ffffffffffffffff", "fffffffffffffff0"), 4);
+});
+
+test("cut: colour continues and scale changes between neighbours", () => {
+  const warm = [30, 0.4, 0.5], warmAgain = [35, 0.42, 0.52], blue = [220, 0.5, 0.5];
+  assert.ok(colourDistance(warm, warmAgain) < colourDistance(warm, blue));
+  assert.equal(colourDistance(null, warm), 0.5, "a picture with no measured colour is neutral");
+  const a = { id: "a" }, b = { id: "b" }, c = { id: "c" };
+  const picks = chooseSequence([
+    { start: 0, ranked: [{ c: a, total: 5, col: warm, scale: "wide" }] },
+    { start: 6, ranked: [{ c: b, total: 5.05, col: blue, scale: "wide" }, { c: c, total: 5, col: warmAgain, scale: "medium" }] },
+  ], 600);
+  assert.equal(picks[1].c.id, "c", "0.05 of raw score is not worth a jump across the colour wheel and two wide frames in a row");
+  assert.ok(picks[1].sequence.colour > 0.2);
+  assert.ok(picks[1].sequence.scale > 0);
+  assert.ok(picks[1].sequence.colourDistance < colourDistance(warm, blue));
+});
+
+test("cut: the three scales are read from the pictures, not guessed", () => {
+  assert.equal(SCALE_PROMPTS.length, 3);
+  assert.equal(scaleOf([0.1, 0.3, 0.2], [0, 1, 2]), "medium");
+  assert.equal(scaleOf([0.31, 0.3, 0.2], [0, 1, 2]), "wide");
+  assert.equal(scaleOf(undefined, [0, 1, 2]), "");
+  assert.deepEqual(sequenceBonus({ scale: "wide" }, { scale: "close" }, false), { colour: 0, scale: 0.12, era: 0 });
+});
+
+test("cut: a modern colour picture is pushed out of a historical scene", () => {
+  const modern = { id: "modern" }, period = { id: "period" };
+  const ranked = [{ c: modern, total: 5.2, era: 0.3 }, { c: period, total: 5, era: 0.75 }];
+  const pick = chooseSequence([{ start: 0, historic: true, ranked }], 600)[0];
+  assert.equal(pick.c.id, "period", "0.2 of raw score does not buy out-of-era footage in a 1947 scene");
+  assert.equal(pick.sequence.total, 5, "the period pick carries no era penalty itself");
+  const now = chooseSequence([{ start: 0, historic: false, ranked }], 600);
+  assert.equal(now[0].c.id, "modern", "in a present-day scene the era bonus is not applied");
 });

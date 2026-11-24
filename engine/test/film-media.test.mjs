@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { chapterMedia, createUseHistory, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSearchPlan, shotSettled, stockShots } from "../src/film-media.mjs";
+import { chapterMedia, createUseHistory, internetArchiveProvider, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSearchPlan, shotSettled, stockShots, verifyArchiveItem } from "../src/film-media.mjs";
+import { classifyLicense } from "../src/documentary-media-fetch.mjs";
 
 const USA_C1 = readFileSync(new URL("../../productions/ramesh-babu/USA/s5-C1.md", import.meta.url), "utf8");
 
@@ -48,7 +49,7 @@ test("Pexels and Pixabay results map to licensed candidates; keys go only where 
   const pb = await pixabayProvider({ apiKey: "PB", fetch: f }).search("old mill", "video", signal);
   assert.equal(pb[0].source, "pixabay");
   assert.ok(calls[1].url.includes("key=PB") && !calls[0].url.includes("PB"));
-  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "loc", "met", "artic", "openverse", "open-archives", "pixabay"], "the free archives need no key");
+  assert.deepEqual(mediaProviders({ pixabayKey: "PB" }).map((p) => p.id), ["wikimedia", "nasa", "internet-archive", "loc", "met", "artic", "openverse", "open-archives", "pixabay"], "the free archives need no key");
   assert.deepEqual(mediaProviders({ archives: false }), []);
 });
 
@@ -247,7 +248,7 @@ test("more legal sources: the Library of Congress, the Met, the Art Institute, O
 
   // The run's provider list: every keyless archive, the Smithsonian only with its key.
   const ids = (/** @type {any} */ k) => mediaProviders({ fetch: f, ...k }).map((p) => p.id);
-  assert.deepEqual(ids({}), ["wikimedia", "nasa", "loc", "met", "artic", "openverse", "open-archives"]);
+  assert.deepEqual(ids({}), ["wikimedia", "nasa", "internet-archive", "loc", "met", "artic", "openverse", "open-archives"]);
   assert.ok(ids({ smithsonianKey: "K" }).includes("smithsonian"));
 });
 
@@ -330,4 +331,50 @@ test("footage first: a shot takes full-frame video before any still; stills unde
   assert.equal(none.shots[0].status, "missing");
   const sharp = provider("pixabay", false, { video: [], image: [item("s3", "image", 1600, false)] });
   assert.equal((await chapterMedia({ chapter: "C1", markdown: md, providers: [tiny, sharp] })).shots[0].pick?.id, "s3");
+});
+
+test("the Internet Archive adds century footage: public-domain collections only, video only, real frame sizes", async () => {
+  /** @type {string[]} */
+  const calls = [];
+  const f = async (/** @type {string} */ url) => {
+    calls.push(url);
+    if (url.startsWith("https://archive.org/advancedsearch.php")) {
+      const q = new URL(url).searchParams.get("q") ?? "";
+      assert.match(q, /mediatype:\(movies\)/);
+      assert.match(q, /collection:\(prelinger\)/);
+      return Response.json({ response: { docs: [
+        { identifier: "prelinger-film", title: "A city street, 1947", year: "1947", collection: ["Prelinger"], licenseurl: "" },
+        { identifier: "still-in-copyright", title: "A modern film", year: "1999", collection: ["some-uploader"], licenseurl: "" },
+        { identifier: "cc-zero-film", title: "Newsreel", year: "1932", collection: ["uploader"], licenseurl: "https://creativecommons.org/publicdomain/zero/1.0/" },
+      ] } });
+    }
+    if (url.startsWith("https://archive.org/metadata/")) {
+      return Response.json({ files: [
+        { name: "film_low.mp4", format: "MPEG4", width: "640", height: "480", length: "600.5" },
+        { name: "film_hd.mp4", format: "h.264", width: "1920", height: "1080", length: "600.5" },
+        { name: "film.ogv", format: "Ogg Video", width: "1920", height: "1080" },
+      ] });
+    }
+    return Response.json({});
+  };
+  const provider = internetArchiveProvider({ fetch: f, perPage: 10, details: 4 });
+  assert.deepEqual(provider.kinds, ["video"], "the archive is asked for moving pictures only");
+  const picks = await provider.search("city street 1947", "video");
+  assert.equal(picks.length, 2, "the in-copyright upload is never even opened");
+  assert.ok(!calls.some((u) => u.includes("still-in-copyright")), "no metadata request is spent on a refused item");
+  const film = picks.find((p) => p.id === "internet-archive:prelinger-film");
+  assert.ok(film, "a Prelinger film is a public-domain film");
+  assert.equal(film.mediaUrl, "https://archive.org/download/prelinger-film/film_hd.mp4", "the 1080p mp4 is the film, not the 640 px copy");
+  assert.equal(film.width, 1920);
+  assert.equal(film.height, 1080);
+  assert.equal(film.durationSeconds, 600.5);
+  assert.equal(film.mediaType, "video");
+  assert.match(String(film.title), /1947/);
+  const rights = classifyLicense(film);
+  assert.equal(rights.allowed, true);
+  assert.equal(rights.licenseId, "PUBLIC-DOMAIN");
+  assert.equal(await verifyArchiveItem({ ...film, rights }), true);
+  assert.equal(await verifyArchiveItem({ ...film, rights, restrictions: "trademark" }), false, "a restricted item is still refused at the item level");
+  assert.deepEqual(await provider.search("city street", "image"), [], "no stills: this provider is the footage archive");
+  assert.equal(classifyLicense({ source: "internet-archive", license: "Some rights reserved", licenseUrl: "" }).allowed, false, "an unconfirmed archive item is refused");
 });

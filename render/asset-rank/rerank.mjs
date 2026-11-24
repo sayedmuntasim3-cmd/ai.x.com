@@ -22,7 +22,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { FREE_LICENCES, REPEAT_WINDOW_SECONDS, pixabayProvider, pexelsProvider, toPick, verifyArchiveItem, wikimediaProvider } from "../../engine/src/film-media.mjs";
+import { FREE_LICENCES, REPEAT_WINDOW_SECONDS, internetArchiveProvider, nasaProvider, pixabayProvider, pexelsProvider, toPick, verifyArchiveItem, wikimediaProvider } from "../../engine/src/film-media.mjs";
 import { createRateLimiter, fetchShotMedia } from "../../engine/src/documentary-media-fetch.mjs";
 
 const run = promisify(execFile);
@@ -212,19 +212,86 @@ export function refusal(c, score, world = {}) {
 }
 
 /**
+ * The scale of a shot, as a picture reads it: a wide establishing frame, a medium frame with one subject,
+ * or a close detail. Three CLIP prompts, one argmax; no second pass over the pictures.
+ */
+export const SCALES = Object.freeze(["wide", "medium", "close"]);
+export const SCALE_PROMPTS = Object.freeze([
+  "a wide establishing shot of a landscape, a city skyline or a large building",
+  "a medium shot of one person or one object in its surroundings",
+  "a close-up detail of hands, a face or a small object",
+]);
+
+/**
+ * How different two pictures look, 0 (the same colour and light) to 1. Hue is weighted by how much
+ * colour the two have, so two grey pictures differ only by their light.
+ * @param {number[] | null | undefined} a [hue 0-360, chroma 0-1, light 0-1] @param {number[] | null | undefined} b
+ */
+export function colourDistance(a, b) {
+  if (!a || !b || a.length < 3 || b.length < 3) return 0.5;
+  const [h1, c1, l1] = a, [h2, c2, l2] = b;
+  const dh = (Math.min(Math.abs(h1 - h2), 360 - Math.abs(h1 - h2)) / 180) * Math.min(1, c1 + c2);
+  return Math.min(1, Math.max(0, 0.5 * dh + 0.4 * Math.abs(l1 - l2) + 0.1 * Math.abs(c1 - c2)));
+}
+
+/** The scale a picture reads as (the highest of the three rows). @param {number[] | undefined} sim @param {number[]} rows */
+export function scaleOf(sim, rows) {
+  if (!sim || !rows?.length) return "";
+  let best = -Infinity, at = "";
+  rows.forEach((r, i) => { if (sim[r] > best) { best = sim[r]; at = SCALES[i]; } });
+  return at;
+}
+
+/** How much the cut gains or loses by this picture following the last one (same weight in the tests). */
+export const SEQUENCE = Object.freeze({ colour: 0.35, scaleSame: 0.18, scaleOther: 0.12, eraMismatch: 0.6 });
+
+/**
+ * Continuity of colour, variety of scale and agreement of era, as a small addition to a pick's score:
+ * a picture close in colour to the one before it gains, two wide frames in a row lose, a modern colour
+ * picture inside a historical scene loses. Small on purpose: relevance is 10x the clip similarity and
+ * stays the first rule.
+ * @param {{ col?: number[] | null, scale?: string } | null} prev @param {{ col?: number[] | null, scale?: string, era?: number }} x @param {boolean} historic
+ */
+export function sequenceBonus(prev, x, historic) {
+  const out = { colour: 0, scale: 0, era: 0 };
+  if (prev?.col && x.col) out.colour = SEQUENCE.colour * (1 - colourDistance(prev.col, x.col));
+  if (prev?.scale && x.scale) out.scale = prev.scale === x.scale ? -SEQUENCE.scaleSame : SEQUENCE.scaleOther;
+  if (historic && typeof x.era === "number" && x.era < 0.45) out.era = -SEQUENCE.eraMismatch;
+  return out;
+}
+
+/**
  * Choose in film order: the best-scoring candidate not used, and not a near copy of a pick, within the
- * repeat window. @template {{ id: string }} C
- * @param {{ start: number, ranked: { c: C, total: number, phash?: string }[] }[]} shots @param {number} [windowSeconds]
- * @returns {({ c: C, total: number, phash?: string } | null)[]}
+ * repeat window; colour, scale and era of the shot before it settle the near-ties. @template {{ id: string }} C
+ * @param {{ start: number, historic?: boolean, ranked: { c: C, total: number, phash?: string, col?: number[] | null, scale?: string, era?: number }[] }[]} shots @param {number} [windowSeconds]
+ * @returns {({ c: C, total: number, phash?: string, sequence?: { colour: number, scale: number, era: number, total: number, colourDistance: number | null, at: string } } | null)[]}
  */
 export function chooseSequence(shots, windowSeconds = REPEAT_WINDOW_SECONDS) {
   /** @type {{ id: string, at: number, phash?: string }[]} */
   const used = [];
+  /** @type {{ col?: number[] | null, scale?: string } | null} */
+  let prev = null;
+  const r3 = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
   return shots.map((s) => {
     const near = used.filter((u) => Math.abs(u.at - s.start) < windowSeconds);
-    const pick = s.ranked.find((x) => !near.some((u) => u.id === x.c.id || (u.phash && x.phash && hamming(u.phash, x.phash) <= DUPLICATE_BITS))) ?? null;
-    if (pick) used.push({ id: pick.c.id, at: s.start, phash: pick.phash });
-    return pick;
+    /** @type {typeof s.ranked[number] | null} */
+    let pick = null;
+    let best = -Infinity;
+    let note = { colour: 0, scale: 0, era: 0 };
+    for (const x of s.ranked) {
+      if (near.some((u) => u.id === x.c.id || (u.phash && x.phash && hamming(u.phash, x.phash) <= DUPLICATE_BITS))) continue;
+      const extra = sequenceBonus(prev, x, Boolean(s.historic));
+      const total = x.total + extra.colour + extra.scale + extra.era;
+      if (total > best) { best = total; pick = x; note = extra; }
+    }
+    if (pick) {
+      const previous = prev;
+      used.push({ id: pick.c.id, at: s.start, phash: pick.phash });
+      const chosen = pick;
+      prev = chosen;
+      return { ...chosen, sequence: { ...note, total: r3(best), colourDistance: previous ? r3(colourDistance(previous.col, chosen.col)) : null, at: chosen.scale ?? "" } };
+    }
+    return null;
   });
 }
 
@@ -272,8 +339,9 @@ export async function rerankRun(o) {
     ...(pixKey ? [pixabayProvider({ apiKey: pixKey, fetch: get, perPage: 50 })] : []),
     ...(env.PEXELS_API_KEY ? [pexelsProvider({ apiKey: env.PEXELS_API_KEY, perPage: 40 })] : []),
   ];
-  // Real photographs of the named thing (R2): Commons reports width, licence and restrictions with the search.
-  const archives = [wikimediaProvider({ perPage: 30 })];
+  // Real records of the named thing (R2): Commons and NASA report width, licence and restrictions with the
+  // search; the Internet Archive adds century footage (mission M3 item 1), read of the public-domain collections only.
+  const archives = [wikimediaProvider({ perPage: 30 }), nasaProvider({ perPage: 20 }), internetArchiveProvider({ perPage: 12 })];
   const limiter = createRateLimiter();
   /** @type {Map<string, Promise<any[]>>} */
   const searched = new Map();
@@ -295,7 +363,10 @@ export async function rerankRun(o) {
     const lists = [];
     for (const q of qs) {
       lists.push(search(q, "video", stock));
-      if (s.rung === "R2" || historic) lists.push(search(q, "image", archives));
+      if (s.rung === "R2" || historic) {
+        lists.push(search(q, "video", archives));
+        lists.push(search(q, "image", archives));
+      }
       lists.push(search(q, "image", stock));
     }
     for (const q of pool) lists.push(search(q, "video", stock));
@@ -312,7 +383,7 @@ export async function rerankRun(o) {
   const texts = [];
   const row = (/** @type {string} */ t) => { const i = texts.indexOf(t); if (i >= 0) return i; texts.push(t); return texts.length - 1; };
   const off = offPrompts(world).map((x) => ({ ...x, row: row(x.text) }));
-  const shared = { off, place: placePrompts(world).map(row), quality: QUALITY.map(row), watermark: WATERMARK.map(row), era: ERA.map(row) };
+  const shared = { off, place: placePrompts(world).map(row), quality: QUALITY.map(row), watermark: WATERMARK.map(row), era: ERA.map(row), scale: SCALE_PROMPTS.map(row) };
   const atOf = new Map(shots.map((/** @type {any} */ s) => [s, { ...shared, pos: shotPrompts(s, beatAt(beats, s.start, s.end), world).map(row) }]));
   const images = [];
   const seenImg = new Set();
@@ -337,10 +408,10 @@ export async function rerankRun(o) {
       const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : null;
       const why = refusal(c, score, world);
       if (why) { refused[why] = (refused[why] ?? 0) + 1; continue; }
-      ranked.push({ c, total: /** @type {any} */ (score).total, score, phash: ans.images[c.id]?.phash });
+      ranked.push({ c, total: /** @type {any} */ (score).total, score, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score).era });
     }
     ranked.sort((a, b) => b.total - a.total);
-    return { s, start: s.start, ranked, refused, seen: (candidatesOf.get(s) ?? []).length };
+    return { s, start: s.start, historic, ranked, refused, seen: (candidatesOf.get(s) ?? []).length };
   });
   const chosen = chooseSequence(plan);
 
@@ -357,11 +428,20 @@ export async function rerankRun(o) {
       s.status = "found";
       s.review = "eyes";
       s.alternates = p.ranked.filter((x) => x.c.id !== c.id).slice(0, 3).map((x) => x.c.id);
-      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, before };
+      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before };
     }
-    report.push({ scene: s.scene, shot: s.shot, start: s.start, before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
+    report.push({ scene: s.scene, shot: s.shot, start: s.start, before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
   });
   const picks = report.filter((r) => r.after);
+  // Continuity across the chosen picks (M3 item 5), measured on the same pass: no extra requests or passes.
+  /** @type {any[]} */
+  const seqPicks = chosen.filter(Boolean);
+  const seqDists = seqPicks.slice(1).map((p, i) => colourDistance(seqPicks[i].col, p.col));
+  const seqColour = seqDists.reduce((a, b) => a + b, 0);
+  const seqColourCount = seqDists.length;
+  const seqPairs = seqPicks.slice(1).map((/** @type {any} */ p, /** @type {number} */ i) => [seqPicks[i], p]).filter((/** @type {any[]} */ pair) => pair[0].scale && pair[1].scale);
+  const seqVariety = seqPairs.filter((/** @type {any[]} */ pair) => pair[0].scale !== pair[1].scale).length;
+  const seqVarietyCount = seqPairs.length;
   const summary = {
     model: ans.model, world, shots: report.length, picked: picks.length,
     video: picks.filter((r) => r.kind === "video").length,
@@ -369,10 +449,18 @@ export async function rerankRun(o) {
     candidates: { total: images.length, perShotMin: Math.min(...plan.map((p) => p.seen)), perShotMax: Math.max(...plan.map((p) => p.seen)) },
     images: { computed: ans.computed, cached: ans.cached, unseen: ans.unseen ?? 0 },
     seconds: { search: Math.round(searchSeconds), see: Math.round(seeSeconds), total: Math.round((Date.now() - t0) / 1000) },
+    // The cut's own continuity (M3 item 5): mean colour change between neighbours, how often the scale
+    // changes, and how many picks broke a historical scene. Measured, so the critic can read it.
+    sequence: {
+      colourDistanceMean: seqColour ? Math.round((seqColour / seqColourCount) * 1000) / 1000 : null,
+      scaleVariety: seqVarietyCount ? Math.round((seqVariety / seqVarietyCount) * 1000) / 1000 : null,
+      eraMismatch: picks.filter((r) => (r.sequence?.era ?? 0) < 0).length,
+    },
   };
   await writeFile(mediaPath, JSON.stringify(media, null, 1));
   await writeFile(join(o.run, "rank-C1.json"), JSON.stringify({ summary, shots: report }, null, 1));
   log(`Eyes: ${summary.picked}/${summary.shots} shots chosen by OpenCLIP from ${summary.candidates.total} candidates (${summary.candidates.perShotMin}-${summary.candidates.perShotMax} per shot); video ${summary.video}/${summary.picked}; ${summary.flaggedOff} still look off-world; ${summary.images.unseen} thumbnails could not be fetched; ${summary.seconds.total} s (search ${summary.seconds.search} s, seeing ${summary.seconds.see} s).`);
+  log(`Cut: colour change between neighbours ${summary.sequence.colourDistanceMean ?? "-"} (0 = one colour, 1 = a new world); scale changes on ${summary.sequence.scaleVariety ?? "-"} of neighbouring pairs; ${summary.sequence.eraMismatch} pick(s) broke a historical scene.`);
   if (o.sheet) {
     for (const [name, which] of /** @type {const} */ ([["sheet-before.jpg", "before"], ["sheet-after.jpg", "after"]])) {
       const before = which === "before" ? await readJson(join(o.run, "media-C1.before.json")) : media;

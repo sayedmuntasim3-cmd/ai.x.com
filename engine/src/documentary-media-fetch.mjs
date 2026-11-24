@@ -55,6 +55,9 @@ export function classifyLicense(result) {
   if (/\bcc[ -]by\b|licenses\/by\/|^by \d|\bby \d\.\d|creative commons attribution(?! -?share| -?non| -?no)/.test(text)) return decide("CC-BY", true, true, "Attribution licence: credit required.");
   if (result.source === "wikimedia" && /^public domain$/i.test(raw)) return decide("PUBLIC-DOMAIN", true, true, "Commons public-domain file: the file page must show no restrictions.");
   if (result.source === "wikimedia" && /^(no restrictions|copyrighted free use|attribution)$/i.test(raw)) return decide("FREE-WITH-CREDIT", true, true, "Commons free-use file: credit the author; the file page must show no restrictions.");
+  // Internet Archive: only items the archive itself calls public domain (a public-domain collection, or a
+  // public-domain licence URL). Everything else there is unknown and refused.
+  if (result.source === "internet-archive" && /public domain/.test(text.toLowerCase())) return decide("PUBLIC-DOMAIN", true, true, "Internet Archive public-domain film: the item page must confirm it.");
   // Open archives (open-archives.mjs): the archive's own public-domain or "no known restrictions" statement,
   // already checked record by record before it reaches the studio.
   if (result.source === "open-archives" && /^(public domain|no known (copyright )?restrictions)/.test(raw.toLowerCase())) return decide("PUBLIC-DOMAIN", true, true, `Open archive: ${raw}`);
