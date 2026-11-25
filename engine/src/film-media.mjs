@@ -208,6 +208,22 @@ export const JUDGE_POOL = 4;
  *   returns, per shot key, the candidate indices that fit the shot, best first ([] = none fits)
  */
 
+/** A moving clip shorter than this is a flicker, not footage. */
+export const MIN_VIDEO_SECONDS = 2;
+
+/**
+ * How well a candidate's length fits the shot it would fill: 0 good (a video at least as long as the
+ * shot, or an unbounded still), 1 usable but shorter than the shot (the shot will have to cut away),
+ * 2 refused (a moving clip too short to show at all). Stills are never length-checked.
+ * @param {import("./documentary-media-fetch.mjs").MediaCandidate} c
+ * @param {number} shotSeconds
+ */
+export function durationFit(c, shotSeconds) {
+  if (c.mediaType !== "video" || c.durationSeconds === null || c.durationSeconds === undefined || !Number.isFinite(c.durationSeconds)) return 0;
+  if (c.durationSeconds < MIN_VIDEO_SECONDS) return 2;
+  return shotSeconds > 0 && c.durationSeconds + 0.5 < shotSeconds ? 1 : 0;
+}
+
 /** The pick record of a candidate (also used by render/asset-rank). @param {import("./documentary-media-fetch.mjs").MediaCandidate} c @returns {MediaPick} */
 export function toPick(c) {
   return {
@@ -256,21 +272,27 @@ export async function chapterMedia(o) {
       row.trace.push(...found.trace.map((t) => ({ query, ...t })));
       // Every candidate here passed its item-level rights check inside fetchShotMedia.
       const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId) && (!o.wholeWord || titleHasWords(c.title, query)));
-      if (!free.length) continue;
+      // A clip too short to show is not footage: try the next query/provider. Among the rest, a clip at
+      // least as long as the shot comes first, so a long shot is not filled by a 2-second clip that repeats.
+      const shotSeconds = Math.max(0, shot.end - shot.start);
+      const usable = free.filter((c) => durationFit(c, shotSeconds) < 2);
+      if (usable.length < free.length) row.trace.push({ query, provider: "length", outcome: "too-short", returned: free.length - usable.length, allowed: 0 });
+      if (!usable.length) continue;
+      usable.sort((a, b) => durationFit(a, shotSeconds) - durationFit(b, shotSeconds));
       row.query = query;
-      if (o.judge) { pools.set(row, free); break search; }
+      if (o.judge) { pools.set(row, usable); break search; }
       // A file that cannot be fetched would become a text card in the film: try the next candidate instead.
       if (o.reachable) {
-        let usable = -1;
-        for (let i = 0; i < Math.min(free.length, 4) && usable < 0; i += 1) {
-          const url = free[i].mediaUrl;
-          if (url && (await o.reachable(url).catch(() => false))) usable = i;
-          else row.trace.push({ query, provider: free[i].source, outcome: "unreachable", returned: 1, allowed: 0 });
+        let at = -1;
+        for (let i = 0; i < Math.min(usable.length, 4) && at < 0; i += 1) {
+          const url = usable[i].mediaUrl;
+          if (url && (await o.reachable(url).catch(() => false))) at = i;
+          else row.trace.push({ query, provider: usable[i].source, outcome: "unreachable", returned: 1, allowed: 0 });
         }
-        if (usable < 0) continue;
-        free.unshift(...free.splice(usable, 1));
+        if (at < 0) continue;
+        usable.unshift(...usable.splice(at, 1));
       }
-      const [best, ...rest] = free;
+      const [best, ...rest] = usable;
       row.status = "found";
       row.pick = toPick(best);
       row.alternates = rest.slice(0, 3).map((c) => c.id);

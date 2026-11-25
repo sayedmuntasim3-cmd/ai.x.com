@@ -74,6 +74,8 @@ const T = {
     pictureDone: "সেভ হয়েছে। পরের রেন্ডারে এই শটে বসবে। মোট লিংক:",
     pictureRemoved: "লিংক মুছে গেছে।",
     lastError: "শেষ চেষ্টায় সমস্যা (আবার চেষ্টা হচ্ছে)",
+    progress: "ধাপ",
+    quotaPaused: "ফ্রি এআই-এর দৈনিক কোটা শেষ: ফিল্ম থেমে আছে, কাজ সংরক্ষিত; কোটা রিসেটের পর Resume করুন",
     failedWhy: "থেমে গেছে, কারণ",
     resume: "যেখানে থেমেছে সেখান থেকে চালাও",
     resumeHint: "শেষ হওয়া ধাপগুলোর টাকা আবার লাগবে না।",
@@ -153,6 +155,8 @@ const T = {
     pictureDone: "Saved. The next render puts it in this shot. Links:",
     pictureRemoved: "Link removed.",
     lastError: "Last attempt failed (retrying)",
+    progress: "Stage",
+    quotaPaused: "Free AI daily limit reached: the film is paused and its work is saved; press Resume after the limit resets",
     failedWhy: "Stopped because",
     resume: "Resume where it stopped",
     resumeHint: "Finished stages are not paid for again.",
@@ -326,8 +330,12 @@ function showRun(/** @type {string} */ id, /** @type {any} */ run, /** @type {an
   out.append(h("h3", `${run.film?.topic ?? ""} · ${l.status}: ${run.status ?? "queued"}`));
   out.append(h("p", `${l.spent}: $${run.costUsd ?? 0}`));
   if (run.status === "running" && run.lastError) out.append(h("p", `⚠ ${l.lastError} (${run.lastError.stage}): ${run.lastError.message}`));
+  // Progress: the stage now running and how many of the film's stages are finished.
+  if (run.status === "running" && run.progress?.total) out.append(h("p", `${l.progress}: ${Math.min(run.progress.done + 1, run.progress.total)} / ${run.progress.total}${run.progress.stage ? ` · ${run.progress.stage}` : ""}`));
+  // A used-up free day is a pause, not a failure: the reset time is shown and Resume goes on from here.
+  if (run.status === "paused-quota") out.append(h("p", `${l.quotaPaused}${run.resumeAt ? ` (${new Date(run.resumeAt).toLocaleString(lang() === "bn" ? "bn-BD" : "en-US")})` : ""}`));
   if ((run.status === "failed" || run.status === "stopped-budget") && run.error) out.append(h("p", `✗ ${l.failedWhy}: ${run.error}`));
-  if (run.status === "failed" || run.status === "stopped-budget") out.append(resumeForm(id));
+  if (run.status === "failed" || run.status === "stopped-budget" || run.status === "paused-quota") out.append(resumeForm(id));
   const list = document.createElement("ul");
   for (const [stage, info] of Object.entries(run.stages ?? {})) {
     const label = stage.startsWith("s5:") ? `S5 ${stage.slice(3)}` : stage.startsWith("media:") ? `${l.footage} ${stage.slice(6)}` : stage.startsWith("edit:") ? `${l.edit} ${stage.slice(5)}` : l.stages[stage] ?? stage;

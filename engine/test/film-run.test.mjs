@@ -65,6 +65,18 @@ test("film requests are validated and the cost is estimated before a run", () =>
   assert.ok(estimateRun(2700, "claude-sonnet-5-5").usdHigh < e.usdHigh);
 });
 
+test("40, 50 and 60 minute films are accepted, estimated and planned in chapters", () => {
+  for (const minutes of [40, 50, 60]) {
+    const made = newFilm({ topic: `A ${minutes} minute documentary`, minutes }, `len${minutes}`);
+    assert.ok(made.ok, `${minutes} min refused: ${made.ok ? "" : made.error}`);
+    assert.equal(made.film.durationSeconds, minutes * 60);
+    const e = estimateRun(made.film.durationSeconds);
+    assert.ok(e.chapters >= 5, `${minutes} min planned in ${e.chapters} chapters`);
+    assert.ok(e.usdHigh > 0);
+  }
+  assert.equal(newFilm({ topic: "too long", minutes: 301 }, "x").ok, false, "over five hours is refused");
+});
+
 test("the chapter plan must tile the film", () => {
   const good = [
     { id: "C1", title: "A", start: "0:00:00", end: "0:01:00", firstScene: "SC0001", lastScene: "SC0006", brief: "b" },
@@ -698,6 +710,38 @@ test("the viewer panel's fix that breaks the word budget is not applied, and a l
   assert.equal(viewer.applied, 0);
   assert.match(String(viewer.reverted ?? ""), /broke a code check/);
   assert.ok(state.gaps.some((/** @type {string} */ g) => g.startsWith("viewer panel: the opening scored 3/10")));
+});
+
+test("a saved research file is reused, not researched again; progress shows the stage and how many remain", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "reuse");
+  assert.ok(made.ok);
+  const store = memoryStore();
+  store.put("s01.md", "## S0\n## S1\nTitle A");
+  store.put("research.json", JSON.stringify({ subject: "mill", facts: [{ id: "F01", claim: "c", value: "v", sources: ["https://example.org/0"], confidence: "high", conflict: null }] }));
+  const model = scriptedModel();
+  const state = await runFilm({ film: made.film, manual: "MANUAL", model, store });
+  assert.equal(state.status, "done", JSON.stringify(state.gaps));
+  assert.ok(!model.calls.includes("research"), "the paid research call is not made twice");
+  assert.deepEqual(state.stages.research.result, { facts: 1, reused: true });
+  assert.deepEqual(state.progress, { ...state.progress, stage: "s7", running: false, done: 13, total: 18 }, JSON.stringify(state.progress));
+});
+
+test("a quota pause is a pause, not a failure: the status, the reset time and the finished stages are kept", async () => {
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "quota");
+  assert.ok(made.ok);
+  const store = memoryStore();
+  const base = scriptedModel();
+  // What reaches the run after a Workflow step: a plain error whose message carries the pause and the
+  // reset time (the extra field on the original object does not survive serialisation).
+  const paused = new Error("NonRetryableError: QUOTA_PAUSED 2026-11-26T08:00:00.000Z Gemini's free daily limit is used up (GenerateRequestsPerDayPerProjectPerModel-FreeTier = 20).");
+  const model = { ...base, call: async (/** @type {any} */ r) => { if (r.stage === "research") throw paused; return base.call(r); } };
+  await assert.rejects(runFilm({ film: made.film, manual: "MANUAL", model, store }), /free daily limit/);
+  const state = JSON.parse(store.m.get("run.json"));
+  assert.equal(state.status, "paused-quota");
+  assert.equal(state.resumeAt, "2026-11-26T08:00:00.000Z");
+  assert.equal(state.stages.s01.status, "done", "finished work is kept for the resume");
+  assert.equal(state.progress.running, false);
+  assert.equal(state.progress.stage, "research");
 });
 
 test("the channel's lessons reach S3, every S5 chapter and the Edit Director", async () => {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { chapterMedia, createUseHistory, internetArchiveProvider, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSearchPlan, shotSettled, stockShots, verifyArchiveItem } from "../src/film-media.mjs";
+import { chapterMedia, createUseHistory, durationFit, internetArchiveProvider, MIN_VIDEO_SECONDS, mediaProviders, pexelsProvider, pixabayProvider, shotKey, shotSearchPlan, shotSettled, stockShots, verifyArchiveItem } from "../src/film-media.mjs";
 import { classifyLicense } from "../src/documentary-media-fetch.mjs";
 
 const USA_C1 = readFileSync(new URL("../../productions/ramesh-babu/USA/s5-C1.md", import.meta.url), "utf8");
@@ -377,4 +377,25 @@ test("the Internet Archive adds century footage: public-domain collections only,
   assert.equal(await verifyArchiveItem({ ...film, rights, restrictions: "trademark" }), false, "a restricted item is still refused at the item level");
   assert.deepEqual(await provider.search("city street", "image"), [], "no stills: this provider is the footage archive");
   assert.equal(classifyLicense({ source: "internet-archive", license: "Some rights reserved", licenseUrl: "" }).allowed, false, "an unconfirmed archive item is refused");
+});
+
+test("a clip too short to show is refused; a clip at least as long as the shot comes before a shorter one", async () => {
+  const md = `**SC0001** | 0:00:00-0:00:12 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 mill wheel turning slowly | SRC: Pexels · Q1 "old mill" | LOOK: L`;
+  /** @param {number} seconds @param {number} n */
+  const clip = (seconds, n) => ({ id: `pexels:video:${n}`, source: "pexels", mediaType: "video", title: "old mill", previewUrl: null, mediaUrl: `https://v/${n}.mp4`, sourcePageUrl: `https://www.pexels.com/video/${n}/`, creator: null, license: "Pexels License", licenseUrl: null, durationSeconds: seconds, width: 1920, height: 1080, attributionRequired: false });
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const stock = { id: "pexels", layer: 2, kinds: ["video"], cacheTtlSeconds: 0, rate: { capacity: 100, windowSeconds: 60 }, async search() { return [clip(1, 1), clip(5, 2), clip(15, 3)]; } };
+  const media = await chapterMedia({ chapter: "C1", markdown: md, providers: [stock] });
+  assert.equal(media.shots[0].pick?.id, "pexels:video:3", "12-second shot takes the 15-second clip, not the 5-second one");
+  assert.ok(media.shots[0].trace.some((t) => t.outcome === "too-short"), "the 1-second clip is reported, not silently used");
+  assert.equal(durationFit(clip(1, 4), 12), 2);
+  assert.equal(durationFit(clip(5, 5), 12), 1);
+  assert.equal(durationFit(clip(20, 6), 12), 0);
+  assert.equal(durationFit({ ...clip(1, 7), mediaType: "image", durationSeconds: null }, 12), 0, "a still has no length to check");
+  assert.equal(MIN_VIDEO_SECONDS, 2);
+
+  /** @type {import("../src/film-media.mjs").MediaProvider} */
+  const flicker = { ...stock, async search() { return [clip(1, 8)]; } };
+  const none = await chapterMedia({ chapter: "C1", markdown: md, providers: [flicker] });
+  assert.equal(none.stats.found, 0, "no fake footage is made from a one-frame clip");
 });

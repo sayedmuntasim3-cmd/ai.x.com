@@ -322,6 +322,15 @@ function highestPrice() {
 export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "medium", s3: "high", s4: "medium", s5: "high", repair: "medium", qa: "high", viewer: "medium", edit: "medium", s6: "medium", s7: "medium" });
 
 /**
+ * The stages every film runs, in order, before the per-chapter ones (s5, edit and media, three per
+ * chapter). The studio uses it with state.progress to show "stage 7 of 24" instead of a bare spinner.
+ */
+export const STAGE_PLAN = Object.freeze(["market", "s01", "research", "sources", "s2", "s3", "s4", "qa", "viewer", "s6", "s7", "originality"]);
+
+/** Stages a chapter adds: its script, its edit plan and its footage search. */
+export const PER_CHAPTER_STAGES = 3;
+
+/**
  * Run (or resume) a film. Returns the final run state.
  * budgetUsd stops the run before any stage that starts once the money spent
  * has reached it, so a small budget is never overrun by more than one stage.
@@ -370,6 +379,19 @@ export async function runFilm(o) {
   if (state.status !== "running") { if (state.status !== "revising") state.resumes = (state.resumes ?? 0) + 1; state.status = "running"; }
   delete state.error;
   delete state.lastError;
+  delete state.resumeAt;
+  // Chapters are known only after s3; until then the per-chapter stages are not counted.
+  let chapterCount = 0;
+  /**
+   * What the studio shows while a long film runs: the stage now running, how many are finished and
+   * how many this film will have. Written before the stage starts, so a film that is paused or
+   * stopped still shows exactly where it is.
+   * @param {string} stageId @param {boolean} running
+   */
+  function setProgress(stageId, running) {
+    const done = Object.keys(state.stages).filter((k) => state.stages[k]?.status === "done").length;
+    state.progress = { stage: stageId, running, done, total: STAGE_PLAN.length + chapterCount * PER_CHAPTER_STAGES, at: new Date().toISOString() };
+  }
   const save = () => store.put("run.json", JSON.stringify(state, null, 1));
 
   /**
@@ -458,6 +480,8 @@ export async function runFilm(o) {
       throw new BudgetReached(`Budget of $${o.budgetUsd} reached ($${state.costUsd} spent) before ${id}.`);
     }
     log(`${id}: start`);
+    setProgress(id, true);
+    await save();
     const out = await step(id, async () => {
       const before = state.gaps.length;
       pending = { costUsd: 0, usage: {} };
@@ -483,6 +507,7 @@ export async function runFilm(o) {
     delete state.lastError;
     // The stage's own gaps are kept with it, so a revision that redoes the stage withdraws exactly them.
     state.stages[id] = { status: "done", result, gaps: out.gaps };
+    setProgress(id, false);
     await save();
     log(`${id}: done`);
     return result;
@@ -569,6 +594,14 @@ export async function runFilm(o) {
     };
 
     await stage("research", async () => {
+      // Already researched (a run that stopped while writing the next stage, or a resume after a pause or
+      // a quota stop): the saved file is used as it is. Only a revision sent back by the review redoes it,
+      // and that carries a note, so the research is not paid for a second time.
+      const savedResearch = await store.get("research.json");
+      if (savedResearch && !state.revisionNotes?.research) {
+        const facts = safeParse(savedResearch)?.facts;
+        if (Array.isArray(facts) && facts.length) return { facts: facts.length, reused: true };
+      }
       const s01 = await read("s01.md");
       if (o.researchMode === "knowledge") {
         const data = await knowledgeResearch(s01);
@@ -634,6 +667,10 @@ export async function runFilm(o) {
       await store.put("s3-chapters.json", JSON.stringify(chapters, null, 1));
       return { chapters: /** @type {ChapterPlan[]} */ (chapters) };
     });
+    // The chapter count is known now: the studio's "stage N of M" counts the per-chapter stages too.
+    chapterCount = plan.chapters.length;
+    setProgress("s3", false);
+    await save();
 
     await stage("s4", async () => {
       const text = await ask("s4", [
@@ -911,9 +948,21 @@ export async function runFilm(o) {
 
     state.status = state.gaps.length ? "done-with-gaps" : "done";
   } catch (error) {
-    if (error instanceof RunStopped) state.status = "paused";
+    /** @type {any} */
+    const stop = error;
+    // The free daily brain quota is used up and the deployment pauses instead of sleeping (worker/quota-step.mjs):
+    // a pause, not a failure. The reset time is read from the message (a Workflow serialises a step's error,
+    // so a field on the object may not survive), kept for the studio, and every finished stage stays.
+    const message = (error instanceof Error ? error.message : String(error)).replace(/^NonRetryableError:\s*/, "");
+    const paused = /^QUOTA_PAUSED (\S+)\s*/.exec(message);
+    if (stop?.quotaPause === true || paused) {
+      state.status = "paused-quota";
+      const at = stop?.resumeAt ?? paused?.[1];
+      if (at) state.resumeAt = at;
+      if (state.progress) state.progress = { ...state.progress, running: false };
+    } else if (error instanceof RunStopped) state.status = "paused";
     else if (!(error instanceof BudgetReached)) state.status = "failed";
-    state.error = (error instanceof Error ? error.message : String(error)).replace(/^NonRetryableError:\s*/, "");
+    state.error = message.replace(/^QUOTA_PAUSED \S+\s*/, "");
     await save();
     throw error;
   }

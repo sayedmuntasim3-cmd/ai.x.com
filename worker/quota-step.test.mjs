@@ -80,3 +80,16 @@ test("a stage whose fetches met the limit but went on with less is run again in 
   assert.equal(out, "page");
   assert.deepEqual(wf.steps, ["sources", "sources:fresh-1"]);
 });
+
+test("QUOTA_MODE=pause: a used-up free day pauses the film with its reset time instead of sleeping a day", async () => {
+  const wf = fakeWorkflow();
+  const stop = (/** @type {string} */ m) => Object.assign(new Error(m), { name: "NonRetryableError" });
+  const step = quotaAwareStep({ step: wf.step, options: {}, permanent: permanentError, stop, pauseOnQuota: true, now: () => 0 });
+  const error = await step("research", async () => { throw dailyError(); }).catch((/** @type {any} */ e) => e);
+  assert.equal(error.quotaPause, true, "the run can tell a pause from a failure");
+  assert.match(error.message, /^QUOTA_PAUSED \S+T\S* Gemini's free daily limit is used up/, "the reset time travels in the message a Workflow serialises");
+  assert.match(error.resumeAt, /^\d{4}-\d{2}-\d{2}T/, "the reset time is kept for the studio");
+  assert.equal(error.waitMs, 30463_000 + 120_000);
+  assert.deepEqual(wf.sleeps, [], "no Workflow is held open for a day");
+  assert.deepEqual(wf.steps, ["research"], "the failed attempt is not retried in the same run");
+});
