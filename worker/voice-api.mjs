@@ -19,6 +19,8 @@
  *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed with the Worker's own key (free; the key never leaves Cloudflare)   (ticket, or Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/film             the finished MP4   (?ticket= from GET /api/voice/:id, or Bearer STUDIO_TOKEN)
+ *   GET  /api/voice/:id/ledger           the channel's Craft Ledger (R2 channel/craft-ledger.json), for the next film's targets   (ticket, or Bearer STUDIO_TOKEN)
+ *   POST /api/voice/:id/ledger           { report, genre? } the finished film's critic measures, recorded under this id   (ticket, or Bearer STUDIO_TOKEN)
  *
  * The recording stays private in R2 (bucket FILMS, voice/<id>/...). Files go up in
  * pieces (R2 multipart), so a 40-minute WAV fits under Cloudflare's 100 MB request
@@ -27,6 +29,50 @@
  */
 import { msg } from "../engine/src/messages.mjs";
 import { checkMarks } from "../engine/src/quran-marks.mjs";
+import { addAudience, addRecord, emptyLedger, ledgerJson, parseLedger, recordFromReport } from "../engine/src/craft-memory.mjs";
+
+/** The Craft Ledger's one home: next to channel/lessons.json, one ledger for every film of the channel. */
+export const LEDGER_KEY = "channel/craft-ledger.json";
+
+/**
+ * The Craft Ledger in R2: read it, or change it with a compare-and-swap (a film finishing on two runners at
+ * once never loses the other's record). `change` returns the next ledger and a note, or null to leave it.
+ * @param {any} bucket
+ */
+export function r2Ledger(bucket) {
+  const read = async () => {
+    const obj = await bucket.get(LEDGER_KEY);
+    if (!obj) return { ledger: emptyLedger(), notes: [], etag: null };
+    return { ...parseLedger(await obj.text()), etag: obj.etag ?? null };
+  };
+  /** @param {(l: import("../engine/src/craft-memory.mjs").Ledger) => { ledger: any, note: { code: string, params?: any } } | null} change */
+  const update = async (change) => {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const cur = await read();
+      const next = change(cur.ledger);
+      if (!next) return null;
+      const put = await bucket.put(LEDGER_KEY, ledgerJson(next.ledger), { httpMetadata: { contentType: "application/json" }, onlyIf: cur.etag ? { etagMatches: cur.etag } : { etagDoesNotMatch: "*" } });
+      if (put !== null) return next;
+    }
+    throw new Error("the craft ledger kept changing under this write");
+  };
+  return { read, update };
+}
+
+/**
+ * Hook for the audience signal: a published film's retention report into the ledger, when that film has a
+ * record there (it is a no-op note otherwise). The retention route calls it after it learns a curve.
+ * @param {any} bucket @param {string} filmId @param {any} retention @param {string} at
+ */
+export async function ledgerAudience(bucket, filmId, retention, at) {
+  let note = null;
+  await r2Ledger(bucket).update((ledger) => {
+    const made = addAudience(ledger, { filmId, retention, at });
+    note = made.note;
+    return made.ok ? { ledger: made.ledger, note: made.note } : null;
+  });
+  return note;
+}
 
 /** Every piece except the last must be this size (R2 asks for at least 5 MiB, equal sizes). */
 export const PART_SIZE = 16 * 1024 * 1024;
@@ -281,6 +327,24 @@ export async function handleVoice(request, env, url, deps = {}) {
     delete rec.uploadId;
     rec.progress.push(progressEntry("uploaded", { mb: Math.round(rec.bytes / 1048576) }));
     return start(rec);
+  }
+
+  // The Craft Ledger: the runner reads the channel's targets before the shot plan, and records the film after the gate.
+  if (sub === "ledger" && (method === "GET" || method === "POST")) {
+    if (!owner && !runner) return json({ error: "Wrong ticket." }, 401);
+    const store = r2Ledger(bucket);
+    if (method === "GET") {
+      const { ledger, notes } = await store.read();
+      return json({ ...ledger, notes });
+    }
+    const body = /** @type {any} */ (await request.json().catch(() => null));
+    const made = recordFromReport({ filmId: id, report: body?.report, genre: typeof body?.genre === "string" ? body.genre : undefined, at: new Date(now()).toISOString() });
+    if (!made.ok) return json({ error: msg(made.notes[0].code, made.notes[0].params ?? {}).en, notes: made.notes }, 400);
+    const done = await store.update((ledger) => {
+      const next = addRecord(ledger, made.record);
+      return { ledger: next.ledger, note: { code: "craft.added", params: { filmId: id, genre: made.record.genre, verdict: made.record.verdict, seconds: made.record.seconds, films: next.ledger.films.length } } };
+    });
+    return json({ ok: true, films: done?.ledger.films.length ?? 0, note: done?.note ?? null, notes: made.notes });
   }
 
   if (sub === "marks" && method === "POST") {

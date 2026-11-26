@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { msg } from "../engine/src/messages.mjs";
 import { placeholderTokens } from "../engine/src/claim-values.mjs";
+import { METRICS, craftReport } from "../engine/src/craft-memory.mjs";
 
 /**
  * The house standard. Numbers, not taste: each one is a failure the owner's
@@ -153,8 +154,10 @@ export function subtitleFit(narration, captions, seconds) {
  * Read a timeline and the render's report and return every finding.
  * @param {any} timeline
  * @param {any} report
- * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null }} [evidence]
- * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any> }}
+ * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any }} [evidence]
+ *   craft: the Craft Ledger's calibrated targets for this genre (craft-memory.mjs calibratedDoctrine): a note per
+ *   measure short of its target and the craft index 0-100 in `craft`. Notes only: the floor above decides blocks.
+ * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any>, craft?: ReturnType<typeof craftReport> }}
  */
 export function critique(timeline, report = {}, evidence = {}) {
   /** @type {Finding[]} */
@@ -341,7 +344,15 @@ export function critique(timeline, report = {}, evidence = {}) {
     subtitles: { coverage: round(subs.coverage, 3), maxGap: round(subs.maxGap, 1), overlap: subs.overlap, beyond: subs.beyond },
     repeatsInWindow: within, missingMedia: holes.length, transitionsRequired: required.length, transitionsMissing: lost.length,
   };
-  return { verdict: verdictOf(findings), findings, measures };
+  if (!evidence.craft?.targets) return { verdict: verdictOf(findings), findings, measures };
+  const craft = craftReport(measures, evidence.craft);
+  /** @param {any} v */
+  const shown = (v) => (Array.isArray(v) ? `${v[0]}-${v[1]}` : String(v));
+  for (const b of craft.below) {
+    const spec = METRICS[/** @type {keyof typeof METRICS} */ (b.metric)];
+    add({ ...msg("craft.below", { metricEn: spec.en, metricBn: spec.bn, value: b.value, target: shown(b.target), source: b.source }), code: "craft.below", severity: "note", value: b.value });
+  }
+  return { verdict: verdictOf(findings), findings, measures, craft };
 }
 
 /**
