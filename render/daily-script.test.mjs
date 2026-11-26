@@ -33,6 +33,16 @@ test("narration is only what the narrator says: no headings, markdown or quotati
   assert.equal(wordCount("Forty-two miles an hour, it's said."), 6);
 });
 
+test("the fact pass cuts the sentences it listed, unless it would cut most of the part", async () => {
+  const { cutSentences } = await import("./daily-script.mjs");
+  const text = "The deck twisted. Within seconds it fell into the water below.\n\nTubby the dog died. Nobody else did. The bridge was new.";
+  const r = cutSentences(text, "- Within seconds, it fell into the water below\n");
+  assert.equal(r.text, "The deck twisted.\n\nTubby the dog died. Nobody else did. The bridge was new.");
+  assert.equal(r.removed.length, 1);
+  assert.equal(cutSentences(text, "NONE").text, text);
+  assert.equal(cutSentences(text, "The deck twisted.\nWithin seconds it fell into the water below.\nTubby the dog died.").removed.length, 0);
+});
+
 test("the outline's lines are read, else a plain escalating arc", () => {
   const o = parseOutline("1. The fall: the deck twists\n2. **The need**: a bridge for Tacoma\n3. The answer - what changed", 3);
   assert.deepEqual(o.map((x) => x.title), ["The fall", "The need", "The answer"]);
@@ -57,16 +67,19 @@ test("the whole script: outline, eight parts from the source, a short part conti
     if (u.includes("/progress")) return new Response("{}");
     const b = JSON.parse(init.body);
     prompts.push(b.prompt);
+    if (/List every sentence/.test(b.prompt)) return new Response(JSON.stringify({ text: /Write part|SOURCE:\n## Introduction[\s\S]*Design facts/.test(b.prompt) ? "Some drivers were thrown into the water." : "NONE", model: "groq-a" }));
     if (/Plan the film/.test(b.prompt)) return new Response(JSON.stringify({ text: [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `${i}. Title ${i}: beat ${i}`).join("\n"), model: "groq-a" }));
     // Part 3 comes back short the first time: the next call continues it.
     const short = /Write part 3 of/.test(b.prompt);
-    return new Response(JSON.stringify({ text: "The deck moved in the wind. ".repeat(short ? 30 : 130), model: "groq-a" }));
+    return new Response(JSON.stringify({ text: `${/Write part 1 of/.test(b.prompt) ? "Some drivers were thrown into the water. " : ""}${"The deck moved in the wind. ".repeat(short ? 30 : 130)}`, model: "groq-a" }));
   });
   const topic = { ...DAILY_TOPICS[0], wiki: ["Test Bridge"] };
   const dir = (await import("node:fs")).mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "daily-"));
   const s = await writeScript({ c: { site: "https://s", id: "i", ticket: "t", fetch: fetchBrain }, topic, out: dir, get: /** @type {any} */ (async () => new Response(JSON.stringify(article))), sleep: async () => {}, gapMs: 0, log: () => {} });
   assert.equal(s.chapters.length, 8);
-  assert.equal(prompts.length, 10);
+  assert.equal(prompts.length, 18);
+  assert.deepEqual(s.factCheck.cut, ["Some drivers were thrown into the water."]);
+  assert.doesNotMatch(s.chapters[0].text, /thrown/);
   assert.ok(prompts.some((p) => /Continue this part seamlessly/.test(p)));
   assert.ok(s.words > 5000);
   assert.equal(s.sources[0].url, "https://en.wikipedia.org/wiki/Test_Bridge");

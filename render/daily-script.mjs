@@ -120,6 +120,28 @@ export function parseOutline(text, n) {
   return Array.from({ length: n }, (_, i) => ({ title: `Part ${i + 1}`, beat: arc[Math.min(i, arc.length - 1)] }));
 }
 
+export const FACT_SYSTEM = "You are a strict fact-checker for a documentary narration. You compare each sentence of the narration with the SOURCE text. A sentence passes only if the SOURCE states or directly implies it; scene-setting color fails when it adds events, deaths, injuries, times, numbers, names or quotes. You answer only with the failing sentences, copied exactly, one per line, or NONE.";
+
+/** @param {string} t */
+const sentences = (t) => t.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+/** @param {string} t */
+const norm = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/**
+ * Cut the sentences the fact pass listed (matched loosely: case, spacing and punctuation ignored).
+ * A list that would cut over a third of the part is not trusted: nothing is cut, and it is reported.
+ * @param {string} text @param {string} listed the fact pass's reply, one sentence a line, or NONE
+ */
+export function cutSentences(text, listed) {
+  const flagged = new Set(listed.split("\n").map((l) => norm(l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, ""))).filter((l) => l.length > 15));
+  if (!flagged.size) return { text, removed: [] };
+  const all = text.split(/\n\s*\n/).map(sentences);
+  const removed = all.flat().filter((x) => flagged.has(norm(x)));
+  if (removed.length > all.flat().length / 3) return { text, removed: [] };
+  const kept = all.map((p) => p.filter((x) => !flagged.has(norm(x))).join(" ")).filter(Boolean);
+  return { text: kept.join("\n\n"), removed };
+}
+
 /** @param {{ title: string, question: string }} topic */
 export function systemPrompt(topic) {
   return [
@@ -212,6 +234,9 @@ export async function writeScript(o) {
 
   /** @type {{ title: string, beat: string, text: string, words: number }[]} */
   const chapters = [];
+  let factChanges = 0;
+  /** @type {string[]} */
+  const unsupported = [];
   for (let i = 0; i < CHAPTERS; i += 1) {
     // Each part's length follows what is left, so a long part is balanced by shorter ones after it.
     const sofar = chapters.reduce((n, ch) => n + ch.words, 0);
@@ -227,11 +252,17 @@ export async function writeScript(o) {
       const more = await brainCall(o.c, { system, maxTokens: 1800, prompt: `SOURCE:\n${sources[i]}\n\nThis is part ${i + 1} of ${CHAPTERS} so far:\n${text}\n\nContinue this part seamlessly for about ${want - wordCount(text)} more words, with facts from the SOURCE not used yet. Do not repeat or summarize what is already written. ${i === CHAPTERS - 1 ? "End on a quiet, memorable last line." : ""}` }, state);
       text = `${text}\n\n${cleanNarration(trimToSentence(more.text, more.stopReason))}`;
     }
+    // The fact pass: the brain lists the part's sentences its own source does not support; they are cut.
+    const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 4000, prompt: `SOURCE:\n${sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, state);
+    const cut = cutSentences(text, flagged.text);
+    factChanges += cut.removed.length;
+    unsupported.push(...cut.removed);
+    text = cut.text;
     chapters.push({ title: outline[i].title, beat: outline[i].beat, text, words: wordCount(text) });
     log(`part ${i + 1}/${CHAPTERS}: ${wordCount(text)} words (${r.model})`);
   }
   const words = chapters.reduce((n, ch) => n + ch.words, 0);
-  const script = { topic: o.topic.id, title: o.topic.title, question: o.topic.question, sources: articles.map((a) => ({ title: a.title, url: a.url, license: "CC BY-SA 4.0 (facts paraphrased)" })), words, chapters, calls: state.calls, models: [...new Set(state.calls.map((x) => x.model))], minutes: Math.round((Date.now() - t0) / 6000) / 10, notes: words < 5500 ? [`The script is ${words} words, under the 5,500-word target; it is kept (a film every day, good or bad).`] : [] };
+  const script = { topic: o.topic.id, title: o.topic.title, question: o.topic.question, sources: articles.map((a) => ({ title: a.title, url: a.url, license: "CC BY-SA 4.0 (facts paraphrased)" })), words, chapters, calls: state.calls, models: [...new Set(state.calls.map((x) => x.model))], factCheck: { sentencesCut: factChanges, cut: unsupported, how: "each part checked against its own source by the same free brain; flagged sentences are cut (not a human fact-check)" }, minutes: Math.round((Date.now() - t0) / 6000) / 10, notes: words < 5500 ? [`The script is ${words} words, under the 5,500-word target; it is kept (a film every day, good or bad).`] : [] };
   mkdirSync(o.out, { recursive: true });
   writeFileSync(join(o.out, "script.json"), JSON.stringify(script, null, 1));
   writeFileSync(join(o.out, "script.md"), `# ${script.title}\n\n${chapters.map((ch) => ch.text).join("\n\n")}\n`);
