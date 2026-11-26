@@ -712,7 +712,12 @@ export async function renderFilm(o) {
       try {
         const shot = join(dirs.cards, `${hash({ g: designed, n: v.frames, w: t.width, h: t.height, fps: t.fps, v: 1 })}-graphic.mp4`);
         if (!existsSync(shot)) {
-          browser ??= pw.chromium.launch();
+          if (!browser) {
+            browser = pw.chromium.launch();
+            // A browser that cannot start (a missing system library, a broken install) is handled where it
+            // is awaited: one fallback to the ffmpeg card, never an unhandled rejection that loses the film.
+            browser.catch(() => {});
+          }
           await renderGraphic({ template: designed.template, data: designed.data, width: t.width, height: t.height, fps: t.fps, frames: v.frames, out: shot + ".part.mp4", ffmpeg, browser: await browser });
           renameSync(shot + ".part.mp4", shot);
         }
@@ -1248,6 +1253,7 @@ export function voiceFolder(dir) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = /** @type {Record<string, string>} */ ({});
+  // --no-graphics draws the cards with ffmpeg instead of a browser: for a machine with no Chromium.
   for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
   if (!args.out || !(args.run || (args.api && args.id))) {
     console.error("Usage: node render/render-film.mjs (--run <folder> | --api <site> --id <film id>) --out film.mp4 [--voice <folder> | --one-track <recording> --words <words.json>] [--music <folder>] [--sfx <folder>] [--look documentary|cinematic|archive] [--timing voice|script] [--motion reduced|calm|balanced|dynamic] [--ai <folder>] [--pictures <folder>] [--part i/N | --join part1.mp4,part2.mp4,...] [--width 1920 --height 1080 --fps 30 --work .render --font file.ttf] [--require-graphics]");
@@ -1307,7 +1313,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (args.part && !partArg) throw new Error(`--part must look like 2/8, not "${args.part}".`);
   const part = partArg ? { index: Number(partArg[1]) - 1, count: Number(partArg[2]) } : undefined;
   const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
-  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), edits: chapters.map((c) => c.edit).filter(Boolean), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), ...(process.argv.includes("--no-graphics") ? { graphics: false } : {}), edits: chapters.map((c) => c.edit).filter(Boolean), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
   if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
   // M6: the timeline (shot times, types, scene ids) is written next to the film, so the contact sheets
   // and the weak-shot loop are drawn from what was actually rendered, not from a second reading of the script.

@@ -36,25 +36,41 @@ for; the pictures are search phrases for Wikimedia Commons, not file names.
   for a shot, the viewer sees a card with those words, never a blank frame.
 - **`voicePreset`** is one of the narrator's presets (`historical`,
   `cinematic`, `science`, `nature`, `investigative`).
+- **`beats`** are the designed moments — the difference between an edit and a
+  slideshow. Each one is a wordless card with its own sound: `counter` (a number
+  that runs up to the value written, e.g. `"30 bronze gears"`), `kinetic` (a line
+  that rises in) or `quote` (a quotation that lands). `after` names the scene it
+  follows.
+- **`closing`** is the last line of the film, a card over black-free picture.
+  `titleCard: false` drops the opening title card; `titleSeconds` /
+  `closingSeconds` / a beat's `seconds` change how long a card holds.
 
 ## What it does for each card
 
 1. **Run folder** — `film.json`, `s3-chapters.json`, `s5-C1.md` in the shape
-   the engine already reads, with the clock derived from the words, so the
-   chapter passes `engine/src/scene-lines.mjs` on the first try
-   (`script-check.json` holds that check).
+   the engine already reads, with the clock derived from the words plus the
+   seconds the designed cards hold, so the chapter passes
+   `engine/src/scene-lines.mjs` on the first try (`script-check.json` holds that
+   check). A title card opens the film and each scene can be followed by a
+   designed beat, which is what makes the opening move and the critic count the
+   film as edited.
 2. **Pictures** — Wikimedia Commons, keyless. A picture is kept only when its
    own licence is public domain, CC0, plain CC BY or "no known restrictions";
    share-alike, non-commercial, no-derivatives and GFDL files are refused, and
    so are small frames, banners and page furniture (a paper's figure, a logo, a
-   schematic). It must also be of the subject the phrase names. No picture is
-   used twice inside the film's repeat window. `CREDITS.md` lists every
-   picture, its author, its licence and its file page.
+   schematic). It must also be of the subject the phrase names, and it is
+   measured for brightness before it is kept: a picture under 22/255 of mean
+   luma (`MIN_PICTURE_LUMA`) is a hole in the film, not a night scene — a free
+   deep-space photograph once held the screen as black for five seconds. No
+   picture is used twice inside the film's repeat window. `CREDITS.md` lists
+   every picture, its author, its licence and its file page.
 3. **Voice** — the free Zupona Narrator (Kokoro-82M through kokoro-onnx), one
    take per scene, with word-level timings for the captions.
 4. **Render** — `render/render-film.mjs`, the one renderer: stills move, sound
    design and the mix are synthesised, captions and the licence report come out
-   beside the MP4.
+   beside the MP4. Designed cards are drawn by a real browser when Playwright
+   and its system libraries are present; pass `--no-graphics` on a machine
+   without them and ffmpeg draws the same cards instead.
 
 ## The day's ten
 

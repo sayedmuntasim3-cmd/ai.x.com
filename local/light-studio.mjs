@@ -44,7 +44,17 @@ import { getVersion } from "../engine/src/versions.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** What a light film may be, and how many of them a day may hold. */
-export const LIGHT_LIMITS = Object.freeze({ minMinutes: 1, maxMinutes: 15, dailyFilms: 10, maxScenes: 120 });
+export const LIGHT_LIMITS = Object.freeze({ minMinutes: 1, maxMinutes: 15, dailyFilms: 10, maxScenes: 120, maxBeats: 24 });
+
+/** How long a designed card stays up: long enough to read, short enough not to stall. */
+export const BEAT_SECONDS = 3;
+
+/**
+ * The mean brightness (0-255) below which a picture is a hole in the film, not
+ * a night scene. A free deep-space photograph or a broken file measures under
+ * ten; a genuinely dark room still measures in the twenties.
+ */
+export const MIN_PICTURE_LUMA = 22;
 
 /** Words a minute the channel speaks: the clock a card is laid on. */
 export const LIGHT_WPM = getVersion("en-US")?.narrationWpm?.target ?? 150;
@@ -71,9 +81,40 @@ export function freeLicence(text) {
   return null;
 }
 
+/**
+ * A picture's own brightness (mean luma, 0-255) from the file itself. A free
+ * deep-space photograph, a night shot and a broken download all look alike in a
+ * search result, and only the file says which one the viewer will see.
+ * @param {string} url @param {{ fetch?: typeof fetch, ffmpeg?: string }} [o]
+ * @returns {Promise<number | null>} null when the picture cannot be read
+ */
+export async function pictureLuma(url, o = {}) {
+  const fetch_ = o.fetch ?? fetch;
+  const ffmpeg = o.ffmpeg ?? "ffmpeg";
+  let bytes;
+  try {
+    const res = await fetch_(url);
+    if (!res.ok) return null;
+    bytes = Buffer.from(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+  if (!bytes.length) return null;
+  return new Promise((ok) => {
+    const child = spawn(ffmpeg, ["-hide_banner", "-nostats", "-i", "pipe:0", "-frames:v", "1", "-vf", "signalstats,metadata=print:file=-", "-f", "null", "-"], { stdio: ["pipe", "pipe", "ignore"] });
+    let out = "";
+    child.stdout.on("data", (d) => { out += d; });
+    child.on("error", () => ok(null));
+    child.on("close", () => {
+      const found = /YAVG=([\d.]+)/.exec(out);
+      ok(found ? Number(found[1]) : null);
+    });
+    child.stdin.end(bytes);
+  });
+}
+
 /** @param {number} s */
-export function clockOf(s) {
-  const tenths = Math.round(Math.max(0, s) * 10);
+export function clockOf(s) {  const tenths = Math.round(Math.max(0, s) * 10);
   const h = Math.floor(tenths / 36000);
   const m = Math.floor(tenths / 600) % 60;
   const rest = (tenths % 600) / 10;
@@ -105,6 +146,15 @@ export function checkCard(card) {
     if (typeof s?.narration !== "string" || !s.narration.trim()) errors.push(`Scene ${i + 1} has no narration.`);
     if (s?.shots !== undefined && !Array.isArray(s.shots)) errors.push(`Scene ${i + 1}: shots must be a list of search phrases.`);
   });
+  const beats = Array.isArray(card.beats) ? card.beats : [];
+  if (beats.length > LIGHT_LIMITS.maxBeats) errors.push(`A card holds at most ${LIGHT_LIMITS.maxBeats} designed beats.`);
+  beats.forEach((/** @type {any} */ b, /** @type {number} */ i) => {
+    const kind = String(b?.kind ?? "kinetic");
+    if (!["counter", "kinetic", "quote"].includes(kind)) errors.push(`Beat ${i + 1}: kind must be counter, kinetic or quote.`);
+    if (typeof b?.text !== "string" || !b.text.trim()) errors.push(`Beat ${i + 1} has no text.`);
+    if (!(Number(b?.after) >= 1 && Number(b?.after) <= scenes.length)) errors.push(`Beat ${i + 1}: "after" must name one of the card's scenes (1-${scenes.length}).`);
+    if (kind === "counter" && !/\d/.test(String(b?.text ?? ""))) errors.push(`Beat ${i + 1}: a counter card needs a number to count up to.`);
+  });
   return { ok: errors.length === 0, errors };
 }
 
@@ -134,24 +184,81 @@ export function sceneTiming(scenes, seconds, wpm = LIGHT_WPM) {
 }
 
 /**
- * The chapter as the engine writes it: one line per scene, fields separated by
- * " | ", shots as "(1) ...; (2) ...". A shot's phrase is what Commons is asked
- * for, so it is written as a search, not as a sentence.
- * @param {any} card @param {{ words: number, start: number, end: number }[]} timing
+ * The film as it plays: a title card, the scenes in order, a designed card
+ * after any scene the card names, then an optional closing line. These cards
+ * are why a light film is an edit and not a slideshow: the critic counts a
+ * number that runs up, a line that rises in and a chapter title as designed
+ * moments, and a film needs about one a minute.
+ * @param {any} card
+ * @returns {{ kind: "title" | "closing" | "scene" | "beat", text?: string, seconds?: number, scene?: any, index?: number, beat?: any }[]}
  */
+export function programOf(card) {
+  /** @type {{ kind: "title" | "closing" | "scene" | "beat", text?: string, seconds?: number, scene?: any, index?: number, beat?: any }[]} */
+  const items = [];
+  if (card?.title && card.titleCard !== false) items.push({ kind: "title", text: String(card.title), seconds: Number(card.titleSeconds ?? BEAT_SECONDS) });
+  const scenes = Array.isArray(card?.scenes) ? card.scenes : [];
+  scenes.forEach((scene, i) => {
+    items.push({ kind: "scene", scene, index: i });
+    for (const beat of (Array.isArray(card?.beats) ? card.beats : []).filter((/** @type {any} */ b) => Number(b?.after) === i + 1)) items.push({ kind: "beat", beat });
+  });
+  if (card?.closing) items.push({ kind: "closing", text: String(card.closing), seconds: Number(card.closingSeconds ?? BEAT_SECONDS) });
+  return items;
+}
+
+/**
+ * The clock of a whole program: the narration keeps the share the words give
+ * it at the channel's rate, and every designed card takes its fixed seconds.
+ * @param {{ kind: string, scene?: any, text?: string, seconds?: number }[]} program
+ * @param {number} [wpm]
+ */
+export function programTiming(program, wpm = LIGHT_WPM) {
+  const round1 = (/** @type {number} */ n) => Math.round(n * 10) / 10;
+  const words = program.map((it) => (it.kind === "scene" ? String(it.scene?.narration ?? "").trim().split(/\s+/).filter(Boolean).length : 0));
+  const total = words.reduce((a, b) => a + b, 0) || 1;
+  const spoken = round1((total / wpm) * 60);
+  let at = 0;
+  const timing = program.map((it, i) => {
+    const seconds = it.kind === "scene" ? Math.max(0.1, round1((words[i] / total) * spoken)) : Math.max(0.5, round1(Number(it.seconds ?? BEAT_SECONDS)));
+    const end = round1(at + seconds);
+    const item = { words: words[i], start: at, end, seconds: round1(end - at) };
+    at = end;
+    return item;
+  });
+  return { timing, seconds: at, words: total };
+}
+
 /**
  * The chapter as the engine writes it: one line per scene, fields separated by
  * " | ", shots as "(1) ...; (2) ...". A shot's phrase is what Commons is asked
  * for, so it is written as a search, not as a sentence. `substitute` rewrites a
  * shot after the search (a shot with no free picture becomes a labelled card).
- * @param {any} card @param {{ words: number, start: number, end: number }[]} timing
- * @param {(scene: string, shot: number, query: string) => string} [substitute]
+ * A designed card is wordless and names its effect, so the renderer draws it
+ * instead of looking for a photograph that does not exist.
+ * @param {any} card @param {{ kind: string, scene?: any, text?: string, seconds?: number, beat?: any }[]} program
+ * @param {{ words: number, start: number, end: number }[]} timing
+ * @param {(scene: string, shot: number, query: string) => string | null} [substitute]
  */
-export function chapterMarkdown(card, timing, substitute) {
+export function chapterMarkdown(card, program, timing, substitute) {
   const chapter = card.chapter ?? "C1";
-  return card.scenes.map((/** @type {any} */ s, /** @type {number} */ i) => {
+  return program.map((item, i) => {
     const t = timing[i];
     const sc = "SC" + String(i + 1).padStart(4, "0");
+    if (item.kind !== "scene") {
+      const text = String(item.kind === "title" || item.kind === "closing" ? item.text : item.beat?.text ?? "").replace(/["“”]/g, "").replace(/\s+/g, " ").trim().slice(0, 90);
+      const kind = item.kind === "title" ? "title card" : item.kind === "closing" ? "closing card" : String(item.beat?.kind ?? "kinetic");
+      const counter = kind === "counter";
+      const fields = [
+        `NARR: (wordless)`,
+        `W 0/0`,
+        `ANCHOR: ${text}`,
+        `SHOTS: (1) R1 ${counter ? "counter" : "kinetic"} card "${text}"`,
+        `FX: ${counter ? "FX-COUNTER" : "FX-KINETIC"}`,
+        `OST: "${text}"`,
+        `LOOK: ${card.look ?? "ARCHIVE stills, slow push"}`,
+      ];
+      return `**${sc}** | ${clockOf(t.start)}-${clockOf(t.end)} | ${chapter} | ${kind} | ${i + 1} | - | ${fields.join(" | ")}`;
+    }
+    const s = item.scene;
     const anchor = `"${String(s.anchor ?? card.title).replace(/["”]/g, "")}"`;
     // A shot the substitute drops (no free picture) leaves the scene; if none are left, the
     // scene is one labelled card, so no shot is ever blank and no number is skipped.
@@ -180,12 +287,12 @@ export function writeRun(card, o) {
   const card_ = checkCard(card);
   if (!card_.ok) throw new Error(card_.errors.join(" "));
   const minutes = Number(card.minutes ?? o.minutes ?? 3);
-  // The film is as long as its words are at the channel's rate: a clock the words cannot fill
-  // is a hole in the film, and the engine's own chapter check refuses it. So the words decide.
-  const words = card.scenes.reduce((n, /** @type {any} */ s) => n + String(s.narration ?? "").trim().split(/\s+/).filter(Boolean).length, 0);
-  const seconds = Math.max(1, Math.round(((words / LIGHT_WPM) * 60) * 10) / 10);
-  const timing = sceneTiming(card.scenes, seconds);
-  const markdown = chapterMarkdown(card, timing);
+  // The film is as long as its words are at the channel's rate, plus the seconds its designed cards
+  // hold the screen: a clock the words cannot fill is a hole in the film, and the engine's own
+  // chapter check refuses it. So the words decide, and the cards take their fixed beats.
+  const program = programOf(card);
+  const { timing, seconds, words } = programTiming(program, LIGHT_WPM);
+  const markdown = chapterMarkdown(card, program, timing);
   mkdirSync(o.dir, { recursive: true });
   const film = {
     id: card.id ?? dirname(o.dir).split("/").pop(),
@@ -200,13 +307,14 @@ export function writeRun(card, o) {
     createdAt: new Date().toISOString(),
   };
   writeFileSync(join(o.dir, "film.json"), JSON.stringify(film, null, 1));
-  writeFileSync(join(o.dir, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: card.chapterTitle ?? card.title, startSeconds: 0, endSeconds: seconds, firstScene: 1, lastScene: card.scenes.length }], null, 1));
+  writeFileSync(join(o.dir, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: card.chapterTitle ?? card.title, startSeconds: 0, endSeconds: seconds, firstScene: 1, lastScene: program.length }], null, 1));
   writeFileSync(join(o.dir, "s5-C1.md"), markdown + "\n");
-  const check = checkChapter(markdown, { startSeconds: 0, endSeconds: seconds, firstScene: 1, lastScene: card.scenes.length });
+  const check = checkChapter(markdown, { startSeconds: 0, endSeconds: seconds, firstScene: 1, lastScene: program.length });
   const scenes = parseSceneLines(markdown);
   // A card that asks for three minutes and writes one is said out loud, never padded or cut.
   const short = seconds < minutes * 60 - 1;
-  return { dir: o.dir, film, seconds, requestedSeconds: minutes * 60, words, short, timing, markdown, scenes, check };
+  const designed = program.filter((it) => it.kind !== "scene").length;
+  return { dir: o.dir, film, seconds, requestedSeconds: minutes * 60, words, short, timing, program, designed, markdown, scenes, check };
 }
 
 /**
@@ -301,11 +409,12 @@ export function rankPictures(results, query) {
  * Every shot's picture, from Commons, in film order. A picture is never used
  * twice inside the repeat window; a shot with nothing free is left to the
  * renderer's text card.
- * @param {{ scenes: any[], seconds: number }} run @param {any} card
- * @param {{ provider?: any, log?: (l: string) => void }} [o]
+ * @param {{ scenes: any[], seconds: number, program?: any[] }} run @param {any} card
+ * @param {{ provider?: any, luma?: (url: string) => Promise<number | null>, log?: (l: string) => void }} [o]
  */
 export async function pickMedia(run, card, o = {}) {
   const provider = o.provider ?? wikimediaProvider();
+  const luma = o.luma ?? pictureLuma;
   const log = o.log ?? (() => {});
   const used = new Map();
   const windowSeconds = 75;
@@ -313,6 +422,8 @@ export async function pickMedia(run, card, o = {}) {
   const picks = [];
   const credits = [];
   for (const [i, scene] of run.scenes.entries()) {
+    // A designed card is drawn by the renderer, not searched for on Commons.
+    if (run.program?.[i] && run.program[i].kind !== "scene") continue;
     const queries = shotParts(scene.fields.SHOTS ?? "").length ? shotParts(scene.fields.SHOTS ?? "") : ["archival photograph"];
     for (const [k, query] of queries.entries()) {
       const before = picks.length;
@@ -337,6 +448,13 @@ export async function pickMedia(run, card, o = {}) {
           if ((Number(picture.width) || 0) < 1000) continue;
           if (!usablePicture(picture)) continue;
           if (!isSubject(picture, stem)) continue;
+          // A black picture is a hole in the film however free it is: a deep-space photo measured 8/255 and
+          // held the screen for five seconds in the first real film. Brightness is read from the file.
+          const brightness = await luma(picture.mediaUrl);
+          if (brightness !== null && brightness < MIN_PICTURE_LUMA) {
+            log(`  ${scene.sc} shot ${k + 1}: "${picture.title}" is too dark (${Math.round(brightness)}/255); the next one is tried.`);
+            continue;
+          }
           const last = used.get(picture.id);
           if (last !== undefined && Math.abs(run.scenes[i].start - last) < windowSeconds) continue;
           used.set(picture.id, run.scenes[i].start);
@@ -407,7 +525,7 @@ export function runCommand(command, argv) {
 /**
  * One card to one film: run folder, pictures, voice, MP4, credits.
  * @param {any} card
- * @param {{ out?: string, render?: boolean, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any }} [o]
+ * @param {{ out?: string, render?: boolean, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, graphics?: boolean, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, luma?: (url: string) => Promise<number | null> }} [o]
  */
 export async function makeFilm(card, o = {}) {
   const log = o.log ?? (() => {});
@@ -415,17 +533,17 @@ export async function makeFilm(card, o = {}) {
   const slug = String(card.id ?? card.title).toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "film";
   const dir = resolve(o.out ?? join(ROOT, "films", slug));
   const run = writeRun({ ...card, id: card.id ?? slug }, { dir, log });
-  log(`run folder: ${dir} (${run.scenes.length} scenes, ${run.words} words, ${run.seconds} s)`);
+  log(`run folder: ${dir} (${run.scenes.length} scenes, ${run.words} words, ${run.seconds} s, ${run.designed} designed cards)`);
   if (run.short) log(`  ${say({ code: "light.short", params: { seconds: run.seconds, wanted: Math.round(run.requestedSeconds) } })}`);
   for (const e of run.check.errors) log(`  script check: ${e.scene ?? ""} ${e.code}: ${e.detail}`);
   writeFileSync(join(dir, "script-check.json"), JSON.stringify(run.check, null, 1));
 
-  const { media, credits } = await pickMedia(run, card, { provider: o.provider, log });
+  const { media, credits } = await pickMedia(run, card, { provider: o.provider, luma: o.luma, log });
   writeFileSync(join(dir, "media-C1.json"), JSON.stringify(media, null, 1));
   // A shot with no free picture is a labelled card, not a blank frame: the scene's own anchor is
   // what the viewer sees, in quotes, so the renderer draws a card with words on it.
   const have = new Set(media.shots.map((s) => `${s.scene}#${s.shot}`));
-  const substitute = chapterMarkdown(card, run.timing, (scene, shot, query) => (have.has(`${scene}#${shot}`) ? query : null));
+  const substitute = chapterMarkdown(card, run.program, run.timing, (scene, shot, query) => (have.has(`${scene}#${shot}`) ? query : null));
   if (substitute !== run.markdown) writeFileSync(join(dir, "s5-C1.md"), substitute + "\n");
   writeFileSync(join(dir, "CREDITS.md"), creditsMarkdown(card, credits));
   log(`pictures: ${media.shots.length} of ${run.scenes.reduce((n, s) => n + shotParts(s.fields.SHOTS ?? "").length, 0)} shots from Commons`);
@@ -434,14 +552,14 @@ export async function makeFilm(card, o = {}) {
   const voiceDir = join(dir, "voice");
   await exec(process.execPath, [join(ROOT, "render/narrate.mjs"), "--run", dir, "--out", voiceDir, "--preset", card.voicePreset ?? "historical", "--python", o.python ?? "python3", ...(o.models ? ["--models", o.models] : [])]);
   const out = join(dir, "film.mp4");
-  await exec(process.execPath, [join(ROOT, "render/render-film.mjs"), "--run", dir, "--voice", voiceDir, "--out", out, "--width", String(o.width ?? 1280), "--height", String(o.height ?? 720), "--fps", String(o.fps ?? 30), ...(o.font ? ["--font", o.font] : [])]);
+  await exec(process.execPath, [join(ROOT, "render/render-film.mjs"), "--run", dir, "--voice", voiceDir, "--out", out, "--width", String(o.width ?? 1280), "--height", String(o.height ?? 720), "--fps", String(o.fps ?? 30), ...(o.font ? ["--font", o.font] : []), ...(o.graphics === false ? ["--no-graphics"] : [])]);
   return { dir, out, media, credits, rendered: true, seconds: run.seconds };
 }
 
 /**
  * A queue of cards, under the daily cap: what is left of today's ten, in the
  * order the queue gives them.
- * @param {any[]} cards @param {{ dir?: string, limit?: number, force?: boolean, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, now?: Date, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, render?: boolean }} [o]
+ * @param {any[]} cards @param {{ dir?: string, limit?: number, force?: boolean, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, luma?: (url: string) => Promise<number | null>, now?: Date, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, graphics?: boolean, render?: boolean }} [o]
  */
 export async function makeQueue(cards, o = {}) {
   const log = o.log ?? (() => {});
@@ -476,11 +594,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     options: {
       card: { type: "string" }, queue: { type: "string" }, out: { type: "string" }, limit: { type: "string" },
       width: { type: "string" }, height: { type: "string" }, fps: { type: "string" }, font: { type: "string" },
-      python: { type: "string" }, models: { type: "string" }, "skip-render": { type: "boolean" }, force: { type: "boolean" },
+      python: { type: "string" }, models: { type: "string" }, "skip-render": { type: "boolean" }, "no-graphics": { type: "boolean" }, force: { type: "boolean" },
     },
   });
   const log = (/** @type {string} */ line) => console.log(line);
-  const shared = { python: values.python, models: values.models, width: Number(values.width ?? 1280), height: Number(values.height ?? 720), fps: Number(values.fps ?? 30), font: values.font, render: values["skip-render"] !== true, force: values.force === true, log };
+  const shared = { python: values.python, models: values.models, width: Number(values.width ?? 1280), height: Number(values.height ?? 720), fps: Number(values.fps ?? 30), font: values.font, graphics: values["no-graphics"] !== true, render: values["skip-render"] !== true, force: values.force === true, log };
   if (values.card) {
     const card = JSON.parse(readFileSync(resolve(values.card), "utf8"));
     const made = await makeFilm(card, { ...shared, out: values.out ? resolve(values.out) : undefined });
@@ -492,7 +610,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const result = await makeQueue(cards, { ...shared, limit: Number(values.limit ?? LIGHT_LIMITS.dailyFilms) });
     console.log(`made ${result.done.length} today; the day's cap allows ${LIGHT_LIMITS.dailyFilms}.`);
   } else {
-    console.error("Usage: node local/light-studio.mjs (--card <card.json> | --queue <queue.json>) [--out <folder>] [--limit 10] [--width 1280 --height 720] [--skip-render] [--force]");
+    console.error("Usage: node local/light-studio.mjs (--card <card.json> | --queue <queue.json>) [--out <folder>] [--limit 10] [--width 1280 --height 720] [--skip-render] [--no-graphics] [--force]");
     process.exit(2);
   }
 }

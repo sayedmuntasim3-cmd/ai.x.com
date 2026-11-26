@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { LIGHT_LIMITS, chapterMarkdown, checkCard, clockOf, creditsMarkdown, freeLicence, madeToday, makeFilm, pickMedia, rankPictures, readLedger, sceneTiming, secondsOf, writeRun } from "./light-studio.mjs";
+import { LIGHT_LIMITS, MIN_PICTURE_LUMA, chapterMarkdown, checkCard, clockOf, creditsMarkdown, freeLicence, madeToday, makeFilm, pickMedia, programOf, programTiming, rankPictures, readLedger, sceneTiming, secondsOf, writeRun } from "./light-studio.mjs";
 import { parseSceneLines } from "../engine/src/scene-lines.mjs";
 
 /** A card of three short scenes, the smallest thing that is still a film. */
@@ -11,6 +11,7 @@ const card = {
   id: "test-film",
   title: "The Lamp That Lit a Street",
   minutes: 1,
+  titleCard: false,
   chapterTitle: "One street, one lamp",
   scenes: [
     { narration: "In eighteen eighty one a street in Newcastle had no electric light at all.", shots: ["electric lamp 1880", "Victorian street at night"], anchor: "Newcastle" },
@@ -93,7 +94,7 @@ test("every shot gets a free picture, none twice inside the window", async () =>
       ];
     },
   };
-  const { media, credits } = await pickMedia(run, card, { provider });
+  const { media, credits } = await pickMedia(run, card, { provider, luma: async () => 90 });
   assert.equal(media.shots.length, 4, "four written shots, four pictures");
   assert.ok(calls.every((q) => q.includes("lamp") || q.includes("street") || q.includes("bulb") || q.includes("lamp") || q.includes("Victorian")), calls.join(","));
   assert.ok(media.shots.every((s) => s.pick.licence.id === "CC-BY"));
@@ -107,7 +108,7 @@ test("a shot with no free picture is left to a text card, not filled with an unf
   const dir = mkdtempSync(join(tmpdir(), "light-none-"));
   const run = writeRun(card, { dir });
   const provider = { async search() { return [{ id: "u", title: "u", mediaUrl: "https://example.test/u.jpg", license: "CC BY-NC 4.0", mediaType: "image" }]; } };
-  const { media } = await pickMedia(run, card, { provider });
+  const { media } = await pickMedia(run, card, { provider, luma: async () => 90 });
   assert.equal(media.shots.length, 0);
 });
 
@@ -126,7 +127,7 @@ test("the ledger is appended, never rewritten", async () => {
   const dir = mkdtempSync(join(tmpdir(), "light-ledger-"));
   const file = join(dir, "light-ledger.json");
   const provider = { async search() { return []; } };
-  await makeFilm(card, { out: join(dir, "one"), render: false, provider });
+  await makeFilm(card, { out: join(dir, "one"), render: false, provider, luma: async () => 90 });
   assert.ok(existsSync(join(dir, "one", "media-C1.json")));
   assert.ok(existsSync(join(dir, "one", "CREDITS.md")));
   assert.ok(existsSync(join(dir, "one", "film.json")));
@@ -136,10 +137,67 @@ test("the ledger is appended, never rewritten", async () => {
 test("a rendered film runs the narrator and the one renderer, in that order", async () => {
   const dir = mkdtempSync(join(tmpdir(), "light-exec-"));
   const calls = [];
-  await makeFilm(card, { out: join(dir, "film"), provider: { async search() { return []; } }, exec: async (c, a) => { calls.push(a); } });
+  await makeFilm(card, { out: join(dir, "film"), provider: { async search() { return []; } }, luma: async () => 90, exec: async (c, a) => { calls.push(a); } });
   assert.equal(calls.length, 2);
   assert.match(calls[0].join(" "), /render\/narrate\.mjs .*--run/);
   assert.match(calls[1].join(" "), /render\/render-film\.mjs .*--voice/);
   assert.match(calls[1].join(" "), /--width 1280 --height 720/);
-  assert.equal(chapterMarkdown(card, sceneTiming(card.scenes, 60)).split("\n").length, 3);
+  assert.equal(chapterMarkdown(card, programOf(card), programTiming(programOf(card)).timing).split("\n").length, 3);
+});
+
+test("a card's designed beats become wordless cards the renderer draws, not slideshow frames", () => {
+  const dir = mkdtempSync(join(tmpdir(), "light-beat-"));
+  const withBeats = {
+    ...card,
+    titleCard: true,
+    beats: [
+      { after: 2, kind: "counter", text: "30 bronze gears" },
+      { after: 3, kind: "kinetic", text: "The sky in a box" },
+    ],
+    closing: "Who paid for it still has no answer",
+  };
+  const run = writeRun(withBeats, { dir });
+  // title + 3 scenes + 2 beats + closing
+  assert.equal(run.scenes.length, 7);
+  assert.equal(run.designed, 4);
+  assert.deepEqual(run.check.errors, []);
+  const parsed = parseSceneLines(readFileSync(join(dir, "s5-C1.md"), "utf8"));
+  assert.equal(parsed[0].wordless, true, "the title card is wordless");
+  assert.match(parsed[0].fields.SHOTS, /R1 kinetic card "The Lamp That Lit a Street"/);
+  assert.equal(parsed[0].fields.FX, "FX-KINETIC");
+  const counter = parsed.find((s) => /30 bronze gears/.test(s.raw));
+  assert.equal(counter?.wordless, true);
+  assert.equal(counter?.fields.FX, "FX-COUNTER");
+  assert.equal(counter?.fields.OST, '"30 bronze gears"');
+  assert.equal(parsed[parsed.length - 1].wordless, true, "the closing card is wordless too");
+  // The cards take real seconds out of the film, and the words keep their share.
+  assert.ok(run.seconds > 19.2, `the cards add time (${run.seconds})`);
+});
+
+test("a beat that cannot be drawn is refused with its reason", () => {
+  const bad = { ...card, beats: [{ after: 9, kind: "counter", text: "no number here" }] };
+  const errors = checkCard(bad).errors.join(" ");
+  assert.match(errors, /scenes \(1-3\)/);
+  assert.match(errors, /needs a number/);
+});
+
+test("a picture that is black on screen is skipped for the next free one", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "light-dark-"));
+  const run = writeRun(card, { dir });
+  const asked = [];
+  const provider = {
+    async search(query) {
+      asked.push(query);
+      return [
+        // A free deep-space photograph: 8/255, a hole in the film.
+        { id: `dark:${query}`, title: `${query} deep space objects`, mediaUrl: `https://example.test/dark-${encodeURIComponent(query)}.jpg`, license: "Public domain", mediaType: "image", width: 1920, height: 1280 },
+        { id: `lit:${query}`, title: `${query} in a museum`, mediaUrl: `https://example.test/lit-${encodeURIComponent(query)}.jpg`, license: "Public domain", mediaType: "image", width: 1920, height: 1280 },
+      ];
+    },
+  };
+  const luma = async (url) => (url.includes("dark-") ? 8 : 110);
+  const { media } = await pickMedia(run, card, { provider, luma });
+  assert.equal(media.shots.length, 4);
+  assert.ok(media.shots.every((s) => s.pick.id.startsWith("lit:")), media.shots.map((s) => s.pick.id).join(","));
+  assert.ok(MIN_PICTURE_LUMA > 8);
 });

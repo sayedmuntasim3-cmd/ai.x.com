@@ -18,8 +18,8 @@ ledger of what worked on *this* channel, film after film, cannot be downloaded.
    per film.
 2. **Keep.** One compact record per film (`filmId`, genre, time, duration, verdict, measures). The same film
    re-rendered replaces its record instead of counting twice; the ledger is capped at 200 films, oldest out.
-3. **Learn.** `targetFor` uses only **passing films of the same genre**, and only from the third film on
-   (`MIN_FILMS = 3`): two films are an accident, three are a habit.
+3. **Learn.** `targetFor` uses only **passing films of the same genre** (and films the audience held, see
+   below), and only from the third film on (`MIN_FILMS = 3`): two films are an accident, three are a habit.
 4. **Judge.** `craftIndex` scores any film 0–100 against those targets. `fit` is 1 inside a band and falls
    away by the band's own width, so the number means "how far from where this channel wants to be".
 
@@ -37,6 +37,30 @@ Learning from your own output is how a channel drifts into mediocre and stays th
 
 The doctrine itself (`DOCTRINE`, per genre: history, biography, science, motivation, default) is code, not a
 prompt: it is reviewable, testable and identical on every machine.
+
+## The audience: the only judge that watched the film
+
+The critic measures the cut; the audience measures the film. Once a film is published, YouTube's own
+retention curve is laid over its scenes (`engine/src/retention.mjs`, `worker/youtube-analytics.mjs`) and
+the result is filed with the ledger record:
+
+- **Thresholds.** A film counts as *held* when at least 55 % are still watching at 0:30 and at least 25 %
+  reach the end (`AUDIENCE`). Those are floors for a documentary, not good numbers: a hit holds far more.
+- **What it changes.** A held film is evidence even when the critic only said `review` — the audience saw
+  the finished thing and stayed — and its record carries `pass` from then on. A held film the critic
+  **blocked** stays blocked: a defect the audience sat through is still a defect.
+- **What it keeps.** `at30`, `half`, `end`, the video id and the scenes where viewers left (`drops`) and
+  stayed (`holds`). The CLI prints those as lessons for the next film's writers and editor.
+- **It survives a re-render.** The curve belongs to the published cut, so re-measuring the film keeps it.
+
+The retention curve is not used to *move* a numeric target: a target is still a median of what passing
+films measured. Retention decides which films are allowed to teach, which is the honest use of it — an
+unwatched film is not evidence about craft, however tidy its report looked.
+
+```bash
+# after the film is published and YouTube has a curve for it (a day or two)
+node local/craft-memory.mjs --retention out/<film>.retention.json --id <filmId>
+```
 
 ## Use
 
@@ -65,5 +89,7 @@ reading of a film winning.
   as well — the guards slow that down, but they cannot replace a gate that is honest.
 - **The ledger is per genre.** It does not compare a history film with a motivation film; different genres
   are different crafts.
-- **Not yet fed by retention.** `retention.mjs` already ties a published film's audience curve to its scenes;
-  once a channel has published films, that curve is the better teacher and can weight the ledger later.
+- **Retention needs a published film and an audience.** Under a few hundred views the curve is noise; the
+  ledger only takes its thresholds at face value, so early films are judged by the critic alone.
+- **A held film is not a good film.** It means the hook and the pacing worked well enough that people stayed.
+  Nothing in a retention curve says the writing was true.

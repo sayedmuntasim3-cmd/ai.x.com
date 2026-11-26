@@ -136,6 +136,25 @@ export const RELAX = Object.freeze({ min: 0.85, max: 1.25, band: 0.5 });
 /** Films below this count do not move a target: three films are an accident. */
 export const MIN_FILMS = 3;
 
+/**
+ * What a published film's retention curve must reach before its craft counts as
+ * evidence even when the critic was cautious (`review`): this many viewers still
+ * watching at 0:30 and this share at the end. The audience is the only judge
+ * that has actually watched the film.
+ */
+export const AUDIENCE = Object.freeze({ at30: 55, end: 25 });
+
+/**
+ * @typedef {object} Audience
+ * @property {number | null} at30 share still watching at 0:30 (%)
+ * @property {number | null} half share still watching at the middle (%)
+ * @property {number | null} end share still watching at the end (%)
+ * @property {string} videoId
+ * @property {string} at when the curve was read
+ * @property {{ scene: string, start: number, perMinute: number, said: string }[]} drops the scenes viewers left fastest
+ * @property {{ scene: string, start: number, said: string }[]} holds the scenes that kept them
+ */
+
 /** @typedef {"pass" | "review" | "block" | "unknown"} Verdict */
 /**
  * @typedef {object} FilmRecord
@@ -146,6 +165,7 @@ export const MIN_FILMS = 3;
  * @property {number} seconds
  * @property {Verdict} verdict
  * @property {Measures} measures
+ * @property {Audience} [audience] the published film's retention, once it has one
  */
 /** @typedef {{ version: number, films: FilmRecord[] }} Ledger */
 /** @typedef {{ code: string, params?: Record<string, string | number> }} Note */
@@ -237,6 +257,63 @@ export function emptyLedger() {
 }
 
 /**
+ * The audience numbers of a published film, from its retention report
+ * (engine/src/retention.mjs): the shape the ledger keeps, with the moments
+ * viewers left and stayed so the next film's writers can read them.
+ * @param {any} report a `<film>.retention.json`
+ * @param {string} [at] when it is being filed
+ * @returns {Audience | null} null when the report carries no curve reading
+ */
+export function audienceFromRetention(report, at) {
+  const num = (/** @type {unknown} */ v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const at30 = num(report?.at30);
+  const half = num(report?.half);
+  const end = num(report?.end);
+  if (at30 === null && half === null && end === null) return null;
+  const moment = (/** @type {any} */ m) => ({ scene: String(m?.scene ?? ""), start: Number(m?.start) || 0, perMinute: Number(m?.perMinute) || 0, said: String(m?.said ?? "").slice(0, 140) });
+  const hold = (/** @type {any} */ m) => ({ scene: String(m?.scene ?? ""), start: Number(m?.start) || 0, said: String(m?.said ?? "").slice(0, 140) });
+  return {
+    at30,
+    half,
+    end,
+    videoId: String(report?.videoId ?? ""),
+    at: String(at ?? report?.at ?? new Date(0).toISOString()),
+    drops: (Array.isArray(report?.drops) ? report.drops : []).slice(0, 6).map(moment),
+    holds: (Array.isArray(report?.holds) ? report.holds : []).slice(0, 4).map(hold),
+  };
+}
+
+/**
+ * Did the audience reward this film? A film that held its viewers is evidence
+ * about craft even when the critic only said `review`; a film nobody watched
+ * teaches nothing, whatever its measures were.
+ * @param {Audience | null | undefined} audience
+ */
+export function audienceHolds(audience) {
+  if (!audience) return false;
+  return Number(audience.at30 ?? 0) >= AUDIENCE.at30 && Number(audience.end ?? 0) >= AUDIENCE.end;
+}
+
+/**
+ * Attach a published film's retention to its ledger record. Pure: a new ledger
+ * comes back with the audience and, where the film was flagged `review`, the
+ * verdict `pass` the audience earned it.
+ * @param {Ledger} ledger @param {{ filmId: string, retention: any, at?: string }} o
+ * @returns {{ ledger: Ledger, ok: boolean, note: Note }}
+ */
+export function addAudience(ledger, o) {
+  const id = String(o.filmId ?? "").trim();
+  const films = (Array.isArray(ledger?.films) ? ledger.films : []).map((f) => ({ ...f }));
+  const at = films.findIndex((f) => f.filmId === id);
+  if (at < 0) return { ledger: { version: LEDGER_VERSION, films }, ok: false, note: { code: "craft.noFilm", params: { filmId: id } } };
+  const audience = audienceFromRetention(o.retention, o.at);
+  if (!audience) return { ledger: { version: LEDGER_VERSION, films }, ok: false, note: { code: "craft.noAudience", params: { filmId: id } } };
+  const film = films[at];
+  films[at] = { ...film, audience, verdict: film.verdict === "review" && audienceHolds(audience) ? "pass" : film.verdict };
+  return { ledger: { version: LEDGER_VERSION, films }, ok: true, note: { code: "craft.audience", params: { filmId: id, at30: audience.at30 ?? "?", end: audience.end ?? "?", verdict: films[at].verdict } } };
+}
+
+/**
  * Add or replace one film's record. Pure: a new ledger comes back.
  * - the same `filmId` keeps only the newer `at`, so a re-render corrects the
  *   film instead of counting it twice;
@@ -253,7 +330,9 @@ export function addRecord(ledger, record, o = {}) {
   let added = /** @type {"new" | "replaced" | "older"} */ ("new");
   if (at >= 0) {
     if (Date.parse(films[at].at) > Date.parse(record.at)) return { ledger: { version: LEDGER_VERSION, films }, added: "older", dropped: [] };
-    films[at] = record;
+    // A re-measured film keeps the audience it already earned: the retention curve belongs to the
+    // published cut, not to this measurement run.
+    films[at] = { ...record, ...(record.audience || !films[at].audience ? {} : { audience: films[at].audience }) };
     added = "replaced";
   } else films.push(record);
   films.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.filmId.localeCompare(b.filmId));
@@ -283,7 +362,8 @@ function quantile(sorted, /** @type {number} */ q) {
  * @param {MetricKey} metric
  */
 export function evidenceFor(ledger, genre, metric) {
-  const films = (Array.isArray(ledger?.films) ? ledger.films : []).filter((f) => f.genre === genre && f.verdict === "pass");
+  // A film the audience held is evidence even when the critic was cautious; a block is never evidence.
+  const films = (Array.isArray(ledger?.films) ? ledger.films : []).filter((f) => f.genre === genre && (f.verdict === "pass" || (f.verdict !== "block" && audienceHolds(f.audience))));
   return films
     .map((f) => ({ filmId: f.filmId, at: f.at, value: Number(f.measures?.[metric]) }))
     .filter((f) => Number.isFinite(f.value))
@@ -456,6 +536,7 @@ export function parseLedger(text) {
       seconds: Number.isFinite(Number(f?.seconds)) ? Number(f.seconds) : 0,
       verdict: ["pass", "review", "block", "unknown"].includes(String(f?.verdict)) ? /** @type {Verdict} */ (String(f.verdict)) : "unknown",
       measures,
+      ...(f?.audience && typeof f.audience === "object" ? { audience: /** @type {Audience} */ (f.audience) } : {}),
     });
   }
   films.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.filmId.localeCompare(b.filmId));
