@@ -1,6 +1,6 @@
 # Viral long documentaries: what repeats (M1, 21 Nov 2026)
 
-Owner's order: study 30+ of the most viral long documentaries across every niche. **Done: 36 videos, all 10M+ views, 10+ min.** Metadata only, no video downloaded. Extends `REFERENCE_STANDARD.md` (no second copy). Date checked: 2026-11-21.
+Owner's order (extended 26 Nov to the 12 niches, see the section near the end): study 30+ of the most viral long documentaries across every niche. **Done: 36 videos, all 10M+ views, 10+ min.** Metadata only, no video downloaded. Extends `REFERENCE_STANDARD.md` (no second copy). Date checked: 2026-11-21.
 
 ## Sources and what was NOT seen
 - Numbers (views, length, date, title, chapters): YouTube Data API through the Worker `GET /api/videos` (`data/*.json`; tools `tools/research/viral*.mjs`). Source for every number below. "My reading" = my judgement.
@@ -107,6 +107,68 @@ Owner's order: study 30+ of the most viral long documentaries across every niche
 - **Chapters:** write them into the description: chapter 1 at 0:00 named as the hook scene (not "Intro"); one chapter per 1.5-3 min for 15-25 min films (mystery/history rhythm: 1.3-4.7 min in the sample), 5-10 min only for 60+ min compilations (not our target).
 - **Length:** 13-25 min for the first films (19 min is the median here), longer only when the topic carries it.
 - **Quran recitation films:** none of the 36 are a model (Arabic recitation is outside this set); do not copy these patterns onto them without a separate study.
+
+## The owner's 12 niches: top 3 long videos and free real footage (26 Nov 2026)
+Rule: long (10+ min), English, USA-style audience, ranked by views from the YouTube Data API (`data/niche-candidates*.json`, `data/niche-handles.json`; tools `niches.mjs`, `niche-handles.mjs`, `niche-table.mjs`). Date checked: 2026-11-26. Views are the API values on that day; the table above (21 Nov) may differ for the same video.
+
+**Gaps (plain):** the YouTube search quota hit 429 again on 26 Nov, so 12 of 24 second-round queries (cars, WWII, tech, nature, geography) ran only through channel uploads (`/api/videos?handle=`, last 50 uploads per channel). A niche's "top 3" is therefore the top 3 *found*, not proven to be the top 3 on YouTube. Niches thin at 10M+ in what I found: Business (rank 2-3 near 10M), Automotive (9.4M, 9.0M), Engineering, Geography (no map-explainer film at 10M+). Re-run `niches.mjs 2` after the quota resets (08:00 UTC) to fill them. Search also returns off-topic hits; I picked by title by hand (my reading), and the notes name what I left out and why.
+
+**Column "Free real footage (my reading)":** a rating of what Zupona can legally get for free as *real* footage (NASA, NARA/US government public domain, Internet Archive, Pixabay video). The rating is my reading from what those sources hold; the "IA items" number is a measured count from the Internet Archive search API (`tools/research/footage.mjs`, `data/niche-footage.json`). \*It counts movie items in collections `nasa`, `prelinger` or creator "National Archives" that match a few niche keywords with OR. Crude: it shows relative size, not quality, not usable length, and not rights per item (check each item's rights before use). Pixabay was not counted (no route to its API from here; Pixabay's own licence page decides use).
+
+| Niche | # | Video | Channel | Views | Min | Date | Free real footage (my reading) | IA items* |
+|---|---|---|---|---|---|---|---|---|
+| **History & Civilizations** | 1 | [What Did Ancient Humans Actually Do All Day?](https://youtu.be/49_Ph2q6uIM) | Ink Explainer | 19.4M | 11 | 2026-08 | Medium | 2439 |
+|  | 2 | [The Complete History Of The Roman Empire In 4 Hours / Empire…](https://youtu.be/P3IIRiSTc3g) | Odyssey - Ancient Hist | 14.1M | 233 | 2023-04 |  |  |
+|  | 3 | [The Rise of Man - Homo Sapiens Invents Civilizations](https://youtu.be/4p51Jj2kyh0) | Best Documentary | 13.0M | 93 | 2023-11 |  |  |
+| **Disasters & Mysteries** | 1 | [Cicada 3301: An Internet Mystery](https://youtu.be/I2O7blSSzpI) | LEMMiNO | 43.2M | 18 | 2018-05 | Medium-High | 2502 |
+|  | 2 | [The Vanishing of Flight 370](https://youtu.be/kd2KEHvK-q8) | LEMMiNO | 30.3M | 25 | 2019-04 |  |  |
+|  | 3 | [The Search For D. B. Cooper](https://youtu.be/CbUjuwhQPKs) | LEMMiNO | 24.6M | 29 | 2020-04 |  |  |
+| **Science** | 1 | [The Closest Thing We Have to Alien Technology](https://youtu.be/MiUHjLxm3V0) | Veritasium | 66.9M | 55 | 2025-12 | High | 4228 |
+|  | 2 | [AI Just Crossed the Terrifying Line - Now What?](https://youtu.be/ujkD4SxPKOI) | Kurzgesagt – In a Nuts | 24.2M | 22 | 2026-10 |  |  |
+|  | 3 | [I finally saw quantum physics with my own eyes... (It's spoo…](https://youtu.be/KfODG5REyss) | Veritasium | 21.0M | 66 | 2026-11 |  |  |
+| **Engineering & Megaprojects** | 1 | [CHINESE MEGASTRUCTURES / Wonders of Engineering](https://youtu.be/7wLhJ7q7By4) | Lifeder | 18.2M | 137 | 2026-10 | Medium | 2557 |
+|  | 2 | [The Insane Scale of Europe’s New Mega-Tunnel](https://youtu.be/QiYvXKQksgI) | The B1M | 15.4M | 28 | 2022-11 |  |  |
+|  | 3 | [Why the World’s Largest Megaproject Collapsed / WSJ](https://youtu.be/GbB3vFfiaVU) | The Wall Street Journa | 13.5M | 11 | 2026-08 |  |  |
+| **Economics & Financial History** | 1 | [Principles for Dealing with the Changing World Order by Ray …](https://youtu.be/xguam0TKMw8) | Principles by Ray Dali | 245.7M | 44 | 2022-03 | Medium | 2569 |
+|  | 2 | [Tune Out the Noise / Documentary Film](https://youtu.be/T98825bzcKw) | Dimensional Fund Advis | 32.1M | 88 | 2025-03 |  |  |
+|  | 3 | [Age of Easy Money (full documentary) / FRONTLINE](https://youtu.be/EpMLAQbSYAw) | FRONTLINE PBS | Offici | 23.8M | 113 | 2023-03 |  |  |
+| **Business & Company History** | 1 | [How America's Largest Buffet Survived The Death Of All-You-C…](https://youtu.be/TXg1mYN2tbw) | Business Insider | 10.6M | 18 | 2024-06 | Low-Medium | 4672 |
+|  | 2 | [🚗 BYD : The biggest SCAM of the car industry ?](https://youtu.be/tS_fJJxMjn4) | Statrys | 10.1M | 15 | 2026-04 |  |  |
+|  | 3 | [Rockefeller: The World’s First Billionaire](https://youtu.be/fNh_GyRbJDA) | MagnatesMedia | 7.8M | 50 | 2023-11 |  |  |
+| **Automotive & Transport** | 1 | [Skoda Octavia Production Line: Inside the Complete Car Facto…](https://youtu.be/Tr1B18XJ8Z8) | GommeBlog - Car & Perf | 34.1M | 24 | 2022-01 | Medium | 6116 |
+|  | 2 | [TITANIC of the Skies! - The Air France 447 Accident Explaine…](https://youtu.be/e5AGHEUxLME) | Mentour Pilot | 9.4M | 56 | 2022-12 |  |  |
+|  | 3 | [ULTRA RARE Cars in Suspended Animation for Future Generation…](https://youtu.be/y0ygn8QKbGA) | Hagerty | 9.0M | 46 | 2024-03 |  |  |
+| **WWII & Military** | 1 | [How 130,000 Soldiers Stormed Normandy in One Day](https://youtu.be/0UJYYkK4d8s) | Best Documentary | 60.6M | 100 | 2022-02 | Very high | 4874 |
+|  | 2 | [World War II Every Day with Army Sizes](https://youtu.be/1CqGeAmVu1I) | Christopher | 47.0M | 13 | 2022-03 |  |  |
+|  | 3 | [How a Nighthawk Was Shot Down](https://youtu.be/Zd88lzCWjpA) | Yarnhub | 34.2M | 12 | 2024-10 |  |  |
+| **Space & Astronomy** | 1 | [Journey to the edge of the Observable Universe](https://youtu.be/U9WOMerccoM) | Spacetime | 19.1M | 10 | 2024-02 | Very high | 10572 |
+|  | 2 | [How Big is The Universe?](https://youtu.be/pSHVbLPWA28) | Science Time | 15.7M | 11 | 2024-02 |  |  |
+|  | 3 | [Shocking Discoveries Voyager Made at the Edge of the Solar S…](https://youtu.be/fSbm5LCJspk) | Destiny | 11.0M | 46 | 2025-01 |  |  |
+| **Technology & Inventions** | 1 | [The Thinking Game / Full documentary / Tribeca Film Festival…](https://youtu.be/d95J8yzvjbQ) | Google DeepMind | 443.1M | 84 | 2025-11 | Medium | 2481 |
+|  | 2 | [The Insane Real Engineering of the Nazi Enigma Machine](https://youtu.be/JsBZOcqZerk) | Veritasium | 22.3M | 48 | 2026-09 |  |  |
+|  | 3 | [Fiber Optics are so much cooler than I thought](https://youtu.be/NiCgcUTL9_Q) | Veritasium | 16.7M | 35 | 2026-10 |  |  |
+| **Nature & Ocean** | 1 | [The World's Largest Cave: It Has a Forest, a River, and Clou…](https://youtu.be/87Jor5G_NBs) | Ruhi Cenet Documentari | 83.5M | 16 | 2025-03 | High | 2417 |
+|  | 2 | [Animals of Amazon 4K - Animals That Call The Jungle Home / A…](https://youtu.be/s7DbVTkaXn0) | Scenic Scenes | 42.0M | 28 | 2022-12 |  |  |
+|  | 3 | [Travel to the Depths of Our Mysterious Oceans / 4K UHD / Blu…](https://youtu.be/EF8C4v7JIbA) | BBC Earth | 31.5M | 67 | 2023-09 |  |  |
+| **Geography & Maps** | 1 | [The World's Highest Security Prison: CECOT (The most evil ar…](https://youtu.be/H42zWaD4A4s) | Ruhi Cenet Documentari | 202.6M | 21 | 2025-02 | High | 7356 |
+|  | 2 | [America’s Most Secretive Jewish Community: Hasidic Jews (48 …](https://youtu.be/l6UtZ-u9CyM) | Ruhi Cenet Documentari | 92.3M | 40 | 2026-08 |  |  |
+|  | 3 | [Dictator's Dilemma (Full Episode) / North Korea: Inside the …](https://youtu.be/9qRxNYuR2c4) | National Geographic | 40.7M | 44 | 2022-04 |  |  |
+
+### Footage notes and picks (niche: what exists; note on picks)
+- **History & Civilizations** (Medium): NARA/LoC photos and film for modern history; Internet Archive; museum open-access images for ancient (little real video of antiquity). Greek-mythology 210-min compilation (26.1M) left out: not history.
+- **Disasters & Mysteries** (Medium-High): NARA, NOAA, USGS, FEMA, NTSB reports, old newsreels on Internet Archive; no footage of most modern mysteries (MH370, Cicada). Hindi/French disaster films (Dhruv Rathee 36.6M, Investigation 34.3M) skipped: not a USA audience.
+- **Science** (High): NASA, NIH, NOAA, USGS video and images; Pixabay science/nature clips. Animation (Kurzgesagt) and lab shoots (Veritasium) are not free-footage films.
+- **Engineering & Megaprojects** (Medium): US Army Corps, Bureau of Reclamation, NARA and Prelinger construction film for 1900-1970 projects; modern megaprojects (China, Saudi) have none free. First pick is a 137-min compilation. Only 3 films at 10M+ found.
+- **Economics & Financial History** (Medium): NARA/LoC Depression photos and film, FRED/gov charts, Prelinger; modern markets none. Dalio film is animation. Folding Ideas NFTs (19.1M, 138 min) is 4th.
+- **Business & Company History** (Low-Medium): Company footage is copyrighted; free only pre-1929, gov films, Prelinger ads. Thin at 10M+: third pick is 7.8M (MagnatesMedia). Search quota gap.
+- **Automotive & Transport** (Medium): Prelinger (cars, rail, highways), NASA/NARA aviation, Smithsonian; modern car footage is copyrighted; Pixabay vehicle clips. Last two are under 10M (9.4M, 9.0M); a Disney Cars cartoon (50.8M) is not a documentary. Search quota gap.
+- **WWII & Military** (Very high): NARA and US Army/Navy/Air Force film, Internet Archive, LoC; best free supply of any niche. Rank 1 is a 100-min re-upload style film; rank 2 is a map animation; rank 3 is CGI (Yarnhub).
+- **Space & Astronomy** (Very high): NASA (images, video, audio are generally public domain), ESA/Hubble not all free. NASA Artemis II live broadcasts (28.0M, 19.3M, 234-383 min) left out: broadcasts, not films.
+- **Technology & Inventions** (Medium): NASA, NARA, Prelinger, AT&T-era films on Internet Archive for pre-1990; modern tech/AI needs original screen capture. Rank 1 (443M) is a Google DeepMind film release, not a normal channel result.
+- **Nature & Ocean** (High): NOAA Ocean Explorer, NPS, USGS, NASA Earth, Pixabay nature/ocean video. Rank 2 is 4K ambient footage (28 min, no story); rank 1 is a travel film (host on camera).
+- **Geography & Maps** (High): LoC maps (public domain), NASA Earth Observatory, USGS, Pixabay aerials. Pure map-explainer channels (Wendover, RealLifeLore) had no 10M+ film in their latest 50; the three are place-journalism, not map films.
+
+**Rank by free real footage (my reading; ties by IA count):** 1 Space (10.6k), 2 WWII & Military (4.9k), 3 Geography & Maps (7.4k) and Nature & Ocean, 5 Science (4.2k), then Disasters & Mysteries, Automotive & Transport (6.1k), Engineering, History, Technology (about 2.4-6k, mostly old film), last Economics and Business (company and market footage is mostly copyrighted). Do not rank on IA counts alone: Automotive and Business have many Prelinger ads and promotional films that are public domain but dated.
 
 ## Found for others
 - `/api/videos` returns no description (first lines and links not measurable). One field `description` (first 400 chars) would close it; belongs to the worker/ owner (Boss decides).
