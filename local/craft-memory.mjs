@@ -16,9 +16,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { msg } from "../engine/src/messages.mjs";
+import { lessonsText } from "../engine/src/retention.mjs";
 import {
   METRICS,
   MIN_FILMS,
+  addAudience,
   addRecord,
   calibratedDoctrine,
   craftIndex,
@@ -66,6 +68,7 @@ function main() {
     args: process.argv.slice(2),
     options: {
       report: { type: "string" },
+      retention: { type: "string" },
       timeline: { type: "string" },
       id: { type: "string" },
       genre: { type: "string", default: "default" },
@@ -84,6 +87,23 @@ function main() {
       const targets = calibratedDoctrine(ledger, film.genre);
       console.log(`${film.at.slice(0, 10)}  ${film.filmId.padEnd(24)} ${film.genre.padEnd(10)} ${film.verdict.padEnd(7)} craft ${craftIndex(film.measures, targets)}`);
     }
+    return 0;
+  }
+
+  if (values.retention) {
+    if (!existsSync(String(values.retention))) {
+      console.error(`No retention report at ${values.retention}`);
+      return 2;
+    }
+    const retention = JSON.parse(readFileSync(String(values.retention), "utf8"));
+    const made = addAudience(ledger, { filmId: String(values.id ?? retention.filmId ?? ""), retention, at: values.at ?? new Date().toISOString() });
+    say(made.note.code, made.note.params ?? {});
+    if (!made.ok) return 1;
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, ledgerJson(made.ledger));
+    // Where viewers left and stayed, for the next film's writers: the only notes the audience writes.
+    const lessons = lessonsText([retention], 1);
+    if (lessons) console.log(lessons);
     return 0;
   }
 

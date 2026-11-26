@@ -420,6 +420,11 @@ export function blurAndFlicker(samples, video, o = {}) {
       if (Number.isFinite(y) && y < darkLuma) dark.push({ id: acc.id, value: round(y, 1) });
     }
     for (let k = 1; k < acc.luma.length; k += 1) {
+      // A sample taken inside a shot's last half second (or first) can be the next picture: shots are
+      // cut to whole frames, and a cut is not a flicker. Only a jump with both samples well inside the
+      // shot is measured, so an honest cut is never reported as flicker on playback.
+      const edge = 0.5;
+      if (acc.luma[k].t - acc.start < edge || acc.end - acc.luma[k].t < edge) continue;
       const jump = Math.abs(acc.luma[k].y - acc.luma[k - 1].y);
       if (jump > flickerJump) flicker.push({ id: acc.id, at: round(acc.luma[k].t, 2), from: round(acc.luma[k - 1].y, 1), to: round(acc.luma[k].y, 1) });
     }

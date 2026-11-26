@@ -188,3 +188,16 @@ test("a still's own soft backdrop is design, not a blurred copy; a dark shot is 
   assert.ok(designedStill({ type: "card", counter: true }));
   assert.ok(!designedStill({ type: "clip" }));
 });
+
+test("a cut is not a flicker: a jump on a shot's own edge is the next picture", () => {
+  const text = [
+    "frame:0 pts_time:0", "lavfi.blur=5", "lavfi.signalstats.YAVG=80",
+    "frame:2 pts_time:1", "lavfi.blur=5", "lavfi.signalstats.YAVG=82",
+    "frame:4 pts_time:1.8", "lavfi.blur=5", "lavfi.signalstats.YAVG=150",
+    "frame:5 pts_time:2.5", "lavfi.blur=5", "lavfi.signalstats.YAVG=60",
+    "frame:8 pts_time:4", "lavfi.blur=5", "lavfi.signalstats.YAVG=160",
+  ].join("\n");
+  const video = [{ id: "SC1-1", start: 0, end: 2, type: "clip" }, { id: "SC1-2", start: 2, end: 6, type: "clip" }];
+  const r = blurAndFlicker(parsePicture(text), video);
+  assert.deepEqual(r.flicker.map((f) => f.id), ["SC1-2"], "only the jump well inside a shot counts");
+});

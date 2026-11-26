@@ -6,7 +6,11 @@ import {
   LEDGER_VERSION,
   MAX_FILMS,
   MIN_FILMS,
+  AUDIENCE,
+  addAudience,
   addRecord,
+  audienceFromRetention,
+  audienceHolds,
   calibratedDoctrine,
   craftIndex,
   doctrineFor,
@@ -276,4 +280,42 @@ test("the doctrine is data a reader can check, not a magic number", () => {
     const band = rule.avgShot;
     assert.ok(Array.isArray(band) && band[0] > 1 && band[1] > band[0], `${genre} shot band`);
   }
+});
+
+// --- the audience -------------------------------------------------------
+
+test("a published film's retention becomes its audience, and a film the audience held is evidence", () => {
+  let ledger = addRecord(emptyLedger(), rec("held", HOUSE, { verdict: "review", at: "2026-11-02T00:00:00Z" })).ledger;
+  const curve = { videoId: "abc12345678", at30: 71.4, half: 44.2, end: 31.8, at: "2026-11-10T00:00:00Z", drops: [{ scene: "SC0007", start: 61.2, perMinute: 4.1, said: "the gears" }], holds: [{ scene: "SC0004", start: 30.1, said: "the size of a shoebox" }] };
+  const audience = audienceFromRetention(curve, "2026-11-10T00:00:00Z");
+  assert.equal(audience?.at30, 71.4);
+  assert.equal(audienceHolds(audience), true);
+  const made = addAudience(ledger, { filmId: "held", retention: curve, at: "2026-11-10T00:00:00Z" });
+  assert.equal(made.ok, true);
+  ledger = made.ledger;
+  assert.equal(ledger.films[0].verdict, "pass", "the audience earned the cautious review a pass");
+  assert.equal(ledger.films[0].audience?.drops[0].scene, "SC0007");
+  assert.deepEqual(evidenceFor(ledger, "history", "designedPerMinute").map((e) => e.filmId), ["held"]);
+});
+
+test("a film nobody watched teaches nothing, and a blocked film is never evidence", () => {
+  let ledger = addRecord(emptyLedger(), rec("thin", HOUSE, { verdict: "review", at: "2026-11-02T00:00:00Z" })).ledger;
+  ledger = addAudience(ledger, { filmId: "thin", retention: { at30: 18, end: 3 }, at: "2026-11-10T00:00:00Z" }).ledger;
+  assert.equal(ledger.films[0].verdict, "review");
+  assert.deepEqual(evidenceFor(ledger, "history", "designedPerMinute"), []);
+  let blocked = addRecord(emptyLedger(), rec("bad", HOUSE, { verdict: "block", at: "2026-11-03T00:00:00Z" })).ledger;
+  blocked = addAudience(blocked, { filmId: "bad", retention: { at30: 90, end: 60 }, at: "2026-11-10T00:00:00Z" }).ledger;
+  assert.equal(blocked.films[0].verdict, "block", "a block is a defect the audience cannot excuse");
+  assert.deepEqual(evidenceFor(blocked, "history", "designedPerMinute"), []);
+});
+
+test("an audience survives a re-measure and a shelf-to-shelf write", () => {
+  let ledger = addRecord(emptyLedger(), rec("film-a", HOUSE, { at: "2026-11-02T00:00:00Z" })).ledger;
+  ledger = addAudience(ledger, { filmId: "film-a", retention: { at30: 64, half: 40, end: 28 }, at: "2026-11-10T00:00:00Z" }).ledger;
+  // The film is measured again later: the curve belongs to the published cut and stays.
+  ledger = addRecord(ledger, rec("film-a", HOUSE, { at: "2026-11-20T00:00:00Z" })).ledger;
+  assert.equal(ledger.films[0].audience?.at30, 64);
+  const reread = parseLedger(ledgerJson(ledger)).ledger;
+  assert.equal(reread.films[0].audience?.end, 28);
+  assert.equal(addAudience(ledger, { filmId: "missing", retention: { at30: 50, end: 30 } }).ok, false);
 });

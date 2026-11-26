@@ -7,6 +7,13 @@
   "contentType": "documentary",
   "voicePreset": "historical",
   "look": "ARCHIVE bronze, sea and archive stills, slow push",
+  "beats": [
+    { "after": 4, "kind": "counter", "text": "30 bronze gears" },
+    { "after": 8, "kind": "counter", "text": "235 months in one dial" },
+    { "after": 9, "kind": "counter", "text": "223 months to an eclipse" },
+    { "after": 12, "kind": "kinetic", "text": "A machine that knew the sky" }
+  ],
+  "closing": "Who paid for it still has no answer",
   "scenes": [
     {
       "narration": "In nineteen oh one, a boat of sponge divers sheltered from a storm beside a small Greek island and found a wreck forty-five metres down.",
@@ -114,8 +121,8 @@
     {
       "narration": "No gearing of comparable complexity is known from the ancient world, and nothing like it appears again in Europe for more than a thousand years.",
       "shots": [
-        "astronomical clock",
-        "Prague Orloj"
+        "astronomical clock face",
+        "Prague astronomical clock"
       ],
       "anchor": "the gap in the record"
     },
