@@ -123,6 +123,22 @@ export async function mediaDuration(file, ffprobe = "ffprobe") {
 }
 
 /**
+ * A picture's own shape (width / height), read before it is placed. A photo
+ * whose shape is already the frame's should fill the frame; one that is very
+ * tall or very wide needs a plate behind it.
+ * @param {string} file @param {string} [ffprobe]
+ */
+export async function pictureAspect(file, ffprobe = "ffprobe") {
+  try {
+    const out = await run(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", file]);
+    const [w, h] = out.trim().split("x").map(Number);
+    return w > 0 && h > 0 ? w / h : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The number a counter card runs up to, with the words around it; null when
  * there is no whole number to count (decimals and ranges stay static).
  * @param {string} text
@@ -527,7 +543,7 @@ export async function renderFilm(o) {
     const designed = graphic && !graphic.alpha ? graphic : null;
     // The look of an M4 shot joins the key only for shots it draws, so every other cached shot stays valid.
     const m4 = { ...(designed ? { graphic: [designed.template, designed.data, 1] } : {}), ...(depthOn && v.still && v.frame !== "print" && v.shotType !== "photo-designed" ? { depth: 1 } : {}) };
-    const key = hash({ v: 10, ...moves, ...m4, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 13, ...moves, ...m4, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -570,7 +586,7 @@ export async function renderFilm(o) {
         }
         if (deep) {
           // drawn above
-        } else if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < (W / H) * 0.8) {
+        } else if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < 1) {
           // A portrait or square photograph: 2.5D parallax. The sharp picture grows and drifts one way,
           // its blurred copy behind it the other way, so the photo seems to float in depth.
           const bg = join(dirs.cards, `${plateKey}-bg.png`);
@@ -598,10 +614,20 @@ export async function renderFilm(o) {
           // A landscape photograph: framed over a blurred copy of itself, then moved slowly
           // (push in, pull out or pan, in turn) so it lives on screen like footage.
           const print = v.frame === "print";
-          const plate = join(dirs.cards, `${plateKey}${print ? "-print" : ""}.png`);
+          // Owner's note on film 993f09ea: a small photo floating on a blurred copy of itself looks
+          // like a slide show. A photograph whose own shape is close to the frame's now covers the
+          // frame (the crop a camera would take); only an odd shape keeps a plate behind it.
+          const aspect = await pictureAspect(src, ffprobe);
+          const frameAspect = W / H;
+          // 4:3 is the shape of most archive photographs: it crops to the frame like a camera would.
+          const cover = !print && aspect !== null && Math.abs(aspect - frameAspect) / frameAspect <= 0.35;
+          const plate = join(dirs.cards, `${plateKey}${print ? "-print" : cover ? "-cover" : ""}.png`);
           if (!existsSync(plate)) {
             const W2 = W * 2;
             const H2 = H * 2;
+            if (cover) {
+              await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},setsar=1`, plate]);
+            } else {
             const bg = `[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=${print ? "-0.18:saturation=0.55" : "-0.07:saturation=0.8"}[bgb]`;
             // A print: the photo in a white border, turned a degree or two, casting a soft shadow on its own blur.
             const angle = (i % 2 ? 1 : -1) * 0.03;
@@ -610,6 +636,7 @@ export async function renderFilm(o) {
               ? `[fg]scale=w='min(${Math.round(W2 * 0.8)},iw*${Math.round(H2 * 0.72)}/ih)':h=-2,pad=iw+${2 * border}:ih+${2 * border}:${border}:${border}:color=0xf4f1ea,format=rgba,rotate=${angle}:c=none:ow=rotw(${angle}):oh=roth(${angle}),split=2[p1][p2];[p2]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.55,boxblur=${Math.round(H2 * 0.012)}:2[sh];[bgb][sh]overlay=(W-w)/2+${Math.round(H2 * 0.012)}:(H-h)/2+${Math.round(H2 * 0.018)}[b2];[b2][p1]overlay=(W-w)/2:(H-h)/2,setsar=1`
               : `[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`;
             await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-filter_complex", `[0]split=2[bg][fg];${bg};${fg}`, plate]);
+            }
           }
           input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
           chain.push(`${stillMove(v.focus, print, i, n, v.move)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);

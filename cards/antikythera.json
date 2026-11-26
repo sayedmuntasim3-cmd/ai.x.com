@@ -1,0 +1,163 @@
+{
+  "id": "antikythera-mechanism",
+  "title": "The Machine That Predicted the Sky",
+  "chapterTitle": "A lump of bronze from the sea",
+  "minutes": 3,
+  "formatId": "history",
+  "contentType": "documentary",
+  "voicePreset": "historical",
+  "look": "ARCHIVE bronze, sea and archive stills, slow push",
+  "scenes": [
+    {
+      "narration": "In nineteen oh one, a boat of sponge divers sheltered from a storm beside a small Greek island and found a wreck forty-five metres down.",
+      "shots": [
+        "Antikythera shipwreck",
+        "sponge diving"
+      ],
+      "anchor": "Antikythera, 1901"
+    },
+    {
+      "narration": "They raised marble statues, bronze figures, glassware, and one shapeless lump of corroded metal that nobody thought worth a second look.",
+      "shots": [
+        "Greek sculpture",
+        "marble statue"
+      ],
+      "anchor": "the wreck's cargo"
+    },
+    {
+      "narration": "The lump went to a museum storeroom in Athens. A year later it split open, and someone saw a gear wheel cut by a Greek hand.",
+      "shots": [
+        "Antikythera fragment",
+        "corroded coins"
+      ],
+      "anchor": "National Archaeological Museum, Athens"
+    },
+    {
+      "narration": "It was a machine the size of a shoebox, made of bronze in the second century before Christ.",
+      "shots": [
+        "Antikythera mechanism"
+      ],
+      "anchor": "second century BC"
+    },
+    {
+      "narration": "At least thirty gears, cut by hand, meshed to carry one motion into another, with a crank on the side to drive them.",
+      "shots": [
+        "Antikythera gears",
+        "Antikythera mechanism"
+      ],
+      "anchor": "the gearwork"
+    },
+    {
+      "narration": "On the front, a ring of the zodiac turned behind pointers for the sun and the moon, with a small silvered ball for the moon's phase.",
+      "shots": [
+        "Antikythera front",
+        "Antikythera mechanism"
+      ],
+      "anchor": "the front dial"
+    },
+    {
+      "narration": "Around it ran a calendar of three hundred and sixty-five days, the Egyptian year, which drifts by one day every four years.",
+      "shots": [
+        "Antikythera inscription",
+        "Antikythera replica"
+      ],
+      "anchor": "the calendar ring"
+    },
+    {
+      "narration": "The back carried spiral dials. One counted nineteen years, two hundred and thirty-five months, and folded the calendar back on itself.",
+      "shots": [
+        "Antikythera back",
+        "Kotsanas Antikythera"
+      ],
+      "anchor": "the Metonic dial"
+    },
+    {
+      "narration": "Another counted two hundred and twenty-three months: the Saros cycle, which tells when the sun and moon will fall into line and an eclipse is due.",
+      "shots": [
+        "solar eclipse",
+        "lunar eclipse"
+      ],
+      "anchor": "the Saros dial"
+    },
+    {
+      "narration": "A third dial named the years of the Olympic games. The sky above, and the calendar of a Greek city, on the same piece of bronze.",
+      "shots": [
+        "Olympia Greece",
+        "Greek vase athletes"
+      ],
+      "anchor": "the Olympiad dial"
+    },
+    {
+      "narration": "Its plates were covered in inscriptions: not a dedication, but a manual. Which star rises, what the pointer means, what each dial predicts.",
+      "shots": [
+        "Greek inscription",
+        "Greek marble inscription"
+      ],
+      "anchor": "the inscriptions"
+    },
+    {
+      "narration": "In nineteen seventy-one, Derek de Solla Price read inside it with gamma rays. In two thousand and five, a CT scanner counted the teeth and read the text.",
+      "shots": [
+        "CT scanner",
+        "X-ray machine"
+      ],
+      "anchor": "Price, 1971; Freeth, 2006"
+    },
+    {
+      "narration": "Michael Wright built working models by hand, brass turning on brass, and showed that the machine does what its inscriptions claim.",
+      "shots": [
+        "Antikythera model",
+        "Antikythera gears"
+      ],
+      "anchor": "Michael Wright's models"
+    },
+    {
+      "narration": "No gearing of comparable complexity is known from the ancient world, and nothing like it appears again in Europe for more than a thousand years.",
+      "shots": [
+        "astronomical clock",
+        "Prague Orloj"
+      ],
+      "anchor": "the gap in the record"
+    },
+    {
+      "narration": "So the machine is a fragment of a tradition that was lost: workshops that could cut precision gears, and a client who wanted the sky in his hand.",
+      "shots": [
+        "bronze tools",
+        "bronze workshop"
+      ],
+      "anchor": "a lost workshop tradition"
+    },
+    {
+      "narration": "The ship was a freighter carrying goods west, perhaps Greek art for a Roman villa, and it went down on the way.",
+      "shots": [
+        "amphora shipwreck",
+        "amphorae"
+      ],
+      "anchor": "the ship"
+    },
+    {
+      "narration": "It sank with a cargo of luxuries for a Roman buyer, and it was the only thing aboard that could think about the future.",
+      "shots": [
+        "Roman villa mosaic",
+        "ancient Rome painting"
+      ],
+      "anchor": "the cargo"
+    },
+    {
+      "narration": "Divers still work those waters, and the wreck has not finished giving up what it carried.",
+      "shots": [
+        "underwater archaeology",
+        "Aegean Sea"
+      ],
+      "anchor": "the site today"
+    },
+    {
+      "narration": "What the workshop was, and who paid for it, still has no answer.",
+      "shots": [
+        "armillary sphere",
+        "Greek philosopher bust"
+      ],
+      "anchor": "the open question"
+    }
+  ]
+}
