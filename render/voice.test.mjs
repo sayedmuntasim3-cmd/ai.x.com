@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { recordVoice, voiceLines } from "./voice.mjs";
+import { pricedClaims } from "../engine/src/claim-values.mjs";
 
 const md = [
   `**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: The mill opens at dawn. | W 5/5 | ANCHOR: x | SHOTS: (1) R3 mill | LOOK: L`,
@@ -117,3 +118,21 @@ test("hard names are read as S4's lexicon spells them, and the captions still sh
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a scene whose number was never priced is reported, never dropped silently; the run's priced numbers fill it", () => {
+  const bare = voiceLines([{ markdown: md }]);
+  assert.deepEqual(bare.unresolved, [{ scene: "SC0003", tokens: ["[C12 low]"] }], "the hole has a name, not a shrug");
+  assert.deepEqual(bare.lines.map((l) => l.scene), ["SC0001", "SC0004"]);
+  const claims = pricedClaims({
+    rates: { "2025": 87.1468 },
+    cpi: { annual: { "2025": 321.87 }, latest: { year: 2026, month: 10, value: 337.476 } },
+    priced: { C12: { rupees: { low: { inr: 100, year: 2025 } }, thenLow: 1.15, thenHigh: 1.15, todayLow: 1.2, todayHigh: 1.2 } },
+  });
+  const filled = voiceLines([{ markdown: md }], { claims });
+  assert.deepEqual(filled.unresolved, []);
+  assert.deepEqual(filled.skipped, []);
+  assert.equal(filled.filled, 1);
+  assert.deepEqual(filled.lines.map((l) => l.scene), ["SC0001", "SC0003", "SC0004"]);
+  assert.equal(filled.lines[1].text, "It cost about one dollar and fifteen cents dollars.");
+});
+

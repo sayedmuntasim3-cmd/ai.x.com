@@ -282,7 +282,8 @@ export function retryAfterSeconds(v, now = Date.now()) {
  * @typedef {import("../engine/src/timeline.mjs").Timeline} Timeline
  * oneTrack: the voice system's path: one recording is the whole narration, laid from 0:00, never sped up,
  *   slowed, cut or re-ordered (the timeline was built on its own word times); per-scene voice is ignored.
- * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[] }} RenderOptions
+ * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[], edits?: any[] }} RenderOptions
+ *   edits: the Edit Director's plans (edit-C1.json ...), so the critic can say whether what the editor asked for reached the film.
  */
 
 /**
@@ -1140,11 +1141,13 @@ export async function renderFilm(o) {
   try { channels = (await measureFilm(o.outFile, { ffmpeg, ffprobe, freezes: false })).channels; } catch { /* the report says null */ }
   const mixed = master ? { ...master, channels } : null;
   // Blurred copies and flicker are measured on the picture itself, one pass at two frames a second.
-  /** @type {{ blurred: any[], flicker: any[] } | null} */
+  /** @type {{ blurred: any[], blurredDesigned?: any[], flicker: any[], dark?: any[] } | null} */
   let picture = null;
   try { picture = await measurePicture(o.outFile, t, { ffmpeg }); } catch { /* the report says null */ }
   // The eyes' per-shot relevance (M3) reaches the gate too, not only the `why` field of a media file.
-  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(picture ? { blurred: picture.blurred, flicker: picture.flicker } : {}) });
+  // The critic also reads which scenes really carry a voice (a single recording voices them all) and the edit plans,
+  // so a scene that lost its narration or a transition the editor asked for cannot pass unnoticed.
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
   if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
@@ -1277,7 +1280,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (args.part && !partArg) throw new Error(`--part must look like 2/8, not "${args.part}".`);
   const part = partArg ? { index: Number(partArg[1]) - 1, count: Number(partArg[2]) } : undefined;
   const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
-  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), edits: chapters.map((c) => c.edit).filter(Boolean), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
   if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
   // M6: the timeline (shot times, types, scene ids) is written next to the film, so the contact sheets
   // and the weak-shot loop are drawn from what was actually rendered, not from a second reading of the script.
