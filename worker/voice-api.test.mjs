@@ -253,3 +253,90 @@ test("Quran: the reviewer listens, taps each ayah end, and the film is made agai
   const quran = JSON.parse(sent.at(-1).inputs.quran);
   assert.deepEqual(quran.marks, { start: 1, ends: [4, 8, 12.5], by: "Hafiz A" });
 });
+
+test("the Craft Ledger: the runner reads it and records the film; the audience hook adds retention", async () => {
+  const { LEDGER_KEY, ledgerAudience } = await import("./voice-api.mjs");
+  const bucket = fakeBucket();
+  const env = { FILMS: bucket, STUDIO_TOKEN: "owner-token" };
+  await bucket.put(`voice/${ID}/voice.json`, JSON.stringify({ id: ID, kind: "narration", ext: "mp3", progress: [] }));
+  const ticket = await makeTicket("owner-token", ID, "runner", 3600, Date.now());
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/ledger`)).status, 401);
+  const empty = await call(env, "GET", `/api/voice/${ID}/ledger?ticket=${ticket}`);
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.data.films, []);
+  const report = { critic: { verdict: "pass", measures: { seconds: 180, movingShare: 0.7, designedPerMinute: 2, avgShot: 4, narrationCoverage: 1, cutsIn30: 8, longestShot: 7, cueCoverage: 0.9, subtitles: { maxGap: 2 } } } };
+  const put = await call(env, "POST", `/api/voice/${ID}/ledger?ticket=${ticket}`, { body: { report, genre: "biography" } });
+  assert.equal(put.status, 200);
+  assert.equal(put.data.films, 1);
+  assert.equal(put.data.note.code, "craft.added");
+  // The second film reads the first's record.
+  const read = await call(env, "GET", `/api/voice/${ID}/ledger`, { headers: OWNER });
+  assert.equal(read.data.films.length, 1);
+  assert.equal(read.data.films[0].filmId, ID);
+  assert.equal(read.data.films[0].genre, "biography");
+  assert.equal(read.data.films[0].measures.subtitleGap, 2);
+  // A report without measures teaches nothing and says so.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/ledger?ticket=${ticket}`, { body: { report: {} } })).status, 400);
+  // The audience hook: a retention report for a film in the ledger lands on its record; an unknown film is a note.
+  const curve = Array.from({ length: 100 }, (_, i) => ({ at: i / 100, watching: 0.9 - i * 0.006 }));
+  const note = await ledgerAudience(bucket, ID, { filmId: ID, videoId: "abc", at30: 70, half: 50, end: 35, curve, drops: [], holds: [] }, "2026-11-26T00:00:00Z");
+  assert.equal(note?.code, "craft.audience");
+  const after = JSON.parse(new TextDecoder().decode(bucket.files.get(LEDGER_KEY)));
+  assert.equal(after.films[0].audience.at30, 70);
+  const unknown = await ledgerAudience(bucket, "99999999-2222-3333-4444-555555555555", { at30: 70, end: 35, curve }, "2026-11-26T00:00:00Z");
+  assert.equal(unknown?.code, "craft.noFilm");
+});
+
+test("the daily film: one a day, the next unused topic, the brain and the voice through the runner's ticket", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r", GROQ_API_KEY: "groq", GEMINI_API_KEY: "gem", GEMINI_POOL: "off" };
+  /** @type {any[]} */
+  const calls = [];
+  const net = async (/** @type {string} */ u, /** @type {any} */ init) => {
+    calls.push({ u, body: init?.body ? JSON.parse(init.body) : null });
+    if (u.includes("api.github.com")) return new Response(null, { status: 204 });
+    if (u.includes("api.groq.com")) return new Response(JSON.stringify({ choices: [{ message: { content: "Part one words." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 3 } }), { status: 200 });
+    return new Response("{}", { status: 500 });
+  };
+  assert.equal((await call(env, "POST", "/api/voice/daily", {})).status, 401);
+  const t0 = Date.parse("2026-11-26T10:23:00Z");
+  const started = await call(env, "POST", "/api/voice/daily", { headers: OWNER, fetch: net, now: () => t0 });
+  assert.equal(started.status, 202);
+  assert.equal(started.data.topic, "tacoma-narrows-1940");
+  const gh = calls.find((c) => c.u.includes("daily-film.yml/dispatches"));
+  assert.equal(gh.body.inputs.topic_id, "tacoma-narrows-1940");
+  assert.equal(gh.body.inputs.voice_id, ID);
+  const ticket = gh.body.inputs.ticket;
+  // One a day: a second start the same day is refused.
+  assert.equal((await call(env, "POST", "/api/voice/daily", { headers: OWNER, fetch: net, now: () => t0 + 3600_000 })).status, 409);
+
+  // The brain: only with this film's ticket; Groq answers first.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/brain`, { body: { prompt: "x" } })).status, 401);
+  const brain = await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { system: "s", prompt: "Write part one.", maxTokens: 900 }, fetch: net, now: () => t0 });
+  assert.equal(brain.status, 200);
+  assert.equal(brain.data.text, "Part one words.");
+  assert.equal(brain.data.model, "openai/gpt-oss-120b");
+
+  // The voice goes up in pieces with the ticket; complete starts the voiceover film.
+  const audio = new Uint8Array(4096).map((_, i) => i % 7);
+  const opened = await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: audio.byteLength }, now: () => t0 });
+  assert.deepEqual(opened.data, { partSize: PART_SIZE, parts: 1 });
+  const p1 = await call(env, "PUT", `/api/voice/${ID}/parts/1?ticket=${ticket}`, { body: audio, now: () => t0 });
+  const done = await call(env, "POST", `/api/voice/${ID}/complete?ticket=${ticket}`, { body: { parts: [p1.data] }, fetch: net, now: () => t0 });
+  assert.equal(done.status, 202);
+  const vf = calls.filter((c) => c.u.includes("voice-film.yml/dispatches")).at(-1);
+  assert.equal(vf.body.inputs.ext, "mp3");
+  assert.match(vf.body.inputs.topic, /Tacoma Narrows/);
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: 4096 }, now: () => t0 })).status, 409);
+
+  // The next day: the next topic (Tacoma has its voice, never repeated).
+  const next = await call(env, "POST", "/api/voice/daily", { headers: OWNER, fetch: net, now: () => t0 + 24 * 3600_000 });
+  assert.equal(next.data.topic, "st-francis-dam");
+});
+
+test("an uploaded voice's runner ticket cannot use the daily film's brain or voice routes", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GROQ_API_KEY: "groq" };
+  const created = await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "a.mp3", bytes: 2000 } });
+  const ticket = await makeTicket("owner-token", created.data.id, "runner", 3600);
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { prompt: "x" } })).status, 401);
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: 2000 } })).status, 401);
+});

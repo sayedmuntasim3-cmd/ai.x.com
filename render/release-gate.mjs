@@ -50,10 +50,12 @@ export async function main(argv, deps = {}) {
     // M6: the critic's verdict is part of the release, not decoration. A film that is complete but not
     // good (a flat wall of sound, a stock montage rhythm, a slideshow, black picture) does not go out.
     const critic = report?.critic ?? null;
-    writeFileSync(values.report.replace(/\.report\.json$/, "") + ".master-gate.json", JSON.stringify({ ...g, critic: critic ? { verdict: critic.verdict, measures: critic.measures } : null, measuredSeconds, at: new Date().toISOString() }, null, 1));
+    writeFileSync(values.report.replace(/\.report\.json$/, "") + ".master-gate.json", JSON.stringify({ ...g, critic: critic ? { verdict: critic.verdict, measures: critic.measures, ...(critic.craft ? { craft: critic.craft } : {}) } : null, measuredSeconds, at: new Date().toISOString() }, null, 1));
     for (const f of g.findings) print(`${f.severity.toUpperCase()}: ${both(f.message)}`);
     for (const f of critic?.findings ?? []) print(`${f.severity.toUpperCase()} ${f.code}: ${f.en}\n${f.bn}`);
     if (critic) print(`Critic: ${String(critic.verdict).toUpperCase()}\nক্রিটিক: ${critic.verdict === "pass" ? "পাস" : "ব্লক"}`);
+    // The Craft Ledger's number for this film (0-100 against its genre's calibrated targets): reported, never a block.
+    if (critic?.craft) print(both({ code: "craft.index", params: { index: critic.craft.index, filmId: critic.craft.filmId ?? report?.filmId ?? values.id ?? "this film", genre: critic.craft.genre } }));
     print(both({ code: `gate.${g.verdict === "block" || critic?.verdict === "block" ? "block" : "pass"}`, params: { gate: "master" } }));
     return g.verdict === "block" || critic?.verdict === "block" ? 1 : 0;
   }

@@ -201,3 +201,22 @@ test("a cut is not a flicker: a jump on a shot's own edge is the next picture", 
   const r = blurAndFlicker(parsePicture(text), video);
   assert.deepEqual(r.flicker.map((f) => f.id), ["SC1-2"], "only the jump well inside a shot counts");
 });
+
+test("the Craft Ledger's targets add notes and a craft index, never a block", async () => {
+  const { calibratedDoctrine, emptyLedger } = await import("../engine/src/craft-memory.mjs");
+  const shots = [];
+  for (let i = 0; i < 30; i += 1) shots.push({ start: i * 6, end: (i + 1) * 6, type: "clip" });
+  const video = shots.map((s, i) => (i % 5 === 2 ? { ...s, counter: true } : s));
+  const sfx = video.filter((v) => v.counter).map((v) => ({ token: "AUTO-IMPACT", kind: "hit", scene: v.scene, start: v.start + 0.1, end: v.start + 1.2 }));
+  const master = { master: { integratedLufs: -14.2, truePeakDbtp: -1.4, loudnessRangeLu: 8, black: [] } };
+  const plain = critique(timeline(video, { sfx }), master, { channels: 2 });
+  assert.equal(plain.craft, undefined, "no targets, no craft section");
+  const r = critique(timeline(video, { sfx }), master, { channels: 2, craft: { ...calibratedDoctrine(emptyLedger(), "history"), filmId: "f1" } });
+  assert.equal(r.verdict, "pass", "craft notes never block");
+  assert.ok(r.craft && r.craft.index > 0 && r.craft.index < 100, `index ${r.craft?.index}`);
+  assert.equal(r.craft.filmId, "f1");
+  assert.equal(r.craft.genre, "history");
+  const notes = r.findings.filter((f) => f.code === "craft.below");
+  assert.ok(notes.length >= 1 && notes.every((f) => f.severity === "note" && f.en.length > 10 && f.bn.length > 10));
+  assert.ok(notes.some((f) => /cuts in the first 30 s/.test(f.en)), "5 cuts against the history target of 6");
+});

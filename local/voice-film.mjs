@@ -45,7 +45,8 @@ import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
-import { DESIGNED_TYPES, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
+import { DESIGNED_TYPES, GENRE_RHYTHM, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
+import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom } from "../engine/src/craft-memory.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
 import { groqLook, groqModel } from "../worker/groq.mjs";
@@ -404,7 +405,7 @@ export async function understand(o) {
 /**
  * Step 4. With a free brain (voiceBrain: Groq, then the Gemini pool) the plan is written in batches of
  * whole sections; without one, or for scenes past its quota, it comes from each scene's own words.
- * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null }} o
+ * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null, ledger?: import("../engine/src/craft-memory.mjs").Ledger | null, ledgerFile?: string, filmId?: string }} o
  */
 export async function pictures(o) {
   const u = o.understanding;
@@ -432,10 +433,16 @@ export async function pictures(o) {
   const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The shot plan (shots.json): every shot typed, re-cut to the genre's rhythm, designed moments on the voice's own lines.
-  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure });
+  // The Craft Ledger: the targets earlier films taught for this genre (never looser than the house), read by the
+  // shot plan here and by the renderer's critic through craft-targets.json.
+  const doctrine = calibratedDoctrine(o.ledger ?? emptyLedger(), ledgerGenre(director.genre));
+  const rhythm = rhythmFrom(doctrine, GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (director.genre)] ?? GENRE_RHYTHM.documentary);
+  await writeFile(join(o.out, "craft-targets.json"), JSON.stringify({ ...doctrine, rhythm, filmId: o.filmId ?? basename(o.out), ...(o.ledgerFile ? { ledgerFile: o.ledgerFile } : {}) }, null, 1));
+  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure, rhythm });
   const lens = plan.shots.map((x) => x.seconds).sort((a, b) => a - b);
   const designed = plan.shots.filter((x) => DESIGNED_TYPES.includes(x.type));
   const planMessages = [
+    msg("craft.read", { films: doctrine.films, genre: doctrine.genre, learned: Object.values(doctrine.targets).filter((t) => t.source === "learned").length, lo: rhythm.median[0], hi: rhythm.median[1], max: rhythm.max }),
     msg("voice.shotPlan", { shots: plan.shots.length, designed: designed.length, kinds: [...new Set(designed.map((x) => x.type))].join(", ") || "—", median: lens[Math.floor(lens.length / 2)] ?? 0, problems: plan.findings.length }),
     msg("voice.hook", { score: plan.hook.score, beats: plan.hook.beats, titleAt: plan.hook.titleAt === null ? null : Math.round(plan.hook.titleAt), designed: plan.hook.designed }),
   ];
@@ -542,7 +549,12 @@ async function main() {
     const vb = voiceBrain(process.env);
     if (vb.refused) console.log("- " + msg("voice.paidBrainRefused")[lang]);
     else if (vb.model) console.log(`- Brain: ${vb.kind}`);
-    const step4 = await pictures({ out, understanding, brain: vb.model, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
+    // The ledger (--ledger, default out/craft-ledger.json): read here; this film is added to it after the render,
+    // unless --ledger-record off (the studio's runner: the Worker keeps the ledger in R2 and records it there).
+    const ledgerPath = resolve(typeof args.ledger === "string" ? args.ledger : join("out", "craft-ledger.json"));
+    const read = await readFile(ledgerPath, "utf8").then(parseLedger, () => null);
+    for (const n of read?.notes ?? []) console.log("- " + msg(n.code, n.params ?? {})[lang]);
+    const step4 = await pictures({ out, understanding, brain: vb.model, ledger: read?.ledger ?? null, ledgerFile: args["ledger-record"] === "off" ? undefined : ledgerPath, filmId: typeof args["film-id"] === "string" ? args["film-id"] : undefined, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
     if (!step4.ok) process.exit(1);

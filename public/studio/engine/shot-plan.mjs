@@ -400,10 +400,11 @@ function moveFor(emotion, prev) {
  * the Director pass (beats.json). Out: the same scene lines with every shot re-cut to the genre's rhythm and
  * typed, designed moments on narration beats, the world in every picture's search, the shot table, the code
  * edit (sound cues and print frames for the Edit Director stage), and the findings of the code checks.
- * @param {{ markdown: string, scenes: VoiceScene[], beats: any[], world: World, genre: string, topic?: string, structure?: Structure | null }} o
+ * `rhythm` (optional) replaces the genre's rhythm: the Craft Ledger's calibrated one (craft-memory.mjs rhythmFrom), never looser.
+ * @param {{ markdown: string, scenes: VoiceScene[], beats: any[], world: World, genre: string, topic?: string, structure?: Structure | null, rhythm?: { target: number, median: [number, number], max: number } }} o
  */
 export function planShots(o) {
-  const rhythm = GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (o.genre)] ?? GENRE_RHYTHM.documentary;
+  const rhythm = o.rhythm ?? GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (o.genre)] ?? GENRE_RHYTHM.documentary;
   const lines = parseSceneLines(o.markdown);
   const bySc = new Map(lines.map((l) => [l.sc, l]));
   const beatOf = (/** @type {VoiceScene} */ s) => o.beats.find((b) => s.start >= b.start - 0.01 && s.start < b.end - 0.01) ?? o.beats.at(-1) ?? null;

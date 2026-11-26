@@ -66,7 +66,7 @@ import { listFilms } from "./films.mjs";
 import { radarSearch, videoDetails } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
-import { handleVoice } from "./voice-api.mjs";
+import { handleVoice, ledgerAudience } from "./voice-api.mjs";
 import { handleMedia } from "./media-api.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
@@ -371,7 +371,11 @@ export default {
         const body = /** @type {any} */ (await request.json().catch(() => null));
         const channel = { get: async (/** @type {string} */ k) => { const o = await env.FILMS.get(k); return o ? o.text() : null; }, put: async (/** @type {string} */ k, /** @type {string} */ v) => { await env.FILMS.put(k, v); } };
         const result = await learnFromVideo({ store: r2Store(env.FILMS, retention[1]), channel, filmId: retention[1], video: body?.video, clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET }).catch((error) => ({ ok: /** @type {const} */ (false), status: 502, error: error instanceof Error ? error.message : String(error) }));
-        return result.ok ? json(result) : json({ error: result.error }, result.status);
+        if (!result.ok) return json({ error: result.error }, result.status);
+        // The audience signal for the Craft Ledger: a film the ledger holds gets its retention (a no-op note otherwise).
+        const saved = await r2Store(env.FILMS, retention[1]).get("retention.json");
+        const craft = saved ? await ledgerAudience(env.FILMS, retention[1], JSON.parse(saved), new Date().toISOString()).catch(() => null) : null;
+        return json({ ...result, ...(craft ? { craft } : {}) });
       }
       const pictures = /^\/api\/films\/([0-9a-f-]{36})\/pictures$/.exec(url.pathname);
       if (pictures && request.method === "POST") {

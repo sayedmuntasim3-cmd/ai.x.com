@@ -564,3 +564,65 @@ export function mergeLedgers(a, b, o = {}) {
   for (const film of [...(a?.films ?? []), ...(b?.films ?? [])]) out = addRecord(out, film, o).ledger;
   return out;
 }
+
+/**
+ * The ledger's genre for a genre named elsewhere (the shot plan's
+ * "documentary" and "business" have no doctrine of their own: default).
+ * @param {unknown} genre
+ */
+export function ledgerGenre(genre) {
+  const g = String(genre ?? "").trim().toLowerCase();
+  return g !== "default" && Object.prototype.hasOwnProperty.call(DOCTRINE, g) ? g : "default";
+}
+
+/**
+ * The shot plan's rhythm with the calibrated targets laid over it. It only
+ * ever gets tighter: the median band is the overlap of the plan's own band and
+ * the target band, the longest hold is the smaller of the two. A target that
+ * would loosen the plan, or a band with no overlap, leaves the plan as it is.
+ * @param {{ targets: Record<MetricKey, Target> } | null | undefined} doctrine
+ * @param {{ target: number, median: [number, number], max: number }} rhythm
+ * @returns {{ target: number, median: [number, number], max: number, from: "learned" | "doctrine" | "plan" }}
+ */
+export function rhythmFrom(doctrine, rhythm) {
+  const base = { target: rhythm.target, median: /** @type {[number, number]} */ ([...rhythm.median]), max: rhythm.max };
+  const band = doctrine?.targets?.avgShot;
+  const longest = doctrine?.targets?.longestShot;
+  if (!band && !longest) return { ...base, from: "plan" };
+  let [lo, hi] = base.median;
+  if (band && Array.isArray(band.value)) {
+    const nlo = Math.max(lo, Number(band.value[0]));
+    const nhi = Math.min(hi, Number(band.value[1]));
+    if (Number.isFinite(nlo) && Number.isFinite(nhi) && nhi - nlo >= 0.5) [lo, hi] = [nlo, nhi];
+  }
+  const max = longest && Number.isFinite(Number(longest.value)) ? Math.max(hi, Math.min(base.max, Number(longest.value))) : base.max;
+  const target = round(Math.min(hi, Math.max(lo, base.target)), 2);
+  const learned = [band, longest].some((t) => t?.source === "learned");
+  return { target, median: [round(lo, 2), round(hi, 2)], max: round(max, 2), from: learned ? "learned" : "doctrine" };
+}
+
+/**
+ * A finished film against its genre's calibrated targets: the craft index
+ * 0-100, and each measure that fell short. It is reported, never a block: the
+ * critic's own floor decides blocks.
+ * @param {Record<string, any>} criticMeasures the critic's `measures`
+ * @param {{ genre: string, films: number, passing: number, targets: Record<MetricKey, Target> }} doctrine
+ */
+export function craftReport(criticMeasures, doctrine) {
+  const { measures } = measuresFromReport({ critic: { measures: criticMeasures } });
+  const below = [];
+  for (const [key, target] of Object.entries(doctrine.targets)) {
+    const value = measures[/** @type {MetricKey} */ (key)];
+    if (value === null || value === undefined) continue;
+    if (fit(Number(value), target) < 0.999) below.push({ metric: key, value, target: target.value, source: target.source });
+  }
+  return {
+    ...(typeof (/** @type {any} */ (doctrine).filmId) === "string" ? { filmId: /** @type {any} */ (doctrine).filmId } : {}),
+    genre: doctrine.genre,
+    films: doctrine.films,
+    passing: doctrine.passing,
+    learned: Object.entries(doctrine.targets).filter(([, t]) => t.source === "learned").map(([k]) => k),
+    index: craftIndex(measures, doctrine),
+    below,
+  };
+}

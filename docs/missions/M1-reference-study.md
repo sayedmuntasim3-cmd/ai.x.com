@@ -13,11 +13,11 @@ Must not touch: engine/, render/, worker/ (ask the Boss if an API route is missi
 - [x] Analyse the owner's 50+ links in docs/YOUTUBE_BENCHMARKS.md ("not analysed yet") the same way.
 - [x] Compare the strongest and the average videos of the same channel: what differs (topic, title, length,
       chapter rhythm)?
-- [ ] Do not ask the owner for anything. Measure craft from public sources: the creators' own talks and
+- [x] Do not ask the owner for anything. Measure craft from public sources: the creators' own talks and
       behind-the-scenes posts, chapter timings, and published analyses. Mark each number as sourced or
       "my reading".
 - [x] Use YouTube's own Audience Retention guidance (cite the help pages): first 30 s, dips, re-hooks.
-- [ ] Write docs/research/REFERENCE_STANDARD.md:
+- [x] Write docs/research/REFERENCE_STANDARD.md:
   - per-genre numbers (history, biography or motivation, science or explainer);
   - what to learn;
   - what NOT to copy;
@@ -37,3 +37,4 @@ REFERENCE_STANDARD.md exists with at least 15 sourced videos and measured number
 - 2026-11-21: Worker route = `GET /api/ideas?q=&months=` (worker/index.mjs:269, worker/youtube.mjs, YOUTUBE_API_KEY set: /api/health youtube:true). `tools/research/collect.mjs` (needs NODE_USE_ENV_PROXY=1) -> 166 videos, 28 channels, data/reference-videos.json. Strongest-vs-average: docs/research/CHANNEL_COMPARISON.md. YouTube retention help cited: https://support.google.com/youtube/answer/9314415 (intro = % still watching after 30 s; spikes; dips; top moments).
 - 2026-11-21: PR #40 merged (a44811a), production GET /api/videos?handle=@lemmino returned 200 with chapters. `tools/research/by-id.mjs` + `analyse.mjs`: all 46 owner links measured (docs/research/OWNER_LINKS_ANALYSIS.md, data/*.json), YOUTUBE_BENCHMARKS.md tables filled; LEMMiNO, MagnatesMedia, Business Casual, DW added from their latest 25 uploads. Waiting on: 3-5 owner screen recordings (asked the Boss), then REFERENCE_STANDARD.md.
 - 2026-11-21: merged main (PR #43 made the craft-measurement item public-sources-only; the owner is never asked, so the recording wording in the log and REFERENCE_STANDARD.md is obsolete and is being replaced). Next: measure shot rhythm from chapter timings and public sources, mark each number sourced or "my reading".
+- 2026-11-26: 12 owner niches (top 3 + free-footage column) added to VIRAL_STUDY.md (`tools/research/niches.mjs`, `niche-handles.mjs`, `footage.mjs`, `niche-table.mjs`). Search quota 429 again: some niches thin, re-run after 08:00 UTC. Craft numbers: no public measured source exists; REFERENCE_STANDARD.md "Craft numbers" marks each sourced or "my reading". Gate decision is the Boss's.

@@ -1,0 +1,980 @@
+{
+ "note": "Factor values are the Boss's reading of the market study (26 Nov 2026), not measurements. Evidence for outliers is from docs/research/ENGINEERING_MARKET_STUDY.md section 8. Visual and source claims still need the W10 archive check.",
+ "pastFilms": [],
+ "topics": [
+  {
+   "id": "st-francis-dam",
+   "title": "St. Francis Dam failure (1928) and the LA Aqueduct",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "dam",
+    "failure",
+    "los angeles",
+    "aqueduct",
+    "mulholland"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "LA Aqueduct 4.31x (PE); dam films 1.03-1.13x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "1928 photos (LoC, Huntington, Wikimedia PD); little moving film",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 4,
+     "reason": "1928 Governor's commission report + LA DWP records",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 5,
+     "reason": "famous engineer, dam fails the night after he inspects it",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "hyatt-walkway",
+   "title": "Hyatt Regency walkway collapse (1981)",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "walkway",
+    "collapse",
+    "kansas city",
+    "hotel",
+    "structural"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "skywalk collapse 1.89x; bridge-collapse film 1.52x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "NBS/NIST report photos and drawings (PD); news film is copyrighted",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "NBS investigation report (federal, PD)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 2,
+     "reason": "114 deaths: tell it through the investigation, no graphic footage",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 5,
+     "reason": "one changed rod detail doubles the load: clear reveal",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "tacoma-narrows",
+   "title": "Tacoma Narrows Bridge (1940)",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "bridge",
+    "collapse",
+    "tacoma",
+    "wind",
+    "flutter"
+   ],
+   "evidenceStrength": "weak",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 2,
+     "reason": "no direct evidence in the sample; process-only bridge film 0.49x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 1,
+     "reason": "one of the most covered engineering failures: needs a distinct angle",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 5,
+     "reason": "1940 film (PD, Internet Archive/Prelinger), HAER drawings",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "Carmody board report 1941, many papers",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "big-dig",
+   "title": "Boston Big Dig (and Seattle's stuck tunnel machine)",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "tunnel",
+    "boston",
+    "megaproject",
+    "cost overrun",
+    "highway"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "Channel Tunnel 2.23x, US metro film 4.65x (siblings)",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "MassDOT photos, NTSB 2006 ceiling-collapse report; news film copyrighted",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 2,
+     "reason": "long, political history: heavy research",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "katrina-levees",
+   "title": "New Orleans levee failures in Katrina (2005)",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "levee",
+    "flood",
+    "new orleans",
+    "katrina",
+    "army corps"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "PE flaw that flooded New Orleans 1.71x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 5,
+     "reason": "USACE, NOAA, FEMA photos and video (federal PD)",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "USACE IPET report, ASCE review, Team Louisiana",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 3,
+     "reason": "many deaths: keep to the engineering record",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "oroville-spillway",
+   "title": "Oroville spillway crisis (2017) / Teton Dam",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "dam",
+    "spillway",
+    "oroville",
+    "teton",
+    "failure"
+   ],
+   "evidenceStrength": "weak",
+   "factors": {
+    "demand": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 2,
+     "reason": "Teton 1.03x, spillway film 0.67x (weak)",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 4,
+     "reason": "California DWR photos and video; Bureau of Reclamation Teton film (PD)",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "Independent Forensic Team report 2018",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "i35w-bridge",
+   "title": "I-35W Minneapolis bridge collapse (2007)",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "bridge",
+    "collapse",
+    "minneapolis",
+    "gusset",
+    "interstate"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 3,
+     "reason": "MacArthur Maze 1.31x (provisional), bridge film 1.52x; I-35W itself inference",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "NTSB report photos/animations (PD); news film copyrighted",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "NTSB HAR-08/03",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "hanford",
+   "title": "Hanford: cleaning up the biggest US nuclear waste site",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "nuclear",
+    "waste",
+    "hanford",
+    "plutonium",
+    "cleanup"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "Fukushima 2.58x, Chernobyl 2.93x (siblings)",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 5,
+     "reason": "DOE Hanford archive: decades of PD film and photos",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 2,
+     "reason": "very technical: heavy research",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "camp-century",
+   "title": "Camp Century, the US base under the Greenland ice",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "military base",
+    "greenland",
+    "ice",
+    "army",
+    "cold war"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 3,
+     "reason": "Real Engineering Greenland base 1.34x; mystery films 2.93x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 5,
+     "reason": "US Army film Camp Century (PD), NARA",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 4,
+     "reason": "Army reports, declassified Project Iceworm papers; verify every claim",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 5,
+     "reason": "a city under the ice, a secret purpose, waste left behind",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "oceanwide-plaza",
+   "title": "Oceanwide Plaza, the abandoned LA skyscraper",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "skyscraper",
+    "abandoned",
+    "los angeles",
+    "unfinished",
+    "tower"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "B1M LA video 154k/day at 7 days (provisional)",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 1,
+     "reason": "almost no free authentic footage: news and photographers own it",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 2,
+     "reason": "news-peg topic, dates fast",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "power-grid",
+   "title": "The US power grid and the 2003 blackout",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "power grid",
+    "blackout",
+    "transmission",
+    "electricity"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 3,
+     "reason": "PE transmission towers 1.57M in 8 days; outlets 1.33x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "diagrams + some DOE/agency photos; little 2003 PD footage",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "US-Canada Task Force final report 2004",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "merrimack-gas",
+   "title": "The 2018 Merrimack Valley gas explosions",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "gas",
+    "explosion",
+    "pressure regulator",
+    "massachusetts",
+    "pipeline"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 4,
+     "reason": "PE pressure regulators 1.68x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "NTSB report diagrams/photos; news film copyrighted",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 2,
+     "reason": "recent, one death, legal settlements: careful wording",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "hoover-dam",
+   "title": "Hoover Dam: how it was poured and why it still works",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "dam",
+    "hoover",
+    "concrete",
+    "colorado river",
+    "megaproject"
+   ],
+   "evidenceStrength": "weak",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 2,
+     "reason": "only weak, indirect evidence",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 1,
+     "reason": "heavily covered",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 5,
+     "reason": "Bureau of Reclamation 1930s film and photos (PD), HAER",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "second-avenue-subway",
+   "title": "Why American subways cost so much (Second Avenue Subway)",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "subway",
+    "new york",
+    "cost",
+    "tunnel",
+    "transit"
+   ],
+   "evidenceStrength": "medium",
+   "factors": {
+    "demand": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 5,
+     "reason": "City Beautiful 4.65x; RMTransit 3.2x",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "MTA Flickr photos (CC BY, check each); little film",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 4,
+     "reason": "NYU Transit Costs Project report; policy-adjacent",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  },
+  {
+   "id": "deep-tunnel",
+   "title": "Chicago's Deep Tunnel flood-control system",
+   "niche": "engineering-disasters-megaprojects",
+   "tags": [
+    "tunnel",
+    "flood",
+    "chicago",
+    "reservoir",
+    "stormwater"
+   ],
+   "evidenceStrength": "weak",
+   "factors": {
+    "demand": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "outliers": {
+     "value": 2,
+     "reason": "retention ponds 2.11x but tunnel films 0.72-0.74x (mixed)",
+     "evidence": "ENGINEERING_MARKET_STUDY.md s8"
+    },
+    "competition": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "usAppeal": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "visuals": {
+     "value": 3,
+     "reason": "MWRD photos; little free film",
+     "evidence": ""
+    },
+    "reliability": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "advertiserFit": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "effort": {
+     "value": 4,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "evergreen": {
+     "value": 5,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    },
+    "narrative": {
+     "value": 3,
+     "reason": "Boss reading (opinion)",
+     "evidence": ""
+    }
+   }
+  }
+ ]
+}

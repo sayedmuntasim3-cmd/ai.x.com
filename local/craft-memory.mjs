@@ -14,6 +14,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { msg } from "../engine/src/messages.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
@@ -161,4 +162,28 @@ function main() {
   return 0;
 }
 
-process.exitCode = main();
+/**
+ * One finished film into a ledger file (the voiceover path calls this after a render). A ledger that cannot
+ * be written never stops a film: the lines say so. Returns the lines to print, each in English and Bangla.
+ * @param {{ file: string, filmId: string, report: any, genre?: string, at?: string }} o
+ * @returns {string[]}
+ */
+export function recordFilm(o) {
+  /** @param {string} code @param {Record<string, any>} [params] */
+  const both = (code, params = {}) => { const m = msg(code, params); return `${m.en}\n${m.bn}`; };
+  try {
+    const { ledger, notes } = existsSync(o.file) ? parseLedger(readFileSync(o.file, "utf8")) : { ledger: emptyLedger(), notes: [] };
+    const made = recordFromReport({ filmId: o.filmId, report: o.report, genre: o.genre, at: o.at ?? new Date().toISOString() });
+    const lines = [...notes, ...made.notes].map((n) => both(n.code, n.params ?? {}));
+    if (!made.ok) return lines;
+    const { ledger: next } = addRecord(ledger, made.record);
+    mkdirSync(dirname(o.file), { recursive: true });
+    writeFileSync(o.file, ledgerJson(next));
+    lines.push(both("craft.added", { filmId: made.record.filmId, genre: made.record.genre, verdict: made.record.verdict, seconds: made.record.seconds, films: next.films.length }));
+    return lines;
+  } catch (error) {
+    return [both("craft.recordFailed", { why: error instanceof Error ? error.message : String(error) })];
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main();

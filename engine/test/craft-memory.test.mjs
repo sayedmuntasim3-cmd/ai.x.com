@@ -319,3 +319,33 @@ test("an audience survives a re-measure and a shelf-to-shelf write", () => {
   assert.equal(reread.films[0].audience?.end, 28);
   assert.equal(addAudience(ledger, { filmId: "missing", retention: { at30: 50, end: 30 } }).ok, false);
 });
+
+test("the shot plan's rhythm only gets tighter from the ledger", async () => {
+  const { rhythmFrom, ledgerGenre, calibratedDoctrine, craftReport } = await import("../src/craft-memory.mjs");
+  assert.equal(ledgerGenre("documentary"), "default");
+  assert.equal(ledgerGenre("History"), "history");
+  const plan = { target: 4.5, median: /** @type {[number, number]} */ ([2.5, 6]), max: 8 };
+  assert.deepEqual(rhythmFrom(null, plan), { ...plan, from: "plan" });
+  // History doctrine (3-7 s, 9 s longest) over a 2.5-6 s plan: the overlap 3-6, the plan's own 8 s cap.
+  const house = rhythmFrom(calibratedDoctrine(emptyLedger(), "history"), plan);
+  assert.deepEqual(house, { target: 4.5, median: [3, 6], max: 8, from: "doctrine" });
+  // Three passing films that cut fast teach a tighter band and a shorter hold.
+  let ledger = emptyLedger();
+  for (let i = 0; i < 3; i += 1) {
+    ledger = addRecord(ledger, { version: 1, filmId: `f${i}`, genre: "history", at: `2026-11-2${i}T00:00:00Z`, seconds: 180, verdict: "pass", measures: { movingShare: 0.8, designedPerMinute: 2, avgShot: 3, narrationCoverage: 1, cutsIn30: 9, longestShot: 6, cueCoverage: 0.9, subtitleGap: 2 } }).ledger;
+  }
+  const learned = rhythmFrom(calibratedDoctrine(ledger, "history"), plan);
+  assert.equal(learned.from, "learned");
+  assert.ok(learned.median[0] >= plan.median[0] && learned.median[1] <= plan.median[1]);
+  assert.ok(learned.max <= plan.max && learned.max >= learned.median[1]);
+  assert.ok(learned.target >= learned.median[0] && learned.target <= learned.median[1]);
+  // A sloppy ledger (slow films) never loosens the plan.
+  let slow = emptyLedger();
+  for (let i = 0; i < 3; i += 1) slow = addRecord(slow, { version: 1, filmId: `s${i}`, genre: "history", at: `2026-11-2${i}T00:00:00Z`, seconds: 180, verdict: "pass", measures: { movingShare: 0.5, designedPerMinute: 0.6, avgShot: 11, narrationCoverage: 0.9, cutsIn30: 2, longestShot: 19, cueCoverage: 0.5, subtitleGap: 7 } }).ledger;
+  const loose = rhythmFrom(calibratedDoctrine(slow, "history"), plan);
+  assert.ok(loose.median[1] <= plan.median[1] && loose.max <= plan.max);
+  const rep = craftReport({ movingShare: 0.8, designedPerMinute: 2, avgShot: 3, narrationCoverage: 1, cutsIn30: 9, longestShot: 6, cueCoverage: 0.9, subtitles: { maxGap: 2 } }, calibratedDoctrine(ledger, "history"));
+  assert.equal(rep.index, 100);
+  assert.deepEqual(rep.below, []);
+  assert.equal(rep.films, 3);
+});
