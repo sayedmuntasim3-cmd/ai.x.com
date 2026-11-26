@@ -68,7 +68,9 @@ for; the pictures are search phrases for Wikimedia Commons, not file names.
    take per scene, with word-level timings for the captions.
 4. **Render** — `render/render-film.mjs`, the one renderer: stills move, sound
    design and the mix are synthesised, captions and the licence report come out
-   beside the MP4.
+   beside the MP4. Designed cards are drawn by a real browser when Playwright
+   and its system libraries are present; pass `--no-graphics` on a machine
+   without them and ffmpeg draws the same cards instead.
 
 ## The day's ten
 

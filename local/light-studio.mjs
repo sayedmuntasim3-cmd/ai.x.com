@@ -525,7 +525,7 @@ export function runCommand(command, argv) {
 /**
  * One card to one film: run folder, pictures, voice, MP4, credits.
  * @param {any} card
- * @param {{ out?: string, render?: boolean, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, luma?: (url: string) => Promise<number | null> }} [o]
+ * @param {{ out?: string, render?: boolean, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, graphics?: boolean, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, luma?: (url: string) => Promise<number | null> }} [o]
  */
 export async function makeFilm(card, o = {}) {
   const log = o.log ?? (() => {});
@@ -552,14 +552,14 @@ export async function makeFilm(card, o = {}) {
   const voiceDir = join(dir, "voice");
   await exec(process.execPath, [join(ROOT, "render/narrate.mjs"), "--run", dir, "--out", voiceDir, "--preset", card.voicePreset ?? "historical", "--python", o.python ?? "python3", ...(o.models ? ["--models", o.models] : [])]);
   const out = join(dir, "film.mp4");
-  await exec(process.execPath, [join(ROOT, "render/render-film.mjs"), "--run", dir, "--voice", voiceDir, "--out", out, "--width", String(o.width ?? 1280), "--height", String(o.height ?? 720), "--fps", String(o.fps ?? 30), ...(o.font ? ["--font", o.font] : [])]);
+  await exec(process.execPath, [join(ROOT, "render/render-film.mjs"), "--run", dir, "--voice", voiceDir, "--out", out, "--width", String(o.width ?? 1280), "--height", String(o.height ?? 720), "--fps", String(o.fps ?? 30), ...(o.font ? ["--font", o.font] : []), ...(o.graphics === false ? ["--no-graphics"] : [])]);
   return { dir, out, media, credits, rendered: true, seconds: run.seconds };
 }
 
 /**
  * A queue of cards, under the daily cap: what is left of today's ten, in the
  * order the queue gives them.
- * @param {any[]} cards @param {{ dir?: string, limit?: number, force?: boolean, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, luma?: (url: string) => Promise<number | null>, now?: Date, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, render?: boolean }} [o]
+ * @param {any[]} cards @param {{ dir?: string, limit?: number, force?: boolean, log?: (l: string) => void, exec?: (c: string, a: string[]) => Promise<void>, provider?: any, luma?: (url: string) => Promise<number | null>, now?: Date, python?: string, models?: string, width?: number, height?: number, fps?: number, font?: string, graphics?: boolean, render?: boolean }} [o]
  */
 export async function makeQueue(cards, o = {}) {
   const log = o.log ?? (() => {});
@@ -594,11 +594,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     options: {
       card: { type: "string" }, queue: { type: "string" }, out: { type: "string" }, limit: { type: "string" },
       width: { type: "string" }, height: { type: "string" }, fps: { type: "string" }, font: { type: "string" },
-      python: { type: "string" }, models: { type: "string" }, "skip-render": { type: "boolean" }, force: { type: "boolean" },
+      python: { type: "string" }, models: { type: "string" }, "skip-render": { type: "boolean" }, "no-graphics": { type: "boolean" }, force: { type: "boolean" },
     },
   });
   const log = (/** @type {string} */ line) => console.log(line);
-  const shared = { python: values.python, models: values.models, width: Number(values.width ?? 1280), height: Number(values.height ?? 720), fps: Number(values.fps ?? 30), font: values.font, render: values["skip-render"] !== true, force: values.force === true, log };
+  const shared = { python: values.python, models: values.models, width: Number(values.width ?? 1280), height: Number(values.height ?? 720), fps: Number(values.fps ?? 30), font: values.font, graphics: values["no-graphics"] !== true, render: values["skip-render"] !== true, force: values.force === true, log };
   if (values.card) {
     const card = JSON.parse(readFileSync(resolve(values.card), "utf8"));
     const made = await makeFilm(card, { ...shared, out: values.out ? resolve(values.out) : undefined });
@@ -610,7 +610,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const result = await makeQueue(cards, { ...shared, limit: Number(values.limit ?? LIGHT_LIMITS.dailyFilms) });
     console.log(`made ${result.done.length} today; the day's cap allows ${LIGHT_LIMITS.dailyFilms}.`);
   } else {
-    console.error("Usage: node local/light-studio.mjs (--card <card.json> | --queue <queue.json>) [--out <folder>] [--limit 10] [--width 1280 --height 720] [--skip-render] [--force]");
+    console.error("Usage: node local/light-studio.mjs (--card <card.json> | --queue <queue.json>) [--out <folder>] [--limit 10] [--width 1280 --height 720] [--skip-render] [--no-graphics] [--force]");
     process.exit(2);
   }
 }
