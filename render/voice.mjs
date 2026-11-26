@@ -19,6 +19,8 @@ import { fileURLToPath } from "node:url";
 import { parseSceneLines } from "../engine/src/scene-lines.mjs";
 import { ELEVENLABS_MODELS } from "../engine/src/voice-plan.mjs";
 import { lookFor } from "../engine/src/formats.mjs";
+import { placeholderTokens, pricedClaims, resolvePlaceholders } from "../engine/src/claim-values.mjs";
+import { msg } from "../engine/src/messages.mjs";
 import { loadRunFiles, loadRunText } from "./render-film.mjs";
 
 const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/;
@@ -33,20 +35,39 @@ const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/;
 
 /**
  * The lines to record, in film order, each with its neighbours as context.
- * @param {{ markdown: string }[]} chapters
- * @returns {{ lines: VoiceLine[], skipped: { scene: string, reason: string }[] }}
+ * A scene whose number was never priced is not recorded (the voice must never
+ * read a placeholder), but it is never dropped quietly either: it comes back in
+ * `unresolved`, which the callers report and fail on. With `claims` (the run's
+ * own claim-values.json, read by pricedClaims) a placeholder is filled here, as
+ * a fallback, so a number the fill step missed still gets its words.
+ * @param {{ markdown: string }[]} chapters @param {{ claims?: Record<string, any> | null }} [o]
+ * @returns {{ lines: VoiceLine[], skipped: { scene: string, reason: string }[], unresolved: { scene: string, tokens: string[] }[], filled: number }}
  */
-export function voiceLines(chapters) {
+export function voiceLines(chapters, o = {}) {
   const scenes = chapters.flatMap((c) => parseSceneLines(c.markdown)).filter((s) => !s.wordless);
   /** @type {VoiceLine[]} */
   const lines = [];
   /** @type {{ scene: string, reason: string }[]} */
   const skipped = [];
+  /** @type {{ scene: string, tokens: string[] }[]} */
+  const unresolved = [];
+  let filled = 0;
   scenes.forEach((s, i) => {
-    if (PLACEHOLDER.test(s.narration)) { skipped.push({ scene: s.sc, reason: `unresolved number ${s.narration.match(PLACEHOLDER)?.[0]}` }); return; }
-    lines.push({ scene: s.sc, text: s.narration, previous: scenes[i - 1]?.narration.slice(-300) ?? "", next: scenes[i + 1]?.narration.slice(0, 300) ?? "", ...(s.fields.DELIVERY ? { delivery: s.fields.DELIVERY } : {}) });
+    let text = s.narration;
+    if (PLACEHOLDER.test(text)) {
+      const fix = o.claims ? resolvePlaceholders(text, o.claims, { spoken: true }) : null;
+      if (!fix || fix.unresolved.length) {
+        const tokens = fix ? fix.unresolved : placeholderTokens(text);
+        skipped.push({ scene: s.sc, reason: `unresolved number ${text.match(PLACEHOLDER)?.[0]}` });
+        unresolved.push({ scene: s.sc, tokens: [...new Set(tokens)] });
+        return;
+      }
+      text = fix.text;
+      filled += 1;
+    }
+    lines.push({ scene: s.sc, text, previous: scenes[i - 1]?.narration.slice(-300) ?? "", next: scenes[i + 1]?.narration.slice(0, 300) ?? "", ...(s.fields.DELIVERY ? { delivery: s.fields.DELIVERY } : {}) });
   });
-  return { lines, skipped };
+  return { lines, skipped, unresolved, filled };
 }
 
 /** ElevenLabs v3: the expressive model that reads [bracketed] delivery tags as performance. */
@@ -228,7 +249,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
   const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
   const chapters = await loadRunFiles(from);
-  const { lines, skipped } = voiceLines(chapters);
+  // The run's priced numbers (claim-values.json), so a placeholder the fill step missed is still spoken as words.
+  /** @type {Record<string, any> | null} */
+  let claims = null;
+  try {
+    const priced = await loadRunText(from, "claim-values.json");
+    if (priced) claims = pricedClaims(JSON.parse(priced));
+  } catch { claims = null; }
+  const { lines, skipped, unresolved, filled } = voiceLines(chapters, { claims });
+  if (filled) console.log(`numbers filled from claim-values.json: ${filled} scene(s)`);
   for (const s of skipped) console.warn(`${s.scene}: not recorded (${s.reason})`);
   // Stories and motivation read with v3 and its delivery tags (owner's decision, 4 Nov 2026); documentaries keep the version's model.
   const film = JSON.parse((await loadRunText(from, "film.json")) ?? (await loadRunText(from, "run.json")) ?? "{}");
@@ -238,6 +267,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const lexicon = parseLexicon((await loadRunText(from, "s4.md")) ?? "");
   if (lexicon.length) console.log(`pronunciation lexicon: ${lexicon.length} names`);
   const r = await recordVoice({ apiKey, voiceId: args["voice-id"], versionId: args.version, modelId, outDir: args.out, lines, lexicon, concurrency: Number(args.concurrency ?? 2), log: (l) => console.log(l) });
-  console.log(JSON.stringify({ ...r, skipped: skipped.length }, null, 1));
-  if (r.failed.length) process.exit(1);
+  console.log(JSON.stringify({ ...r, skipped: skipped.length, unresolved }, null, 1));
+  if (unresolved.length) {
+    const line = { count: unresolved.length, scenes: unresolved.map((u) => u.scene).join(", ") };
+    console.error(msg("voice.unresolved", line).en);
+    console.error(msg("voice.unresolved", line).bn);
+  }
+  if (r.failed.length || unresolved.length) process.exit(1);
 }
