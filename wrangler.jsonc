@@ -20,6 +20,9 @@
   // 2026). Research then runs through the code desk (worker/index.mjs researchDesk).
   "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60", "GEMINI_SEARCH": "off", "GITHUB_REPO": "sayedmuntasim3-cmd/ai.x.com", "SITE_URL": "https://ai-x-com.sayedmuntasim3.workers.dev" },
   "observability": { "enabled": true },
+  // The daily film (worker/index.mjs scheduled): 10:23 UTC every day starts the next engineering topic
+  // (worker/daily-film.mjs) on GitHub Actions (daily-film.yml). Free; var DAILY_FILM=off stops it.
+  "triggers": { "crons": ["23 10 * * *"] },
   // Run the Worker (and its film Workflow) in Google Cloud's us-central1, where the Gemini API is
   // offered. At the owner's nearest Cloudflare location Gemini answered "User location is not
   // supported for the API use" (19 Nov 2026).

@@ -286,3 +286,57 @@ test("the Craft Ledger: the runner reads it and records the film; the audience h
   const unknown = await ledgerAudience(bucket, "99999999-2222-3333-4444-555555555555", { at30: 70, end: 35, curve }, "2026-11-26T00:00:00Z");
   assert.equal(unknown?.code, "craft.noFilm");
 });
+
+test("the daily film: one a day, the next unused topic, the brain and the voice through the runner's ticket", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r", GROQ_API_KEY: "groq", GEMINI_API_KEY: "gem", GEMINI_POOL: "off" };
+  /** @type {any[]} */
+  const calls = [];
+  const net = async (/** @type {string} */ u, /** @type {any} */ init) => {
+    calls.push({ u, body: init?.body ? JSON.parse(init.body) : null });
+    if (u.includes("api.github.com")) return new Response(null, { status: 204 });
+    if (u.includes("api.groq.com")) return new Response(JSON.stringify({ choices: [{ message: { content: "Part one words." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 3 } }), { status: 200 });
+    return new Response("{}", { status: 500 });
+  };
+  assert.equal((await call(env, "POST", "/api/voice/daily", {})).status, 401);
+  const t0 = Date.parse("2026-11-26T10:23:00Z");
+  const started = await call(env, "POST", "/api/voice/daily", { headers: OWNER, fetch: net, now: () => t0 });
+  assert.equal(started.status, 202);
+  assert.equal(started.data.topic, "tacoma-narrows-1940");
+  const gh = calls.find((c) => c.u.includes("daily-film.yml/dispatches"));
+  assert.equal(gh.body.inputs.topic_id, "tacoma-narrows-1940");
+  assert.equal(gh.body.inputs.voice_id, ID);
+  const ticket = gh.body.inputs.ticket;
+  // One a day: a second start the same day is refused.
+  assert.equal((await call(env, "POST", "/api/voice/daily", { headers: OWNER, fetch: net, now: () => t0 + 3600_000 })).status, 409);
+
+  // The brain: only with this film's ticket; Groq answers first.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/brain`, { body: { prompt: "x" } })).status, 401);
+  const brain = await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { system: "s", prompt: "Write part one.", maxTokens: 900 }, fetch: net, now: () => t0 });
+  assert.equal(brain.status, 200);
+  assert.equal(brain.data.text, "Part one words.");
+  assert.equal(brain.data.model, "openai/gpt-oss-120b");
+
+  // The voice goes up in pieces with the ticket; complete starts the voiceover film.
+  const audio = new Uint8Array(4096).map((_, i) => i % 7);
+  const opened = await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: audio.byteLength }, now: () => t0 });
+  assert.deepEqual(opened.data, { partSize: PART_SIZE, parts: 1 });
+  const p1 = await call(env, "PUT", `/api/voice/${ID}/parts/1?ticket=${ticket}`, { body: audio, now: () => t0 });
+  const done = await call(env, "POST", `/api/voice/${ID}/complete?ticket=${ticket}`, { body: { parts: [p1.data] }, fetch: net, now: () => t0 });
+  assert.equal(done.status, 202);
+  const vf = calls.filter((c) => c.u.includes("voice-film.yml/dispatches")).at(-1);
+  assert.equal(vf.body.inputs.ext, "mp3");
+  assert.match(vf.body.inputs.topic, /Tacoma Narrows/);
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: 4096 }, now: () => t0 })).status, 409);
+
+  // The next day: the next topic (Tacoma has its voice, never repeated).
+  const next = await call(env, "POST", "/api/voice/daily", { headers: OWNER, fetch: net, now: () => t0 + 24 * 3600_000 });
+  assert.equal(next.data.topic, "st-francis-dam");
+});
+
+test("an uploaded voice's runner ticket cannot use the daily film's brain or voice routes", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GROQ_API_KEY: "groq" };
+  const created = await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "a.mp3", bytes: 2000 } });
+  const ticket = await makeTicket("owner-token", created.data.id, "runner", 3600);
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { prompt: "x" } })).status, 401);
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: 2000 } })).status, 401);
+});

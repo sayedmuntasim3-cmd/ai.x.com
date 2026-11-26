@@ -166,6 +166,8 @@ export const MESSAGES = Object.freeze({
   "revise.limit": { en: (p) => `The revision limit (${p.max}) is reached; what is still wrong stays listed.`, bn: (p) => `সংশোধনের সীমা (${p.max}) শেষ; যা এখনো ঠিক হয়নি তা তালিকায় থাকছে।` },
 
   // Voice system: intake, words, understanding, pictures
+  "voice.stage.script": { en: (p) => `Daily film: the script is written (${p.words} words, ${p.chapters} chapters, facts from ${p.source}).`, bn: (p) => `দৈনিক ফিল্ম: স্ক্রিপ্ট লেখা হয়েছে (${p.words} শব্দ, ${p.chapters}টি অধ্যায়, তথ্যের উৎস ${p.source})।` },
+  "voice.stage.narrate": { en: (p) => `Daily film: the free narrator read the script (${p.minutes} min).`, bn: (p) => `দৈনিক ফিল্ম: ফ্রি ন্যারেটর স্ক্রিপ্টটি পড়েছে (${p.minutes} মিনিট)।` },
   "voice.stage.uploaded": { en: (p) => `Recording received (${p.mb} MB). It stays private.`, bn: (p) => `রেকর্ডিং পাওয়া গেছে (${p.mb} MB)। এটি প্রাইভেট থাকবে।` },
   "voice.stage.marked": { en: (p) => `The reviewer (${p.by}) marked ${p.count} ayah ends; the film is made again with them, and the verbatim text is shown on those times.`, bn: (p) => `রিভিউয়ার (${p.by}) ${p.count}টি আয়াতের শেষ চিহ্নিত করেছেন; সেই সময় ধরে ফিল্ম আবার বানানো হচ্ছে, আর হুবহু আয়াতের লেখা সেই সময়ে দেখানো হবে।` },
   "voice.stage.queued": { en: () => "Waiting for a free film machine.", bn: () => "একটি ফাঁকা ফিল্ম মেশিনের অপেক্ষায়।" },

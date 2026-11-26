@@ -41,7 +41,7 @@ const endpoint = (c, path) => `${c.site}/api/voice/${c.id}${path}${path.includes
  * POST JSON to the Worker, retried a few times on a network error or a 5xx.
  * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} path @param {unknown} body @param {string} [method]
  */
-async function send(c, path, body, method = "POST") {
+export async function send(c, path, body, method = "POST") {
   const get = c.fetch ?? fetch;
   let last = "";
   for (let attempt = 1; attempt <= 4; attempt += 1) {
@@ -111,7 +111,18 @@ export function summarizeRun(dir) {
 export async function deliver(c, file, o) {
   const bytes = statSync(file).size;
   await send(c, "/progress", { stage: "deliver" });
-  const opened = await send(c, "/film", { bytes });
+  const parts = await uploadParts(c, file, await send(c, "/film", { bytes }), "/film/parts");
+  await send(c, "/film/complete", { parts, seconds: o.seconds });
+  const minutes = o.seconds ? Math.max(1, Math.round(o.seconds / 60)) : 0;
+  await send(c, "/progress", { stage: "done", params: { minutes, ...(o.review ? { review: 1 } : {}) }, ...(o.report ? { report: o.report } : {}) });
+}
+
+/**
+ * Send a file in the pieces an opened upload asked for; returns the parts for "complete".
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} file @param {{ partSize?: number, parts: number }} opened @param {string} path
+ */
+async function uploadParts(c, file, opened, path) {
+  const bytes = statSync(file).size;
   const size = Number(opened.partSize) || PART_SIZE;
   const fh = await open(file, "r");
   const parts = [];
@@ -123,17 +134,24 @@ export async function deliver(c, file, o) {
       const get = c.fetch ?? fetch;
       let done = null;
       for (let attempt = 1; attempt <= 4 && !done; attempt += 1) {
-        const res = await get(endpoint(c, `/film/parts/${n}`), { method: "PUT", body: buf }).catch(() => null);
+        const res = await get(endpoint(c, `${path}/${n}`), { method: "PUT", body: buf }).catch(() => null);
         if (res?.ok) done = await res.json();
         else await new Promise((r) => setTimeout(r, 3000 * attempt));
       }
-      if (!done) throw new Error(`piece ${n} of the film could not be sent`);
+      if (!done) throw new Error(`piece ${n} of ${file} could not be sent`);
       parts.push({ partNumber: done.partNumber, etag: done.etag });
     }
   } finally { await fh.close(); }
-  await send(c, "/film/complete", { parts, seconds: o.seconds });
-  const minutes = o.seconds ? Math.max(1, Math.round(o.seconds / 60)) : 0;
-  await send(c, "/progress", { stage: "done", params: { minutes, ...(o.review ? { review: 1 } : {}) }, ...(o.report ? { report: o.report } : {}) });
+  return parts;
+}
+
+/**
+ * The daily film's narration goes up as the recording; "complete" starts voice-film.yml for it (the Worker).
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} file
+ */
+export async function sendVoice(c, file) {
+  const parts = await uploadParts(c, file, await send(c, "/voice", { bytes: statSync(file).size }), "/parts");
+  return send(c, "/complete", { parts });
 }
 
 async function main() {
@@ -165,6 +183,10 @@ async function main() {
       const done = await ledger(c, { out: String(a.out) });
       console.log(`craft ledger: ${done.films} film(s) read`);
     }
+  } else if (a._ === "voice") {
+    // node render/voice-runner.mjs voice --file narration.mp3   (the daily film's narration; the Worker starts the film)
+    const r = await sendVoice(c, String(a.file));
+    console.log(`voice sent; the voiceover film is ${r.status ?? "started"}${r.run?.actionsUrl ? ` (${r.run.actionsUrl})` : ""}`);
   } else if (a._ === "deliver") {
     const report = typeof a.report === "string" && existsSync(a.report) ? JSON.parse(readFileSync(a.report, "utf8")) : null;
     // Quran: the located ayat, so the studio can ask the reviewer for one tap at each ayah end.

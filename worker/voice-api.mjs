@@ -19,6 +19,9 @@
  *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed with the Worker's own key (free; the key never leaves Cloudflare)   (ticket, or Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/film             the finished MP4   (?ticket= from GET /api/voice/:id, or Bearer STUDIO_TOKEN)
+ *   POST /api/voice/daily                start today's daily film (the next unused topic; also the Worker's daily cron)   (Bearer STUDIO_TOKEN)
+ *   POST /api/voice/:id/brain            { system, prompt, maxTokens } one script call through the free brain (Groq, then Gemini)   (ticket, daily film only)
+ *   POST /api/voice/:id/voice            { bytes } -> open the upload of the daily film's narration; then parts/:n and complete   (ticket, daily film only)
  *   GET  /api/voice/:id/ledger           the channel's Craft Ledger (R2 channel/craft-ledger.json), for the next film's targets   (ticket, or Bearer STUDIO_TOKEN)
  *   POST /api/voice/:id/ledger           { report, genre? } the finished film's critic measures, recorded under this id   (ticket, or Bearer STUDIO_TOKEN)
  *
@@ -30,6 +33,8 @@
 import { msg } from "../engine/src/messages.mjs";
 import { checkMarks } from "../engine/src/quran-marks.mjs";
 import { addAudience, addRecord, emptyLedger, ledgerJson, parseLedger, recordFromReport } from "../engine/src/craft-memory.mjs";
+import { brainFromEnv } from "./brain.mjs";
+import { nextDailyTopic } from "./daily-film.mjs";
 
 /** The Craft Ledger's one home: next to channel/lessons.json, one ledger for every film of the channel. */
 export const LEDGER_KEY = "channel/craft-ledger.json";
@@ -88,7 +93,7 @@ export const DOWNLOAD_TICKET_SECONDS = 2 * 3600;
 const AUDIO_TYPES = /** @type {const} */ ({ mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac", flac: "audio/flac", ogg: "audio/ogg", opus: "audio/opus", webm: "audio/webm" });
 const ID = /^[0-9a-f-]{36}$/;
 /** The stages the runner reports, in order (each has a message voice.stage.<stage>). */
-export const VOICE_STAGES = /** @type {const} */ (["uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
+export const VOICE_STAGES = /** @type {const} */ (["script", "narrate", "uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
 
 /** @param {unknown} body @param {number} [status] */
 function json(body, status = 200) {
@@ -208,23 +213,65 @@ function publicView(rec) {
 
 /**
  * Start the "Voiceover film" GitHub workflow for an uploaded recording.
- * @param {{ token: string, repo: string, rec: any, site: string, ticket: string, ref?: string, fetch?: typeof fetch }} o
+ * @param {{ token: string, repo: string, rec: any, site: string, ticket: string, ref?: string, workflow?: "voice-film.yml" | "daily-film.yml", fetch?: typeof fetch }} o
  * @returns {Promise<{ ok: true, actionsUrl: string } | { ok: false, error: string }>}
  */
 export async function dispatchVoiceFilm(o) {
+  const inputs = o.workflow === "daily-film.yml"
+    ? { voice_id: o.rec.id, site: o.site, ticket: o.ticket, topic_id: o.rec.daily?.topicId ?? "" }
+    : { voice_id: o.rec.id, site: o.site, ticket: o.ticket, kind: o.rec.kind, ext: o.rec.ext, topic: o.rec.topic || "", quran: o.rec.kind === "quran" ? JSON.stringify({ surah: o.rec.surah, ayat: o.rec.ayat || "", reciter: o.rec.reciter || "", ...(o.rec.marks ? { marks: o.rec.marks } : {}) }) : "" };
+  return dispatchWorkflow(o, o.workflow ?? "voice-film.yml", inputs);
+}
+
+/**
+ * Start one GitHub workflow of this repository with its inputs.
+ * @param {{ token: string, repo: string, site: string, ref?: string, fetch?: typeof fetch }} o @param {string} workflow @param {Record<string, string>} inputs
+ * @returns {Promise<{ ok: true, actionsUrl: string } | { ok: false, error: string }>}
+ */
+async function dispatchWorkflow(o, workflow, inputs) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(o.repo)) return { ok: false, error: "GITHUB_REPO must look like owner/name." };
   if (!/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$/.test(o.site)) return { ok: false, error: "Bad site address." };
-  const inputs = { voice_id: o.rec.id, site: o.site, ticket: o.ticket, kind: o.rec.kind, ext: o.rec.ext, topic: o.rec.topic || "", quran: o.rec.kind === "quran" ? JSON.stringify({ surah: o.rec.surah, ayat: o.rec.ayat || "", reciter: o.rec.reciter || "", ...(o.rec.marks ? { marks: o.rec.marks } : {}) }) : "" };
   const get = o.fetch ?? fetch;
-  const res = await get(`https://api.github.com/repos/${o.repo}/actions/workflows/voice-film.yml/dispatches`, {
+  const res = await get(`https://api.github.com/repos/${o.repo}/actions/workflows/${workflow}/dispatches`, {
     method: "POST",
     headers: { authorization: `Bearer ${o.token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "zupona-studio", "content-type": "application/json" },
     body: JSON.stringify({ ref: o.ref ?? "main", inputs }),
   });
-  if (res.status === 204 || res.status === 200) return { ok: true, actionsUrl: `https://github.com/${o.repo}/actions/workflows/voice-film.yml` };
+  if (res.status === 204 || res.status === 200) return { ok: true, actionsUrl: `https://github.com/${o.repo}/actions/workflows/${workflow}` };
   const detail = (await res.text()).slice(0, 300);
   const why = res.status === 401 ? "the GitHub token is wrong or expired" : res.status === 403 ? "the GitHub token lacks Actions write permission" : res.status === 404 ? "the workflow is not on that branch yet (merge it into main) or the repository name is wrong" : `GitHub answered ${res.status}`;
   return { ok: false, error: `Film not started: ${why}. ${detail}`.trim() };
+}
+
+/** A daily film that was started this long ago and never got its voice may be started again. */
+export const DAILY_RETRY_MS = 20 * 3600 * 1000;
+
+/**
+ * Start today's daily film: the next topic no earlier daily film has voiced, a record for it, and the
+ * daily-film workflow (script, narration, then the voiceover pipeline). One a day: a film started in
+ * the last 20 hours that has not failed is left alone. Used by the Worker's cron and POST /api/voice/daily.
+ * @param {any} env @param {{ fetch?: typeof fetch, now?: () => number, uuid?: () => string, site?: string }} [deps]
+ * @returns {Promise<{ ok: true, id: string, topic: string, actionsUrl: string } | { ok: false, skipped?: boolean, error: string }>}
+ */
+export async function startDailyFilm(env, deps = {}) {
+  if (!env.FILMS || !env.STUDIO_TOKEN) return { ok: false, error: "The daily film needs the FILMS bucket and the STUDIO_TOKEN secret." };
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return { ok: false, error: "GitHub is not connected (GITHUB_TOKEN secret, GITHUB_REPO var), so the daily film cannot start." };
+  const now = deps.now ?? Date.now;
+  const listed = await env.FILMS.list({ prefix: "voice/", delimiter: "/" });
+  const ids = (listed.delimitedPrefixes ?? []).map((/** @type {string} */ p) => p.split("/")[1]).filter((/** @type {string} */ id) => ID.test(id));
+  const daily = (await Promise.all(ids.map((/** @type {string} */ id) => load(env.FILMS, id)))).filter((r) => r?.daily?.topicId);
+  const recent = daily.find((r) => now() - Date.parse(r.createdAt) < DAILY_RETRY_MS && statusOf(r) !== "failed");
+  if (recent) return { ok: false, skipped: true, error: `Today's daily film is already under way (${recent.id}, ${recent.daily.topicId}).` };
+  const topic = nextDailyTopic(daily.filter((r) => r.uploaded).map((r) => r.daily.topicId));
+  if (!topic) return { ok: false, error: "Every topic in the daily queue (worker/daily-film.mjs) has a film; add more topics." };
+  const id = (deps.uuid ?? (() => crypto.randomUUID()))();
+  const rec = { id, kind: "narration", ext: "mp3", fileName: `${topic.id}.mp3`, bytes: 0, topic: topic.title, surah: null, ayat: "", reciter: "", audioKey: `voice/${id}/audio.mp3`, daily: { topicId: topic.id }, createdAt: new Date(now()).toISOString(), progress: [] };
+  const site = deps.site || env.SITE_URL;
+  const started = await dispatchVoiceFilm({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPO, rec, site, ticket: await makeTicket(env.STUDIO_TOKEN, id, "runner", RUNNER_TICKET_SECONDS, now()), ref: env.GITHUB_REF || "main", workflow: "daily-film.yml", fetch: deps.fetch });
+  rec.progress.push(progressEntry("queued", {}, started.ok ? undefined : started.error));
+  if (started.ok) rec.run = { actionsUrl: started.actionsUrl };
+  await save(env.FILMS, rec);
+  return started.ok ? { ok: true, id, topic: topic.id, actionsUrl: started.actionsUrl } : { ok: false, error: started.error };
 }
 
 /**
@@ -267,6 +314,12 @@ export async function handleVoice(request, env, url, deps = {}) {
     return json({ error: "Not found." }, 404);
   }
 
+  if (parts[0] === "daily" && parts.length === 1 && method === "POST") {
+    if (!owner) return json({ error: "Wrong studio token." }, 401);
+    const r = await startDailyFilm(env, { fetch: deps.fetch, now, uuid: deps.uuid, site: env.SITE_URL || url.origin });
+    return json(r, r.ok ? 202 : r.skipped ? 409 : 502);
+  }
+
   const id = parts[0];
   if (!ID.test(id)) return json({ error: "Not found." }, 404);
   const rec = await load(bucket, id);
@@ -289,12 +342,46 @@ export async function handleVoice(request, env, url, deps = {}) {
     return json(publicView(r), started.ok ? 202 : 502);
   };
   const sub = parts.slice(1).join("/");
+  /** The daily film's runner writes and voices the film itself, so it may also send the recording. */
+  const dailyRunner = Boolean(runner && rec.daily);
+
+  // The daily film's script: one call to the free brain (Groq first, then the Gemini pool), with the Worker's own keys.
+  if (sub === "brain" && method === "POST") {
+    if (!dailyRunner) return json({ error: "Wrong ticket." }, 401);
+    const body = /** @type {any} */ (await request.json().catch(() => null));
+    const system = String(body?.system ?? "").slice(0, 20000);
+    const prompt = String(body?.prompt ?? "").slice(0, 60000);
+    if (!prompt) return json({ error: "Send the prompt." }, 400);
+    const brain = brainFromEnv(env, { fetch: deps.fetch });
+    if (!brain.ok) return json({ error: brain.error }, 503);
+    try {
+      const r = await brain.model.call({ stage: "daily-script", system: [{ text: system }], messages: [{ role: "user", content: [{ text: prompt }] }], maxTokens: Math.min(Math.max(Number(body?.maxTokens) || 2000, 256), 8000) });
+      return json({ text: r.text, model: r.model ?? brain.model.name, stopReason: r.stopReason, usage: r.usage ?? null });
+    } catch (error) {
+      // The brains' own words (a daily limit, a busy minute), as 429 so the runner itself decides to wait or stop.
+      return json({ error: error instanceof Error ? error.message.slice(0, 600) : String(error) }, 429);
+    }
+  }
+
+  // The daily film's narration, made on the runner, goes up like an uploaded voice; complete starts voice-film.yml.
+  if (sub === "voice" && method === "POST") {
+    if (!dailyRunner) return json({ error: "Wrong ticket." }, 401);
+    if (rec.uploaded) return json({ error: "This daily film already has its voice." }, 409);
+    const bytes = Number((/** @type {any} */ (await request.json().catch(() => null)))?.bytes);
+    if (!Number.isInteger(bytes) || bytes < 1024 || bytes > MAX_AUDIO_BYTES) return json({ error: "bytes must be the narration's size." }, 400);
+    if (rec.uploadId) await bucket.resumeMultipartUpload(rec.audioKey, rec.uploadId).abort().catch(() => {});
+    const upload = await bucket.createMultipartUpload(rec.audioKey, { httpMetadata: { contentType: AUDIO_TYPES.mp3 } });
+    rec.bytes = bytes;
+    rec.uploadId = upload.uploadId;
+    await save(bucket, rec);
+    return json({ partSize: PART_SIZE, parts: partsFor(bytes) }, 201);
+  }
 
   // The creator's own upload of the recording.
   const part = /^(film\/)?parts\/(\d{1,5})$/.exec(sub);
   if (part && method === "PUT") {
     const forFilm = Boolean(part[1]);
-    if (forFilm ? !runner : !owner) return json({ error: forFilm ? "Wrong ticket." : "Wrong studio token." }, 401);
+    if (forFilm ? !runner : !(owner || dailyRunner)) return json({ error: forFilm ? "Wrong ticket." : "Wrong studio token." }, 401);
     const target = forFilm ? rec.filmUpload : rec.uploadId && !rec.uploaded ? { key: rec.audioKey, uploadId: rec.uploadId, bytes: rec.bytes } : null;
     if (!target) return json({ error: "No upload is open for this file." }, 409);
     const n = Number(part[2]);
@@ -309,7 +396,7 @@ export async function handleVoice(request, env, url, deps = {}) {
 
   if ((sub === "complete" || sub === "film/complete") && method === "POST") {
     const forFilm = sub === "film/complete";
-    if (forFilm ? !runner : !owner) return json({ error: forFilm ? "Wrong ticket." : "Wrong studio token." }, 401);
+    if (forFilm ? !runner : !(owner || dailyRunner)) return json({ error: forFilm ? "Wrong ticket." : "Wrong studio token." }, 401);
     const target = forFilm ? rec.filmUpload : rec.uploadId && !rec.uploaded ? { key: rec.audioKey, uploadId: rec.uploadId, bytes: rec.bytes } : null;
     if (!target) return json({ error: "No upload is open for this file." }, 409);
     const body = /** @type {any} */ (await request.json().catch(() => null));
