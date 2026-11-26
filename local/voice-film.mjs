@@ -48,6 +48,7 @@ import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom }
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
 import { groqModel } from "../worker/groq.mjs";
+import { workerBrain } from "../render/voice-runner.mjs";
 
 import { planVoice } from "../engine/src/voice-plan.mjs";
 import { ayahEndsOf } from "../engine/src/voice-master.mjs";
@@ -161,6 +162,10 @@ export function voiceBrain(env, o = {}) {
     if (b.ok) return { model: b.model, kind: b.kind === "gemini" && groqOn ? "groq+gemini" : b.kind };
   }
   if (groqOn) return { model: /** @type {any} */ (groqModel({ apiKey: String(env.GROQ_API_KEY), ...(o.fetch ? { fetch: o.fetch } : {}) })), kind: "groq" };
+  // On the GitHub runner the keys stay in the Worker: the free brain is asked through it, with this film's ticket.
+  if (env.SITE && env.VOICE_ID && env.VOICE_TICKET && env.VOICE_SELFTEST !== "1" && String(env.GROQ ?? "").toLowerCase() !== "off") {
+    return { model: /** @type {any} */ (workerBrain({ site: env.SITE, id: env.VOICE_ID, ticket: env.VOICE_TICKET, ...(o.fetch ? { fetch: o.fetch } : {}) }, { log: (l) => console.log(l) })), kind: "worker" };
+  }
   return { model: null, kind: "none" };
 }
 
@@ -554,6 +559,13 @@ async function main() {
     const step4 = await pictures({ out, understanding, brain: vb.model, ledger: read?.ledger ?? null, ledgerFile: args["ledger-record"] === "off" ? undefined : ledgerPath, filmId: typeof args["film-id"] === "string" ? args["film-id"] : undefined, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
+    // What the free brain cost this film (measured, so a 40-minute film's need is known against the daily limits).
+    const calls = /** @type {any} */ (vb.model)?.calls;
+    if (Array.isArray(calls)) {
+      const by = calls.reduce((/** @type {Record<string, number>} */ a, /** @type {any} */ x) => ({ ...a, [x.model]: (a[x.model] ?? 0) + 1 }), {});
+      console.log(`- Free brain calls: ${calls.length} (${Object.entries(by).map(([m, n]) => `${m} ${n}`).join(", ") || "none"})`);
+      await writeFile(join(out, "brain-calls.json"), JSON.stringify(calls, null, 1));
+    }
     if (!step4.ok) process.exit(1);
   } else if (args.master) {
     if (args.kind === "auto") { console.error("--master needs --kind quran or narration when there is no transcript to tell them apart."); process.exit(2); }

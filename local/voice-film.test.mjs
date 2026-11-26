@@ -78,4 +78,9 @@ test("voice brain: free brains only, Groq first", async () => {
   assert.equal(voiceBrain({ GROQ_API_KEY: "g" }).kind, "groq");
   assert.equal(voiceBrain({ GROQ_API_KEY: "g", GEMINI_API_KEY: "k", GEMINI_MODELS: "gemini-2.5-flash" }).kind, "groq+gemini");
   assert.equal(voiceBrain({ GEMINI_API_KEY: "k", GEMINI_MODELS: "gemini-2.5-flash" }).kind, "gemini");
+  // On the runner: no keys, the Worker's free brain through the film's ticket; text only, no web search.
+  const w = voiceBrain({ SITE: "https://s", VOICE_ID: "i", VOICE_TICKET: "t" });
+  assert.equal(w.kind, "worker");
+  assert.deepEqual(/** @type {any} */ (w.model).capabilities, { vision: false, webSearch: false });
+  assert.equal(voiceBrain({ SITE: "https://s", VOICE_ID: "i", VOICE_TICKET: "t", VOICE_SELFTEST: "1" }).model, null);
 });

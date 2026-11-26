@@ -89,3 +89,20 @@ test("the whole script: outline, eight parts from the source, a short part conti
   const list = concatList([{ scene: "SC0001", partStart: true }, { scene: "SC0002", partStart: false }, { scene: "SC0003", partStart: true }], "/n", new Set(["SC0001", "SC0003"]));
   assert.equal(list, "file '/n/SC0001.wav'\nfile '/n/gap-part.wav'\nfile '/n/SC0003.wav'\n");
 });
+
+test("the Worker's free brain as a model: text only, a busy minute waited out, a used-up day stops", async () => {
+  const { workerBrain } = await import("./voice-runner.mjs");
+  let n = 0;
+  const c = { site: "https://s", id: "i", ticket: "t", fetch: /** @type {any} */ (async (/** @type {string} */ u, /** @type {any} */ init) => {
+    assert.match(u, /\/brain\?ticket=t$/);
+    assert.equal(JSON.parse(init.body).req.stage, "voice-director");
+    return ++n < 2 ? new Response('{"error":"Groq: tried a (busy)"}', { status: 429 }) : new Response('{"text":"beats","model":"openai/gpt-oss-120b"}');
+  }) };
+  const m = workerBrain(c, { sleep: async () => {}, waitMs: 0 });
+  assert.deepEqual(m.capabilities, { vision: false, webSearch: false });
+  const r = await m.call({ stage: "voice-director", system: [{ text: "s" }], messages: [{ role: "user", content: [{ text: "p" }] }], maxTokens: 100 });
+  assert.equal(r.text, "beats");
+  assert.equal(m.calls.length, 1);
+  const spent = workerBrain({ ...c, fetch: /** @type {any} */ (async () => new Response('{"error":"Groq: tried a (day used up); Gemini RESOURCE_EXHAUSTED"}', { status: 429 })) }, { sleep: async () => {}, waitMs: 0 });
+  await assert.rejects(spent.call({ stage: "x", system: [], messages: [], maxTokens: 10 }), /daily limit is used up/);
+});
