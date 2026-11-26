@@ -1,8 +1,9 @@
 name: Daily film
 
 # One ~40-minute engineering documentary a day, good or bad, so the platform learns (Craft Ledger).
-# Started once a day by the Worker's free cron (wrangler.jsonc triggers -> worker/voice-api.mjs
-# startDailyFilm), or by hand from the studio: POST /api/voice/daily (studio key). The Worker picks
+# Once a day the schedule below asks the Worker to start the film (POST /api/voice/daily, proving
+# who it is with GitHub's own OIDC token: no stored secret); by hand, the same route with the studio
+# key, or "Run workflow" here with no inputs (the same as the schedule). The Worker picks
 # the next unused topic (worker/daily-film.mjs) and gives this run a ticket for that one film; the
 # runner never holds a key (the brain and the stock keys stay in the Worker).
 # Steps: the script (render/daily-script.mjs: Wikipedia as the only fact source, the free brain
@@ -13,33 +14,56 @@ name: Daily film
 # Nothing is published.
 
 on:
+  schedule:
+    # 10:23 UTC (5:23 am in New York): the film is ready for the US day.
+    - cron: "23 10 * * *"
   workflow_dispatch:
     inputs:
       voice_id:
-        description: "The daily film's ID (set by the Worker)"
-        required: true
+        description: "The daily film's ID (set by the Worker; leave empty to start today's film)"
+        default: ""
       site:
         description: "Site address"
         required: true
         default: "https://ai-x-com.sayedmuntasim3.workers.dev"
       ticket:
         description: "The Worker's ticket for this one film (set by the Worker)"
-        required: true
+        default: ""
       topic_id:
         description: "Topic id from worker/daily-film.mjs (set by the Worker)"
-        required: true
+        default: ""
 
-run-name: "Daily film ${{ inputs.topic_id }}"
+run-name: "Daily film ${{ inputs.topic_id || 'start' }}"
 
 permissions:
   contents: read
 
 concurrency:
-  group: daily-film
+  group: daily-film-${{ inputs.voice_id || 'start' }}
   cancel-in-progress: false
 
 jobs:
+  # The schedule (or a run with no inputs): the Worker picks the topic and starts this workflow again for that film.
+  start:
+    if: github.event_name == 'schedule' || inputs.voice_id == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    steps:
+      - name: Ask the Worker to start today's film
+        env:
+          SITE: https://ai-x-com.sayedmuntasim3.workers.dev
+        run: |
+          jwt=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=zupona-daily" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).value))')
+          echo "::add-mask::$jwt"
+          code=$(curl -sS -o answer.json -w '%{http_code}' -X POST -H "Authorization: Bearer $jwt" "$SITE/api/voice/daily")
+          cat answer.json; echo
+          # 409: today's film is already under way (not an error).
+          [ "$code" = 202 ] || [ "$code" = 409 ] || { echo "::error::The Worker did not start the daily film ($code)."; exit 1; }
+
   voice:
+    if: github.event_name == 'workflow_dispatch' && inputs.voice_id != ''
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:

@@ -1,7 +1,7 @@
 /**
  * The daily film (one voiceover documentary a day, good or bad, so the Craft Ledger learns).
- * Pure: the topic queue and the choice of the next topic. The Worker starts it once a day
- * (wrangler.jsonc triggers, worker/voice-api.mjs startDailyFilm); the runner writes the script
+ * Pure: the topic queue and the choice of the next topic. daily-film.yml's schedule asks the Worker
+ * once a day (POST /api/voice/daily, worker/voice-api.mjs startDailyFilm); the runner writes the script
  * (render/daily-script.mjs), narrates it (render/daily-voice.mjs) and the voice goes through the
  * same voiceover pipeline as an uploaded voice (voice-film.yml).
  *
