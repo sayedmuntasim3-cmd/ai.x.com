@@ -342,6 +342,40 @@ function cardLine(sentence, around) {
   return "";
 }
 
+const FILLER_START = /^(?:in|from|even|despite|as|but|yet|within|if|when|after|before|so|then|that|this|it|there|we|our|for|on)\b/i;
+
+/**
+ * How much a card line carries: a number, a name, a strong word or a question count; a line that opens like
+ * a link between sentences ("In the months after", "Despite these measures") counts less.
+ * @param {string} line
+ */
+export function cardWeight(line) {
+  const rest = line.split(" ").slice(1).join(" ");
+  return (/\d/.test(line) ? 4 : 0) + (/(?:^|\s)[A-Z][a-z]/.test(rest) ? 2 : 0) + (STRONG.test(line) ? 1 : 0) + (/\?$/.test(line) ? 1 : 0) + (line.split(" ").length >= 5 ? 1 : 0) - (FILLER_START.test(line) && !/\d/.test(line) ? 2 : 0);
+}
+
+const BREAK_BEFORE = /^(?:and|but|when|because|while|which|until|after|before|where|who|so|yet|as|then)$/i;
+
+/**
+ * The best short phrase of a sentence for a card, cut only where speech breaks: at a comma, semicolon,
+ * colon or dash, or before a joining word (and, but, when, because ...). 3 to 9 of the voice's own words,
+ * the ones with a number, a name or a strong word first; "" when no phrase fits.
+ * @param {string} sentence
+ */
+export function phraseLine(sentence) {
+  const words = sentence.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  /** @type {string[][]} */
+  const phrases = [[]];
+  for (const w of words) {
+    if (BREAK_BEFORE.test(w.replace(/[^A-Za-z]/g, "")) && phrases[phrases.length - 1].length) phrases.push([]);
+    phrases[phrases.length - 1].push(w);
+    if (/[,;:—–]$/.test(w)) phrases.push([]);
+  }
+  const clean = (/** @type {string[]} */ p) => p.join(" ").replace(/^[\s,;:—–-]+|[\s,;:.!?—–-]+$/g, "").replace(/^(?:and|but|so|yet|then)\s+/i, "");
+  const fit = phrases.map(clean).filter((t) => { const n = t.split(" ").length; return n >= 3 && n <= 9; });
+  return fit.sort((a, b) => cardWeight(b) - cardWeight(a) || Math.abs(a.split(" ").length - 6) - Math.abs(b.split(" ").length - 6))[0] ?? "";
+}
+
 /**
  * The designed moment a scene can carry, from its own words (null when it has none). Order of preference:
  * a timeline (two years said), a document (a bill, a filing, a headline), a quote (what a person said),
@@ -433,18 +467,37 @@ export function planShots(o) {
     // A designed moment needs room: not within 12 s of the last one (15 s for a kinetic line), the gap fill below makes sure 45 s never pass without one.
     if (m && m.at - last >= (m.type === "kinetic-type" ? 15 : 12)) { design.set(s.sc, m); before = last; last = m.at; lastSc = s.sc; }
   }
-  // A stretch of 45 s with no moment gets a kinetic line from its scene with the shortest whole sentence.
-  for (let guard = 0; guard < 50; guard += 1) {
+  // A stretch of 45 s with no moment gets a kinetic line from a sentence said in it: the shortest whole sentence
+  // or clause, else a phrase cut where the speech breaks (phraseLine). A gap that has none is passed over, never
+  // the gaps after it (a 40-minute film has many), and the check below still reports it.
+  const end = o.scenes.at(-1)?.end ?? 0;
+  const skipped = new Set();
+  for (let guard = 0; guard < 400; guard += 1) {
     const ats = [...design.values()].map((d) => d.at).sort((a, b) => a - b);
-    const end = o.scenes.at(-1)?.end ?? 0;
     const edges = [0, ...ats, end];
     let gapAt = -1;
-    for (let i = 1; i < edges.length; i += 1) if (edges[i] - edges[i - 1] > HOOK.designEvery) { gapAt = edges[i - 1]; break; }
+    for (let i = 1; i < edges.length; i += 1) if (edges[i] - edges[i - 1] > HOOK.designEvery && !skipped.has(edges[i - 1])) { gapAt = edges[i - 1]; break; }
     if (gapAt < 0) break;
-    const pick = o.scenes.filter((s) => !design.has(s.sc) && s.start >= gapAt + 10 && s.start < gapAt + HOOK.designEvery)
-      .flatMap((s) => sentencesOf(s).filter((x) => x.words >= 4 && cardLine(x.text)).map((x) => ({ s, x }))).sort((a, b) => a.x.words - b.x.words)[0];
-    if (!pick) break;
-    design.set(pick.s.sc, { type: "kinetic-type", text: cardLine(pick.x.text), at: pick.x.start, until: Math.min(pick.s.end, pick.x.end + 0.5) });
+    const near = o.scenes.filter((s) => !design.has(s.sc) && s.end > gapAt + 8 && s.start < gapAt + HOOK.designEvery)
+      .flatMap((s) => sentencesOf(s).filter((x) => x.start >= gapAt + 8 && x.start < gapAt + HOOK.designEvery).map((x) => ({ s, x })));
+    // Two or more years said in the stretch: a timeline of them (each year with the voice's own few words beside it).
+    const dated = near.flatMap(({ s, x }) => [...x.text.matchAll(/\b(1[89]\d\d|20[0-4]\d)\b/g)].map((m) => ({ s, x, year: m[1] })));
+    const years = [...new Map(dated.map((d) => [d.year, d])).values()].slice(0, 5);
+    if (years.length >= 2) {
+      const items = years.map(({ x, year }) => {
+        const after = x.text.slice(x.text.indexOf(year) + 4).replace(/^[\s,.;:]+/, "").split(/[,.;]/)[0].trim().split(" ").slice(0, 5).join(" ");
+        const before = x.text.slice(0, x.text.indexOf(year)).replace(/[\s,.;:]+$/, "").split(/[,.;]/).pop()?.trim().split(" ").slice(-5).join(" ") ?? "";
+        return { year, label: after.length >= 3 ? after : before };
+      });
+      const first = years[0];
+      design.set(first.s.sc, { type: "timeline", text: items.map((i) => `${i.year} ${i.label}`).join(" · "), at: first.x.start, until: first.s.end, items });
+      continue;
+    }
+    // Every line the stretch offers (whole sentences, clauses, phrases), the one that carries the most first.
+    const pick = near.flatMap(({ s, x }) => [x.words >= 4 ? cardLine(x.text) : "", phraseLine(x.text)].filter(Boolean).map((line) => ({ s, x, line })))
+      .sort((a, b) => cardWeight(b.line) - cardWeight(a.line) || a.line.split(" ").length - b.line.split(" ").length)[0];
+    if (!pick) { skipped.add(gapAt); continue; }
+    design.set(pick.s.sc, { type: "kinetic-type", text: pick.line, at: pick.x.start, until: Math.min(pick.s.end, pick.x.end + 0.5) });
   }
 
   // 2. Every scene re-cut to the rhythm: shots of the genre's length (shorter in the hook), each typed.
