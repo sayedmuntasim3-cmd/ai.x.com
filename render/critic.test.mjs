@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { blurAndFlicker, critique, designedMoments, measurePicture, parsePicture, STANDARD, verdictOf } from "./critic.mjs";
+import { blurAndFlicker, critique, designedMoments, designedStill, measurePicture, parsePicture, STANDARD, subtitleFit, verdictOf } from "./critic.mjs";
 
 /** A timeline of equal shots, as the renderer builds one (only the fields the critic reads). */
 function timeline(shots, extra = {}) {
@@ -117,4 +117,74 @@ test("what counts as a designed moment: a number, a kinetic line, a chart, a map
     { start: 15, end: 18, type: "black" },
   ]);
   assert.equal(got.length, 4);
+});
+
+/** The codes a nearly-good film earns, so a new check can be read on its own. */
+function codesOf(extra, evidence = {}) {
+  const shots = Array.from({ length: 30 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6 }));
+  const t = timeline(shots, extra);
+  const r = critique(t, { master: { integratedLufs: -14.2, truePeakDbtp: -1.4, loudnessRangeLu: 8, black: [] } }, { channels: 2, ...evidence });
+  return { codes: r.findings.map((f) => f.code), findings: r.findings, measures: r.measures };
+}
+
+test("a narrated scene whose voice never reached the film blocks, and the critic names it", () => {
+  const narration = [{ scene: "SC1", start: 0, end: 6, text: "The mill opens at dawn." }, { scene: "SC2", start: 6, end: 12, text: "By noon the wheel had stopped." }];
+  const missing = codesOf({ narration }, { voiced: ["SC1"] });
+  assert.ok(missing.codes.includes("critic.narration"), "a silent scene is a defect");
+  assert.equal(missing.measures.narrationCoverage, 0.5);
+  assert.match(missing.findings.find((f) => f.code === "critic.narration").en, /SC2/);
+  const whole = codesOf({ narration }, { voiced: ["SC1", "SC2"] });
+  assert.ok(!whole.codes.includes("critic.narration"), "every narrated scene voiced: no finding");
+  assert.equal(whole.measures.narrationCoverage, 1);
+});
+
+test("a number placeholder is never spoken or shown: one left in the film blocks", () => {
+  const narration = [{ scene: "SC1", start: 0, end: 6, text: "It cost about [C12 low] dollars." }];
+  const r = codesOf({ narration });
+  assert.ok(r.codes.includes("critic.unresolved"));
+  assert.match(r.findings.find((f) => f.code === "critic.unresolved").en, /\[C12 low\]/);
+  const clean = codesOf({ narration: [{ scene: "SC1", start: 0, end: 6, text: "It cost about one dollar and fifteen cents." }] });
+  assert.ok(!clean.codes.includes("critic.unresolved"));
+});
+
+test("subtitles: a hole over the speech blocks, captions that overlap or run past the end block too", () => {
+  const narration = [{ scene: "SC1", start: 0, end: 30, text: "words" }];
+  const holey = codesOf({ narration, captions: [{ start: 0, end: 5, text: "a" }, { start: 20, end: 30, text: "b" }] });
+  assert.ok(holey.codes.includes("critic.subtitles"));
+  assert.ok(holey.measures.subtitles.maxGap >= 14, `gap ${holey.measures.subtitles.maxGap}`);
+  const tight = codesOf({ narration, captions: [{ start: 0, end: 15, text: "a" }, { start: 15, end: 30, text: "b" }] });
+  assert.ok(!tight.codes.includes("critic.subtitles"), "a covered stretch of speech passes");
+  const overlap = codesOf({ narration, captions: [{ start: 0, end: 20, text: "a" }, { start: 5, end: 30, text: "b" }] });
+  assert.ok(overlap.codes.includes("critic.subtitleTime"));
+  assert.equal(subtitleFit(narration, [], 30).coverage, 0);
+});
+
+test("footage reused inside ten minutes is a loop; a shot with no media and a lost transition are named", () => {
+  const loop = codesOf({ video: timeline(Array.from({ length: 30 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6 }))).video.map((v, i) => (i === 10 ? { ...v, url: "https://cdn/1.mp4" } : v)) });
+  assert.ok(loop.codes.includes("critic.repeatWindow"));
+  assert.ok(loop.measures.repeatsInWindow >= 1);
+  const hole = codesOf({ video: timeline(Array.from({ length: 30 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6, url: i === 3 ? null : undefined }))).video });
+  assert.ok(hole.codes.includes("critic.media"));
+  const edits = [{ chapter: "C1", scenes: [{ scene: "SC3", transition: "whip" }, { scene: "SC4", transition: "slide" }] }];
+  const lost = codesOf({}, { edits });
+  assert.ok(lost.codes.includes("critic.transition"));
+  assert.deepEqual([lost.measures.transitionsRequired, lost.measures.transitionsMissing], [2, 2]);
+  const kept = codesOf({ video: timeline(Array.from({ length: 30 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6, ...(i === 2 ? { transition: "whip" } : {}), ...(i === 3 ? { transition: "slide" } : {}) }))).video }, { edits });
+  assert.ok(!kept.codes.includes("critic.transition"), "what the editor asked for is in the film");
+});
+
+test("a still's own soft backdrop is design, not a blurred copy; a dark shot is unusable picture", () => {
+  const text = [
+    "frame:0 pts_time:0", "lavfi.blur=34.0", "lavfi.signalstats.YAVG=120",
+    "frame:2 pts_time:1", "lavfi.blur=33.0", "lavfi.signalstats.YAVG=118",
+    "frame:4 pts_time:2", "lavfi.blur=5.0", "lavfi.signalstats.YAVG=6",
+    "frame:6 pts_time:3", "lavfi.blur=4.8", "lavfi.signalstats.YAVG=7",
+  ].join("\n");
+  const video = [{ id: "SC1-1", start: 0, end: 2, type: "clip", still: true }, { id: "SC1-2", start: 2, end: 4, type: "clip" }];
+  const r = blurAndFlicker(parsePicture(text), video);
+  assert.deepEqual(r.blurred, [], "a photograph framed over its own blur is not a blurred copy");
+  assert.deepEqual(r.blurredDesigned.map((b) => b.id), ["SC1-1"]);
+  assert.deepEqual(r.dark.map((d) => d.id), ["SC1-2"], "an almost black footage shot is named");
+  assert.ok(designedStill({ type: "card", counter: true }));
+  assert.ok(!designedStill({ type: "clip" }));
 });

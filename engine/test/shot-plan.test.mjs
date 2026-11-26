@@ -150,3 +150,20 @@ test("Edit Director on a voiceover chapter: scene-relative times repaired, code 
   assert.equal(q.calls, 1);
   assert.match(q.stopped, /429/);
 });
+
+test("the Edit Director's transition and the shot plan's types reach the renderer's timeline", async () => {
+  const md = [
+    "**SC0001** | 0:00:00-0:00:06 | C1 | NARR: In 1979 he lost his father. | SHOTS: (1) R3 Bengaluru street at dawn | TYPE: live-video",
+    "**SC0002** | 0:00:06-0:00:12 | C1 | NARR: In 1993 he bought a van. | SHOTS: (1) R2 Maruti van in 1993, Bengaluru | TYPE: archival-video",
+  ].join("\n");
+  const edit = { chapter: "C1", scenes: [{ scene: "SC0002", transition: "whip", punchIns: [], shakes: [], hits: [] }] };
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, edit }], autoSound: false });
+  const second = t.video.find((v) => v.scene === "SC0002");
+  assert.ok(second, "the second scene is on the timeline");
+  assert.equal(second.transition, "whip", "the editor's transition is on the shot the renderer draws");
+  assert.equal(second.shotType, "archival-video", "the shot plan's type is on the shot too");
+  assert.equal(t.video.find((v) => v.scene === "SC0001").shotType, "live-video");
+  // Without the edit plan nothing is invented: the script's own TRANS field decides.
+  const plain = buildTimeline({ chapters: [{ id: "C1", markdown: md }], autoSound: false });
+  assert.equal(plain.video.find((v) => v.scene === "SC0002").transition, undefined);
+});

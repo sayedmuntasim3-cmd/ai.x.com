@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { msg } from "../engine/src/messages.mjs";
+import { placeholderTokens } from "../engine/src/claim-values.mjs";
 
 /**
  * The house standard. Numbers, not taste: each one is a failure the owner's
@@ -67,7 +68,32 @@ export const STANDARD = Object.freeze({
   blurShare: 0.15,
   /** A jump of this much average luma between two samples inside one shot is a flicker. */
   flickerJump: 28,
+  /**
+   * A still's own soft background (a photograph framed over a blurred copy of itself, a card's backdrop) is
+   * design, not a blurred copy: it is measured against this higher score and never counted in the blur share.
+   */
+  blurMaxDesigned: 32,
+  /** A non-designed shot this dark (median luma, 0-255) is unusable picture, not a night scene. */
+  darkLuma: 12,
+  /** Share of the narrated scenes that must actually carry a voice in the film. */
+  narrationCoverage: 0.98,
+  /** Captions must cover this share of the narrated time, and never leave a hole longer than the gap. */
+  subtitleCoverage: 0.95,
+  subtitleGap: 3,
+  /** The same footage must not return inside this window (seconds); more repeats than the limit is a loop. */
+  repeatWindow: 600,
+  repeatWindowMax: 3,
+  /** Share of the transitions an edit plan asked for that the film may lose before it blocks. */
+  transitionMiss: 0.15,
 });
+
+/** A shot that needs a picture to draw (a card draws itself). */
+const PICTURED = new Set(["clip", "live-video", "archival-video", "photo-designed", "photo-2.5D"]);
+
+/** A shot whose softness is design (a still, a card), not a blurred copy of footage. @param {any} v */
+export function designedStill(v) {
+  return Boolean(v.still || v.chart || v.map || v.counter || v.kinetic || v.chapterTitle || String(v.type) === "card");
+}
 
 /** Moving picture types: real footage, or a still with a designed move. */
 const MOVING = new Set(["clip", "live-video", "archival-video", "photo-designed", "photo-2.5D"]);
@@ -92,10 +118,42 @@ export function designedMoments(video) {
 }
 
 /**
+ * How the captions sit on the speech: the share of narrated time a caption is on
+ * screen, the longest stretch of speech with no caption, and the captions that
+ * overlap another or run past the end of the film. A film whose captions drift
+ * off the voice reads as broken, however good the words are.
+ * @param {{ start: number, end: number }[]} narration @param {{ start: number, end: number }[]} captions @param {number} seconds
+ * @returns {{ coverage: number, maxGap: number, overlap: number, beyond: number }}
+ */
+export function subtitleFit(narration, captions, seconds) {
+  const spans = (narration ?? []).filter((n) => Number(n.end) > Number(n.start)).sort((a, b) => Number(a.start) - Number(b.start));
+  const cues = (captions ?? []).filter((c) => Number(c.end) > Number(c.start)).sort((a, b) => Number(a.start) - Number(b.start));
+  const totalSpeech = spans.reduce((/** @type {number} */ a, /** @type {any} */ n) => a + (Number(n.end) - Number(n.start)), 0);
+  let covered = 0;
+  let maxGap = 0;
+  for (const s of spans) {
+    const from = Number(s.start), to = Number(s.end);
+    let reach = from;
+    for (const c of cues) {
+      const a = Math.max(Number(c.start), from), b = Math.min(Number(c.end), to);
+      if (b <= a) continue;
+      if (a > reach) maxGap = Math.max(maxGap, a - reach);
+      if (b > reach) { covered += b - Math.max(a, reach); reach = b; }
+    }
+    if (to > reach) maxGap = Math.max(maxGap, to - reach);
+  }
+  // A caption that starts on top of the one before it, or runs past the film, is out of step.
+  let overlap = 0;
+  for (let i = 1; i < cues.length; i += 1) if (Number(cues[i].start) < Number(cues[i - 1].end) - 0.05) overlap += 1;
+  const beyond = seconds > 0 ? cues.filter((c) => Number(c.start) < -0.01 || Number(c.end) > seconds + 0.5).length : 0;
+  return { coverage: totalSpeech ? Math.min(1, covered / totalSpeech) : 1, maxGap: Math.round(maxGap * 10) / 10, overlap, beyond };
+}
+
+/**
  * Read a timeline and the render's report and return every finding.
  * @param {any} timeline
  * @param {any} report
- * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null }} [evidence]
+ * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null }} [evidence]
  * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any> }}
  */
 export function critique(timeline, report = {}, evidence = {}) {
@@ -215,6 +273,61 @@ export function critique(timeline, report = {}, evidence = {}) {
     add({ ...msg("critic.flicker", { count: flickers.length }), severity: flickers.length > 2 ? "block" : "warn", value: flickers.length });
   }
 
+  // --- the words, the pictures and the edit -----------------------------
+  const narr = Array.isArray(timeline?.narration) ? timeline.narration : [];
+  const captions = Array.isArray(timeline?.captions) ? timeline.captions : [];
+  // A placeholder is never spoken or shown: an unfilled one is a hole in the film.
+  const tokens = [...narr.map((/** @type {any} */ n) => n.text), ...captions.map((/** @type {any} */ c) => c.text), ...video.map((/** @type {any} */ v) => v.text)]
+    .flatMap((text) => placeholderTokens(String(text ?? "")));
+  if (tokens.length) {
+    add({ ...msg("critic.unresolved", { count: tokens.length, tokens: [...new Set(tokens)].slice(0, 4).join(", ") }), severity: "block", value: tokens.length });
+  }
+  // A narrated scene whose voice never reached the film is silent, however good its plan was.
+  const narratedScenes = [...new Set(narr.map((/** @type {any} */ n) => n.scene).filter(Boolean).map(String))];
+  const voiced = Array.isArray(evidence.voiced) ? new Set(evidence.voiced.map(String)) : null;
+  const unvoiced = voiced ? narratedScenes.filter((sc) => !voiced.has(sc)) : [];
+  const narrationCoverage = narratedScenes.length ? 1 - unvoiced.length / narratedScenes.length : 1;
+  if (unvoiced.length) {
+    add({ ...msg("critic.narration", { count: unvoiced.length, value: round(narrationCoverage * 100, 0), scenes: unvoiced.slice(0, 5).join(", ") }), severity: "block", value: round(narrationCoverage * 100, 0) });
+  }
+  // Subtitles: on screen over the speech, no long hole, never on top of each other or past the end.
+  const subs = subtitleFit(narr, captions, seconds);
+  if (narratedScenes.length && captions.length && (subs.coverage < STANDARD.subtitleCoverage || subs.maxGap > STANDARD.subtitleGap)) {
+    add({ ...msg("critic.subtitles", { value: round(subs.coverage * 100, 0), gap: round(subs.maxGap, 1), min: round(STANDARD.subtitleCoverage * 100, 0), max: STANDARD.subtitleGap }), severity: "block", value: round(subs.coverage * 100, 0) });
+  }
+  if (subs.overlap + subs.beyond > 0) {
+    add({ ...msg("critic.subtitleTime", { count: subs.overlap + subs.beyond }), severity: "block", value: subs.overlap + subs.beyond });
+  }
+  // The same footage returning inside the window is a loop the viewer notices.
+  /** @type {Map<string, number[]>} */
+  const at = new Map();
+  for (const v of video) if (v.url) { const k = String(v.url); at.set(k, [...(at.get(k) ?? []), Number(v.start)]); }
+  let within = 0;
+  for (const starts of at.values()) {
+    const s = [...starts].sort((/** @type {number} */ a, /** @type {number} */ b) => a - b);
+    for (let k = 1; k < s.length; k += 1) if (s[k] - s[k - 1] < STANDARD.repeatWindow) within += 1;
+  }
+  if (within) {
+    add({ ...msg("critic.repeatWindow", { count: within, window: STANDARD.repeatWindow }), severity: within > STANDARD.repeatWindowMax ? "block" : "warn", value: within });
+  }
+  // A picture shot with no media to draw is a hole, not a style.
+  const holes = video.filter((/** @type {any} */ v) => PICTURED.has(String(v.type)) && !v.url);
+  if (holes.length) add({ ...msg("critic.media", { count: holes.length }), severity: "block", value: holes.length });
+  // What the edit plan asked for must be in the film: a transition the timeline lost is a silent change of edit.
+  /** @type {{ scene: string, want: string }[]} */
+  const required = [];
+  for (const plan of evidence.edits ?? []) for (const s of plan?.scenes ?? []) if (s?.transition && s.transition !== "cut") required.push({ scene: String(s.scene), want: String(s.transition) });
+  const lost = required.filter((r) => {
+    const first = video.find((/** @type {any} */ v) => String(v.scene) === r.scene);
+    return !first || String(first.transition ?? "") !== r.want;
+  });
+  if (lost.length) {
+    add({ ...msg("critic.transition", { count: lost.length, required: required.length }), severity: lost.length / required.length > STANDARD.transitionMiss ? "block" : "warn", value: lost.length });
+  }
+  // A dark non-designed shot is unusable picture; a designed shot's soft backdrop is not.
+  const dark = evidence.dark ?? [];
+  if (dark.length) add({ ...msg("critic.dark", { count: dark.length }), severity: "warn", value: dark.length });
+
   const measures = {
     seconds: round(seconds, 1), shots: lengths.length, avgShot: round(avg), longestShot: round(longest),
     shortShare: round(shortShare, 3), movingShare: round(movingShare, 3), designedMoments: designed.length,
@@ -223,6 +336,10 @@ export function critique(timeline, report = {}, evidence = {}) {
     truePeak: Number.isFinite(peak) ? peak : null, lra: Number.isFinite(lra) ? lra : null,
     channels: Number.isFinite(channels) ? channels : null, fps,
     blurredShots: blurred.length, flicker: flickers.length,
+    blurredDesigned: (evidence.blurredDesigned ?? []).length, darkShots: dark.length,
+    narrationCoverage: round(narrationCoverage, 3),
+    subtitles: { coverage: round(subs.coverage, 3), maxGap: round(subs.maxGap, 1), overlap: subs.overlap, beyond: subs.beyond },
+    repeatsInWindow: within, missingMedia: holes.length, transitionsRequired: required.length, transitionsMissing: lost.length,
   };
   return { verdict: verdictOf(findings), findings, measures };
 }
@@ -263,15 +380,17 @@ function median(xs) {
  * blurred when its median blur score passes the standard (a soft background is
  * not a blurred copy: the median, not the worst frame); flicker is a jump of
  * average luma inside one shot, so a cut into a dark scene is not counted.
- * @param {{ t: number, blur: number, luma: number }[]} samples @param {any[]} video @param {{ blurMax?: number, flickerJump?: number }} [o]
+ * @param {{ t: number, blur: number, luma: number }[]} samples @param {any[]} video @param {{ blurMax?: number, blurMaxDesigned?: number, darkLuma?: number, flickerJump?: number }} [o]
  */
 export function blurAndFlicker(samples, video, o = {}) {
   const blurMax = o.blurMax ?? STANDARD.blurMax;
   const flickerJump = o.flickerJump ?? STANDARD.flickerJump;
   const shots = (video ?? []).filter((v) => v.type !== "black");
-  /** @type {Map<string, { id: string, start: number, end: number, blur: number[], luma: { t: number, y: number }[] }>} */
+  const blurMaxDesigned = o.blurMaxDesigned ?? STANDARD.blurMaxDesigned;
+  const darkLuma = o.darkLuma ?? STANDARD.darkLuma;
+  /** @type {Map<string, { id: string, start: number, end: number, designed: boolean, blur: number[], luma: { t: number, y: number }[] }>} */
   const byShot = new Map();
-  for (const s of shots) byShot.set(String(s.id), { id: String(s.id), start: Number(s.start), end: Number(s.end), blur: [], luma: [] });
+  for (const s of shots) byShot.set(String(s.id), { id: String(s.id), start: Number(s.start), end: Number(s.end), designed: designedStill(s), blur: [], luma: [] });
   for (const sample of samples) {
     const shot = shots.find((/** @type {any} */ v) => sample.t >= Number(v.start) && sample.t < Number(v.end));
     if (!shot) continue;
@@ -282,25 +401,36 @@ export function blurAndFlicker(samples, video, o = {}) {
   }
   /** @type {{ id: string, start: number, end: number, value: number }[]} */
   const blurred = [];
+  /** @type {{ id: string, start: number, end: number, value: number }[]} */
+  const blurredDesigned = [];
+  /** @type {{ id: string, value: number }[]} */
+  const dark = [];
   /** @type {{ id: string, at: number, from: number, to: number }[]} */
   const flicker = [];
   for (const acc of byShot.values()) {
     if (acc.blur.length) {
       const value = median(acc.blur);
-      if (Number.isFinite(value) && value > blurMax) blurred.push({ id: acc.id, start: acc.start, end: acc.end, value: round(value, 1) });
+      // A still's own soft backdrop (a photo over a blurred copy of itself) is design: it is noted, never counted as a blurred copy.
+      if (Number.isFinite(value) && acc.designed) {
+        if (value > blurMaxDesigned) blurredDesigned.push({ id: acc.id, start: acc.start, end: acc.end, value: round(value, 1) });
+      } else if (Number.isFinite(value) && value > blurMax) blurred.push({ id: acc.id, start: acc.start, end: acc.end, value: round(value, 1) });
+    }
+    if (!acc.designed && acc.luma.length) {
+      const y = median(acc.luma.map((l) => l.y));
+      if (Number.isFinite(y) && y < darkLuma) dark.push({ id: acc.id, value: round(y, 1) });
     }
     for (let k = 1; k < acc.luma.length; k += 1) {
       const jump = Math.abs(acc.luma[k].y - acc.luma[k - 1].y);
       if (jump > flickerJump) flicker.push({ id: acc.id, at: round(acc.luma[k].t, 2), from: round(acc.luma[k - 1].y, 1), to: round(acc.luma[k].y, 1) });
     }
   }
-  return { blurred, flicker, samples: samples.length, shots: shots.length };
+  return { blurred, blurredDesigned, flicker, dark, samples: samples.length, shots: shots.length };
 }
 
 /**
  * Measure the picture of a finished film: blur and flicker, one pass at two
  * frames a second (the samples land inside their own shot).
- * @param {string} file @param {any} timeline @param {{ ffmpeg?: string, blurMax?: number, flickerJump?: number }} [o]
+ * @param {string} file @param {any} timeline @param {{ ffmpeg?: string, blurMax?: number, blurMaxDesigned?: number, darkLuma?: number, flickerJump?: number }} [o]
  */
 export async function measurePicture(file, timeline, o = {}) {
   const ffmpeg = o.ffmpeg ?? "ffmpeg";
