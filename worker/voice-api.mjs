@@ -20,7 +20,7 @@
  *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed with the Worker's own key (free; the key never leaves Cloudflare)   (ticket, or Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/film             the finished MP4   (?ticket= from GET /api/voice/:id, or Bearer STUDIO_TOKEN)
  *   POST /api/voice/daily                start today's daily film (the next unused topic)   (Bearer STUDIO_TOKEN, or GitHub's OIDC token of daily-film.yml's schedule)
- *   POST /api/voice/:id/brain            { system, prompt, maxTokens } one script call through the free brain (Groq, then Gemini)   (ticket, daily film only)
+ *   POST /api/voice/:id/brain            { req: { stage, system, messages, maxTokens } } (or { system, prompt }) one free-brain call (Groq, then Gemini)   (ticket, narration)
  *   POST /api/voice/:id/voice            { bytes } -> open the upload of the daily film's narration; then parts/:n and complete   (ticket, daily film only)
  *   GET  /api/voice/:id/ledger           the channel's Craft Ledger (R2 channel/craft-ledger.json), for the next film's targets   (ticket, or Bearer STUDIO_TOKEN)
  *   POST /api/voice/:id/ledger           { report, genre? } the finished film's critic measures, recorded under this id   (ticket, or Bearer STUDIO_TOKEN)
@@ -348,17 +348,23 @@ export async function handleVoice(request, env, url, deps = {}) {
   /** The daily film's runner writes and voices the film itself, so it may also send the recording. */
   const dailyRunner = Boolean(runner && rec.daily);
 
-  // The daily film's script: one call to the free brain (Groq first, then the Gemini pool), with the Worker's own keys.
+  // One call to the free brain (Groq first, then the Gemini pool) with the Worker's own keys: the daily film's
+  // script, and a voiceover film's director, writer and editor (local/voice-film.mjs). Never the paid brain.
+  // Text only and no web search: the runner's model says so (canSee/canSearch), so stages pick their own path.
   if (sub === "brain" && method === "POST") {
-    if (!dailyRunner) return json({ error: "Wrong ticket." }, 401);
+    if (!runner || rec.kind !== "narration") return json({ error: "Wrong ticket." }, 401);
     const body = /** @type {any} */ (await request.json().catch(() => null));
-    const system = String(body?.system ?? "").slice(0, 20000);
-    const prompt = String(body?.prompt ?? "").slice(0, 60000);
-    if (!prompt) return json({ error: "Send the prompt." }, 400);
-    const brain = brainFromEnv(env, { fetch: deps.fetch });
+    const text = (/** @type {any} */ v, /** @type {number} */ max) => String(v ?? "").slice(0, max);
+    const blocks = (/** @type {any} */ list, /** @type {number} */ max) => (Array.isArray(list) ? list : []).filter((b) => b && typeof b.text === "string" && !b.image).map((b) => ({ text: text(b.text, max) }));
+    const req = body?.req
+      ? { stage: text(body.req.stage, 60) || "voice", system: blocks(body.req.system, 60000), messages: (Array.isArray(body.req.messages) ? body.req.messages : []).slice(0, 40).map((/** @type {any} */ m) => ({ role: m?.role === "assistant" ? "assistant" : "user", content: blocks(m?.content, 120000) })), maxTokens: Number(body.req.maxTokens) }
+      : { stage: "daily-script", system: [{ text: text(body?.system, 20000) }], messages: [{ role: "user", content: [{ text: text(body?.prompt, 60000) }] }], maxTokens: Number(body?.maxTokens) };
+    if (!req.messages.some((m) => m.content.some((c) => c.text))) return json({ error: "Send the prompt." }, 400);
+    req.maxTokens = Math.min(Math.max(req.maxTokens || 2000, 256), 16000);
+    const brain = brainFromEnv({ ...env, BRAIN: "", ANTHROPIC_API_KEY: undefined }, { fetch: deps.fetch });
     if (!brain.ok) return json({ error: brain.error }, 503);
     try {
-      const r = await brain.model.call({ stage: "daily-script", system: [{ text: system }], messages: [{ role: "user", content: [{ text: prompt }] }], maxTokens: Math.min(Math.max(Number(body?.maxTokens) || 2000, 256), 8000) });
+      const r = await brain.model.call({ ...req, webSearch: false });
       return json({ text: r.text, model: r.model ?? brain.model.name, stopReason: r.stopReason, usage: r.usage ?? null });
     } catch (error) {
       // The brains' own words (a daily limit, a busy minute), as 429 so the runner itself decides to wait or stop.
