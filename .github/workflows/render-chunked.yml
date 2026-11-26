@@ -1,0 +1,129 @@
+name: Chunked render
+
+# Renders one film's picture in N parts on N runners at once, then joins them and
+# mixes the sound once over the whole film (loudness set on the whole, as in one
+# render). A 40-minute voiceover took 1 h 55 min on one runner; N parts take about
+# 1/N of the picture time plus the join. Parts meet on shot boundaries and are
+# joined with concat -c copy, so the frames are the same as one render
+# (render/render.test.mjs checks it frame by frame, joins with moves included).
+#
+# Called by another workflow (for example voice-film.yml) that has prepared the
+# film: it uploads one artifact holding everything render-film.mjs reads (the run
+# folder, the recording, words.json, music), and names the same render arguments
+# it would pass to one render.
+
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: "Name of the artifact with the prepared film (run folder, recording, music)"
+        type: string
+        required: true
+      args:
+        description: 'The render arguments without --out/--work/--part/--join, e.g. "--run run --one-track run/master/dry.wav --words run/words.json --music music --width 1920 --height 1080 --fps 30"'
+        type: string
+        required: true
+      parts:
+        description: "How many runners render the picture (1-16)"
+        type: number
+        default: 8
+      out_artifact:
+        description: "Name of the artifact the finished film is uploaded as"
+        type: string
+        default: "film"
+    outputs:
+      artifact:
+        description: "The artifact holding out/film.mp4, its report and captions"
+        value: ${{ inputs.out_artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      parts: ${{ steps.plan.outputs.parts }}
+    steps:
+      - id: plan
+        env:
+          PARTS: ${{ inputs.parts }}
+        run: |
+          [[ "$PARTS" =~ ^[0-9]+$ ]] && (( PARTS >= 1 && PARTS <= 16 )) || { echo "::error::parts must be 1-16."; exit 1; }
+          echo "parts=$(seq -s, 1 "$PARTS" | sed 's/^/[/;s/$/]/')" >> "$GITHUB_OUTPUT"
+
+  part:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: true
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.parts) }}
+    env:
+      ARGS: ${{ inputs.args }}
+      PART: ${{ matrix.part }}
+      PARTS: ${{ inputs.parts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install ffmpeg and fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
+      # The designed graphics (M4) are drawn by a real browser; without it every card falls back to plain
+      # ffmpeg text and the film loses its motion design, so the browser is part of the render machine.
+      - name: Install the graphics engine (Playwright Chromium)
+        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+      - name: Render this part's picture
+        run: |
+          # The arguments come from the calling workflow; only plain paths and flags are accepted.
+          [[ "$ARGS" =~ ^[A-Za-z0-9_./=:,\ -]+$ ]] || { echo "::error::Bad render arguments."; exit 1; }
+          mkdir -p parts
+          read -r -a argv <<< "$ARGS"
+          node render/render-film.mjs "${argv[@]}" --part "$PART/$PARTS" --work .render --out "parts/part-$PART.mp4"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.out_artifact }}-part-${{ matrix.part }}
+          path: parts/
+          retention-days: 1
+
+  join:
+    needs: part
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ARGS: ${{ inputs.args }}
+      PARTS: ${{ inputs.parts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install ffmpeg and fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.out_artifact }}-part-*
+          path: parts
+          merge-multiple: true
+      - name: Join the parts and mix the sound once
+        run: |
+          [[ "$ARGS" =~ ^[A-Za-z0-9_./=:,\ -]+$ ]] || { echo "::error::Bad render arguments."; exit 1; }
+          list=$(for i in $(seq 1 "$PARTS"); do printf 'parts/part-%s.mp4,' "$i"; done)
+          for f in ${list//,/ }; do [ -s "$f" ] || { echo "::error::$f is missing."; exit 1; }; done
+          mkdir -p out
+          read -r -a argv <<< "$ARGS"
+          node render/render-film.mjs "${argv[@]}" --join "${list%,}" --work .render --out out/film.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.out_artifact }}
+          path: |
+            out/
+          retention-days: 7

@@ -1,0 +1,26 @@
+{
+ "response": {
+  "numFound": 10,
+  "docs": [
+   {
+    "creator": [
+     "Library of Congress. Congressional Research Service",
+     "Bart Elias"
+    ],
+    "date": "2026-03-30T00:00:00Z",
+    "description": "On the night of March 22, 2026, a Jazz Aviation regional jet landing at LaGuardia Airport (LGA) in New York, NY, struck a firefighting vehicle that had received air traffic control clearance to cross the active runway. The collision killed both pilots and injured a flight attendant, several passenge",
+    "identifier": "crs-in12675.2",
+    "mediatype": "texts",
+    "title": "Collision at LaGuardia Airport Spotlights Long-standing Concerns Over Runway Safety (IN12675, v2, March 30, 2026)"
+   },
+   {
+    "creator": "2 Girls, 1 Scaredy Cat",
+    "date": "2019-10-23T00:00:00Z",
+    "description": "The girls struggle with accents and proper airline lingo in this week's minisode all about airplanes! Monica discusses the Tenerife airport disaster while Emilee chose the topic of the disappearance of Fredrick Valentich.",
+    "identifier": "fywzendk4fmltcw7dwavrklbml4qvchkqa3hogxr",
+    "mediatype": "audio",
+    "title": "Minisode 003: Airplanes"
+   }
+  ]
+ }
+}

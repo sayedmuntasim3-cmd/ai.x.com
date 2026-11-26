@@ -1,0 +1,295 @@
+name: Voiceover film
+
+# A creator's finished voiceover (ElevenLabs, their own voice, or a Quran
+# recitation) becomes a film. Started by the studio (worker/voice-api.mjs) after
+# the upload; the words of the recording are the script, the pictures follow them.
+# The runner never holds the studio key: it reads the one recording and reports
+# with the ticket the Worker gave it (render/voice-runner.mjs).
+# Steps: intake, pause tightening, speech-to-text (faster-whisper, free, on this
+# runner), understanding, mastering, pictures (free licensed archives), render
+# from the one recording (render/render-film.mjs --one-track), final check, and
+# the MP4 goes back to the studio (private R2). Nothing is published.
+# A narration's picture renders in 8 parts on 8 runners at once
+# (render-chunked.yml); the sound is mixed once over the whole film.
+# Quran: verbatim Tanzil text, the reciter's own voice only (never synthesized),
+# no music, cuts only in measured silence, and the film waits for a scholar's review.
+#
+# Optional repository secrets: PEXELS_API_KEY, PIXABAY_API_KEY, SMITHSONIAN_API_KEY (more free stock).
+
+on:
+  workflow_dispatch:
+    inputs:
+      voice_id:
+        description: "Voiceover ID (from the studio)"
+        required: true
+      site:
+        description: "Site address"
+        required: true
+        default: "https://ai.zupona.com"
+      ticket:
+        description: "The Worker's ticket for this one recording (set by the studio)"
+        required: true
+      kind:
+        description: "narration or quran"
+        default: "narration"
+      ext:
+        description: "File extension of the recording"
+        default: "mp3"
+      topic:
+        description: "What the film is about (optional)"
+        default: ""
+      quran:
+        description: 'Quran only: {"surah":93,"ayat":"1-11","reciter":"..."}'
+        default: ""
+      resolution:
+        description: "Picture size"
+        default: "1920x1080"
+      selftest:
+        description: 'Self-test: "yes" makes a short spoken sample here and sends nothing to the studio'
+        default: ""
+
+run-name: "Voiceover film ${{ inputs.voice_id }}"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voice-${{ inputs.voice_id }}
+  cancel-in-progress: false
+
+jobs:
+  film:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    outputs:
+      args: ${{ steps.prepare.outputs.args }}
+    env:
+      SITE: ${{ inputs.site }}
+      VOICE_ID: ${{ inputs.voice_id }}
+      VOICE_TICKET: ${{ inputs.ticket }}
+      KIND: ${{ inputs.kind }}
+      EXT: ${{ inputs.ext }}
+      TOPIC: ${{ inputs.topic }}
+      QURAN: ${{ inputs.quran }}
+      RESOLUTION: ${{ inputs.resolution }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ZUPONA_PYTHON: python
+      ZUPONA_STT_BATCH: "8"
+      ZUPONA_MEDIA_CONCURRENCY: "6"
+      VOICE_SELFTEST: ${{ inputs.selftest == 'yes' && '1' || '' }}
+    steps:
+      - name: Check the inputs
+        run: |
+          echo "::add-mask::$VOICE_TICKET"
+          [[ "$VOICE_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::Bad voiceover ID."; exit 1; }
+          [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::Bad site."; exit 1; }
+          [[ "$KIND" =~ ^(narration|quran)$ ]] || { echo "::error::kind must be narration or quran."; exit 1; }
+          [[ "$EXT" =~ ^(mp3|wav|m4a|aac|flac|ogg|opus|webm)$ ]] || { echo "::error::Bad extension."; exit 1; }
+          [[ "$RESOLUTION" =~ ^[0-9]{3,4}x[0-9]{3,4}$ ]] || { echo "::error::Bad resolution."; exit 1; }
+          [ -z "$VOICE_SELFTEST" ] || [[ "$KIND/$EXT" = narration/wav ]] || { echo "::error::The self-test is a narration in wav."; exit 1; }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tell the studio a machine took it
+        run: echo started > .stage && node render/voice-runner.mjs progress --stage started
+      - name: Install ffmpeg and speech-to-text (faster-whisper)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
+          pip install -q faster-whisper==1.2.1
+          [ -z "$VOICE_SELFTEST" ] || sudo apt-get install -y -qq espeak-ng > /dev/null
+          if [ "$KIND" = quran ]; then
+            # The recitation is aligned to the verbatim Tanzil text (local/stt/align.py), and pictures pass the adab guard.
+            pip install -q "opencv-python-headless==4.10.0.84" pillow
+            pip install -q --index-url https://download.pytorch.org/whl/cpu torch
+            pip install -q transformers
+          fi
+      - name: Keep the speech-to-text model between runs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-${{ inputs.kind }}-v1
+      - name: Fetch the recording (private, with this run's ticket)
+        run: |
+          echo intake > .stage
+          if [ -n "$VOICE_SELFTEST" ]; then
+            # A short spoken sample made here (espeak-ng), so the whole film path runs without a studio recording.
+            espeak-ng -v en-us -s 140 -w "in.$EXT" "Lighthouses have guarded dangerous coasts for more than two thousand years. The first great one stood at Alexandria in Egypt, a tower of stone with a fire burning at its top. Sailors far out at sea could see its glow at night and smoke by day. Later towers were built of brick and iron, and their keepers climbed hundreds of steps each evening to light the lamps. In the nineteenth century, a French engineer named Augustin Fresnel designed a lens of glass rings that bent the light into a single strong beam. A lamp that once reached a few miles could now be seen from twenty miles away. Keepers lived lonely lives on rocks and islands, cleaning the glass, winding the clockwork that turned the light, and writing every storm into their logbooks. Today most lighthouses run on their own, with electric lamps and sensors, and satellites guide the ships. Yet the old towers still stand on cliffs and harbours around the world, white and red against the sea, reminding us how people once kept each other safe in the dark."
+            exit 0
+          fi
+          node render/voice-runner.mjs fetch --out "in.$EXT" 2>&1 | tee step.log && test "${PIPESTATUS[0]}" = 0
+      - name: Listen, write down every word, understand, master, find pictures
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          SMITHSONIAN_API_KEY: ${{ secrets.SMITHSONIAN_API_KEY }}
+        run: |
+          echo words > .stage
+          # Free modern stock (Pixabay) with the Worker's own key, relayed for this one recording.
+          [ -n "$VOICE_SELFTEST" ] || export ZUPONA_STOCK_RELAY="$SITE/api/voice/$VOICE_ID/stock?ticket=$VOICE_TICKET"
+          if [ "$KIND" = quran ]; then
+            surah=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!Number.isInteger(q.surah)||q.surah<1||q.surah>114)process.exit(1);console.log(q.surah)') || { echo "::error::Quran needs the surah."; exit 1; }
+            ayat=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");console.log(/^\d{1,3}(-\d{1,3})?$/.test(q.ayat||"")?q.ayat:"")')
+            # The reviewer's ayah marks (taps on the uploaded recording): confirmed times, so no pause is shortened.
+            marks=""
+            if node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!q.marks)process.exit(1);require("fs").writeFileSync("marks.json",JSON.stringify(q.marks))'; then marks="--marks marks.json --tighten off"; fi
+            node local/voice-film.mjs --audio "in.$EXT" --surah "$surah" ${ayat:+--ayat "$ayat"} --master mosque-hall $marks --out run 2>&1 | tee voice-film.log step.log
+          else
+            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model base.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --out run 2>&1 | tee voice-film.log step.log
+          fi
+          test "${PIPESTATUS[0]}" = 0
+          node render/voice-runner.mjs summary --run run
+      - name: Keep the picture-ranking model between runs (OpenCLIP, CPU)
+        if: inputs.kind == 'narration'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/zupona
+          key: asset-rank-v1
+      - name: Look at the pictures (OpenCLIP chooses on-topic, in the film's world)
+        if: inputs.kind == 'narration'
+        env:
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          echo pictures > .stage
+          [ -n "$VOICE_SELFTEST" ] || export ZUPONA_STOCK_RELAY="$SITE/api/voice/$VOICE_ID/stock?ticket=$VOICE_TICKET"
+          # The eyes never stop the film: if they cannot run, the plan's own picks stay (rerank.mjs prints why).
+          if pip install -q --index-url https://download.pytorch.org/whl/cpu torch==2.7.1 torchvision==0.22.1 && pip install -q open_clip_torch==2.29.0 pillow numpy; then
+            export HF_HOME="$HOME/.cache/zupona/hf" ZUPONA_RANK_CACHE="$HOME/.cache/zupona/asset-rank"
+            node render/asset-rank/rerank.mjs --run run 2>&1 | tee -a voice-film.log
+          else
+            echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
+          fi
+      - name: Quran pictures (adab guard; no living beings, no AI pictures)
+        if: inputs.kind == 'quran'
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          echo pictures > .stage
+          node local/quran-media.mjs --run run --detect python --clip 2>&1 | tail -n 20
+          node render/voice-runner.mjs summary --run run --stages pictures
+      - name: Make the film from the one recording (Quran)
+        if: inputs.kind == 'quran'
+        run: |
+          echo render > .stage
+          node render/voice-runner.mjs progress --stage render
+          mkdir -p out
+          reciter=$(node -e 'console.log(String(JSON.parse(process.env.QURAN||"{}").reciter||""))')
+          node render/quran-render.mjs --run run --audio run/master/mosque-hall.wav ${reciter:+--reciter "$reciter"} --out out/film.mp4 2>&1 | tee step.log
+          test "${PIPESTATUS[0]}" = 0
+      - name: Send the film to the studio (private, Quran)
+        if: inputs.kind == 'quran'
+        run: |
+          echo deliver > .stage
+          node render/voice-runner.mjs deliver --file out/film.mp4 --seconds "$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 out/film.mp4)" --review --run run
+      - name: Prepare the render (voice, free score); the parts render on 8 runners
+        id: prepare
+        if: inputs.kind == 'narration'
+        run: |
+          echo render > .stage
+          node render/voice-runner.mjs progress --stage render
+          voice=$(sed -n 's/^Mastered voice: \(.*\) (use it.*/\1/p; s/^Tightened voice: \(.*\) (use it.*/\1/p' voice-film.log | head -n 1)
+          voice=$(realpath --relative-to=. "${voice:-in.$EXT}")
+          case "$voice" in run/*|"in.$EXT") ;; *) echo "::error::The voice is outside the run folder: $voice" | tee step.log; exit 1 ;; esac
+          # The free score (original music made here, never under a recitation) as a quiet bed under the voice.
+          mkdir -p music && touch music/.keep
+          [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
+          echo "args=--run run --one-track $voice --words run/words.json --music music --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: inputs.kind == 'narration'
+        with:
+          name: prep-${{ inputs.voice_id }}
+          path: |
+            run/
+            music/
+            in.${{ inputs.ext }}
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Tell the studio what stopped it
+        if: failure()
+        run: |
+          stage=$(cat .stage 2>/dev/null || echo started)
+          # The failing step's own words: the gate's BLOCK lines first, else that step's last lines.
+          why=$( (grep -h '^BLOCK:' step.log 2>/dev/null || tail -n 3 step.log 2>/dev/null) | head -n 3 | tr '\n' ' ' | cut -c1-300)
+          node render/voice-runner.mjs progress --stage "$stage" --error "The film machine stopped${why:+: $why}. Details: $RUN_URL" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voice-${{ inputs.voice_id }}
+          path: |
+            run/*.json
+            run/*.md
+            voice-film.log
+            out/*.json
+            out/*.srt
+          retention-days: 14
+          if-no-files-found: warn
+
+  render:
+    needs: film
+    if: inputs.kind == 'narration'
+    uses: ./.github/workflows/render-chunked.yml
+    with:
+      artifact: prep-${{ inputs.voice_id }}
+      args: ${{ needs.film.outputs.args }}
+      parts: 8
+      out_artifact: film-${{ inputs.voice_id }}
+
+  finish:
+    needs: [film, render]
+    if: always() && inputs.kind == 'narration' && needs.film.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SITE: ${{ inputs.site }}
+      VOICE_ID: ${{ inputs.voice_id }}
+      VOICE_TICKET: ${{ inputs.ticket }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      RENDER_RESULT: ${{ needs.render.result }}
+      VOICE_SELFTEST: ${{ inputs.selftest == 'yes' && '1' || '' }}
+    steps:
+      - run: echo "::add-mask::$VOICE_TICKET"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The parts rendered and joined
+        run: |
+          echo render > .stage
+          [ "$RENDER_RESULT" = success ] || { echo "Rendering the film in parts stopped ($RENDER_RESULT)." | tee step.log; exit 1; }
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - uses: actions/download-artifact@v4
+        with:
+          name: film-${{ inputs.voice_id }}
+          path: out
+      - name: Check the finished film
+        run: |
+          echo check > .stage
+          node render/release-gate.mjs --report out/film.report.json --file out/film.mp4 2>&1 | tee step.log
+          test "${PIPESTATUS[0]}" = 0
+          node render/voice-runner.mjs progress --stage check
+      - name: Send the film to the studio (private)
+        run: |
+          echo deliver > .stage
+          node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json
+      - name: Tell the studio what stopped it
+        if: failure()
+        run: |
+          stage=$(cat .stage 2>/dev/null || echo render)
+          why=$( (grep -h '^BLOCK:' step.log 2>/dev/null || tail -n 3 step.log 2>/dev/null) | head -n 3 | tr '\n' ' ' | cut -c1-300)
+          node render/voice-runner.mjs progress --stage "$stage" --error "The film machine stopped${why:+: $why}. Details: $RUN_URL" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: voice-${{ inputs.voice_id }}-film
+          path: |
+            out/*.json
+            out/*.srt
+          retention-days: 14
+          if-no-files-found: warn

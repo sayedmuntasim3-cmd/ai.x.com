@@ -1,0 +1,14 @@
+// M1: strongest vs average per channel, from docs/research/data/reference-videos.json -> docs/research/CHANNEL_COMPARISON.md
+import { readFileSync, writeFileSync } from "node:fs";
+const v = JSON.parse(readFileSync(new URL("../../docs/research/data/reference-videos.json", import.meta.url), "utf8"));
+const med = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+const by = new Map(); for (const x of v) (by.get(x.channelTitle) ?? by.set(x.channelTitle, []).get(x.channelTitle)).push(x);
+const m = (s) => (s / 60).toFixed(1), M = (n) => (n / 1e6).toFixed(1) + "M";
+let o = `# Strongest vs average, per channel (measured)\n\nSource: YouTube Data API through the Worker \`/api/ideas\` (\`tools/research/collect.mjs\`), checked ${v[0]?.checked}. ${v.length} videos, published ${v.map((x) => x.publishedAt).sort()[0].slice(0, 10)} to ${v.map((x) => x.publishedAt).sort().at(-1).slice(0, 10)}.\n\n**Bias, stated plainly:** the search returns the most-viewed videos, so "rest" means "the weaker ones among the top results", not the channel's real average. The channel's true mean views per video is the \`ch.avg\` column (from the API's channel statistics). Chapters and thumbnails are not in this route yet.\n\n| Channel | n | top-3 median views | top-3 median min | rest median views | rest median min | ch.avg views | best video |\n|---|---|---|---|---|---|---|---|\n`;
+for (const [k, l] of [...by].sort((a, b) => b[1].length - a[1].length)) {
+  if (l.length < 4) continue; l.sort((a, b) => b.views - a.views);
+  const t = l.slice(0, 3), r = l.slice(3);
+  o += `| ${k} | ${l.length} | ${M(med(t.map((x) => x.views)))} | ${m(med(t.map((x) => x.durationSeconds)))} | ${M(med(r.map((x) => x.views)))} | ${m(med(r.map((x) => x.durationSeconds)))} | ${M(l[0].channelAverage ?? 0)} | [${l[0].title.replace(/\|/g, "/").slice(0, 50)}](${l[0].url}) (${l[0].publishedAt.slice(0, 10)}) |\n`;
+}
+o += `\n## Reading (my reading, from the table, not a rule)\n- Cleo Abram (18 vs 39 min), Yarnhub (19 vs 79) and Fern (21 vs 31) are strongest when **shorter**; Veritasium (55 vs 35), Johnny Harris (60 vs 50) and Ruhi Çenet (29 vs 17) when **longer**. Length alone does not explain strength; it depends on the channel.\n- Top titles name a **person, place or secret** ("The Only Nazi Hitler Feared", "What's Hidden Under Antarctica?", "30 Days on a Death Ship"); weaker ones in the same channel are series, round-ups or topical news ("Epic Naval Battles", "Why Texas Wins").\n- Ruhi Çenet's English channel median of the top 3 is ${M(med([...by.get("Ruhi Cenet Documentaries") ?? []].slice(0, 3).map((x) => x.views)))}: the owner's "Bollywood level" target (70-80M) is that channel's top end (best: ${M(Math.max(...(by.get("Ruhi Cenet Documentaries") ?? []).map((x) => x.views)))}).\n`;
+writeFileSync(new URL("../../docs/research/CHANNEL_COMPARISON.md", import.meta.url), o);

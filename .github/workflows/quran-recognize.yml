@@ -1,0 +1,121 @@
+name: Quran recognition check
+
+# Runs the recitation locator (engine/src/quran-locate.mjs) for real and
+# prints what was measured between QURAN-LOCATE-BEGIN/END:
+#  - on recordings with known ayah times, built on the runner by joining
+#    single-ayah files (archive.org items whose uploaders put a public-domain
+#    mark on them; the mark is the uploader's statement). Each is located
+#    three ways: from the given surah and ayat alone (pauses), by the
+#    recognizer alone, and by both; the ayah-boundary error against the truth
+#    is printed, and a wrong surah is given once to see the question;
+#  - on continuous recitations their uploaders marked CC0, where no truth
+#    exists: what was decided or asked is printed.
+# The recognizer is Whisper base fine-tuned on Quran recitation by Tarteel AI
+# (tarteel-ai/whisper-base-ar-quran, Apache-2.0 on its Hugging Face page; the
+# runner reads the licence from that page and writes it into every result).
+# Test audio is used on the runner only: never committed, never uploaded.
+# Free GitHub runner minutes only; no API key and no paid service is used.
+
+on:
+  push:
+    paths:
+      - "engine/src/quran-locate.mjs"
+      - "engine/src/quran.mjs"
+      - "local/quran-locate.mjs"
+      - "local/stt/**"
+      - ".github/workflows/quran-recognize.yml"
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "recognizer (a faster-whisper size or a Hugging Face repository)"
+        default: "tarteel-ai/whisper-base-ar-quran"
+
+permissions:
+  contents: read
+
+jobs:
+  locate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MODEL: ${{ github.event.inputs.model || 'tarteel-ai/whisper-base-ar-quran' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg and the recognizer
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -q faster-whisper==1.2.1 transformers
+      - name: Build recordings with known ayah times
+        run: |
+          set -e
+          L=local/quran-locate.mjs
+          node $L --fetch surah_1 --out audio/fatiha
+          node $L --fetch quran-audio-verse-by-verse-by-sadaqat-ali-surah-012 --count 40 --out audio/yusuf
+          node $L --fetch quran-audio-verse-by-verse-by-sadaqat-ali-surah-008 --count 40 --out audio/anfal
+          node $L --fetch 006099 --prefix 010 --count 30 --out audio/yunus
+          node $L --join audio/fatiha --surah 1 --gap 0.5 --out sets/fatiha
+          node $L --join audio/yusuf --surah 12 --ayat 1-40 --gap 0.5 --out sets/yusuf
+          node $L --join audio/anfal --surah 8 --ayat 1-40 --gap 0.5 --out sets/anfal
+          node $L --join audio/yunus --surah 10 --ayat 1-30 --gap 0.5 --out sets/yunus
+      - name: Locate (given alone, recognizer alone, both, and a wrong surah)
+        run: |
+          L=local/quran-locate.mjs
+          mkdir -p runs
+          go() { label=$1; shift; if node $L "$@" --label "$label" --out "runs/$label" > "runs/$label.log" 2>&1; then rc=0; else rc=$?; fi; echo "$label exit $rc" >> runs/exits.txt; }
+          # name, surah, ayat, what the first file opens with, a wrong surah of similar length
+          while read -r name surah ayat opening wrong; do
+            a=sets/$name/joined.wav; t=sets/$name/truth.json
+            go "$name-given" --audio $a --surah $surah --ayat $ayat --truth $t
+            go "$name-given-told" --audio $a --surah $surah --ayat $ayat --opening $opening --closing none --truth $t
+            go "$name-heard" --audio $a --stt faster-whisper --model "$MODEL" --truth $t
+            go "$name-both" --audio $a --transcript "runs/$name-heard/heard.json" --surah $surah --ayat $ayat --truth $t
+            go "$name-wrong" --audio $a --transcript "runs/$name-heard/heard.json" --surah $wrong
+          done <<'SETS'
+          fatiha 1 1-7 none 93
+          yusuf 12 1-40 basmala 11
+          anfal 8 1-40 basmala 9
+          yunus 10 1-30 basmala 11
+          SETS
+          n=0
+          for item in "jawad-farogi/Az-Zuha.mp3 93" "001AlFaatihah_201305/001AlFaatihah.mp3 1"; do
+            set -- $item; n=$((n+1))
+            if curl -sSfL --retry 3 -o "audio/real-$n.mp3" "https://archive.org/download/$1"; then
+              go "real-$n-given" --audio "audio/real-$n.mp3" --surah $2
+              go "real-$n-heard" --audio "audio/real-$n.mp3" --stt faster-whisper --model "$MODEL"
+            else
+              echo "not downloaded: $1"
+            fi
+          done
+      - name: Print what was measured
+        if: always()
+        run: |
+          echo QURAN-LOCATE-BEGIN
+          for f in audio/*/source.json; do [ -f "$f" ] && { tr -d '\n' < "$f"; echo; }; done
+          cat runs/exits.txt 2>/dev/null | tr '\n' ';'; echo
+          grep -h "^QURAN-LOCATE " runs/*.log | sed 's/^QURAN-LOCATE //'
+          grep -L "^QURAN-LOCATE " runs/*.log | while read -r f; do echo "no result: $f: $(tail -n 2 "$f" | tr '\n' ' ' | cut -c1-300)"; done
+          echo QURAN-LOCATE-END
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quran-locate
+          path: |
+            runs/**/quran-location.json
+            runs/**/heard.json
+            runs/*.log
+            sets/**/truth.json
+            audio/**/source.json
+          retention-days: 30
+      - name: Fail when a recording with known times was not located
+        run: |
+          for name in fatiha yusuf anfal yunus; do
+            grep -q "^QURAN-LOCATE .*\"label\":\"$name-heard\".*\"decision\":\"accept\"" "runs/$name-heard.log" || { echo "$name: the recognizer path did not accept"; exit 1; }
+            grep -q "\"question\":\"quran.ask.mismatch\"" "runs/$name-wrong.log" || { echo "$name: a wrong surah was not questioned"; exit 1; }
+          done

@@ -1,0 +1,215 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { tokenizeArabic } from "../src/arabic.mjs";
+import { wikimediaProvider } from "../src/film-media.mjs";
+import { ayahText, buildQuranIndex, matchRecitation } from "../src/quran.mjs";
+import { planQuranFilm } from "../src/quran-film.mjs";
+import { alignScript, normalizeTranscript } from "../src/transcript.mjs";
+import { understandVoice } from "../src/voice-understand.mjs";
+import { brainBatches, namePhrases, nounsAfterDeterminers, planVoiceVisuals, quranVisualAdabGuard, topicSpelling, topicSubjects, voiceScore, withMusic, wordsPlan } from "../src/voice-visuals.mjs";
+import { titleHasWords } from "../src/film-media.mjs";
+
+const fixture = (/** @type {string} */ name) => readFileSync(new URL("./fixtures/voice/" + name, import.meta.url), "utf8");
+const truth = JSON.parse(fixture("gettysburg-truth.json"));
+const aligned = alignScript(truth.sentences.join(" "), normalizeTranscript(fixture("gettysburg-pocketsphinx.json")));
+const u = understandVoice({ transcript: aligned, totalSeconds: truth.totalSeconds });
+const scenes = /** @type {NonNullable<typeof u.scenes>} */ (u.scenes);
+const spoken = truth.sentences.join(" ").split(" ");
+
+/** A Commons search that answers every query with one public-domain and one share-alike file. */
+const commonsFetch = async (/** @type {string} */ url) => {
+  const q = new URL(url).searchParams.get("gsrsearch") ?? "";
+  const page = (/** @type {number} */ id, /** @type {string} */ licence, /** @type {number} */ index) => ({ pageid: id, ns: 6, index, title: `File:${q.replace(/ filetype:.*/, "")} ${id}.jpg`, imageinfo: [{ width: 3000, height: 2000, thumburl: `https://upload.wikimedia.org/x/1920px-${id}.jpg`, url: `https://upload.wikimedia.org/${id}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${id}.jpg`, mime: "image/jpeg", extmetadata: { LicenseShortName: { value: licence }, Artist: { value: "Archive" }, Restrictions: { value: "" } } }] });
+  const id = 1000 + (q.length % 97) * 3;
+  const body = /filetype:bitmap/.test(q) ? { query: { pages: [page(id, "CC BY-SA 4.0", 1), page(id + 1, "Public domain", 2)] } } : { query: { pages: [] } };
+  return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+};
+
+/** A fake brain that plans every scene but also "improves" the words and times of two. */
+const meddlingBrain = {
+  name: "fake-local", capabilities: { vision: false, webSearch: false },
+  /** @param {any} r */
+  async call(r) {
+    const lines = r.messages[0].content[0].text.split("\n").filter((/** @type {string} */ l) => l.startsWith("**SC"));
+    const text = lines.map((/** @type {string} */ l, /** @type {number} */ i) => {
+      let x = l.replace("ANCHOR: TODO", "ANCHOR: the field").replace("SHOTS: TODO", "SHOTS: (1) R3 battlefield at dawn").replace("SRC: TODO", 'SRC: Q1 "gettysburg battlefield"').replace("LOOK: TODO", "LOOK: cold morning");
+      if (i === 0) x = x.replace("Four score and seven years ago", "Eighty-seven years ago");
+      if (i === 1) x = x.replace(/\| 0:00:\d\d(\.\d+)?-/, "| 0:00:12-");
+      return x;
+    });
+    return { text: text.join("\n"), stopReason: "end_turn", usage: {} };
+  },
+};
+
+test("a brain that changes words or times is reported and repaired in code; words end unchanged", async () => {
+  const r = await planVoiceVisuals({ scenes, structure: u.structure, brain: meddlingBrain });
+  assert.equal(r.brainUsed, true);
+  assert.deepEqual(r.changedByBrain, ["SC0001", "SC0002"]);
+  assert.ok(r.messages.some((m) => m.code === "voice.wordsChanged"));
+  assert.deepEqual(r.findings, []);
+  assert.deepEqual(r.plan.flatMap((p) => p.narration.split(" ")), spoken, "every spoken word, in order");
+  assert.ok(r.plan.every((p) => /battlefield at dawn/.test(p.shots)));
+});
+
+test("no brain: every scene still gets a plan from its own words, and the words hold", async () => {
+  const r = await planVoiceVisuals({ scenes, structure: u.structure });
+  assert.equal(r.brainUsed, false);
+  assert.ok(r.messages.some((m) => m.code === "voice.noBrain"));
+  assert.deepEqual(r.findings, []);
+  assert.equal(r.plan.length, scenes.length);
+  assert.ok(r.plan.every((p) => /^\(1\) (\d+:\d{2}:\d{2}\.\d{3}-\d+:\d{2}:\d{2}\.\d{3} )?R[23] \S/.test(p.shots)));
+  assert.match(r.plan[0].shots, /^\(1\) (\S+ )?R2/, "a date said in the scene makes it an evidence shot");
+  assert.deepEqual(r.plan.flatMap((p) => p.narration.split(" ")), spoken);
+});
+
+test("a brain that fails or answers nonsense does not stop the plan", async () => {
+  const broken = { name: "x", capabilities: { vision: false }, call: async () => { throw new Error("401 key invalid"); } };
+  const nonsense = { name: "y", capabilities: { vision: false }, call: async () => ({ text: "I cannot help with that.", stopReason: "end_turn", usage: {} }) };
+  for (const brain of [broken, nonsense]) {
+    const r = await planVoiceVisuals({ scenes, structure: u.structure, brain });
+    assert.deepEqual(r.findings, []);
+    assert.deepEqual(r.plan.flatMap((p) => p.narration.split(" ")), spoken);
+  }
+});
+
+test("media from a keyless archive: licence recorded per asset, share-alike refused", async () => {
+  const r = await planVoiceVisuals({ scenes: scenes.slice(0, 3), structure: u.structure, providers: [wikimediaProvider({ fetch: commonsFetch })] });
+  const assets = r.plan.flatMap((p) => p.assets);
+  assert.ok(assets.length >= 3, JSON.stringify(r.media));
+  for (const a of assets) {
+    assert.equal(a.source, "wikimedia");
+    assert.equal(a.licence.licenseId, "PUBLIC-DOMAIN");
+    assert.match(a.page, /^https:\/\/commons\.wikimedia\.org\//);
+  }
+});
+
+test("words plan: names and dates make evidence shots", () => {
+  const p = wordsPlan(scenes[0], u.structure ?? null);
+  assert.match(p.SHOTS, /^\(1\) (\S+ )?R2 /);
+  assert.match(p.SRC, /Q1 "/);
+});
+
+test("words plan: short concrete searches, filler never searched, the topic only as the fallback", () => {
+  // The real case that showed museum prints for a modern story: the whole title was glued to "Rolls nearly".
+  const said = "Reports give his father's name as Paul. A chair, a mirror, a strop, a razor, a pair of scissors on Brigade Road.";
+  let t = 0;
+  const words = said.split(" ").map((text) => { const w = { text, start: t, end: t + 0.4 }; t += 0.45; return w; });
+  const scene = { id: 1, sc: "SC0012", start: 0, end: 13, from: 0, to: words.length - 1, words, narration: said };
+  const p = wordsPlan(scene, null, "Ramesh Babu: from barber to Rolls-Royce");
+  const queries = [...p.SRC.matchAll(/Q\d "([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(queries.includes("Brigade Road"), p.SRC);
+  assert.ok(queries.every((q) => !/Ramesh Babu|from barber/.test(q)), "the title is never glued into a search");
+  assert.ok(queries.every((q) => !/\b(reports|nearly|name|give)\b/i.test(q)), p.SRC);
+  assert.ok(queries.some((q) => q === "barber" || q === "Rolls-Royce"), "the topic's subject is the fallback");
+  assert.equal((p.SHOTS.match(/\(\d\)/g) ?? []).length, 2, "13 s: a shot about every 6 s");
+  assert.match(p.SHOTS, /^\(1\) 0:00:00\.000-0:00:06\.500 R3 /);
+});
+
+const index = buildQuranIndex(JSON.parse(readFileSync(new URL("../data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
+function ikhlas() {
+  const words = [];
+  let t = 2;
+  for (let ayah = 1; ayah <= 4; ayah += 1) {
+    let tokens = tokenizeArabic(ayahText(index, 112, ayah));
+    if (ayah === 1) tokens = tokens.slice(4);
+    for (const text of tokens) { words.push({ text, start: t, end: t + 1.3 }); t += 1.4; }
+    t += 2;
+  }
+  return planQuranFilm({ match: matchRecitation(words, index), index, totalSeconds: t + 1 });
+}
+
+test("quran-visual-adab-guard: nature and patterns pass; living beings, AI, music and unlicensed meanings do not", () => {
+  const plan = ikhlas();
+  const ayat = plan.scenes.filter((s) => s.kind === "ayah");
+  const pd = { licenseId: "PUBLIC-DOMAIN" };
+  const ok = quranVisualAdabGuard({ plan, index, assets: [{ scene: ayat[0].id, source: "wikimedia", title: "Desert dunes at dusk", licence: pd }, { scene: ayat[1].id, source: "met", title: "Geometric tile panel", licence: pd }] });
+  assert.equal(ok.ok, true, ok.problems.join("; "));
+  assert.ok(ok.gaps.some((g) => /licensed translation/.test(g)), "the missing meaning is a reported gap");
+  assert.ok(ok.messages.some((m) => m.code === "voice.meaningGap"));
+
+  const bad = quranVisualAdabGuard({
+    plan: { ...plan, audio: { ...plan.audio, music: true } }, index,
+    assets: [{ scene: ayat[0].id, source: "wikimedia", title: "Camels crossing the desert", licence: pd }, { scene: ayat[1].id, source: "fal", title: "Golden sky", licence: pd }, { scene: ayat[2].id, source: "openverse", title: "Mountains", licence: { licenseId: "CC-BY-SA" } }],
+    meanings: { [ayat[0].id]: { text: "Say: He is God, the One.", source: "some site", licence: "", allowsUse: false } },
+  });
+  assert.equal(bad.ok, false);
+  for (const re of [/music/, /camels/i, /AI pictures/, /no free licence/, /without a licence/]) assert.ok(bad.problems.some((p) => re.test(p)), String(re));
+});
+
+test("quran-visual-adab-guard: a changed ayah text is refused", () => {
+  const plan = ikhlas();
+  const s = plan.scenes.find((x) => x.kind === "ayah");
+  if (s) s.text = s.text + " ";
+  assert.ok(quranVisualAdabGuard({ plan, index }).problems.some((p) => /verbatim/.test(p)));
+});
+
+test("planner pieces: nouns after determiners, misheard names put back, title-case topics, whole-word titles", () => {
+  const w = (/** @type {string} */ t) => t.split(" ").map((text) => ({ text }));
+  // From the live 40-minute run (SC0046, SC0050, SC0051): adjectives and prepositions are not searched.
+  assert.deepEqual(nounsAfterDeterminers(w("The bundle went on a bicycle. And one small object from school.")), ["bundle", "bicycle", "object"]);
+  assert.deepEqual(nounsAfterDeterminers(w("He told the weekend leader about a pen he wasn't allowed")), ["leader", "pen"]);
+  assert.deepEqual(namePhrases(w("His father worked on Brigade Road, in Bengaluru.")), ["Brigade Road", "Bengaluru"]);
+  assert.equal(topicSpelling("Rolls Rice", "Ramesh Babu - From Barber to Rolls-Royce"), "Rolls-Royce");
+  assert.equal(topicSpelling("Brigade Road", "Ramesh Babu - From Barber to Rolls-Royce"), "Brigade Road");
+  assert.deepEqual(topicSubjects("Ramesh Babu - From Barber to Rolls-Royce"), ["barber", "Rolls-Royce"]);
+  assert.equal(titleHasWords("Carina Nebula", "car"), false);
+  assert.equal(titleHasWords("Long-billed Curlew", "bill"), false);
+  assert.equal(titleHasWords("barber, salon, haircut", "barber"), true);
+  assert.equal(titleHasWords("Vintage cars on display", "car"), true);
+  assert.equal(titleHasWords("", "car"), true, "an untitled stock clip is not refused");
+});
+
+test("a picture whose file cannot be fetched is passed over for the next one", async () => {
+  // The live case: NASA's "~large" file answered 403 for some items while "~orig" existed.
+  const all = await planVoiceVisuals({ scenes: scenes.slice(0, 3), structure: u.structure, providers: [wikimediaProvider({ fetch: commonsFetch })] });
+  const first = all.plan.flatMap((p) => p.assets).map((a) => a.url);
+  assert.ok(first.length >= 1);
+  const refused = new Set(first);
+  const r = await planVoiceVisuals({ scenes: scenes.slice(0, 3), structure: u.structure, providers: [wikimediaProvider({ fetch: commonsFetch })], reachable: async (url) => !refused.has(url) });
+  for (const a of r.plan.flatMap((p) => p.assets)) assert.ok(!refused.has(a.url), "an unreachable file is never chosen");
+});
+
+test("a narration voiceover gets a quiet score plan; a recitation never does", () => {
+  const sc = Array.from({ length: 60 }, (_, i) => ({ sc: `SC${String(i + 1).padStart(4, "0")}`, start: i * 10, end: (i + 1) * 10 }));
+  const s = voiceScore(sc, { kind: "narration" });
+  assert.ok(s);
+  const rows = s.s4.split("\n").filter((l) => /^\| M\d{2} /.test(l));
+  assert.equal(rows.length, 3, "10 minutes: opening, one body cue, closing");
+  assert.match(rows[0], /^\| M01 \| C1 \| 0:00:00–/);
+  assert.match(rows.at(-1) ?? "", /resolve/);
+  assert.equal(s.cueOf.get("SC0001"), "M01");
+  assert.equal(s.cueOf.get("SC0060"), "M03");
+  assert.equal(withMusic("**SC0001** | 0:00:00-0:00:10 | NARR: x", s.cueOf), "**SC0001** | 0:00:00-0:00:10 | NARR: x | MUS: M01");
+  assert.equal(voiceScore(sc, { kind: "quran" }), null, "nothing is laid under a recitation");
+});
+
+test("free brain: whole sections are packed into batches under the size limit", () => {
+  const structure = /** @type {any} */ ({ sections: [{ id: "P1", from: scenes[0].sc, to: scenes[1].sc }, { id: "P2", from: scenes[2].sc, to: scenes[scenes.length - 1].sc }] });
+  const one = brainBatches(scenes, structure, () => 100, 100000);
+  assert.equal(one.length, 1);
+  const split = brainBatches(scenes, structure, () => 100, 250);
+  assert.deepEqual(split[0].map((s) => s.sc), [scenes[0].sc, scenes[1].sc], "a section is never split while it fits");
+  assert.deepEqual(split.flat().map((s) => s.sc), scenes.map((s) => s.sc), "every scene once, in order");
+});
+
+test("free brain: one call per batch; a used-up day stops it and the rest come from the words", async () => {
+  let calls = 0;
+  const dayOver = {
+    name: "fake-free", capabilities: { vision: false, webSearch: false },
+    /** @param {any} r */
+    async call(r) {
+      calls += 1;
+      if (calls > 1) throw Object.assign(new Error("Gemini 429: PerDay"), { status: 429, permanent: true });
+      return meddlingBrain.call(r);
+    },
+  };
+  const r = await planVoiceVisuals({ scenes, structure: u.structure, brain: dayOver, batchChars: 1 });
+  assert.equal(calls, 2, "no call after the day is over");
+  assert.equal(r.brainUsed, true);
+  const codes = r.messages.map((m) => m.code);
+  assert.ok(codes.includes("voice.brainBatches") && codes.includes("voice.brainStopped"), codes.join(","));
+  assert.equal(r.plan.length, scenes.length);
+  assert.ok(r.plan.every((p) => p.shots), "every scene has shots");
+  assert.ok(!r.findings.some((f) => f.code === "words-changed" || f.code === "time-changed"));
+});

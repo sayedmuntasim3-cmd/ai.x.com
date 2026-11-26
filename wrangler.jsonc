@@ -1,0 +1,37 @@
+{
+  // Must match the Worker name in the Cloudflare dashboard.
+  "name": "ai-x-com",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // The film API and its durable Workflow (worker/index.mjs). Everything else
+  // is the static site generated from page.tsx (see tools/README.md).
+  "main": "worker/index.mjs",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
+  "workflows": [{ "name": "film-run", "binding": "FILM_RUN", "class_name": "FilmRunWorkflow" }],
+  // Create once: npx wrangler r2 bucket create zupona-films
+  "r2_buckets": [{ "binding": "FILMS", "bucket_name": "zupona-films" }],
+  // GEMINI_SEARCH off: on the owner's free Gemini key, every call with Google Search answered 429
+  // (quota) while the same film's plain calls went through (films 30b47ce8 and 97c6d5a9, 19 Nov
+  // 2026). Research then runs through the code desk (worker/index.mjs researchDesk).
+  "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60", "GEMINI_SEARCH": "off", "GITHUB_REPO": "sayedmuntasim3-cmd/ai.x.com", "SITE_URL": "https://ai-x-com.sayedmuntasim3.workers.dev" },
+  "observability": { "enabled": true },
+  // Run the Worker (and its film Workflow) in Google Cloud's us-central1, where the Gemini API is
+  // offered. At the owner's nearest Cloudflare location Gemini answered "User location is not
+  // supported for the API use" (19 Nov 2026).
+  "placement": { "mode": "targeted", "region": "gcp:us-central1" },
+  // Pull-request previews (`wrangler preview`, run by Workers Builds on non-production branches)
+  // do not inherit bindings. They get the vars only: no R2 bucket and no Workflow, so a preview
+  // can never read or write the production films or start a production film run.
+  "previews": {
+    "vars": { "MODEL": "claude-opus-5-5", "BUDGET_USD": "60" }
+  }
+  // Secrets (npx wrangler secret put NAME): ANTHROPIC_API_KEY, STUDIO_TOKEN
+  // Optional secrets for the media step: PEXELS_API_KEY, PIXABAY_API_KEY
+  // Optional auto-render: secret GITHUB_TOKEN; vars GITHUB_REPO ("owner/name") and SITE_URL ("https://...")
+  // Optional: secret YOUTUBE_API_KEY (topic radar); var ANTHROPIC_BASE_URL (Cloudflare AI Gateway logs)
+}
