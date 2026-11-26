@@ -138,7 +138,9 @@ jobs:
             if node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!q.marks)process.exit(1);require("fs").writeFileSync("marks.json",JSON.stringify(q.marks))'; then marks="--marks marks.json --tighten off"; fi
             node local/voice-film.mjs --audio "in.$EXT" --surah "$surah" ${ayat:+--ayat "$ayat"} --master mosque-hall $marks --out run 2>&1 | tee voice-film.log step.log
           else
-            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model base.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --out run 2>&1 | tee voice-film.log step.log
+            # The Craft Ledger (R2, through the Worker): earlier films' targets for the shot plan and the critic.
+            mkdir -p run && { node render/voice-runner.mjs ledger --out run/craft-ledger.json || echo "::warning::The craft ledger could not be read; the house standard sets the targets."; }
+            node local/voice-film.mjs --audio "in.$EXT" --kind narration --stt faster-whisper --model base.en --language en --media --master dry ${TOPIC:+--topic "$TOPIC"} --ledger run/craft-ledger.json --ledger-record off --film-id "$VOICE_ID" --out run 2>&1 | tee voice-film.log step.log
           fi
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
@@ -278,6 +280,8 @@ jobs:
         run: |
           echo deliver > .stage
           node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json
+      - name: Teach the craft ledger (this film's critic measures, for the next film)
+        run: node render/voice-runner.mjs ledger --report out/film.report.json || echo "::warning::The film is delivered, but the craft ledger could not record it."
       - name: Tell the studio what stopped it
         if: failure()
         run: |

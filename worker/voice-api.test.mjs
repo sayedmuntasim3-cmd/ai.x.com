@@ -253,3 +253,36 @@ test("Quran: the reviewer listens, taps each ayah end, and the film is made agai
   const quran = JSON.parse(sent.at(-1).inputs.quran);
   assert.deepEqual(quran.marks, { start: 1, ends: [4, 8, 12.5], by: "Hafiz A" });
 });
+
+test("the Craft Ledger: the runner reads it and records the film; the audience hook adds retention", async () => {
+  const { LEDGER_KEY, ledgerAudience } = await import("./voice-api.mjs");
+  const bucket = fakeBucket();
+  const env = { FILMS: bucket, STUDIO_TOKEN: "owner-token" };
+  await bucket.put(`voice/${ID}/voice.json`, JSON.stringify({ id: ID, kind: "narration", ext: "mp3", progress: [] }));
+  const ticket = await makeTicket("owner-token", ID, "runner", 3600, Date.now());
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/ledger`)).status, 401);
+  const empty = await call(env, "GET", `/api/voice/${ID}/ledger?ticket=${ticket}`);
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.data.films, []);
+  const report = { critic: { verdict: "pass", measures: { seconds: 180, movingShare: 0.7, designedPerMinute: 2, avgShot: 4, narrationCoverage: 1, cutsIn30: 8, longestShot: 7, cueCoverage: 0.9, subtitles: { maxGap: 2 } } } };
+  const put = await call(env, "POST", `/api/voice/${ID}/ledger?ticket=${ticket}`, { body: { report, genre: "biography" } });
+  assert.equal(put.status, 200);
+  assert.equal(put.data.films, 1);
+  assert.equal(put.data.note.code, "craft.added");
+  // The second film reads the first's record.
+  const read = await call(env, "GET", `/api/voice/${ID}/ledger`, { headers: OWNER });
+  assert.equal(read.data.films.length, 1);
+  assert.equal(read.data.films[0].filmId, ID);
+  assert.equal(read.data.films[0].genre, "biography");
+  assert.equal(read.data.films[0].measures.subtitleGap, 2);
+  // A report without measures teaches nothing and says so.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/ledger?ticket=${ticket}`, { body: { report: {} } })).status, 400);
+  // The audience hook: a retention report for a film in the ledger lands on its record; an unknown film is a note.
+  const curve = Array.from({ length: 100 }, (_, i) => ({ at: i / 100, watching: 0.9 - i * 0.006 }));
+  const note = await ledgerAudience(bucket, ID, { filmId: ID, videoId: "abc", at30: 70, half: 50, end: 35, curve, drops: [], holds: [] }, "2026-11-26T00:00:00Z");
+  assert.equal(note?.code, "craft.audience");
+  const after = JSON.parse(new TextDecoder().decode(bucket.files.get(LEDGER_KEY)));
+  assert.equal(after.films[0].audience.at30, 70);
+  const unknown = await ledgerAudience(bucket, "99999999-2222-3333-4444-555555555555", { at30: 70, end: 35, curve }, "2026-11-26T00:00:00Z");
+  assert.equal(unknown?.code, "craft.noFilm");
+});

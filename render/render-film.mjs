@@ -298,7 +298,7 @@ export function retryAfterSeconds(v, now = Date.now()) {
  * @typedef {import("../engine/src/timeline.mjs").Timeline} Timeline
  * oneTrack: the voice system's path: one recording is the whole narration, laid from 0:00, never sped up,
  *   slowed, cut or re-ordered (the timeline was built on its own word times); per-scene voice is ignored.
- * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[], edits?: any[] }} RenderOptions
+ * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[], edits?: any[], craft?: any }} RenderOptions
  *   edits: the Edit Director's plans (edit-C1.json ...), so the critic can say whether what the editor asked for reached the film.
  */
 
@@ -1179,7 +1179,7 @@ export async function renderFilm(o) {
   // The eyes' per-shot relevance (M3) reaches the gate too, not only the `why` field of a media file.
   // The critic also reads which scenes really carry a voice (a single recording voices them all) and the edit plans,
   // so a scene that lost its narration or a transition the editor asked for cannot pass unnoticed.
-  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
   if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
@@ -1307,13 +1307,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const own = applyOwnPictures(timeline, ownPictureFolder(args.pictures));
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
   }
+  // The Craft Ledger's targets for this film (written by local/voice-film.mjs): the critic notes each measure short of them.
+  const craftFile = args.run ? join(args.run, "craft-targets.json") : null;
+  const craft = craftFile && existsSync(craftFile) ? JSON.parse(readFileSync(craftFile, "utf8")) : null;
   const workDir = args.work ?? ".render";
   // Chunked render: --part i/N renders that part's picture only; --join a.mp4,b.mp4,... joins the parts and mixes the sound.
   const partArg = typeof args.part === "string" ? /^(\d+)\/(\d+)$/.exec(args.part) : null;
   if (args.part && !partArg) throw new Error(`--part must look like 2/8, not "${args.part}".`);
   const part = partArg ? { index: Number(partArg[1]) - 1, count: Number(partArg[2]) } : undefined;
   const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
-  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), ...(process.argv.includes("--no-graphics") ? { graphics: false } : {}), edits: chapters.map((c) => c.edit).filter(Boolean), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), ...(process.argv.includes("--no-graphics") ? { graphics: false } : {}), edits: chapters.map((c) => c.edit).filter(Boolean), ...(craft ? { craft } : {}), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
   if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
   // M6: the timeline (shot times, types, scene ids) is written next to the film, so the contact sheets
   // and the weak-shot loop are drawn from what was actually rendered, not from a second reading of the script.
@@ -1332,6 +1335,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(`cuts: ${cuts.map((c) => c.id).join(", ")}`);
     if (aiShots) report.warnings.unshift(`This film has ${aiShots} realistic AI scenes: when uploading, set "Altered or synthetic content" to Yes in YouTube Studio (nothing is written on the video).`);
     writeFileSync(base + ".report.json", JSON.stringify({ ...report, aiShots, thumbnails: thumbs.map((t) => ({ id: t.id, file: basename(t.file), frameFrom: t.frameFrom, bytes: t.bytes })), cuts: cuts.map((c) => ({ id: c.id, file: basename(c.file), seconds: c.seconds, size: `${c.width}x${c.height}` })) }, null, 1));
+  }
+  // A local film teaches the ledger it read (craft-targets.json names it); a studio film is recorded by the Worker.
+  if (craft?.ledgerFile && report.critic) {
+    const { recordFilm } = await import("../local/craft-memory.mjs");
+    for (const line of recordFilm({ file: craft.ledgerFile, filmId: craft.filmId ?? basename(args.out).replace(/\.mp4$/i, ""), report, genre: craft.genre })) console.log(line);
   }
   console.log(JSON.stringify({ ...report, licences: report.licences.length, warnings: report.warnings.length }, null, 1));
 }
