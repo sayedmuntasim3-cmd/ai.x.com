@@ -1,6 +1,6 @@
 # Reference standard (DRAFT, 21 Nov 2026)
 
-Status: **draft.** Everything below is measured from YouTube metadata unless marked "my reading". The shot-length, motion-versus-stills, text-moment and transition numbers are **not measured yet**: the owner is not asked for recordings (mission rule), so they will come from public sources (creators' talks, behind-the-scenes posts, chapter timings, published analyses), each marked sourced or "my reading". The Gate in `docs/missions/M1-reference-study.md` is therefore not met yet.
+Status: **draft.** Everything below is measured from YouTube metadata unless marked "my reading". The shot-length, motion-versus-stills, text-moment and title-timing numbers have **no public measured source** (searched 26 Nov, see "Craft numbers"); they are marked "my reading" there. The owner is not asked for anything. The Boss decides whether the Gate is met.
 
 ## Sources (all metadata only, no video downloaded)
 | What | Where | Count |
@@ -54,8 +54,26 @@ Source: YouTube Help, "Audience retention", https://support.google.com/youtube/a
 - One film = one named person, place or secret, 13-25 min, chapters in the description, the promise paid inside 30 s.
 - Calm, sourced, no hype; the landing-page design is the product's face (owner decision 16 Nov).
 
-## Craft numbers still to source (needed for the Gate)
-Median shot length, moving-footage versus stills share, text and graphic moments per minute, transitions, and when the title lands. Not measured yet; do not quote any such number until each has a public source or is marked "my reading". The only timing measured so far is chapter spacing (chapters exist in 24 of the owner's 46 links), still to be computed from `data/owner-links.json`.
+## Craft numbers (26 Nov 2026; public sources searched, few exist)
+Searched: creators' own process pages and talks, Cinemetrics (shot-length database), Stephen Follows' shot counts. **No public source gives a per-documentary or per-channel median shot length, moving-footage share, graphic moments per minute or title timing for YouTube documentaries.** Where a number is below, it says "sourced" (with link) or "my reading" (not measured; do not quote it as fact).
+
+| Item | Number | Status |
+|---|---|---|
+| Median shot length, archive/stock documentary (history, WWII) | 4-8 s | my reading (not measured) |
+| Median shot length, animated explainer (Kurzgesagt type) | 2-5 s per scene change | my reading (not measured) |
+| Shot count of an average documentary film | 491 shots (lowest of all genres; no runtime given, so no seconds per shot can be derived) | sourced: [Stephen Follows, 1,037 Cinemetrics films 1997-2016](https://stephenfollows.com/many-shots-average-movie/); these are mostly cinema films, not YouTube |
+| ASL caveat | the mean misleads when a film mixes many short and a few very long shots; Cinemetrics also shows the median | sourced: [Cinemetrics](https://cinemetrics.uchicago.edu/) |
+| Share of moving footage (video vs stills/graphics) | archive-led films: most of the time moving, with held stills and maps used as breaks; no number | my reading |
+| Text/graphic moments per minute | 2-4 (names, dates, places, a number) in the strong history and explainer films | my reading |
+| When the title lands | the title's promise is stated or shown within the first 30-60 s; YouTube's own Intro metric is the share still watching at 30 s | YouTube's 30 s window is sourced (see above); "30-60 s" is my reading |
+| Production effort, animated explainer | about 1,200 hours for one ~9 min Kurzgesagt video | sourced: [kottke.org summary of Kurzgesagt's own process video](https://kottke.org/20/02/how-to-make-a-kurzgesagt-video-in-just-1200-hours) |
+| Pre-production, Johnny Harris-style deep dive | scripting 3-4 days after a research phase; the whole process about four months | sourced only by a podcast/video summary ([podwise](https://podwise.ai/episodes/2768274)), treat as weak |
+| Chapter spacing, strong history/mystery films | median 3.2 min (1.3-10.5 min), first real chapter at a median ~120 s | measured from YouTube metadata (VIRAL_STUDY.md, n=15) |
+
+Consequence for the Gate: the shot-rhythm and graphic-density targets in TRANSFORMATION.md section 4 cannot honestly be called "measured". The only way to measure them is to watch and time a sample ourselves (not asked of the owner); until then they are "my reading" ranges above.
 
 ## Viral study (21 Nov)
 36 videos of 10M+ views across niches, with title/thumbnail/chapter patterns and per-film rules for Zupona: see `VIRAL_STUDY.md` (gaps in space, nature, business, motivation listed there).
+
+## Twelve niches (26 Nov)
+Top 3 long videos and a free-real-footage rating for each of the owner's 12 niches: see `VIRAL_STUDY.md`, section "The owner's 12 niches".
