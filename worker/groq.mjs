@@ -89,6 +89,35 @@ export function groqModel(o) {
   };
 }
 
+/** The one free Groq model that reads pictures (measured 26 Nov 2026: input text and image, 1,000 requests a day). */
+export const GROQ_EYES_MODEL = "qwen/qwen3.8-27b";
+
+/**
+ * Free eyes: one question about one picture (a public image URL), answered in text. The per-minute
+ * window is waited out (up to eight times); a used-up day or any other failure throws.
+ * @param {{ apiKey: string, model?: string, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void> }} o
+ * @returns {(question: string, imageUrl: string) => Promise<string>}
+ */
+export function groqLook(o) {
+  const get = o.fetch ?? fetch;
+  const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const model = o.model ?? GROQ_EYES_MODEL;
+  return async (question, imageUrl) => {
+    for (let attempt = 0; attempt < 9; attempt += 1) {
+      const res = await get("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${o.apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({ model, max_tokens: 120, temperature: 0, reasoning_format: "hidden", messages: [{ role: "user", content: [{ type: "text", text: question }, { type: "image_url", image_url: { url: imageUrl } }] }] }),
+      });
+      if (res.ok) return String((/** @type {any} */ (await res.json())).choices?.[0]?.message?.content ?? "");
+      const raw = await res.text().catch(() => "");
+      if (res.status === 429 && !/per day|RPD|TPD/i.test(raw) && attempt < 8) { await sleep(Math.min(65, Number(res.headers.get("retry-after")) || 10) * 1000 + 500); continue; }
+      throw Object.assign(new Error(`Groq eyes ${res.status}: ${raw.slice(0, 160)}`), { status: res.status });
+    }
+    throw Object.assign(new Error("Groq eyes: still busy after eight waits"), { status: 429 });
+  };
+}
+
 /**
  * Gemini (or any brain) with Groq taking the calls that fit: Groq first, so Gemini's 20 requests a
  * day per model are kept for the calls only it can take; any Groq failure goes to the main brain.

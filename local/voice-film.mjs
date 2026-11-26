@@ -6,6 +6,8 @@
  *        [--adab strict|nature|people-distant]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media] [--tighten on|off]
  *        [--marks marks.json]   (Quran: the reviewer's ayah times {start, ends[], by}; they become confirmed ends)
+ *        [--eyes]               (with --media: after the plan, every picture shot is searched again from its own sentence,
+ *                                OpenCLIP chooses, and the critic's free eyes re-pick any miss; render/asset-rank/rerank.mjs)
  *        [--slice 0:00-3:00]    (the test bench: the whole pipeline runs on that stretch of the recording only;
  *                                a --transcript is cut to it and moved to start at 0; slice.json says where it came from)
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
@@ -46,7 +48,8 @@ import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from ".
 import { DESIGNED_TYPES, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
-import { groqModel } from "../worker/groq.mjs";
+import { groqLook, groqModel } from "../worker/groq.mjs";
+import { rerankRun } from "../render/asset-rank/rerank.mjs";
 
 import { planVoice } from "../engine/src/voice-plan.mjs";
 import { ayahEndsOf } from "../engine/src/voice-master.mjs";
@@ -543,6 +546,17 @@ async function main() {
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
     if (!step4.ok) process.exit(1);
+    if (args.eyes === true && args.media === true && step3.kind !== "quran") {
+      // The eyes never stop the film: without Python, OpenCLIP or the network the plan's picks stay.
+      const groq = process.env.GROQ_API_KEY && String(process.env.GROQ ?? "").toLowerCase() !== "off" ? String(process.env.GROQ_API_KEY) : "";
+      const t = Date.now();
+      try {
+        await rerankRun({ run: out, brain: vb.model, look: groq ? groqLook({ apiKey: groq }) : null, topic: typeof args.topic === "string" ? args.topic : undefined, log: (line) => console.log("- " + line) });
+        console.log(`- Eyes done in ${Math.round((Date.now() - t) / 1000)} s.`);
+      } catch (e) {
+        console.log(`! The eyes could not rank the pictures (${String(/** @type {any} */ (e)?.message ?? e).slice(0, 200)}); the plan's picks stay.`);
+      }
+    }
   } else if (args.master) {
     if (args.kind === "auto") { console.error("--master needs --kind quran or narration when there is no transcript to tell them apart."); process.exit(2); }
     const m = await master({ audio: voicePath, out, kind: /** @type {any} */ (args.kind), space: typeof args.master === "string" ? args.master : undefined, lang, log: (line) => console.log(line) });

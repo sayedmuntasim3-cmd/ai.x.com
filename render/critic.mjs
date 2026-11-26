@@ -345,6 +345,99 @@ export function critique(timeline, report = {}, evidence = {}) {
 }
 
 /**
+ * The question the critic's eyes answer about one shot: does this picture show what the viewer hears?
+ * Strict on the film's world (another country's people, money or streets is a miss), lenient on
+ * documentary craft (a clear visual metaphor for an abstract line is a fit).
+ * @param {string} sentence the sentence heard over the shot @param {{ country?: string, city?: string, currency?: string, era?: string, demonym?: string }} [world] @param {string} [heard] the part of it under this picture
+ */
+export function pictureQuestion(sentence, world = {}, heard = "") {
+  const where = [world.city, world.country].filter(Boolean).join(", ");
+  const over = heard && heard !== sentence ? heard : sentence;
+  return [
+    `You check pictures for a documentary${where ? ` set in ${where}` : ""}${world.era ? `, ${world.era}` : ""}${world.currency ? `, money in ${world.currency}` : ""}.`,
+    `The narrator says, over this picture: "${String(over).slice(0, 300)}"${over !== sentence ? ` (from the sentence: "${String(sentence).slice(0, 300)}")` : ""}`,
+    "Would a viewer hearing that line accept this picture as showing it? It fits when it shows the thing, place or action said, or a clear visual image of an abstract line (a clock for time passing, hands searching files for 'no record').",
+    `It does not fit when it shows something unrelated, a picture of a different thing with the same word, a non-${world.demonym || "local"} person or another country's money or streets, a cartoon, or text and logos that are not the subject.`,
+    'Answer only JSON: {"fits": true or false, "sees": "what the picture shows, 10 words or fewer", "why": "8 words or fewer"}',
+  ].join("\n");
+}
+
+/** The eyes' answer as data; null when it is not readable. @param {string} text */
+export function parseFit(text) {
+  const m = /\{[\s\S]*\}/.exec(String(text ?? ""));
+  if (!m) return null;
+  try {
+    const j = JSON.parse(m[0]);
+    if (typeof j.fits !== "boolean") return null;
+    return { fits: j.fits, sees: String(j.sees ?? "").slice(0, 120), why: String(j.why ?? "").slice(0, 120) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The critic's per-shot check: the picture against its sentence, by free eyes (a model that reads
+ * images). A failed or unreadable look is `fits: null` (unknown), never a pass.
+ * @param {(question: string, imageUrl: string) => Promise<string>} look
+ * @param {{ sentence: string, heard?: string, imageUrl: string, world?: any }} shot
+ * @returns {Promise<{ fits: boolean | null, sees: string, why: string }>}
+ */
+export async function judgePicture(look, shot) {
+  try {
+    const fit = parseFit(await look(pictureQuestion(shot.sentence, shot.world, shot.heard), shot.imageUrl));
+    return fit ?? { fits: null, sees: "", why: "unreadable answer" };
+  } catch (e) {
+    return { fits: null, sees: "", why: String(/** @type {any} */ (e)?.message ?? e).slice(0, 120) };
+  }
+}
+
+/** The critic's reading of candidates by what their makers wrote about them (stock tags), for a text brain. */
+export const CHOICE_SYSTEM = [
+  "You check pictures for a documentary. For each shot you get the line the narrator says over it and numbered candidate clips, each described by its stock-library tags.",
+  "List the numbers of the candidates a viewer hearing that line would accept as showing it: the thing, place or action said, or a clear visual image of an abstract line (a clock for time passing, hands searching files for 'no record').",
+  "Refuse a candidate whose tags show something unrelated, the same word with another meaning (a 'bill' that is a bird or a person named Bill), a wedding, festival, religious rite or tourist sight the line does not speak of, people, money or streets of another country than the film's, cartoons, or abstract backgrounds.",
+  "People: when tags show a person (businessman, seamstress, barber, family, portrait) and name no country, they are usually Western stock models; prefer hands, tools, places and objects, and accept such a person only when no other candidate shows the line.",
+  "Reply with exactly one line per shot and nothing else: ID | numbers that fit, best first, separated by commas (or none)",
+].join("\n");
+
+/**
+ * Read the critic's lines into {id: indices that fit, best first}; a shot with no line is unknown (absent).
+ * @param {string} text @returns {Map<string, number[]>}
+ */
+export function parseChoices(text) {
+  const out = new Map();
+  for (const line of String(text ?? "").split("\n")) {
+    const m = /^\s*[*-]?\s*`?(SC\d{4,5}-\d+)`?\s*[|:]\s*(.*)$/.exec(line);
+    if (!m) continue;
+    out.set(m[1], /none/i.test(m[2]) ? [] : [...new Set([...m[2].matchAll(/\d+/g)].map((x) => Number(x[0])))]);
+  }
+  return out;
+}
+
+/**
+ * The critic on candidates' words: which of each shot's candidates show its line (batches of 8 shots).
+ * @param {{ brain: { call: (req: any) => Promise<{ text?: string }> }, shots: { id: string, heard: string, sentence: string, options: string[] }[], world?: any, log?: (s: string) => void }} o
+ * @returns {Promise<Map<string, number[]>>} 1-based option numbers that fit, per shot id
+ */
+export async function chooseByWords(o) {
+  const where = [o.world?.city, o.world?.country].filter(Boolean).join(", ");
+  const brief = `The film is set in ${where || "a place not given"}${o.world?.era ? `, ${o.world.era}` : ""}${o.world?.currency ? `; its money is ${o.world.currency}` : ""}${o.world?.demonym ? `; its people are ${o.world.demonym}` : ""}.`;
+  /** @type {Map<string, number[]>} */
+  const out = new Map();
+  for (let i = 0; i < o.shots.length; i += 8) {
+    const batch = o.shots.slice(i, i + 8);
+    const text = batch.map((s) => [`${s.id} | line: "${s.heard}"${s.sentence && s.sentence !== s.heard ? ` (sentence: "${s.sentence}")` : ""}`, ...s.options.map((t, k) => `  ${k + 1}. ${String(t).slice(0, 110)}`)].join("\n")).join("\n");
+    try {
+      const reply = await o.brain.call({ stage: "V4", system: [{ text: CHOICE_SYSTEM }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: 1600, effort: "low" });
+      for (const [id, nums] of parseChoices(reply.text ?? "")) if (batch.some((s) => s.id === id)) out.set(id, nums);
+    } catch (e) {
+      o.log?.(`Critic: the free brain did not answer a batch (${String(/** @type {any} */ (e)?.message ?? e).slice(0, 120)}); those shots stay unjudged.`);
+    }
+  }
+  return out;
+}
+
+/**
  * Samples of the picture from ffmpeg's metadata print: time, blur score
  * (higher is blurrier) and average luma.
  * @param {string} text

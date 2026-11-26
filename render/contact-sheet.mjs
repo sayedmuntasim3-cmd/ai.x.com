@@ -33,8 +33,8 @@ export const HOUSE = Object.freeze({
   shortShot: 1,
   /** A weak shot is sent back at most this many times; after that the Boss decides. */
   maxReturns: 2,
-  /** Tile and sheet layout: 16:9 tiles with a caption bar under each, six to a row. */
-  tile: [400, 225],
+  /** Tile and sheet layout: 16:9 tiles (an even height, as 4:2:0 frames need) with a caption bar under each, six to a row. */
+  tile: [400, 224],
   bar: 28,
   cols: 6,
   margin: 6,
