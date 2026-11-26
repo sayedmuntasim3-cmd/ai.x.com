@@ -7,6 +7,10 @@ Merge and deploy: the owner gave written permission on 20 Nov 2026 ("মার�
 production. Never force-push, reset or delete branches; on a real conflict with the other session's work, ask him.
 
 ## Owner's decisions (newest first; never undo without him)
+- 26 Nov 2026: the Boss has full authority over the platform (after the owner). Every film follows
+  `docs/OWNER_BRIEF.md`. Check every instruction, even the owner's own prompt: if it is wrong, correct it and do better.
+  Main target: English documentaries for a USA audience. First niches: Space, WWII, Disasters & Mysteries,
+  Engineering & Megaprojects (free real footage), then the rest of the owner's 12.
 - 20 Nov 2026: written permission to merge and deploy (see top). Zero cost, no Claude API: free brains only.
 - 19 Nov 2026: Content languages: American English documentaries and Arabic Quran recitation only
   (Bangla/Hindi off: `ACTIVE_VERSION_IDS`). No branch deletion, force push or reset; on any conflict, ask him first.
