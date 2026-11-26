@@ -19,7 +19,7 @@
  *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed with the Worker's own key (free; the key never leaves Cloudflare)   (ticket, or Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/film             the finished MP4   (?ticket= from GET /api/voice/:id, or Bearer STUDIO_TOKEN)
- *   POST /api/voice/daily                start today's daily film (the next unused topic; also the Worker's daily cron)   (Bearer STUDIO_TOKEN)
+ *   POST /api/voice/daily                start today's daily film (the next unused topic)   (Bearer STUDIO_TOKEN, or GitHub's OIDC token of daily-film.yml's schedule)
  *   POST /api/voice/:id/brain            { system, prompt, maxTokens } one script call through the free brain (Groq, then Gemini)   (ticket, daily film only)
  *   POST /api/voice/:id/voice            { bytes } -> open the upload of the daily film's narration; then parts/:n and complete   (ticket, daily film only)
  *   GET  /api/voice/:id/ledger           the channel's Craft Ledger (R2 channel/craft-ledger.json), for the next film's targets   (ticket, or Bearer STUDIO_TOKEN)
@@ -35,6 +35,7 @@ import { checkMarks } from "../engine/src/quran-marks.mjs";
 import { addAudience, addRecord, emptyLedger, ledgerJson, parseLedger, recordFromReport } from "../engine/src/craft-memory.mjs";
 import { brainFromEnv } from "./brain.mjs";
 import { nextDailyTopic } from "./daily-film.mjs";
+import { checkGithubOidc } from "./github-oidc.mjs";
 
 /** The Craft Ledger's one home: next to channel/lessons.json, one ledger for every film of the channel. */
 export const LEDGER_KEY = "channel/craft-ledger.json";
@@ -243,13 +244,13 @@ async function dispatchWorkflow(o, workflow, inputs) {
   return { ok: false, error: `Film not started: ${why}. ${detail}`.trim() };
 }
 
-/** A daily film that was started this long ago and never got its voice may be started again. */
-export const DAILY_RETRY_MS = 20 * 3600 * 1000;
+/** One daily film per 12 hours: the cron's next day is never skipped by a film started by hand in the afternoon. */
+export const DAILY_RETRY_MS = 12 * 3600 * 1000;
 
 /**
  * Start today's daily film: the next topic no earlier daily film has voiced, a record for it, and the
- * daily-film workflow (script, narration, then the voiceover pipeline). One a day: a film started in
- * the last 20 hours that has not failed is left alone. Used by the Worker's cron and POST /api/voice/daily.
+ * daily-film workflow (script, narration, then the voiceover pipeline). A film started in the last
+ * 12 hours that has not failed is left alone (so the cron's next day still runs). Used by POST /api/voice/daily (daily-film.yml's schedule, or the studio).
  * @param {any} env @param {{ fetch?: typeof fetch, now?: () => number, uuid?: () => string, site?: string }} [deps]
  * @returns {Promise<{ ok: true, id: string, topic: string, actionsUrl: string } | { ok: false, skipped?: boolean, error: string }>}
  */
@@ -315,7 +316,9 @@ export async function handleVoice(request, env, url, deps = {}) {
   }
 
   if (parts[0] === "daily" && parts.length === 1 && method === "POST") {
-    if (!owner) return json({ error: "Wrong studio token." }, 401);
+    // The studio key, or the daily schedule itself: GitHub's identity token for daily-film.yml on main (no stored secret).
+    const scheduled = !owner && bearer.split(".").length === 3 && env.GITHUB_REPO && (await checkGithubOidc(bearer, { repo: env.GITHUB_REPO, workflow: "daily-film.yml", audience: "zupona-daily", now: now(), fetch: deps.fetch }));
+    if (!owner && !scheduled) return json({ error: "Wrong studio token." }, 401);
     const r = await startDailyFilm(env, { fetch: deps.fetch, now, uuid: deps.uuid, site: env.SITE_URL || url.origin });
     return json(r, r.ok ? 202 : r.skipped ? 409 : 502);
   }

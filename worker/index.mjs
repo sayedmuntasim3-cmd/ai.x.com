@@ -66,7 +66,7 @@ import { listFilms } from "./films.mjs";
 import { radarSearch, videoDetails } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
-import { handleVoice, ledgerAudience, startDailyFilm } from "./voice-api.mjs";
+import { handleVoice, ledgerAudience } from "./voice-api.mjs";
 import { handleMedia } from "./media-api.mjs";
 
 const FILE_NAME = /^[a-z0-9][a-z0-9.-]{0,60}$/i;
@@ -247,17 +247,6 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
 }
 
 export default {
-  /**
-   * The daily film (wrangler.jsonc triggers.crons): once a day the next engineering topic is written, voiced and
-   * made into a film through the voiceover pipeline (worker/daily-film.mjs). DAILY_FILM=off stops it.
-   * @param {any} _event @param {any} env @param {any} ctx
-   */
-  async scheduled(_event, env, ctx) {
-    if (String(env.DAILY_FILM ?? "").toLowerCase() === "off") return;
-    const run = startDailyFilm(env).then((r) => console.log(`daily film: ${JSON.stringify(r)}`));
-    if (ctx?.waitUntil) ctx.waitUntil(run);
-    await run;
-  },
   /** @param {Request} request @param {any} env */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
