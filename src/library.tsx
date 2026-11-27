@@ -42,7 +42,7 @@ const SHOT_SOURCE: Record<ShotList["source"], string> = {
 };
 
 const SUGGESTIONS: Record<CategoryId, string[]> = {
-  nature: ["Snow leopard", "Rainforest canopy", "Wildebeest migration"],
+  engineering: ["Hoover Dam", "Katrina levees", "Panama Canal"],
   ocean: ["Coral reef", "Humpback whale", "Lighthouse storm"],
   space: ["Pillars of Creation", "Saturn", "Aurora from space"],
   history: ["Mughal miniature", "Silk Road", "Steam locomotive"],

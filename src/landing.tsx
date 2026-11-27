@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import {
   AGES,
   CATEGORIES,
+  DURATION_CHIPS,
   DURATION_PRESETS,
   INSPIRATIONS,
   MAX_MINUTES,
   MIN_MINUTES,
   MUSIC,
+  SHOW_PREVIEW_AND_GALLERY,
   STYLES,
   estimateCredits,
   CREDIT_NOTE,
@@ -92,7 +94,7 @@ const DEFAULT_DRAFT: Draft = {
   mode: "idea",
   idea: "",
   minutes: 8,
-  category: "nature",
+  category: "engineering",
   age: "all",
   style: "cinematic",
   music: "epic",
@@ -266,8 +268,11 @@ export default function Landing() {
         <section
           id="studio"
           aria-label="Documentary studio"
-          className={`${container} relative z-10 mt-8 grid scroll-mt-4 grid-cols-1 items-start gap-12 sm:mt-10 lg:mt-14 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)] lg:gap-14`}
+          className={`${container} relative z-10 mt-8 grid scroll-mt-4 grid-cols-1 items-start gap-12 sm:mt-10 lg:mt-14 ${
+            SHOW_PREVIEW_AND_GALLERY ? "lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)] lg:gap-14" : ""
+          }`}
         >
+          <div className={SHOW_PREVIEW_AND_GALLERY ? "min-w-0" : "mx-auto w-full min-w-0 max-w-[40rem]"}>
           <Composer
             draft={draft}
             update={update}
@@ -282,19 +287,22 @@ export default function Landing() {
             ideaRef={ideaRef}
             flash={flash}
           />
-          <Preview
-            category={draft.category}
-            title={title}
-            subtitle={subtitle}
-            runtime={formatRuntime(totalSeconds)}
-            age={findOption(AGES, draft.age).label}
-            chapters={chapters}
-            totalSeconds={totalSeconds}
-          />
+          </div>
+          {SHOW_PREVIEW_AND_GALLERY && (
+            <Preview
+              category={draft.category}
+              title={title}
+              subtitle={subtitle}
+              runtime={formatRuntime(totalSeconds)}
+              age={findOption(AGES, draft.age).label}
+              chapters={chapters}
+              totalSeconds={totalSeconds}
+            />
+          )}
         </section>
 
         <Library idea={userText} topic={draft.category} request={null} />
-        <Explore onPick={loadIdea} />
+        {SHOW_PREVIEW_AND_GALLERY && <Explore onPick={loadIdea} />}
         <HowItWorks />
         <Closing />
       </main>
@@ -321,7 +329,7 @@ function Header() {
         {[
           ["#studio", "Studio"],
           ["#library", "Library"],
-          ["#explore", "Explore"],
+          ...(SHOW_PREVIEW_AND_GALLERY ? [["#explore", "Explore"] as [string, string]] : []),
           ["#how", "How it works"],
         ].map(([href, label]) => (
           <a key={href} href={href} className="rounded-full px-4 py-2 text-[15px] text-ink-2 transition-colors hover:bg-sunken hover:text-ink">
@@ -409,6 +417,12 @@ function Composer(props: ComposerProps) {
   const mins = draft.minutes % 60;
   const lockedClock = formatRuntime(totalSeconds);
 
+  // A chip is selected until the visitor asks for a custom length (or a saved draft holds one).
+  const [custom, setCustom] = useState(!(DURATION_CHIPS as readonly number[]).includes(draft.minutes));
+  useEffect(() => {
+    if (!(DURATION_CHIPS as readonly number[]).includes(draft.minutes)) setCustom(true);
+  }, [draft.minutes]);
+
   return (
     <div
       className={`rounded-[28px] border border-line bg-surface p-4 shadow-card transition-shadow duration-500 motion-safe:animate-rise motion-safe:[animation-delay:160ms] sm:p-6 ${
@@ -456,15 +470,37 @@ function Composer(props: ComposerProps) {
 
       {draft.mode === "idea" ? <IdeaPanel {...props} /> : <VoicePanel {...props} />}
 
-      {/* Duration */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
+      {/* Duration: five chips, plus a stepper for anything else */}
+      <div className="mt-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p id="duration-label" className="text-[17px] font-medium text-ink">
             Duration
           </p>
-          {voiceLocked && <p className="mt-0.5 text-[13px] text-muted">Matched to your narration</p>}
+          <p className="text-[13px] tabular-nums text-muted">{voiceLocked ? lockedClock : `${hours}h ${String(mins).padStart(2, "0")}m`}</p>
         </div>
-        <div className="flex items-center gap-2">
+        {voiceLocked && <p className="mt-0.5 text-[13px] text-muted">Matched to your narration</p>}
+        <div role="group" aria-labelledby="duration-label" className="mt-3 flex flex-wrap gap-2">
+          {DURATION_CHIPS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={custom ? false : draft.minutes === m}
+              disabled={voiceLocked}
+              onClick={() => {
+                setCustom(false);
+                update("minutes", m);
+              }}
+              className={durationChip(!custom && draft.minutes === m)}
+            >
+              {m} min
+            </button>
+          ))}
+          <button type="button" aria-pressed={custom} disabled={voiceLocked} onClick={() => setCustom(true)} className={durationChip(custom)}>
+            Custom
+          </button>
+        </div>
+        {custom && (
+        <div className="mt-3 flex items-center gap-2">
           <Select
             label="Preset lengths"
             triggerLabel="Choose a preset length"
@@ -477,7 +513,7 @@ function Composer(props: ComposerProps) {
           >
             <ClockIcon size={22} />
           </Select>
-          <div role="group" aria-labelledby="duration-label" className="flex h-11 items-center rounded-full bg-sunken p-1 min-[380px]:h-12">
+          <div role="group" aria-label="Custom length" className="flex h-11 items-center rounded-full bg-sunken p-1 min-[380px]:h-12">
             <StepButton
               label="Shorter"
               disabled={voiceLocked || draft.minutes <= MIN_MINUTES}
@@ -497,6 +533,7 @@ function Composer(props: ComposerProps) {
             </StepButton>
           </div>
         </div>
+        )}
       </div>
 
       {/* Idea + age systems */}
@@ -597,6 +634,11 @@ function Composer(props: ComposerProps) {
   );
 }
 
+const durationChip = (on: boolean) =>
+  `inline-flex h-11 items-center rounded-full border px-4 text-[15px] font-medium transition disabled:pointer-events-none disabled:opacity-40 ${
+    on ? "border-transparent bg-brand-gradient text-white shadow-cta" : "border-line-strong text-ink-2 hover:border-ink/40 hover:text-ink"
+  }`;
+
 const rowTrigger =
   "flex h-full min-h-[64px] w-full items-center gap-2.5 rounded-2xl bg-sunken p-2.5 text-left transition hover:bg-sunken-strong sm:gap-3 sm:p-3";
 
@@ -684,7 +726,7 @@ function IdeaPanel({ draft, update, error, setError, ideaRef }: ComposerProps) {
             update("idea", e.target.value);
             if (error) setError("");
           }}
-          placeholder="e.g. Why the Panama Canal took three tries, and what the first two cost"
+          placeholder="e.g. Why the Tacoma Narrows Bridge tore itself apart"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? "studio-error" : undefined}
           className="block max-h-64 min-h-[116px] w-full resize-none bg-transparent px-4 pb-4 pr-14 pt-3.5 text-[16px] leading-relaxed text-ink outline-none placeholder:text-muted [field-sizing:content] focus-visible:outline-none"
@@ -1123,18 +1165,18 @@ function Explore({ onPick }: { onPick: (id: CategoryId) => void }) {
 const STEPS = [
   {
     icon: <BulbIcon size={22} />,
-    title: "Describe it",
-    text: "Write a sentence about your idea, or bring your own voiceover. That is all it takes to begin.",
+    title: "Bring an idea",
+    text: "One line is enough: a bridge that failed, a dam that should not exist, a night a city flooded.",
   },
   {
     icon: <LayersIcon size={22} />,
-    title: "Shape it",
-    text: "Set the length, the audience, the look and the score. Every choice stays yours to change.",
+    title: "Research and script",
+    text: "Zupona reads the public record, writes the script and keeps a source page for every claim it makes.",
   },
   {
     icon: <FilmIcon size={22} />,
-    title: "Watch it",
-    text: "Zupona brings script, visuals, narration and music together into one film you can share.",
+    title: "Film with real footage",
+    text: "Real archive photographs and film run under the narration, with the licence and the source page in the end titles.",
   },
 ];
 
@@ -1211,9 +1253,11 @@ function Footer() {
         <a href="#studio" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
           Studio
         </a>
-        <a href="#explore" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
-          Explore
-        </a>
+        {SHOW_PREVIEW_AND_GALLERY && (
+          <a href="#explore" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
+            Explore
+          </a>
+        )}
         <a href="https://zupona.com" className="inline-flex min-h-11 items-center transition-colors hover:text-ink">
           zupona.com
         </a>
@@ -1234,11 +1278,14 @@ const NAV = [
   { id: "how", label: "Guide", Icon: LayersIcon },
 ] as const;
 
+// The Explore tab goes with the gallery it points at (see SHOW_PREVIEW_AND_GALLERY in ./data).
+const NAV_ITEMS = NAV.filter((n) => SHOW_PREVIEW_AND_GALLERY || n.id !== "explore");
+
 function MobileNav() {
   const [active, setActive] = useState<string>("top");
 
   useEffect(() => {
-    const sections = NAV.map((n) => (n.id === "top" ? document.getElementById("hero-title") : document.getElementById(n.id))).filter(
+    const sections = NAV_ITEMS.map((n) => (n.id === "top" ? document.getElementById("hero-title") : document.getElementById(n.id))).filter(
       (el): el is HTMLElement => el !== null,
     );
     const observer = new IntersectionObserver(
@@ -1259,8 +1306,8 @@ function MobileNav() {
       aria-label="Sections"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-5">
-        {NAV.map(({ id, label, Icon }) => {
+      <ul className={`mx-auto grid max-w-md ${SHOW_PREVIEW_AND_GALLERY ? "grid-cols-5" : "grid-cols-4"}`}>
+        {NAV_ITEMS.map(({ id, label, Icon }) => {
           const on = active === id;
           return (
             <li key={id}>

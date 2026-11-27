@@ -126,40 +126,60 @@ export function HeroMountains({ className = "" }: { className?: string }) {
 
 type SceneProps = { id: string };
 
-function NatureScene({ id }: SceneProps) {
+function EngineeringScene({ id }: SceneProps) {
+  // A suspension bridge at dusk: two towers, the main cable sagging between them, and the
+  // vertical suspenders that carry the deck. Same night palette as the other posters.
+  const cableY = (x: number) =>
+    x <= 120 ? 58 + (120 - x) * 0.88 : x >= 280 ? 58 + (x - 280) * 0.88 : 58 + ((x - 120) * (280 - x)) / 133;
+  const cable = Array.from({ length: 37 }, (_, i) => `${20 + i * 10},${r1(cableY(20 + i * 10))}`).join(" ");
+  const suspenders = Array.from({ length: 11 }, (_, i) => 130 + i * 14);
   return (
     <>
       <defs>
         <linearGradient id={`${id}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#1B2150" />
-          <stop offset="0.5" stopColor="#5B3E86" />
-          <stop offset="0.78" stopColor="#D9708F" />
-          <stop offset="1" stopColor="#F7B98A" />
+          <stop offset="0" stopColor="#121A3C" />
+          <stop offset="0.5" stopColor="#4A3C7E" />
+          <stop offset="0.78" stopColor="#B65C8A" />
+          <stop offset="1" stopColor="#F2A87C" />
         </linearGradient>
         <radialGradient id={`${id}-glow`} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#FFE2C4" stopOpacity="0.95" />
+          <stop offset="0" stopColor="#FFE0BE" stopOpacity="0.9" />
           <stop offset="1" stopColor="#FFB184" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id={`${id}-mist`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#F3C2C7" stopOpacity="0" />
-          <stop offset="1" stopColor="#F3C2C7" stopOpacity="0.5" />
+        <linearGradient id={`${id}-water`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3B3168" />
+          <stop offset="0.45" stopColor="#241F45" />
+          <stop offset="1" stopColor="#0E0C22" />
         </linearGradient>
       </defs>
       <rect width="400" height="250" fill={`url(#${id}-sky)`} />
       <g className="scene-rise">
-        <circle cx="282" cy="150" r="76" fill={`url(#${id}-glow)`} />
-        <circle cx="282" cy="150" r="24" fill="#FFF1DE" opacity="0.95" />
+        <circle cx="200" cy="128" r="78" fill={`url(#${id}-glow)`} />
+        <circle cx="200" cy="128" r="19" fill="#FFEBCB" opacity="0.9" />
       </g>
-      <g fill="#FFF8F0" opacity="0.8">
-        <circle cx="48" cy="34" r="1.4" /><circle cx="96" cy="22" r="1" /><circle cx="140" cy="48" r="1.2" /><circle cx="210" cy="28" r="1" /><circle cx="330" cy="40" r="1.3" /><circle cx="372" cy="18" r="1" /><circle cx="250" cy="60" r="0.9" />
+      <g fill="#FFF8F0" opacity="0.7">
+        <circle cx="46" cy="30" r="1.3" /><circle cx="92" cy="20" r="1" /><circle cx="145" cy="44" r="1.1" /><circle cx="250" cy="26" r="1" /><circle cx="318" cy="46" r="1.2" /><circle cx="366" cy="18" r="1" /><circle cx="286" cy="70" r="0.9" />
       </g>
-      <path d="M0 150 L40 128 L78 140 L120 102 L150 122 L190 88 L232 126 L270 110 L310 132 L350 98 L400 124 L400 250 L0 250Z" fill="#8D7BB5" opacity="0.9" />
-      <path d="M190 88 L176 102 L183 98 L189 108 L195 99 L203 106 L209 101Z M120 102 L108 114 L114 111 L119 119 L125 110 L131 116 L136 112Z M350 98 L338 110 L344 107 L349 116 L355 107 L362 113 L367 109Z" fill="#FFF4F4" />
-      <rect y="118" width="400" height="72" fill={`url(#${id}-mist)`} />
-      <path d="M0 178 L30 160 L64 170 L104 140 L140 162 L176 150 L214 170 L252 144 L292 168 L336 150 L372 166 L400 156 L400 250 L0 250Z" fill="#4A3D7C" />
-      <path d="M0 200 C40 188 70 184 110 192 C150 200 180 178 220 182 C260 186 300 204 340 196 C370 190 390 186 400 188 L400 250 L0 250Z" fill="#2B2756" />
-      <path d="M0 226 C60 214 120 218 170 224 C230 232 290 214 340 218 C370 220 390 226 400 228 L400 250 L0 250Z" fill="#171637" />
-      <path d="M24 226 l6 -20 l6 20z M36 228 l7 -26 l7 26z M50 227 l5 -16 l5 16z M352 222 l6 -22 l6 22z M366 224 l5 -15 l5 15z" fill="#0F0F28" />
+      <rect y="150" width="400" height="100" fill={`url(#${id}-water)`} />
+      <path d="M0 150 L58 143 L120 148 L196 140 L268 147 L336 141 L400 147 L400 151 L0 151Z" fill="#2C2753" />
+      <g fill="#F5C9B4" opacity="0.16">
+        <rect x="26" y="168" width="74" height="2" rx="1" /><rect x="182" y="180" width="96" height="2" rx="1" /><rect x="300" y="166" width="62" height="2" rx="1" /><rect x="96" y="206" width="120" height="2" rx="1" /><rect x="252" y="222" width="92" height="2" rx="1" />
+      </g>
+      <g opacity="0.35" fill="#0D0B20">
+        <rect x="117" y="150" width="6" height="46" /><rect x="277" y="150" width="6" height="46" />
+      </g>
+      <rect x="0" y="146" width="400" height="4" fill="#141130" />
+      <g fill="#141130">
+        <rect x="117" y="46" width="6" height="104" /><rect x="277" y="46" width="6" height="104" />
+        <rect x="112" y="46" width="16" height="3" /><rect x="272" y="46" width="16" height="3" />
+        <rect x="114" y="86" width="12" height="3" /><rect x="274" y="86" width="12" height="3" />
+      </g>
+      <g stroke="#141130" fill="none" strokeLinecap="round">
+        <polyline points={cable} strokeWidth="2" />
+        {suspenders.map((x) => (
+          <line key={x} x1={x} y1={r1(cableY(x))} x2={x} y2="146" strokeWidth="1" opacity="0.85" />
+        ))}
+      </g>
     </>
   );
 }
@@ -434,7 +454,7 @@ function CultureScene({ id }: SceneProps) {
 }
 
 const SCENES: Record<CategoryId, (p: SceneProps) => ReactElement> = {
-  nature: NatureScene,
+  engineering: EngineeringScene,
   ocean: OceanScene,
   space: SpaceScene,
   history: HistoryScene,
