@@ -273,6 +273,18 @@ var SOURCES = [
     keys: ["NARA_API_KEY"],
     signup: "https://www.archives.gov/research/catalog/help/api"
   },
+  {
+    id: "dvids",
+    name: "DVIDS (US military media)",
+    homepage: "https://www.dvidshub.net",
+    group: "Libraries & archives",
+    holds: "US military photos and video stills: bridges, dams, ports, construction, disaster relief",
+    scale: "Millions of public domain assets",
+    topics: ["history", "science"],
+    quality: 0.7,
+    keys: ["DVIDS_API_KEY"],
+    signup: "https://api.dvidshub.net/docs/authentication"
+  },
   // Nature
   {
     id: "inaturalist",
@@ -1189,6 +1201,48 @@ var nara = async (ctx) => {
   }
   return out;
 };
+// DVIDS: all media is produced by the US DoD or a federal agency and is public domain "unless other
+// copyright status is indicated" (api.dvidshub.net/docs/copyright). The search returns only a small
+// thumbnail, so the top hits go through the Asset API for the full-resolution file. A video contributes
+// its full-resolution frame capture (a still), not the clip.
+var DVIDS_NOT_FREE = /©|\bcopyright(ed)?\b|all rights reserved|used with permission|reprinted|\bcourtesy\b|licensed|shutterstock|getty/i;
+var dvids = async (ctx) => {
+  const key = ctx.env.DVIDS_API_KEY ?? "";
+  const search = await ctx.http.json(
+    `https://api.dvidshub.net/search?${qs({ q: ctx.query, "type[]": ["image", "video"], max_results: Math.min(50, ctx.perSource * 2 + 4), sort: "relevance", api_key: key })}`
+  );
+  const hits = (search.results ?? []).filter((h) => h?.id && /^(image|video):/.test(h.id)).slice(0, ctx.perSource + 2);
+  const assets = await Promise.all(
+    hits.map((h) => ctx.http.json(`https://api.dvidshub.net/asset?${qs({ id: h.id, api_key: key })}`).then((d) => d.results, () => null))
+  );
+  const out = [];
+  hits.forEach((h, i) => {
+    const a = assets[i];
+    if (!a?.image) return;
+    const creditText = Array.isArray(a.credit) ? a.credit.map((c) => [c.rank, c.name].filter(Boolean).join(" ")).filter(Boolean).join(", ") : String(a.credit ?? h.credit ?? "");
+    if (DVIDS_NOT_FREE.test([a.title, a.description, a.keywords, creditText].filter(Boolean).join(" "))) return;
+    const isVideo = h.id.startsWith("video:");
+    const width = Number(a.dimensions?.width ?? h.width) || void 0;
+    const height = Number(a.dimensions?.height ?? h.height) || void 0;
+    out.push({
+      nativeId: h.id,
+      title: plain(a.title ?? h.title, 160) || "Untitled",
+      description: plain(a.description ?? h.short_description, 300) || void 0,
+      creator: plain([creditText, a.unit_name].filter(Boolean).join(", "), 120) || void 0,
+      date: String(a.date ?? h.date ?? "").slice(0, 10) || void 0,
+      pageUrl: https(a.url ?? h.url),
+      thumbnailUrl: https(a.thumbnail ?? h.thumbnail ?? a.image),
+      previewUrl: https(a.image),
+      fullUrl: https(a.image),
+      width,
+      height,
+      sizeHint: isVideo ? 2000 : void 0,
+      license: license("us-government", { label: "Public domain (US DoD / DVIDS)", url: "https://api.dvidshub.net/docs/copyright" }),
+      collection: isVideo ? "DVIDS (video frame)" : "DVIDS"
+    });
+  });
+  return out;
+};
 var libraries = {
   loc,
   "internet-archive": internetArchive,
@@ -1199,7 +1253,8 @@ var libraries = {
   europeana,
   smithsonian,
   nypl,
-  nara
+  nara,
+  dvids
 };
 
 // ../ai.x.com/src/media/providers/museums.ts
