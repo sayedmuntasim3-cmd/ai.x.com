@@ -15,7 +15,7 @@ name: Voiceover film
 # no music, cuts only in measured silence, and the film waits for a scholar's review.
 #
 # Optional repository secrets: PEXELS_API_KEY, PIXABAY_API_KEY, SMITHSONIAN_API_KEY (more free stock),
-# EUROPEANA_API_KEY, NARA_API_KEY (open archives; NARA results are never cached, per its terms).
+# EUROPEANA_API_KEY, NARA_API_KEY, DVIDS_API_KEY (open archives; NARA results are never cached, per its terms).
 
 on:
   workflow_dispatch:
@@ -132,6 +132,7 @@ jobs:
           SMITHSONIAN_API_KEY: ${{ secrets.SMITHSONIAN_API_KEY }}
           EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
           NARA_API_KEY: ${{ secrets.NARA_API_KEY }}
+          DVIDS_API_KEY: ${{ secrets.DVIDS_API_KEY }}
         run: |
           echo words > .stage
           # Free modern stock (Pixabay) with the Worker's own key, relayed for this one recording.
