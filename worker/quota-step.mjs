@@ -49,6 +49,7 @@ export function watchFetch(g = globalThis) {
  *   stop: (message: string) => Error,
  *   now?: () => number,
  *   maxNights?: number,
+ *   pauseOnQuota?: boolean,
  *   log?: (line: string) => void,
  * }} o
  * @returns {(name: string, fn: () => Promise<any>) => Promise<any>}
@@ -88,6 +89,18 @@ export function quotaAwareStep(o) {
         }
         const wait = dailyLimitWait(error, now());
         if (wait === null || night >= maxNights) throw error;
+        // QUOTA_MODE=pause: the film is paused with its reset time instead of holding a Workflow awake
+        // for a day. Every finished stage stays, so Resume goes on from this stage (the studio shows
+        // "paused-quota" and the exact time). The owner can still choose QUOTA_MODE=wait for the old
+        // sleep-and-continue behaviour; that is the default in this function for callers that do not ask.
+        if (o.pauseOnQuota) {
+          const at = new Date(now() + wait).toISOString();
+          o.log?.(`${base}: free daily quota used up; pausing until ${at}`);
+          // The reset time travels in the message itself: a Cloudflare Workflow serialises a step's error,
+          // so a field hung on the object is not guaranteed to survive; the message always does.
+          const why = error instanceof Error ? error.message : String(error);
+          throw Object.assign(o.stop(`QUOTA_PAUSED ${at} ${why}`), { quotaPause: true, resumeAt: at, waitMs: wait });
+        }
         o.log?.(`${base}: free daily quota used up; sleeping ${Math.round(wait / 60000)} min`);
         await o.step.sleep(`${base}:wait-${night + 1}`, wait);
       }

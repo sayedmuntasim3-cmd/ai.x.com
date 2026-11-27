@@ -358,18 +358,22 @@ export function transitionFor(trans) {
 export function autoSounds(video, placed = []) {
   /** @type {SoundEvent[]} */
   const out = [];
-  let last = -Infinity;
+  // The room breathes: never two sounds within 1.5 s, whether ours or already placed.
+  const clashes = (/** @type {number} */ at) => out.some((e) => Math.abs(e.start - at) < 1.5) || placed.some((p) => Math.abs(p.start - at) < 1.5);
   const add = (/** @type {string} */ token, /** @type {number} */ start, /** @type {string} */ scene, /** @type {number} */ length) => {
     const at = Math.max(0, start);
-    if (at - last < 1.5 || placed.some((p) => Math.abs(p.start - at) < 1.5)) return;
-    last = at;
+    if (clashes(at)) return;
     out.push({ token, kind: "hit", scene, start: Math.round(at * 1000) / 1000, end: Math.round((at + length) * 1000) / 1000 });
   };
+  // A chapter's turn is marked first: a nearby impact must never take the riser that lands on the cut,
+  // or the music stops following the story there (the critic blocks an unmarked turn).
+  video.forEach((v, i) => {
+    if (v.chapterTitle && i > 0) add("AUTO-RISER", v.start - 1.6, video[i - 1]?.scene ?? v.scene, 1.6);
+  });
   video.forEach((v, i) => {
     const prev = video[i - 1];
     // A sound that starts before its shot belongs to the shot before, so it sits in that shot's span.
     const before = prev?.scene ?? v.scene;
-    if (v.chapterTitle && i > 0) add("AUTO-RISER", v.start - 1.6, before, 1.6);
     if (v.transition === "whip" || v.transition === "slide" || v.transition === "zoom" || v.transition === "leak") add("AUTO-WHOOSH", v.start - 0.2, before, 0.55);
     else if (v.transition === "flash") add("AUTO-BOOM", v.start, v.scene, 2.4);
     else if (v.transition === "glitch") add("AUTO-GLITCH", v.start, v.scene, 0.4);
@@ -377,7 +381,8 @@ export function autoSounds(video, placed = []) {
     if (v.counter || (v.kinetic && v.type === "card")) add("AUTO-IMPACT", v.start + 0.05, v.scene, 1.1);
     else if (v.still && !prev?.still) add("AUTO-CLICK", v.start + 0.02, v.scene, 0.18);
   });
-  return out;
+  // Chronological, whatever order the passes found them in.
+  return out.sort((a, b) => a.start - b.start);
 }
 
 /** How long each synthesised sound lasts (render/sfx-synth.mjs). @type {Record<string, number>} */

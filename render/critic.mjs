@@ -69,6 +69,21 @@ export const STANDARD = Object.freeze({
   blurShare: 0.15,
   /** A jump of this much average luma between two samples inside one shot is a flicker. */
   flickerJump: 28,
+  /** A whole minute with no cut at all is a held picture, not an edit (warn; two in a film is a pattern). */
+  deadMinuteCuts: 1,
+  /** More cuts than this inside one minute is a montage burst; past the hard limit it is blocked. */
+  freneticCuts: 16,
+  freneticBlock: 24,
+  /** The same shot type this many times in a row is one look, not a varied film. */
+  shotTypeRun: 5,
+  shotTypeRunBlock: 9,
+  /** A spoken film with a stretch this long holding no narration is dead air (warn). */
+  quietSeconds: 45,
+  /** The hook, scored 0-10 from the timeline's own picture and words (below warn/block, it is sent back). */
+  hookWarn: 7,
+  hookBlock: 4,
+  /** The score must play under at least this share of the film. */
+  scoreCoverShare: 0.6,
   /**
    * A still's own soft background (a photograph framed over a blurred copy of itself, a card's backdrop) is
    * design, not a blurred copy: it is measured against this higher score and never counted in the blur share.
@@ -116,6 +131,71 @@ const round = (n, digits = 2) => Math.round(n * 10 ** digits) / 10 ** digits;
  */
 export function designedMoments(video) {
   return video.filter((v) => v.type !== "black" && (v.counter || v.kinetic || v.chart || v.map || v.chapterTitle));
+}
+
+/**
+ * Cuts per whole minute, from the picture's own cut times: a minute with none
+ * is a held picture, a minute with thirty is a burst. The last minute is
+ * partial and is reported as such, so a film is not failed on its tail.
+ * @param {any[]} video
+ * @returns {{ minute: number, cuts: number, full: boolean }[]}
+ */
+export function cutsPerMinute(video) {
+  const shots = (video ?? []).filter((v) => v.type !== "black" && Number.isFinite(Number(v.start)));
+  if (!shots.length) return [];
+  const end = Math.max(...shots.map((v) => Number(v.end)));
+  const minutes = Math.max(1, Math.ceil(end / 60));
+  const out = Array.from({ length: minutes }, (_, i) => ({ minute: i, cuts: 0, full: (i + 1) * 60 <= end + 0.001 }));
+  for (const at of shots.map((v) => Number(v.start)).sort((a, b) => a - b).slice(1)) {
+    out[Math.min(minutes - 1, Math.floor(at / 60))].cuts += 1;
+  }
+  return out;
+}
+
+/**
+ * The hook in numbers, from the timeline itself (not from the plan): picture
+ * changes in the first 30 s, when the title lands, designed moments in the
+ * first minute, the length of the first spoken sentence, and whether every
+ * hook shot turns before it settles. 0-10, so a weak opening is sent back.
+ * @param {any} timeline
+ */
+export function hookReport(timeline) {
+  const video = (timeline?.video ?? []).filter((/** @type {any} */ v) => v.type !== "black");
+  const hook = video.filter((/** @type {any} */ v) => Number(v.start) < 30);
+  const beats = hook.length;
+  const titled = video.find((/** @type {any} */ v) => String(v.title ?? "").trim());
+  const titleAt = titled ? round(Number(titled.start), 1) : null;
+  const designed = designedMoments(video).filter((/** @type {any} */ v) => Number(v.start) < 60).length;
+  const first = (timeline?.narration ?? []).find((/** @type {any} */ n) => String(n.text ?? "").replace(/\[[^\]]*\]/g, "").trim());
+  const sentence = first ? String(first.text).replace(/\[[^\]]*\]/g, "").trim().split(/(?<=[.!?])\s+/)[0] : "";
+  const firstSentenceWords = sentence ? sentence.split(/\s+/).filter(Boolean).length : 0;
+  let score = 0;
+  score += Math.min(4, (beats / 6) * 4);
+  score += titleAt !== null && titleAt <= 40 ? 2 : 0;
+  score += Math.min(2, designed);
+  score += firstSentenceWords > 0 && firstSentenceWords <= 15 ? 1 : 0;
+  score += hook.length > 0 && hook.every((/** @type {any} */ v) => Number(v.end) - Number(v.start) <= 8.5) ? 1 : 0;
+  return { score: round(score, 1), beats, titleAt, designedFirstMinute: designed, firstSentenceWords };
+}
+
+/**
+ * Whether the music follows the chapters: every chapter's first shot is
+ * marked by a new cue within 1.5 s, or a riser that lands on it, and the
+ * score plays under most of the film. Measured from the timeline's own music
+ * and sound events, so the critic blocks on the real edit, not on a promise.
+ * @param {any} timeline
+ */
+export function chapterMusic(timeline) {
+  const video = (timeline?.video ?? []).filter((/** @type {any} */ v) => v.type !== "black");
+  const music = [...(timeline?.music ?? [])].sort((/** @type {any} */ a, /** @type {any} */ b) => Number(a.start) - Number(b.start));
+  const turns = video.filter((/** @type {any} */ v) => v.chapterTitle).map((/** @type {any} */ v) => ({ at: round(Number(v.start), 1), title: String(v.chapterTitle) }));
+  // A mark is a *new* cue: the same cue continuing (or a segment boundary inside one cue) is not a change.
+  const changes = music.filter((/** @type {any} */ m, /** @type {number} */ i) => i === 0 || m.cue !== music[i - 1].cue || Number(m.start) - Number(music[i - 1].end) > 0.5).map((/** @type {any} */ m) => Number(m.start));
+  const landings = (timeline?.sfx ?? []).filter((/** @type {any} */ s) => s.token === "AUTO-RISER").map((/** @type {any} */ s) => Number(s.end));
+  const unmarked = turns.filter((t) => !changes.some((c) => Math.abs(c - t.at) < 1.5) && !landings.some((l) => Math.abs(l - t.at) < 1.5));
+  const seconds = Number(timeline?.durationSeconds ?? video[video.length - 1]?.end ?? 0);
+  const covered = music.reduce((n, /** @type {any} */ m) => n + Math.max(0, Number(m.end) - Number(m.start)), 0);
+  return { cues: music.length, turns: turns.length, unmarked, coveredShare: seconds ? round(covered / seconds, 2) : 0 };
 }
 
 /**
@@ -211,7 +291,38 @@ export function critique(timeline, report = {}, evidence = {}) {
     add({ ...msg("critic.cues", { value: round(coverage * 100, 0), target: round(STANDARD.cueCoverage * 100, 0) }), severity: "block", value: round(coverage * 100, 0) });
   }
 
+  // --- rhythm, minute by minute ------------------------------------------
+  const minutes = cutsPerMinute(timeline?.video ?? []);
+  const dead = minutes.filter((m) => m.full && m.cuts < STANDARD.deadMinuteCuts);
+  if (seconds > 120 && dead.length) {
+    add({ ...msg("critic.deadMinute", { count: dead.length, at: dead.slice(0, 3).map((m) => `${m.minute + 1}`).join(", ") }), severity: "warn", value: dead.length });
+  }
+  const busiest = minutes.reduce((top, m) => Math.max(top, m.cuts), 0);
+  if (busiest > STANDARD.freneticCuts) {
+    add({ ...msg("critic.frenetic", { value: busiest, max: STANDARD.freneticCuts }), severity: busiest > STANDARD.freneticBlock ? "block" : "warn", value: busiest });
+  }
+
+  // --- variety: one look is not a film ----------------------------------
+  const typed = video.filter((/** @type {any} */ v) => v.shotType);
+  let typeRun = 0;
+  let typeRunOf = "";
+  let run = 0;
+  let previousType = "";
+  for (const v of typed) {
+    run = v.shotType === previousType ? run + 1 : 1;
+    previousType = String(v.shotType);
+    if (run > typeRun) { typeRun = run; typeRunOf = previousType; }
+  }
+  if (typed.length >= video.length * 0.6 && typeRun > STANDARD.shotTypeRun) {
+    add({ ...msg("critic.variety", { count: typeRun, type: typeRunOf, max: STANDARD.shotTypeRun }), severity: typeRun > STANDARD.shotTypeRunBlock ? "block" : "warn", value: typeRun });
+  }
+
   // --- the hook ---------------------------------------------------------
+  const hook = hookReport(timeline);
+  // A wordless film (a recitation) is judged on picture alone: the spoken hook needs words to measure.
+  if (seconds >= 120 && hook.firstSentenceWords > 0 && hook.score < STANDARD.hookWarn) {
+    add({ ...msg("critic.hook", { score: hook.score, beats: hook.beats, titleAt: hook.titleAt ?? "-", designed: hook.designedFirstMinute, words: hook.firstSentenceWords }), severity: hook.score < STANDARD.hookBlock ? "block" : "warn", value: hook.score });
+  }
   const firstShot = lengths.length ? lengths[0] : 0;
   if (firstShot > STANDARD.firstShotMax) {
     add({ ...msg("critic.firstShot", { value: round(firstShot), max: STANDARD.firstShotMax }), severity: "block", value: round(firstShot) });
@@ -231,6 +342,23 @@ export function critique(timeline, report = {}, evidence = {}) {
       add({ ...msg("critic.relevance", { value: round(share * 100, 0), floor: round(STANDARD.relevanceShare * 100, 0) }), severity: "block", value: round(share * 100, 0) });
     }
   }
+  // --- the music follows the chapters -----------------------------------
+  const score = chapterMusic(timeline);
+  if (score.turns && seconds > 120 && score.unmarked.length) {
+    add({ ...msg("critic.chapterMusic", { count: score.unmarked.length, at: score.unmarked.slice(0, 3).map((u) => `${u.at}`).join(", ") }), severity: "block", value: score.unmarked.length });
+  }
+  if (score.cues && seconds > 120 && score.coveredShare < STANDARD.scoreCoverShare) {
+    add({ ...msg("critic.scoreGap", { value: Math.round(score.coveredShare * 100), min: Math.round(STANDARD.scoreCoverShare * 100) }), severity: "warn", value: score.coveredShare });
+  }
+
+  // --- narration: a spoken film may not go silent for a stretch ---------
+  const spoken = [...(timeline?.narration ?? [])].filter((/** @type {any} */ n) => String(n.text ?? "").trim()).sort((/** @type {any} */ a, /** @type {any} */ b) => Number(a.start) - Number(b.start));
+  let longestQuiet = 0;
+  for (let i = 1; i < spoken.length; i += 1) longestQuiet = Math.max(longestQuiet, Number(spoken[i].start) - Number(spoken[i - 1].end));
+  if (spoken.length && seconds > 120 && longestQuiet > STANDARD.quietSeconds) {
+    add({ ...msg("critic.quiet", { value: round(longestQuiet, 1), max: STANDARD.quietSeconds }), severity: "warn", value: round(longestQuiet, 1) });
+  }
+
   /** @type {Map<string, number>} */
   const uses = new Map();
   for (const v of video) if (v.url) uses.set(String(v.url), (uses.get(String(v.url)) ?? 0) + 1);
@@ -339,6 +467,9 @@ export function critique(timeline, report = {}, evidence = {}) {
     truePeak: Number.isFinite(peak) ? peak : null, lra: Number.isFinite(lra) ? lra : null,
     channels: Number.isFinite(channels) ? channels : null, fps,
     blurredShots: blurred.length, flicker: flickers.length,
+    hook, hookScore: hook.score, busiestMinute: busiest, deadMinutes: dead.length,
+    longestTypeRun: typeRun, chapterTurns: score.turns, unmarkedTurns: score.unmarked.length,
+    scoreCoveredShare: score.coveredShare, longestQuiet: round(longestQuiet, 1),
     blurredDesigned: (evidence.blurredDesigned ?? []).length, darkShots: dark.length,
     narrationCoverage: round(narrationCoverage, 3),
     subtitles: { coverage: round(subs.coverage, 3), maxGap: round(subs.maxGap, 1), overlap: subs.overlap, beyond: subs.beyond },
@@ -590,6 +721,10 @@ export function reportCritic(result) {
   const m = result.measures;
   lines.push(`Critic: ${result.verdict.toUpperCase()} — ${m.shots} shots, average ${m.avgShot} s, ${Math.round(m.movingShare * 100)}% moving, ${m.designedPerMinute} designed moments a minute, ${m.lufs} LUFS, LRA ${m.lra} LU, ${m.channels} channel(s).`);
   lines.push(`ক্রিটিক: ${result.verdict === "pass" ? "পাস" : "ব্লক"} — ${m.shots}টি শট, গড় ${m.avgShot} সেকেন্ড, ${Math.round(m.movingShare * 100)}% নড়ছে, মিনিটে ${m.designedPerMinute}টি ডিজাইন করা মুহূর্ত, ${m.lufs} LUFS, LRA ${m.lra} LU, ${m.channels} চ্যানেল।`);
+  lines.push(`Hook ${m.hookScore}/10 — ${m.hook.beats} picture changes in the first 30 s, title ${m.hook.titleAt === null ? "none" : `at ${m.hook.titleAt} s`}, ${m.hook.designedFirstMinute} designed moment(s) in the first minute, first sentence ${m.hook.firstSentenceWords} word(s).`);
+  lines.push(`হুক ${m.hookScore}/১০ — প্রথম ৩০ সেকেন্ডে ${m.hook.beats}টি ছবি-বদল, টাইটেল ${m.hook.titleAt === null ? "নেই" : `${m.hook.titleAt} সেকেন্ডে`}, প্রথম মিনিটে ${m.hook.designedFirstMinute}টি ডিজাইন করা মুহূর্ত, প্রথম বাক্য ${m.hook.firstSentenceWords} শব্দের।`);
+  lines.push(`Rhythm: busiest minute ${m.busiestMinute} cuts, ${m.deadMinutes} held minute(s); music marks ${m.chapterTurns - m.unmarkedTurns} of ${m.chapterTurns} chapter turn(s), score under ${Math.round((m.scoreCoveredShare ?? 0) * 100)}% of the film; longest quiet ${m.longestQuiet} s.`);
+  lines.push(`ছন্দ: ব্যস্ততম মিনিটে ${m.busiestMinute}টি কাট, ${m.deadMinutes}টি মিনিট কাট ছাড়া; মিউজিক ${m.chapterTurns}টি চ্যাপ্টার-টার্নের ${m.chapterTurns - m.unmarkedTurns}টি চিহ্নিত করেছে, স্কোর ফিল্মের ${Math.round((m.scoreCoveredShare ?? 0) * 100)}% জুড়ে; সবচেয়ে দীর্ঘ নীরবতা ${m.longestQuiet} সেকেন্ড।`);
   return lines.join("\n");
 }
 

@@ -47,6 +47,7 @@ import { quotaAwareStep, watchFetch } from "./quota-step.mjs";
 /** Nights a film may sleep for Gemini's free daily quota before it stops. */
 const MAX_QUOTA_NIGHTS = 7;
 import { mediaProviders } from "../engine/src/film-media.mjs";
+import { archiveKeys } from "../engine/src/open-archives.mjs";
 import { updatePictureLinks } from "../engine/src/picture-links.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../engine/src/film-page.mjs";
@@ -134,7 +135,7 @@ function planFor(env, film) {
   return preflight(graph, {
     brain: brainHealth(env),
     researchDesk: true,
-    mediaProviders: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }).length,
+    mediaProviders: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }).length,
     youtube: Boolean(env.YOUTUBE_API_KEY),
     autoRender: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL),
     minutes: film.durationSeconds / 60,
@@ -190,7 +191,7 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
       // The emergency stop, asked before every model call: the key control/stop in the films bucket stops every running film.
       halt: async () => ((await env.FILMS.get("control/stop")) ? "the key control/stop is set in storage" : null),
-      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
+      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }) },
       // What the channel's published films taught (where viewers left and stayed), for the writers and the editor.
       lessons: { load: async () => { const o = await env.FILMS.get("channel/lessons.json"); return o ? lessonsText(JSON.parse(await o.text())) : ""; } },
       // The source desk opens every page the research cites.
@@ -223,6 +224,10 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
         permanent: permanentError,
         stop: (message) => new NonRetryableError(message),
         maxNights: MAX_QUOTA_NIGHTS,
+        // QUOTA_MODE=pause (the default): a free daily limit pauses the film with its reset time, shown as
+        // "paused-quota" with every finished stage kept, instead of holding the Workflow open for a day.
+        // QUOTA_MODE=wait keeps the older sleep-until-reset behaviour.
+        pauseOnQuota: String(env.QUOTA_MODE ?? "pause").toLowerCase() !== "wait",
         log: (line) => console.log(`[${film.id}] ${line}`),
       }),
     });
@@ -260,7 +265,10 @@ export default {
       if (voice) return voice;
       if (url.pathname === "/api/health") {
         const brain = brainHealth(env);
-        return json({ brain, claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), localBrain: Boolean(env.BRAIN_URL), searxng: Boolean(env.SEARXNG_URL), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: brain.connected ? brain.model : null });
+        // The media step's real provider list: the archives that need no key, plus each stock provider whose
+        // free key is set. The owner can see at a glance whether Pexels is connected, instead of reading code.
+        const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY });
+        return json({ brain, claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), localBrain: Boolean(env.BRAIN_URL), searxng: Boolean(env.SEARXNG_URL), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: brain.connected ? brain.model : null, media: { providers: media.map((p) => p.id), stock: media.filter((p) => p.id === "pexels" || p.id === "pixabay").map((p) => p.id), videoFirst: true, quotaMode: String(env.QUOTA_MODE ?? "pause").toLowerCase() } });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
@@ -283,7 +291,7 @@ export default {
         // Read-only video metadata (ids or a @handle), same key and same studio token as /api/ideas.
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your YouTube quota." }, 503);
         if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
-        const result = await videoDetails({ apiKey: env.YOUTUBE_API_KEY, ids: url.searchParams.get("ids") ?? undefined, handle: url.searchParams.get("handle") ?? undefined, max: url.searchParams.get("max") ?? undefined });
+        const result = await videoDetails({ apiKey: env.YOUTUBE_API_KEY, ids: url.searchParams.get("ids") ?? undefined, handle: url.searchParams.get("handle") ?? undefined, max: url.searchParams.get("max") ?? undefined, pageToken: url.searchParams.get("pageToken") ?? undefined });
         return result.ok ? json(result) : json({ error: result.error }, result.status);
       }
       if (url.pathname === "/api/films" && request.method === "GET") {
@@ -340,7 +348,7 @@ export default {
           manual: MANUAL,
           scene: remake[2],
           instruction: typeof body?.instruction === "string" ? body.instruction : "",
-          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }),
+          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }),
         });
         return json(result, result.ok ? 200 : 422);
       }

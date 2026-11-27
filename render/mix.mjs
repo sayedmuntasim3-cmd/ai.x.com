@@ -141,7 +141,8 @@ export function scoreReport(t = {}) {
   const music = [...(t.music ?? [])].sort((a, b) => a.start - b.start);
   const total = Math.max(0, ...music.map((m) => m.end), ...(t.video ?? []).map((v) => v.start));
   const covered = music.reduce((n, m) => n + Math.max(0, m.end - m.start), 0);
-  const changes = music.slice(1).map((m) => m.start).concat(music.length ? [music[0].start] : []);
+  // A mark is a new cue (or the same cue re-entering after a gap): a segment boundary inside one cue is not a change.
+  const changes = music.filter((m, i) => i === 0 || m.cue !== music[i - 1].cue || m.start - music[i - 1].end > 0.5).map((m) => m.start);
   // A riser ends on its moment, so its start is its landing time minus its own length.
   const landings = (t.sfx ?? []).filter((s) => s.token === "AUTO-RISER").map((s) => s.end);
   const turns = (t.video ?? []).filter((v) => v.chapterTitle).map((v) => v.start).map((at) => ({

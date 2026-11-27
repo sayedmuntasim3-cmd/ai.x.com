@@ -17,6 +17,9 @@ function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
 }
 
+/** NARA's terms forbid caching its results: an answer holding any is never stored. @param {string} text */
+const noStore = (text) => /"source":"nara"/.test(text);
+
 /** Only the string values of the Worker environment (vars and secrets), never bindings. @param {Record<string, unknown>} env */
 function stringEnv(env) {
   return /** @type {Record<string, string>} */ (Object.fromEntries(Object.entries(env).filter(([, v]) => typeof v === "string")));
@@ -37,6 +40,26 @@ export function searchOptions(url, env) {
     limit: num("limit"),
   };
 }
+
+/**
+ * loc.gov refuses Cloudflare Worker addresses ("not authorised" in a few ms) but answers the film runner
+ * (GitHub Actions, film-media.mjs). Report that honestly as "runner-only", not as a broken archive.
+ * @param {any} node
+ */
+export function markRunnerOnly(node) {
+  if (Array.isArray(node)) { node.forEach(markRunnerOnly); return node; }
+  if (node && typeof node === "object") {
+    if (node.id === "loc" && node.status === "error" && /not authorised/i.test(String(node.error ?? ""))) {
+      node.status = "runner-only";
+      node.error = undefined;
+      node.note = "Library of Congress blocks Worker addresses; films fetch it from the runner.";
+    } else for (const v of Object.values(node)) markRunnerOnly(v);
+  }
+  return node;
+}
+
+/** @param {string} line */
+const runnerOnlyLine = (line) => { try { return JSON.stringify(markRunnerOnly(JSON.parse(line))); } catch { return line; } };
 
 /**
  * The media routes, or null for any other path.
@@ -73,14 +96,24 @@ export async function handleMedia(request, url, env, deps = {}) {
     if (cache && deps.waitUntil) deps.waitUntil(cache.put(cacheKey, new Response(body, { headers: { "content-type": type, ...headers } })));
   };
   if (!stream) {
-    const result = await (deps.search ?? searchMedia)(/** @type {any} */ (options), menv);
+    const result = markRunnerOnly(await (deps.search ?? searchMedia)(/** @type {any} */ (options), menv));
     const body = JSON.stringify(result);
-    if (result.sources?.some((/** @type {any} */ s) => s.status === "ok" || s.status === "empty")) keep(body, "application/json; charset=utf-8");
+    if (result.sources?.some((/** @type {any} */ s) => s.status === "ok" || s.status === "empty") && !noStore(body)) keep(body, "application/json; charset=utf-8");
     return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", ...headers } });
   }
-  const [toClient, toCache] = /** @type {ReadableStream} */ ((deps.stream ?? streamMedia)(/** @type {any} */ (options), menv)).tee();
+  let pending = "";
+  const relabel = new TransformStream({
+    transform(chunk, c) {
+      pending += new TextDecoder().decode(chunk, { stream: true });
+      const lines = pending.split("\n");
+      pending = lines.pop() ?? "";
+      for (const l of lines) c.enqueue(new TextEncoder().encode(`${runnerOnlyLine(l)}\n`));
+    },
+    flush(c) { if (pending) c.enqueue(new TextEncoder().encode(runnerOnlyLine(pending))); }
+  });
+  const [toClient, toCache] = /** @type {ReadableStream} */ ((deps.stream ?? streamMedia)(/** @type {any} */ (options), menv)).pipeThrough(relabel).tee();
   if (cache && deps.waitUntil) {
-    deps.waitUntil(new Response(toCache).text().then((text) => { if (/"status":"(ok|empty)"/.test(text)) keep(text, "application/x-ndjson; charset=utf-8"); }));
+    deps.waitUntil(new Response(toCache).text().then((text) => { if (/"status":"(ok|empty)"/.test(text) && !noStore(text)) keep(text, "application/x-ndjson; charset=utf-8"); }));
   } else {
     toCache.cancel().catch(() => {});
   }
