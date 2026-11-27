@@ -226,7 +226,7 @@ export function makeLanes(o = {}) {
  */
 async function laneCall(c, body, state) {
   const lanes = state.lanes;
-  const tokens = Math.ceil((body.system.length + body.prompt.length) / 3.8) + Math.ceil(body.maxTokens * 0.6);
+  const tokens = Math.ceil((body.system.length + body.prompt.length) / 3.8) + Math.ceil(body.maxTokens * 0.5);
   let last = "";
   for (let attempt = 1; attempt <= 12; attempt += 1) {
     let model;
@@ -347,7 +347,7 @@ export async function writeScript(o) {
       text = `${text}\n\n${cleanNarration(trimToSentence(more.text, more.stopReason))}`;
     }
     // The fact pass: the brain lists the part's sentences its own source does not support; they are cut.
-    const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 4000, prompt: `SOURCE:\n${sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, state);
+    const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 1500, prompt: `SOURCE:\n${sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, state);
     const cut = cutSentences(text, flagged.text);
     factChanges += cut.removed.length;
     unsupported.push(...cut.removed);
@@ -370,7 +370,7 @@ export async function writeScript(o) {
 }
 
 /** Findings code can repair itself by dropping a sentence. */
-const FIXABLE = new Set(["critique.inventedNumber", "critique.repetition"]);
+const FIXABLE = new Set(["critique.inventedNumber", "critique.repetition", "critique.logic", "critique.filler"]);
 
 /** Findings about the chain of an act, which a brain may rescue by quoting the sentence code missed. */
 const CHAIN = new Set(["critique.noWhy", "critique.noEvent", "critique.noConsequence", "critique.unanswered"]);
@@ -414,14 +414,14 @@ async function storyCritic(o) {
     // Never stop a film for a fixable line: when only an invented number or a repeat is left (or the rewrites
     // are used up), code drops those sentences itself; it refuses only when more than a tenth of the words would go.
     if (!review.ok && (round >= max || review.findings.every((f) => FIXABLE.has(f.code)))) {
-      const fx = repairScript(acts, { sources: [o.whole] });
+      const fx = repairScript(acts, { sources: [o.whole], brain: brainRead ?? null });
       if (fx.ok && fx.removed.length) {
         const again = critiqueScript({ ...base, acts: fx.acts, ...(brainRead ? { brain: brainRead } : {}) });
         if (again.ok) {
           fx.acts.forEach((a, i) => { o.chapters[i] = { ...o.chapters[i], text: a.text, words: wordCount(a.text) }; });
           rounds.push({ round, repaired: true, share: Math.round(fx.share * 1000) / 10, removed: fx.removed.map((r) => ({ act: r.act, why: r.why, sentence: r.sentence.slice(0, 200) })), ok: true });
           save(true);
-          o.log(`story critic: ${fx.removed.length} sentence(s) dropped by code (${fx.removed.filter((r) => r.why === "number").length} with a number no source has, ${fx.removed.filter((r) => r.why === "repeat").length} repeated), ${(fx.share * 100).toFixed(1)}% of the words; the script passes.`);
+          o.log(`story critic: ${fx.removed.length} sentence(s) dropped by code (${["number", "repeat", "logic", "filler"].map((w) => `${fx.removed.filter((r) => r.why === w).length} ${w}`).join(", ")}), ${(fx.share * 100).toFixed(1)}% of the words; the script passes.`);
           return { summary: { ok: true, rounds: round + 1, repaired: fx.removed.length } };
         }
         o.log(`story critic: dropping ${fx.removed.length} sentence(s) was not enough (${again.findings.map((f) => f.code.replace("critique.", "")).join(", ")} remain).`);
@@ -444,7 +444,7 @@ async function storyCritic(o) {
       const ch = o.chapters[i];
       const r = await brainCall(o.c, { system: o.system, maxTokens: Math.round(ch.words * 1.9) + 300, prompt: `SOURCE:\n${o.sources[i]}\n\nTHIS IS PART ${i + 1} OF ${o.chapters.length}:\n${ch.text}\n\nA story editor sent this part back. Fix every point below; keep everything else that was right and keep about ${ch.words} words. Use only facts the SOURCE states.\n- ${list.join("\n- ")}\n\nAnswer with the whole rewritten part only.` }, o.state);
       let text = cleanNarration(trimToSentence(r.text, r.stopReason));
-      const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 4000, prompt: `SOURCE:\n${o.sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, o.state);
+      const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 1500, prompt: `SOURCE:\n${o.sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, o.state);
       text = cutSentences(text, flagged.text).text;
       o.chapters[i] = { ...ch, text, words: wordCount(text) };
     }));
