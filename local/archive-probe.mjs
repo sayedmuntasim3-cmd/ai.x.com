@@ -23,3 +23,23 @@ for (const query of ["Tacoma Narrows Bridge", "Hoover Dam", "Teton Dam"]) {
 }
 const until = locGate.blockedUntil();
 console.log(`\nLoC gate: ${until ? `blocked until ${new Date(until).toISOString()}` : "not blocked"}`);
+
+// One real call per key: status only, never the key itself.
+const trim = (k) => (process.env[k] ?? "").trim();
+/** @param {string} name @param {string} key @param {(key: string) => Promise<Response>} call @param {(data: any) => number} [count] */
+async function keyCheck(name, key, call, count) {
+  if (!key) { console.log(`${name}: needs-key (secret empty)`); return; }
+  try {
+    const res = await call(key);
+    if (res.status === 401 || res.status === 403) { console.log(`${name}: not authorised (HTTP ${res.status})`); return; }
+    if (!res.ok) { console.log(`${name}: error (HTTP ${res.status})`); return; }
+    if (!count) { console.log(`${name}: ok (HTTP ${res.status})`); return; }
+    const n = count(await res.json());
+    console.log(`${name}: ${n > 0 ? "ok" : "empty"} (HTTP ${res.status}, ${n} results)`);
+  } catch (e) { console.log(`${name}: error (${e instanceof Error ? e.message : e})`); }
+}
+console.log("\n== key checks");
+const sig = () => AbortSignal.timeout(15000);
+await keyCheck("smithsonian", trim("SMITHSONIAN_API_KEY"), (k) => fetch(`https://api.si.edu/openaccess/api/v1.0/search?${new URLSearchParams({ q: "Hoover Dam", rows: "3", api_key: k })}`, { signal: sig() }), (d) => Number(d?.response?.rowCount ?? 0));
+await keyCheck("pixabay", trim("PIXABAY_API_KEY"), (k) => fetch(`https://pixabay.com/api/?${new URLSearchParams({ key: k, q: "hoover dam", per_page: "3" })}`, { signal: sig() }), (d) => Number(d?.totalHits ?? 0));
+await keyCheck("groq", trim("GROQ_API_KEY"), (k) => fetch("https://api.groq.com/openai/v1/models", { headers: { authorization: `Bearer ${k}` }, signal: sig() }));
