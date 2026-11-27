@@ -213,3 +213,15 @@ test("free brain: one call per batch; a used-up day stops it and the rest come f
   assert.ok(r.plan.every((p) => p.shots), "every scene has shots");
   assert.ok(!r.findings.some((f) => f.code === "words-changed" || f.code === "time-changed"));
 });
+
+test("respellNames: a misheard name takes the topic's spelling; other words stay", async () => {
+  const { respellNames } = await import("../src/voice-visuals.mjs");
+  const words = [{ text: "When" }, { text: "Ramish" }, { text: "was" }, { text: "seven," }, { text: "Ramesh's" }, { text: "Rome." }, { text: "Rolls-Rice" }];
+  const n = respellNames(words, "Ramesh Babu - From Barber to Rolls-Royce");
+  assert.equal(words[1].text, "Ramesh");
+  assert.equal(words[4].text, "Ramesh's");
+  assert.equal(words[5].text, "Rome.");
+  assert.equal(words[0].text, "When");
+  assert.equal(n, 1);
+  assert.equal(respellNames([{ text: "Ramish" }], ""), 0);
+});

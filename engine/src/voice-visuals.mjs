@@ -153,6 +153,43 @@ export function topicSpelling(phrase, topic) {
   return phrase;
 }
 
+/** Edit distance (Levenshtein), small strings only. @param {string} a @param {string} b */
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Put names the speech-to-text misheard back in the topic's spelling, in place,
+ * so cards and subtitles never show two spellings of one person ("Ramish" when
+ * the topic says "Ramesh"). Only capitalised words, same first letter, close in
+ * spelling (1 letter for short names, 2 for 6+ letters). Returns how many changed.
+ * @param {{ text: string }[]} words @param {string} topic
+ */
+export function respellNames(words, topic) {
+  const names = new Map();
+  for (const w of String(topic ?? "").match(/\p{Lu}[\p{L}'’]{3,}/gu) ?? []) names.set(key(w), w);
+  if (!names.size) return 0;
+  let changed = 0;
+  for (const w of words ?? []) {
+    const raw = String(w.text ?? "");
+    const t = bare(raw);
+    if (!/^\p{Lu}/u.test(t) || t.length < 4) continue;
+    const k = key(t);
+    if (names.has(k)) continue;
+    for (const [nk, name] of names) {
+      if (nk[0] !== k[0] || Math.abs(nk.length - k.length) > 2) continue;
+      if (editDistance(k, nk) <= (nk.length >= 6 ? 2 : 1)) { w.text = raw.replace(t, name); changed++; break; }
+    }
+  }
+  return changed;
+}
+
 /**
  * A plan from the scene's own words, for a scene the brain did not plan.
  * Each search is a short concrete thing said in the scene: a name or place
