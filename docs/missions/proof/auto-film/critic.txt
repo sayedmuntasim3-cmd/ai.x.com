@@ -1,0 +1,8 @@
+BLOCK critic.cues: 69% of the designed moments have a sound cue; the target is 70%.
+ডিজাইন করা মুহূর্তের 69%তে সাউন্ড কিউ আছে; লক্ষ্য 70%.
+BLOCK critic.flat: The loudness range is 1.6 LU: a narrow wall of sound, with little silence or lift under a reveal (the target is 3.5 LU or more).
+লাউডনেস রেঞ্জ 1.6 LU: শব্দের সরু দেয়াল, রিভিলের নিচে নীরবতা বা উত্থান কম (লক্ষ্য 3.5 LU বা বেশি)।
+BLOCK critic.subtitles: Captions cover 90% of the narrated time, and one stretch of speech runs 1 s with no caption (the floor is 95% and 3 s).
+কথার 90% সময়ে সাবটাইটেল আছে, আর এক জায়গায় 1 সেকেন্ড কথা চলছে সাবটাইটেল ছাড়া (ন্যূনতম 95%, সর্বোচ্চ 3 সেকেন্ড)।
+Critic: BLOCK — 44 shots, average 4.09 s, 75% moving, 5.33 designed moments a minute, -13.9 LUFS, LRA 1.6 LU, 2 channel(s).
+ক্রিটিক: ব্লক — 44টি শট, গড় 4.09 সেকেন্ড, 75% নড়ছে, মিনিটে 5.33টি ডিজাইন করা মুহূর্ত, -13.9 LUFS, LRA 1.6 LU, 2 চ্যানেল।

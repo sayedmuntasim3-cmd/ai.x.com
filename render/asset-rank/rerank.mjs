@@ -16,7 +16,7 @@
  * Pixabay is searched with PIXABAY_API_KEY, or through ZUPONA_STOCK_RELAY (the Worker's own key).
  * Without Python or the model the old picks stay and the reason is printed: the film never stops here.
  */
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { copyFile, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,6 +24,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { FREE_LICENCES, REPEAT_WINDOW_SECONDS, internetArchiveProvider, nasaProvider, pixabayProvider, pexelsProvider, toPick, verifyArchiveItem, wikimediaProvider } from "../../engine/src/film-media.mjs";
 import { createRateLimiter, fetchShotMedia } from "../../engine/src/documentary-media-fetch.mjs";
+import { chooseByWords, judgePicture } from "../critic.mjs";
+import { groqLook, groqModel } from "../../worker/groq.mjs";
 
 const run = promisify(execFile);
 
@@ -45,7 +47,7 @@ const REGIONS = Object.freeze({
 /** Banknotes the film's money is not. */
 const MONEY = Object.freeze({ dollars: "US dollar banknotes", euros: "euro banknotes", pounds: "British pound banknotes", rupees: "Indian rupee banknotes", taka: "Bangladeshi taka banknotes", dirhams: "UAE dirham banknotes", reais: "Brazilian real banknotes" });
 /** Pictures that say nothing in any documentary (owner's judgement of film 993f09ea, 21 Nov 2026). */
-const GENERIC_OFF = Object.freeze(["an abstract background", "an old film strip", "a computer animation of particles and light", "planets and stars in outer space", "a cartoon illustration", "a waterfall in a tropical jungle"]);
+const GENERIC_OFF = Object.freeze(["an abstract background", "an old film strip", "a computer animation of particles and light", "planets and stars in outer space", "a cartoon illustration", "a waterfall in a tropical jungle", "a person in front of a green screen", "a flat vector cartoon of people"]);
 const QUALITY = Object.freeze(["a sharp, well lit, professional photograph", "a blurry, dark, low quality amateur photo"]);
 const WATERMARK = Object.freeze(["a photo with a large watermark or logo text printed across it", "a clean photo with no text on it"]);
 const ERA = Object.freeze(["an old black and white historical photograph", "a modern colour photo taken recently"]);
@@ -58,6 +60,10 @@ const COUNTRY_TAGS = Object.freeze({
   Indonesia: ["indonesia", "bali", "jakarta"], China: ["china", "chinese", "beijing", "shanghai"], Japan: ["japan", "japanese", "tokyo"], Iran: ["iran", "iranian", "tehran"],
   Brazil: ["brazil", "brazilian", "amazon", "rio"], Mexico: ["mexico", "mexican"], "United Arab Emirates": ["dubai", "uae", "emirates", "abu dhabi"], Egypt: ["egypt", "egyptian", "cairo"],
   Turkey: ["turkey", "turkish", "istanbul"], Russia: ["russia", "russian", "moscow"], France: ["france", "french", "paris"], Italy: ["italy", "italian", "venice", "rome"],
+  // Measured on film 993f09ea (26 Nov 2026): Australian notes for "rupees", a Bogotá street for Bengaluru traffic.
+  Australia: ["australia", "australian", "sydney", "melbourne"], Colombia: ["colombia", "colombian", "bogot", "bogota", "medellin"], Canada: ["canada", "canadian", "toronto"],
+  Spain: ["spain", "spanish", "madrid", "barcelona"], "South Korea": ["korea", "korean", "seoul"], Philippines: ["philippines", "filipino", "manila"], Malaysia: ["malaysia", "kuala lumpur"],
+  Singapore: ["singapore"], "Hong Kong": ["hong kong"], Taiwan: ["taiwan", "taipei"], Peru: ["peru", "lima"], Morocco: ["morocco", "marrakech"], Kenya: ["kenya", "nairobi"], Nigeria: ["nigeria", "lagos"], "South Africa": ["south africa", "cape town"],
 });
 
 /**
@@ -86,6 +92,8 @@ export const DUPLICATE_BITS = 8;
 export const VIDEO_EDGE = 0.5;
 /** Above this, CLIP reads a watermark or logo across the picture: refused. */
 export const WATERMARK_LIMIT = 0.8;
+/** How far an off-world prompt may beat the shot's own before the picture is refused (CLIP similarity). */
+export const OFF_WORLD_LIMIT = 0;
 
 /** Is an era string historical (before 2000)? "1990s", "1880s–1890s", "1947". @param {string | undefined} era */
 export function historicEra(era) {
@@ -118,7 +126,9 @@ export function shotPrompts(shot, beat, world) {
   const era = beat?.era || world.era || "";
   const where = [place, historicEra(era) ? era : ""].filter(Boolean).join(", ");
   const out = [`a photo of ${subject}${where ? ` in ${where}` : ""}`];
-  if (beat?.words) out.push(`${place ? place + ": " : ""}${beat.words}`.slice(0, 300));
+  // The words heard over this one shot when known (its own sentence); else the beat's words.
+  const heard = /** @type {any} */ (shot).sentence || beat?.words;
+  if (heard) out.push(`${place ? place + ": " : ""}${heard}`.slice(0, 300));
   return out;
 }
 
@@ -162,6 +172,229 @@ export function worldQueries(world, topicWords) {
   const out = [world.city, `${world.city || world.country} street`, `${world.country} city`, `${world.country} people`].filter(Boolean);
   for (const w of topicWords.slice(0, 8)) out.push(`${w} ${world.country}`);
   return [...new Set(/** @type {string[]} */ (out))];
+}
+
+/** Picture types that are footage or a photograph (the designed cards are drawn, not searched). */
+export const PICTURE_TYPES = Object.freeze(["live-video", "archival-video", "photo-2.5D", "photo-designed"]);
+
+/**
+ * The words heard over a shot, and the whole sentence they belong to (a shot that holds a fragment is
+ * judged by its sentence). @param {{ text: string, start: number, end: number }[]} words @param {number} start @param {number} end
+ */
+export function shotSentence(words, start, end) {
+  const inside = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const w = words[i];
+    const mid = (w.start + w.end) / 2;
+    if (mid >= start && mid < end) inside.push(i);
+  }
+  if (!inside.length) return { heard: "", sentence: "" };
+  const stop = (/** @type {number} */ i) => /[.?!]["')\]]?$/.test(words[i]?.text ?? "");
+  let a = inside[0], b = inside[inside.length - 1];
+  while (a > 0 && !stop(a - 1) && inside[0] - a < 25) a -= 1;
+  while (b < words.length - 1 && !stop(b) && b - inside[inside.length - 1] < 25) b += 1;
+  const text = (/** @type {number} */ x, /** @type {number} */ y) => words.slice(x, y + 1).map((w) => w.text).join(" ").replace(/\s+-/g, "-").replace(/\s+/g, " ").trim();
+  return { heard: text(inside[0], inside[inside.length - 1]), sentence: text(a, b) };
+}
+
+/** Words that name nothing a camera can film. */
+const UNFILMABLE = /^(?:the|a|an|and|or|but|so|of|to|in|on|at|by|for|with|from|as|is|was|were|be|been|are|has|have|had|he|she|it|its|his|her|they|them|their|we|our|this|that|these|those|what|who|how|when|where|which|one|most|some|any|no|not|still|only|then|now|also|just|said|says|say|accounts?|reports?|latest|first|after|before|again|about|over|under|there|here|nearly|almost|every|each|all|being|does|did|do|done|would|could|should|may|might|can|will|years?|old|new|own|way|thing|things|record|time|film|neither|none|none|hold|kept|keeps?|gives?|gave|agree|depends?|understood|happened|next)$/i;
+
+/**
+ * Searches written in code from the shot's own words, when no brain wrote them: the filmable words of
+ * the line heard over it, two and one at a time. @param {string} heard @param {{ country?: string }} world
+ */
+export function sentenceQueries(heard, world = {}) {
+  const words = String(heard).replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter((w) => w.length > 2 && !UNFILMABLE.test(w) && !/^\d+$/.test(w));
+  const out = [];
+  if (words.length >= 2) out.push(`${words[words.length - 2]} ${words[words.length - 1]}`.toLowerCase());
+  for (const w of words.slice(-3).reverse()) out.push(w.toLowerCase());
+  if (!out.length && world.country) out.push(`${world.city || world.country} street`);
+  return [...new Set(out)].slice(0, 3);
+}
+
+/** The picture researcher's brief: concrete, filmable searches in the film's world, one line per shot. */
+export const QUERY_SYSTEM = [
+  "You are the picture researcher of a documentary. For every shot you get the words the narrator says over it.",
+  "Write three searches for a free stock VIDEO library (Pixabay) that would find footage showing exactly what those words say.",
+  "Rules: 2 to 4 plain words each; things a camera can film (objects, places, actions, hands, streets); the film's country, city, era and money where they matter (\"rupee notes\", \"Indian street traffic\");",
+  "an abstract line becomes a concrete image of its meaning (\"no filing backs that up\" -> \"hands searching files\"; \"years passed\" -> \"old clock ticking\");",
+  "never a private person's name, never a word that means something else in stock libraries (\"bill\" -> \"tax bill paper\" or \"rupee notes\");",
+  "a person is shown by hands, tools or from behind unless the line is about a crowd. The first search is the best one.",
+  "Reply with exactly one line per shot and nothing else: ID | search one ; search two ; search three",
+].join("\n");
+
+/**
+ * Read the researcher's lines into {id: [queries]}. @param {string} text
+ * @returns {Map<string, string[]>}
+ */
+export function parseQueryLines(text) {
+  const out = new Map();
+  for (const line of String(text ?? "").split("\n")) {
+    const m = /^\s*[*-]?\s*`?(SC\d{4,5}-\d+)`?\s*[|:]\s*(.+)$/.exec(line);
+    if (!m) continue;
+    const qs = m[2].split(/\s*;\s*/).map((q) => q.replace(/["`*]/g, "").trim().toLowerCase()).filter((q) => q.length > 1 && q.split(/\s+/).length <= 6);
+    if (qs.length) out.set(m[1], [...new Set(qs)].slice(0, 3));
+  }
+  return out;
+}
+
+/**
+ * The searches for every shot: the free brain writes them from each shot's own sentence and the film's
+ * world (batches of 20), and code writes them from the words for any shot the brain did not answer.
+ * @param {{ brain?: { call: (req: any) => Promise<{ text?: string }> } | null, shots: { id: string, heard: string, sentence: string }[], world: World, topic?: string, log?: (s: string) => void }} o
+ */
+export async function writeQueries(o) {
+  /** @type {Map<string, string[]>} */
+  const got = new Map();
+  let calls = 0, answered = 0;
+  const where = [o.world.city, o.world.country].filter(Boolean).join(", ");
+  const brief = `Film: ${o.topic || "a documentary"}. World: ${where || "not given"}${o.world.era ? `, ${o.world.era}` : ""}${o.world.currency ? `, money in ${o.world.currency}` : ""}.`;
+  if (o.brain) {
+    for (let i = 0; i < o.shots.length; i += 20) {
+      const batch = o.shots.slice(i, i + 20);
+      calls += 1;
+      try {
+        const text = batch.map((s) => `${s.id} | heard: "${s.heard}"${s.sentence !== s.heard ? ` | sentence: "${s.sentence}"` : ""}`).join("\n");
+        const reply = await o.brain.call({ stage: "V4", system: [{ text: QUERY_SYSTEM }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: 2400, effort: "low" });
+        const lines = parseQueryLines(reply.text ?? "");
+        for (const s of batch) if (lines.has(s.id)) { got.set(s.id, /** @type {string[]} */ (lines.get(s.id))); answered += 1; }
+      } catch (e) {
+        o.log?.(`Searches: the free brain did not answer a batch (${String(/** @type {any} */ (e)?.message ?? e).slice(0, 120)}); those shots search their own words.`);
+      }
+    }
+  }
+  /** @type {Map<string, { queries: string[], by: "brain" | "words" }>} */
+  const out = new Map();
+  for (const s of o.shots) {
+    const brain = got.get(s.id);
+    out.set(s.id, brain ? { queries: brain, by: "brain" } : { queries: sentenceQueries(s.heard || s.sentence, o.world), by: "words" });
+  }
+  return { queries: out, calls, answered };
+}
+
+/**
+ * The media shots of the final shot plan (shots.json), so every pick lands on the shot the renderer
+ * draws (scene and shot number as in s5-C1.md), each with the words heard over it.
+ * @param {{ shots: { id: string, scene: string, start: number, end: number, type: string, rung?: string, subject?: string }[] }} plan
+ * @param {{ text: string, start: number, end: number }[]} words
+ */
+export function planMediaShots(plan, words) {
+  return plan.shots.filter((s) => PICTURE_TYPES.includes(s.type)).map((s) => {
+    const { heard, sentence } = shotSentence(words, Number(s.start), Number(s.end));
+    return { scene: s.scene, shot: Number(String(s.id).split("-").pop()), id: s.id, start: Number(s.start), end: Number(s.end), type: s.type, rung: s.rung ?? "R3", description: s.subject ?? "", heard, sentence, query: /** @type {string | null} */ (null), queries: /** @type {string[]} */ ([]), status: "planned", alternates: [], trace: [] };
+  });
+}
+
+/**
+ * How many of the shot's own search words a candidate's tags name (Pixabay tags are what a person
+ * wrote about the clip): each one is worth TAG_BONUS, up to three. @param {string | null | undefined} title @param {string[]} queries
+ */
+export function tagHits(title, queries) {
+  const tags = ` ${String(title ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ")} `;
+  const words = new Set(queries.flatMap((q) => q.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").split(" ")).filter((w) => w.length > 2 && !UNFILMABLE.test(w)));
+  let n = 0;
+  for (const w of words) if (tags.includes(` ${w} `) || tags.includes(` ${w}s `) || (w.endsWith("s") && tags.includes(` ${w.slice(0, -1)} `))) n += 1;
+  return Math.min(3, n);
+}
+export const TAG_BONUS = 0.4;
+
+/**
+ * What kind of record a pick is (owner's rule, 26 Nov 2026): A authentic historical, B authentic present-day,
+ * C reconstruction, D CGI, E AI. Only A and B may stand as evidence; C-E are illustration and must be shown as such.
+ * @param {{ source?: string, title?: string | null }} c @param {boolean} historic
+ * @returns {"A" | "B" | "C" | "D" | "E"}
+ */
+export function recordClass(c, historic) {
+  const tags = String(c.title ?? "").toLowerCase();
+  if (/\b(ai[- ]generated|generative ai|midjourney|stable diffusion|dall-?e)\b/.test(tags) || /^(ai|fal|generated)$/.test(String(c.source ?? ""))) return "E";
+  if (/\b(3d|render(ing)?|cgi|animation|animated|computer graphics|motion graphics)\b/.test(tags)) return "D";
+  if (/\b(reenactment|re-enactment|reconstruction|costume|actor|staged)\b/.test(tags)) return "C";
+  return historic && ["wikimedia", "nasa", "internet-archive", "loc", "smithsonian", "met", "artic"].includes(String(c.source ?? "")) ? "A" : "B";
+}
+
+/** A card's words: the line heard, cut to what one card can hold. @param {string} text */
+export function cardText(text) {
+  const t = String(text).replace(/\s+/g, " ").replace(/^[,;:\s]+|[,;:\s]+$/g, "").trim();
+  return t.length <= 70 ? t : `${t.slice(0, 67).replace(/\s+\S*$/, "")}…`;
+}
+
+/**
+ * Turn the named shots of a scene plan (s5-C1.md) into kinetic-type cards: the shot's text, its TYPE entry,
+ * and the scene's FX. Other shots and fields are left exactly as they were.
+ * @param {string} markdown @param {{ scene: string, shot: number, text: string }[]} gaps
+ */
+export function markGaps(markdown, gaps) {
+  return markdown.split("\n").map((line) => {
+    const sc = /^\W*(SC\d{4,5})\b/.exec(line)?.[1];
+    const mine = gaps.filter((g) => g.scene === sc);
+    if (!mine.length) return line;
+    let out = line;
+    for (const g of mine) {
+      const card = `R1 kinetic-type card "${cardText(g.text).replace(/"/g, "'")}"`;
+      out = out.replace(new RegExp(`(\\(${g.shot}\\)\\s+(?:\\d+:\\d\\d:\\d\\d(?:\\.\\d+)?-\\d+:\\d\\d:\\d\\d(?:\\.\\d+)?\\s+)?)(.*?)(?=\\s\\(${g.shot + 1}\\)\\s|\\s\\|\\s)`), (_m, head) => head + card);
+      out = out.replace(/(\|\s*TYPE:\s*)([^|]*?)(\s*(?:\||$))/, (_m, a, types, z) => {
+        const list = types.split(/;\s*/);
+        if (list.length >= g.shot) list[g.shot - 1] = "kinetic-type";
+        return a + list.join("; ") + z;
+      });
+    }
+    if (/\|\s*FX:/.test(out)) { if (!/FX-KINETIC/.test(out)) out = out.replace(/(\|\s*FX:\s*)/, "$1FX-KINETIC "); }
+    else out = out.replace(/(\|\s*TYPE:[^|]*)/, "$1 | FX: FX-KINETIC");
+    return out;
+  }).join("\n");
+}
+
+/** A line about the film's own person or family (postmortem P0: an unknown face shown as the real man). */
+const ABOUT_SUBJECT = /\b(he|him|his|she|her|name|named|father|mother|son|wife|family|buyer|owner)\b/i;
+/** Tags that show one person's face or figure (hands and tools are fine). */
+const A_PERSON = /\b(man|woman|person|portrait|face|boy|girl|businessman|businesswoman|male|female|guy|lady|model|selfie|thinking|thoughtful)\b/i;
+
+/** "stranger as the subject" when the line is about the film's person and the tags show a person who is not him. @param {string} heard @param {string | null | undefined} title */
+export function strangerAsSubject(heard, title) {
+  return ABOUT_SUBJECT.test(heard) && A_PERSON.test(String(title ?? "")) && !/\b(crowd|people|street|market|traffic)\b/i.test(String(title ?? "")) ? "stranger as the subject" : "";
+}
+
+/** Stock that is not documentary footage, by its tags (film 993f09ea: green-screen scissors and money). */
+const NOT_FOOTAGE = /\b(green ?screen|greenscreen|chroma ?key|alpha channel|cartoon|clip ?art|vector|illustration|wedding|bride|groom)\b/i;
+
+/** "not footage" when the tags say green screen, cartoon or a wedding the shot's own searches did not ask for. @param {string | null | undefined} title @param {string[]} queries */
+export function notFootage(title, queries) {
+  const m = NOT_FOOTAGE.exec(String(title ?? ""));
+  if (!m) return "";
+  return queries.some((q) => q.toLowerCase().includes(m[1].toLowerCase().split(" ")[0])) ? "" : "not footage";
+}
+/** What the critic's "this candidate shows the line" is worth: more than any CLIP difference between two candidates. */
+export const FIT_BONUS = 5;
+/** A still that fits still loses to a clip that fits (the film should move): half a clear CLIP difference. */
+export const STILL_FIT_COST = 1;
+/** Candidates the critic reads per shot and round (by their tags: about 25 tokens each). */
+export const OFFER = 10;
+
+/**
+ * A small copy of a picture for the critic's eyes (320 px wide JPEG, as a data URL): a tenth of the
+ * image tokens of the stock preview. Without ffmpeg or the file, the URL itself.
+ * @param {string} url @returns {Promise<string>}
+ */
+export async function shrinkImage(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) return url;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    const jpg = await new Promise((resolve, reject) => {
+      const p = spawn("ffmpeg", ["-v", "error", "-i", "pipe:0", "-vf", "scale=320:-2", "-frames:v", "1", "-q:v", "5", "-f", "mjpeg", "pipe:1"]);
+      /** @type {Buffer[]} */
+      const out = [];
+      p.stdout.on("data", (d) => out.push(d));
+      p.on("error", reject);
+      p.on("close", (code) => (code === 0 && out.length ? resolve(Buffer.concat(out)) : reject(new Error(`ffmpeg ${code}`))));
+      p.stdin.on("error", () => {});
+      p.stdin.end(bytes);
+    });
+    return `data:image/jpeg;base64,${/** @type {Buffer} */ (jpg).toString("base64")}`;
+  } catch {
+    return url;
+  }
 }
 
 /** @param {number[]} xs */
@@ -208,6 +441,9 @@ export function refusal(c, score, world = {}) {
   if (namesOtherCountry(c.title, world)) return "another country";
   if (!score) return "thumbnail not seen";
   if (score.watermark > WATERMARK_LIMIT) return "watermark";
+  // OpenCLIP sees another world's money, place or people (or a cartoon, a green screen) more than the line:
+  // refused outright, so no critic's yes on the tags can bring it back (film 993f09ea: dollars for rupees).
+  if (/** @type {any} */ (score).offBy > OFF_WORLD_LIMIT) return "off-world";
   return "";
 }
 
@@ -317,14 +553,18 @@ function relayFetch(relay) {
 }
 
 /**
- * The whole pass over one run folder. @param {{ run: string, python?: string, env?: Record<string, string | undefined>, log?: (s: string) => void, sheet?: boolean }} o
+ * The whole pass over one run folder. With the final shot plan (shots.json) and the words (words.json),
+ * every picture shot is searched from its own sentence (the free brain writes the searches, else code),
+ * video first; archives only in a historical scene. After OpenCLIP chooses, the critic's eyes (`look`)
+ * check every pick against its sentence; a miss is re-picked from the next candidates, at most twice.
+ * @param {{ run: string, python?: string, env?: Record<string, string | undefined>, log?: (s: string) => void, sheet?: boolean, brain?: { call: (req: any) => Promise<{ text?: string }> } | null, look?: ((question: string, imageUrl: string) => Promise<string>) | null, topic?: string }} o
  */
 export async function rerankRun(o) {
   const t0 = Date.now();
   const env = o.env ?? process.env;
   const log = o.log ?? ((s) => console.log(s));
   const mediaPath = join(o.run, "media-C1.json");
-  const media = await readJson(mediaPath);
+  const media = await readJsonOr(mediaPath, { chapter: "C1", providers: [], repeatWindowSeconds: REPEAT_WINDOW_SECONDS, shots: [] });
   const beatsFile = await readJsonOr(join(o.run, "beats.json"), { world: {}, beats: [] });
   /** @type {World} */
   const world = beatsFile.world ?? {};
@@ -332,6 +572,18 @@ export async function rerankRun(o) {
   const beats = beatsFile.beats ?? [];
   const understanding = await readJsonOr(join(o.run, "understanding.json"), {});
   const topicWords = (understanding?.structure?.topicWords ?? []).map((/** @type {any} */ t) => t.word).filter((/** @type {string} */ w) => w.length > 2);
+  // The final shot plan: the picks land on the shots the renderer draws, each searched from its own sentence.
+  const shotPlan = await readJsonOr(join(o.run, "shots.json"), null);
+  const wordsFile = await readJsonOr(join(o.run, "words.json"), null);
+  /** @type {{ calls: number, answered: number, by: Record<string, number> } | null} */
+  let written = null;
+  if (shotPlan?.shots?.length && wordsFile?.words?.length) {
+    media.shots = planMediaShots(shotPlan, wordsFile.words);
+    const w = await writeQueries({ brain: o.brain ?? null, shots: media.shots, world, topic: o.topic ?? beatsFile.topic, log });
+    for (const m of media.shots) { const q = /** @type {any} */ (w.queries.get(m.id)); m.queries = q.queries; m.query = q.queries[0] ?? null; m.queriesBy = q.by; }
+    written = { calls: w.calls, answered: w.answered, by: { brain: media.shots.filter((/** @type {any} */ m) => m.queriesBy === "brain").length, words: media.shots.filter((/** @type {any} */ m) => m.queriesBy === "words").length } };
+    log(`Searches: ${media.shots.length} picture shots, each from its own sentence; ${written.by.brain} written by the free brain, ${written.by.words} from the words.`);
+  }
 
   const get = relayFetch(env.ZUPONA_STOCK_RELAY);
   const pixKey = env.PIXABAY_API_KEY || (env.ZUPONA_STOCK_RELAY ? "relay" : "");
@@ -348,7 +600,7 @@ export async function rerankRun(o) {
   /** @param {string} query @param {"video" | "image"} kind @param {any[]} providers */
   const search = (query, kind, providers) => {
     const k = `${kind}|${providers.map((p) => p.id).join(",")}|${query}`;
-    if (!searched.has(k)) searched.set(k, fetchShotMedia({ shotId: k, query, kind }, { providers, limiter, verifyItem: verifyArchiveItem, minCandidates: 999 }).then((r) => r.candidates).catch(() => []));
+    if (!searched.has(k)) searched.set(k, fetchShotMedia({ shotId: k, query, kind }, { providers, limiter, verifyItem: verifyArchiveItem, minCandidates: 999, maxWaitMs: 900_000 }).then((r) => r.candidates).catch(() => []));
     return /** @type {Promise<any[]>} */ (searched.get(k));
   };
 
@@ -361,16 +613,18 @@ export async function rerankRun(o) {
     const historic = historicEra(beat?.era || world.era);
     const qs = shotQueries(s, world);
     const lists = [];
+    // Video first: every search on stock video; stills only from the best search; archives only for real history.
     for (const q of qs) {
       lists.push(search(q, "video", stock));
-      if (s.rung === "R2" || historic) {
+      if (historic) {
         lists.push(search(q, "video", archives));
         lists.push(search(q, "image", archives));
       }
-      lists.push(search(q, "image", stock));
     }
-    for (const q of pool) lists.push(search(q, "video", stock));
-    const all = (await Promise.all(lists)).flat();
+    if (qs[0]) lists.push(search(qs[0], "image", stock));
+    let all = (await Promise.all(lists)).flat();
+    // The film's place pool only when the shot's own searches found little: a generic street must not outbid the sentence.
+    if (new Set(all.map((c) => c?.id)).size < 40) all = all.concat((await Promise.all(pool.map((q) => search(q, "video", stock)))).flat());
     if (s.pick) all.push({ ...s.pick, mediaType: s.pick.kind, rights: { allowed: true, licenseId: s.pick.licence?.licenseId } });
     /** @type {Map<string, any>} */
     const byId = new Map();
@@ -378,6 +632,8 @@ export async function rerankRun(o) {
     candidatesOf.set(s, [...byId.values()]);
   }
   const searchSeconds = (Date.now() - t0) / 1000;
+  const empty = shots.filter((/** @type {any} */ s) => !(candidatesOf.get(s) ?? []).length).length;
+  if (empty) log(`Searches: ${empty} shot(s) found no candidate at all (a provider refused or timed out); their plan pick stays.`);
 
   // One text list for the whole film; each shot's own prompts are appended.
   const texts = [];
@@ -402,18 +658,101 @@ export async function rerankRun(o) {
     const beat = beatAt(beats, s.start, s.end);
     const historic = historicEra(beat?.era || world.era);
     const refused = /** @type {Record<string, number>} */ ({});
+    /** @type {any[]} */
+    const lastResort = [];
     const ranked = [];
     for (const c of candidatesOf.get(s) ?? []) {
       const sim = ans.sim[c.id];
       const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : null;
-      const why = refusal(c, score, world);
-      if (why) { refused[why] = (refused[why] ?? 0) + 1; continue; }
-      ranked.push({ c, total: /** @type {any} */ (score).total, score, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score).era });
+      const why = refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
+      const tags = tagHits(c.title, s.queries ?? [s.query ?? ""]);
+      const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags, score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
+      if (why) { refused[why] = (refused[why] ?? 0) + 1; if (why === "off-world" && score) lastResort.push(row); continue; }
+      ranked.push(row);
     }
+    // Never an empty shot: when everything was refused as off-world, the least off-world come back, pushed down.
+    if (!ranked.length) for (const x of lastResort) ranked.push({ ...x, total: x.total - FIT_BONUS });
     ranked.sort((a, b) => b.total - a.total);
     return { s, start: s.start, historic, ranked, refused, seen: (candidatesOf.get(s) ?? []).length };
   });
-  const chosen = chooseSequence(plan);
+  // The critic, before the cut is chosen: the free brain reads each shot's best candidates by their tags
+  // against the line heard over it. A candidate that does not show the line is banned for that shot; one
+  // that does moves up. When none of a shot's ten fit, the next ten are offered (at most two re-picks).
+  /** @type {Map<string, { fits: boolean | null, sees: string, why: string, by: string }>} */
+  const verdicts = new Map();
+  /** @type {Map<any, number>} */
+  const repicks = new Map();
+  const vkey = (/** @type {any} */ p, /** @type {any} */ x) => `${p.s.id}|${x.c.id}`;
+  let asked = 0, looks = 0;
+  const t2 = Date.now();
+  if (o.brain) {
+    for (let round = 0; round < 3; round += 1) {
+      // Judged on the cut as it would be chosen now: a shot whose pick is not a confirmed fit is asked again,
+      // and is offered only candidates no other shot has taken (no repeats, so a fit taken elsewhere is no help).
+      const now = chooseSequence(plan);
+      const taken = new Set(now.filter(Boolean).map((x) => /** @type {any} */ (x).c.id));
+      const need = plan.filter((p, i) => p.s.sentence && p.ranked.length && (!now[i] || verdicts.get(vkey(p, now[i]))?.fits !== true));
+      if (!need.length) break;
+      // Video first: ten clips; a still only fills the ten when the shot has too few clips left.
+      const offer = new Map(need.map((p) => {
+        const mine = now[plan.indexOf(p)]?.c.id;
+        const open = p.ranked.filter((x) => !verdicts.has(vkey(p, x)) && (x.c.id === mine || !taken.has(x.c.id)));
+        const clips = open.filter((x) => x.c.mediaType === "video").slice(0, OFFER);
+        return [p, clips.length >= OFFER ? clips : [...clips, ...open.filter((x) => x.c.mediaType !== "video").slice(0, OFFER - clips.length)]];
+      }));
+      const ask = need.filter((p) => /** @type {any[]} */ (offer.get(p)).length);
+      if (!ask.length) break;
+      asked += ask.length;
+      const answers = await chooseByWords({ brain: o.brain, world, log, shots: ask.map((p) => ({ id: p.s.id, heard: p.s.heard, sentence: p.s.sentence, options: /** @type {any[]} */ (offer.get(p)).map((x) => String(x.c.title ?? "")) })) });
+      for (const p of ask) {
+        const nums = answers.get(p.s.id);
+        if (!nums) continue;
+        const opts = /** @type {any[]} */ (offer.get(p));
+        opts.forEach((x, k) => {
+          const rank = nums.indexOf(k + 1);
+          verdicts.set(vkey(p, x), { fits: rank >= 0, sees: String(x.c.title ?? "").slice(0, 80), why: rank >= 0 ? `tags fit (choice ${rank + 1})` : "tags do not show the line", by: "words" });
+          // The critic's own order among the ones that fit settles near-ties.
+          if (rank >= 0) x.total += FIT_BONUS - 0.2 * rank - (x.c.mediaType === "video" ? 0 : STILL_FIT_COST);
+        });
+        // A re-pick: the shot's pick in the cut was refused, or a further ten offered (rounds two and three).
+        const mine = now[plan.indexOf(p)]?.c.id;
+        if (round > 0 || verdicts.get(`${p.s.id}|${mine}`)?.fits === false) repicks.set(p, (repicks.get(p) ?? 0) + 1);
+        p.ranked = p.ranked.filter((x) => verdicts.get(vkey(p, x))?.fits !== false);
+        p.ranked.sort((x, y) => y.total - x.total);
+      }
+    }
+  }
+  let chosen = chooseSequence(plan);
+
+  // The critic's eyes on the cut itself (a model that sees, at 320 px): a pick it says does not show its
+  // line is banned and the cut chosen again, at most twice. A used-up day leaves the rest unjudged by eye.
+  /** @type {Map<string, string>} */
+  const small = new Map();
+  if (o.look) {
+    let stopped = "";
+    for (let round = 0; round < 3 && !stopped; round += 1) {
+      const ask = plan.map((p, i) => ({ p, pick: chosen[i] })).filter(({ p, pick }) => pick && p.s.sentence && verdicts.get(vkey(p, pick))?.by !== "eyes");
+      let again = false;
+      for (const { p, pick } of ask) {
+        if (stopped) break;
+        const c = /** @type {any} */ (pick).c;
+        if (!small.has(c.id)) small.set(c.id, await shrinkImage(c.previewUrl));
+        looks += 1;
+        const v = await judgePicture(/** @type {any} */ (o.look), { heard: p.s.heard, sentence: p.s.sentence, imageUrl: /** @type {string} */ (small.get(c.id)), world });
+        if (v.fits === null) { if (/429|per day|TPD/i.test(v.why)) stopped = v.why; continue; }
+        verdicts.set(vkey(p, pick), { ...v, by: "eyes" });
+        if (v.fits === false && (repicks.get(p) ?? 0) < 2) {
+          p.ranked = p.ranked.filter((x) => x.c.id !== c.id);
+          repicks.set(p, (repicks.get(p) ?? 0) + 1);
+          again = true;
+        }
+      }
+      if (stopped) log(`Critic: the free eyes stopped (${stopped.slice(0, 120)}); the rest is judged by words only.`);
+      if (!again) break;
+      chosen = chooseSequence(plan);
+    }
+  }
+  const lookSeconds = (Date.now() - t2) / 1000;
 
   await copyFile(mediaPath, join(o.run, "media-C1.before.json"));
   const report = [];
@@ -428,9 +767,11 @@ export async function rerankRun(o) {
       s.status = "found";
       s.review = "eyes";
       s.alternates = p.ranked.filter((x) => x.c.id !== c.id).slice(0, 3).map((x) => x.c.id);
-      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before };
+      const critic = verdicts.get(`${s.id}|${c.id}`) ?? null;
+      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0, record: recordClass(c, p.historic) };
+      if (critic?.fits === false) s.review = "critic-miss";
     }
-    report.push({ scene: s.scene, shot: s.shot, start: s.start, before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
+    report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
   });
   const picks = report.filter((r) => r.after);
   // Continuity across the chosen picks (M3 item 5), measured on the same pass: no extra requests or passes.
@@ -446,9 +787,21 @@ export async function rerankRun(o) {
     model: ans.model, world, shots: report.length, picked: picks.length,
     video: picks.filter((r) => r.kind === "video").length,
     flaggedOff: picks.filter((r) => r.why?.offWhy).length,
+    records: Object.fromEntries(["A", "B", "C", "D", "E"].map((k) => [k, picks.filter((r) => r.why?.record === k).length])),
     candidates: { total: images.length, perShotMin: Math.min(...plan.map((p) => p.seen)), perShotMax: Math.max(...plan.map((p) => p.seen)) },
     images: { computed: ans.computed, cached: ans.cached, unseen: ans.unseen ?? 0 },
-    seconds: { search: Math.round(searchSeconds), see: Math.round(seeSeconds), total: Math.round((Date.now() - t0) / 1000) },
+    seconds: { search: Math.round(searchSeconds), see: Math.round(seeSeconds), look: Math.round(lookSeconds), total: Math.round((Date.now() - t0) / 1000) },
+    searches: written,
+    // The critic's numbers: how many picks it looked at, how many it sent back, and what is still a miss.
+    critic: o.brain || o.look ? {
+      shotsAsked: asked,
+      looked: looks,
+      firstRoundMisses: [...repicks.values()].filter((n) => n >= 1).length,
+      repicked: [...repicks.values()].reduce((a, b) => a + b, 0),
+      fits: picks.filter((r) => r.why?.critic?.fits === true).length,
+      misses: picks.filter((r) => r.why?.critic?.fits === false).length,
+      unknown: picks.filter((r) => !r.why?.critic || r.why.critic.fits === null).length,
+    } : null,
     // The cut's own continuity (M3 item 5): mean colour change between neighbours, how often the scale
     // changes, and how many picks broke a historical scene. Measured, so the critic can read it.
     sequence: {
@@ -457,9 +810,24 @@ export async function rerankRun(o) {
       eraMismatch: picks.filter((r) => (r.sequence?.era ?? 0) < 0).length,
     },
   };
+  // A shot no right picture was found for becomes a designed line of its own words (owner's rule: a
+  // marked gap or a card, never an unrelated photo). The plan files say so, so the renderer draws a card.
+  const gaps = plan.filter((p, i) => !chosen[i] && p.s.heard).map((p) => ({ scene: p.s.scene, shot: p.s.shot, text: p.s.heard }));
+  if (gaps.length) {
+    const s5 = join(o.run, "s5-C1.md");
+    if (existsSync(s5)) await writeFile(s5, markGaps(await readFile(s5, "utf8"), gaps));
+    if (shotPlan?.shots) {
+      for (const g of gaps) { const x = shotPlan.shots.find((/** @type {any} */ y) => y.id === `${g.scene}-${g.shot}`); if (x) { x.type = "kinetic-type"; x.subject = cardText(g.text); x.gap = "no picture showed the line"; } }
+      await writeFile(join(o.run, "shots.json"), JSON.stringify(shotPlan, null, 1));
+    }
+    for (const g of gaps) { const m = media.shots.find((/** @type {any} */ y) => y.scene === g.scene && y.shot === g.shot); if (m) { m.status = "gap-card"; delete m.pick; } }
+    log(`Gaps: ${gaps.length} shot(s) had no picture that shows the line; each is now a designed card of its own words (${gaps.map((g) => `${g.scene}-${g.shot}`).join(", ")}).`);
+  }
+  summary.gapCards = gaps.length;
   await writeFile(mediaPath, JSON.stringify(media, null, 1));
   await writeFile(join(o.run, "rank-C1.json"), JSON.stringify({ summary, shots: report }, null, 1));
   log(`Eyes: ${summary.picked}/${summary.shots} shots chosen by OpenCLIP from ${summary.candidates.total} candidates (${summary.candidates.perShotMin}-${summary.candidates.perShotMax} per shot); video ${summary.video}/${summary.picked}; ${summary.flaggedOff} still look off-world; ${summary.images.unseen} thumbnails could not be fetched; ${summary.seconds.total} s (search ${summary.seconds.search} s, seeing ${summary.seconds.see} s).`);
+  if (summary.critic) log(`Critic: ${summary.critic.shotsAsked} shot questions by words, ${summary.critic.looked} looks by eye; ${summary.critic.firstRoundMisses} shots sent back (${summary.critic.repicked} re-picks); now ${summary.critic.fits} fit, ${summary.critic.misses} still miss, ${summary.critic.unknown} not judged (${summary.seconds.look} s).`);
   log(`Cut: colour change between neighbours ${summary.sequence.colourDistanceMean ?? "-"} (0 = one colour, 1 = a new world); scale changes on ${summary.sequence.scaleVariety ?? "-"} of neighbouring pairs; ${summary.sequence.eraMismatch} pick(s) broke a historical scene.`);
   if (o.sheet) {
     for (const [name, which] of /** @type {const} */ ([["sheet-before.jpg", "before"], ["sheet-after.jpg", "after"]])) {
@@ -487,7 +855,9 @@ function args(argv) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const a = args(process.argv.slice(2));
   if (typeof a.run !== "string") { console.error("Usage: node render/asset-rank/rerank.mjs --run <run folder> [--python <python>] [--sheet]"); process.exit(2); }
-  rerankRun({ run: a.run, python: typeof a.python === "string" ? a.python : undefined, sheet: a.sheet === true }).catch((e) => {
+  // The free brain (Groq) writes the searches and its free eyes are the critic; without a key, code and OpenCLIP alone.
+  const groq = process.env.GROQ_API_KEY && String(process.env.GROQ ?? "").toLowerCase() !== "off" ? String(process.env.GROQ_API_KEY) : "";
+  rerankRun({ run: a.run, python: typeof a.python === "string" ? a.python : undefined, sheet: a.sheet === true, brain: groq ? groqModel({ apiKey: groq }) : null, look: groq ? groqLook({ apiKey: groq }) : null, topic: typeof a.topic === "string" ? a.topic : undefined }).catch((e) => {
     // The plan's own picks stay: the film is never stopped by the eyes.
     console.log(`::warning::The eyes could not rank the pictures (${String(e?.message ?? e).slice(0, 200)}); the plan's picks stay.`);
   });

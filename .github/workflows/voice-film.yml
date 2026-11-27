@@ -158,13 +158,15 @@ jobs:
         env:
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          # Free Groq: writes each shot's searches from its sentence, and its free eyes are the critic (none when unset).
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           echo pictures > .stage
           [ -n "$VOICE_SELFTEST" ] || export ZUPONA_STOCK_RELAY="$SITE/api/voice/$VOICE_ID/stock?ticket=$VOICE_TICKET"
           # The eyes never stop the film: if they cannot run, the plan's own picks stay (rerank.mjs prints why).
           if pip install -q --index-url https://download.pytorch.org/whl/cpu torch==2.7.1 torchvision==0.22.1 && pip install -q open_clip_torch==2.29.0 pillow numpy; then
             export HF_HOME="$HOME/.cache/zupona/hf" ZUPONA_RANK_CACHE="$HOME/.cache/zupona/asset-rank"
-            node render/asset-rank/rerank.mjs --run run 2>&1 | tee -a voice-film.log
+            node render/asset-rank/rerank.mjs --run run ${TOPIC:+--topic "$TOPIC"} 2>&1 | tee -a voice-film.log
           else
             echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
           fi

@@ -1,0 +1,4450 @@
+{
+ "summary": {
+  "model": "hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+  "world": {
+   "country": "India",
+   "city": "Bengaluru",
+   "demonym": "Indian",
+   "currency": "rupees",
+   "era": "2010s–2020s",
+   "cities": [
+    "Bengaluru",
+    "Bangalore",
+    "Mumbai",
+    "Bombay",
+    "Delhi",
+    "New Delhi",
+    "Chennai",
+    "Madras",
+    "Kolkata",
+    "Calcutta",
+    "Hyderabad",
+    "Pune",
+    "Mysuru",
+    "Mysore",
+    "Kochi",
+    "Ahmedabad",
+    "Jaipur"
+   ]
+  },
+  "shots": 37,
+  "picked": 33,
+  "video": 22,
+  "flaggedOff": 0,
+  "records": {
+   "A": 0,
+   "B": 31,
+   "C": 0,
+   "D": 1,
+   "E": 1
+  },
+  "candidates": {
+   "total": 3273,
+   "perShotMin": 176,
+   "perShotMax": 255
+  },
+  "images": {
+   "computed": 421,
+   "cached": 2852,
+   "unseen": 0
+  },
+  "seconds": {
+   "search": 123,
+   "see": 28,
+   "look": 111,
+   "total": 262
+  },
+  "searches": {
+   "calls": 2,
+   "answered": 37,
+   "by": {
+    "brain": 37,
+    "words": 0
+   }
+  },
+  "critic": {
+   "shotsAsked": 64,
+   "looked": 2,
+   "firstRoundMisses": 23,
+   "repicked": 40,
+   "fits": 30,
+   "misses": 0,
+   "unknown": 3
+  },
+  "sequence": {
+   "colourDistanceMean": 0.113,
+   "scaleVariety": 0.688,
+   "eraMismatch": 0
+  },
+  "gapCards": 4
+ },
+ "shots": [
+  {
+   "scene": "SC0001",
+   "shot": 1,
+   "start": 0,
+   "sentence": "Bengaluru, India.",
+   "queries": [
+    "bengaluru skyline",
+    "indian city street",
+    "2010s india"
+   ],
+   "before": null,
+   "after": "pixabay:video:176609",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0,
+    "scale": 0,
+    "era": 0,
+    "total": 11.015,
+    "colourDistance": null,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.815,
+    "relevance": 0.257,
+    "place": 0.99,
+    "quality": 0.915,
+    "era": 0.997,
+    "watermark": 0,
+    "offBy": -0.03,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 193,
+    "passed": 38,
+    "refused": {
+     "another country": 37,
+     "off-world": 101,
+     "size unknown": 2,
+     "not footage": 2,
+     "not landscape": 4
+    },
+    "sequence": {
+     "colour": 0,
+     "scale": 0,
+     "era": 0,
+     "total": 11.015,
+     "colourDistance": null,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "Aerial view of a residential area with palm trees and roads.",
+     "why": "Shows a plausible Indian city street scene.",
+     "by": "eyes"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:176609",
+     "title": "street, road, people, india, shiva, drone, city, indian cult",
+     "total": 4.815,
+     "relevance": 0.257,
+     "place": 0.99,
+     "quality": 0.915,
+     "era": 0.997,
+     "watermark": 0,
+     "offBy": -0.03,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.848,
+     "relevance": 0.255,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.074,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:200435",
+     "title": "buildings, shiva, sunrise, cablebridge, hyderabad, drone, ci",
+     "total": 4.727,
+     "relevance": 0.296,
+     "place": 0.794,
+     "quality": 0.348,
+     "era": 0.992,
+     "watermark": 0.01,
+     "offBy": -0.066,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.92,
+     "relevance": 0.268,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.085,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:photo:245037",
+     "title": "vikasa soudha, vidhana soudha, bangalore, india, government,",
+     "total": 4.853,
+     "relevance": 0.307,
+     "place": 0.991,
+     "quality": 0.993,
+     "era": 0.996,
+     "watermark": 0.007,
+     "offBy": -0.131,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0001",
+   "shot": 3,
+   "start": 4.46,
+   "sentence": "A Rolls-Royce Ghost joins a rental fleet.",
+   "queries": [
+    "rolls‑royce ghost",
+    "rental fleet cars",
+    "luxury car showroom"
+   ],
+   "before": null,
+   "after": "pixabay:video:44911",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.30328734722222217,
+    "scale": -0.18,
+    "era": 0,
+    "total": 10.003,
+    "colourDistance": 0.133,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.68,
+    "relevance": 0.25,
+    "place": 0.013,
+    "quality": 0.737,
+    "era": 0.998,
+    "watermark": 0,
+    "offBy": -0.092,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 180,
+    "passed": 2,
+    "refused": {
+     "off-world": 158,
+     "size unknown": 5,
+     "another country": 6,
+     "not landscape": 5,
+     "not footage": 1
+    },
+    "sequence": {
+     "colour": 0.30328734722222217,
+     "scale": -0.18,
+     "era": 0,
+     "total": 10.003,
+     "colourDistance": 0.133,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "rolls royce 3d, black, car, rendering, design, glass, body",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "D"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:44911",
+     "title": "rolls royce 3d, black, car, rendering, design, glass, body",
+     "total": 3.68,
+     "relevance": 0.25,
+     "place": 0.013,
+     "quality": 0.737,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.092,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:98022",
+     "title": "modern, vintage, germany, rolls royce, luxury, phantom, dist",
+     "total": 3.694,
+     "relevance": 0.234,
+     "place": 0.057,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0.007,
+     "offBy": -0.056,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0002",
+   "shot": 1,
+   "start": 7.54,
+   "sentence": "Its buyer cuts hair, as of the latest reports, in 2025 he still does.",
+   "queries": [
+    "barber scissors",
+    "hands cutting hair",
+    "modern salon india"
+   ],
+   "before": null,
+   "after": "pixabay:video:23502",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.271194,
+    "scale": -0.18,
+    "era": 0,
+    "total": 9.92,
+    "colourDistance": 0.225,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.029,
+    "relevance": 0.261,
+    "place": 0.124,
+    "quality": 0.986,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.057,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 190,
+    "passed": 34,
+    "refused": {
+     "another country": 31,
+     "off-world": 93,
+     "size unknown": 4,
+     "not footage": 4,
+     "stranger as the subject": 10,
+     "watermark": 2,
+     "not landscape": 3
+    },
+    "sequence": {
+     "colour": 0.271194,
+     "scale": -0.18,
+     "era": 0,
+     "total": 9.92,
+     "colourDistance": 0.225,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "scissors, cutting, snipping",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:23502",
+     "title": "scissors, cutting, snipping",
+     "total": 4.029,
+     "relevance": 0.261,
+     "place": 0.124,
+     "quality": 0.986,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.057,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:378918",
+     "title": "classic grooming, men's style, precision hair cut, pro barbe",
+     "total": 4.302,
+     "relevance": 0.279,
+     "place": 0.216,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0.023,
+     "offBy": -0.104,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:48968",
+     "title": "barber, barbershop, hairstyle, hand, human hand, man, males,",
+     "total": 4.112,
+     "relevance": 0.261,
+     "place": 0.205,
+     "quality": 1,
+     "era": 0.995,
+     "watermark": 0.013,
+     "offBy": -0.116,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:29917",
+     "title": "hair salon, mode, room, chairs, indoors, design, modern, fur",
+     "total": 3.962,
+     "relevance": 0.258,
+     "place": 0.08,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.003,
+     "offBy": -0.095,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:116192",
+     "title": "hair clipper, hair cutter, vintage, manual, dresser, stylist",
+     "total": 3.914,
+     "relevance": 0.256,
+     "place": 0.055,
+     "quality": 0.99,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.067,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0002",
+   "shot": 2,
+   "start": 10.565,
+   "sentence": "Its buyer cuts hair, as of the latest reports, in 2025 he still does.",
+   "queries": [
+    "barber scissors",
+    "hands cutting hair",
+    "2025 salon"
+   ],
+   "before": null,
+   "after": "pixabay:video:58444",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.28001963888888887,
+    "scale": -0.18,
+    "era": 0,
+    "total": 9.7,
+    "colourDistance": 0.2,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.4,
+    "relevance": 0.219,
+    "place": 0.002,
+    "quality": 0.818,
+    "era": 0.999,
+    "watermark": 0.252,
+    "offBy": -0.06,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 219,
+    "passed": 36,
+    "refused": {
+     "another country": 33,
+     "off-world": 116,
+     "size unknown": 4,
+     "not footage": 4,
+     "stranger as the subject": 11,
+     "watermark": 2,
+     "not landscape": 4
+    },
+    "sequence": {
+     "colour": 0.28001963888888887,
+     "scale": -0.18,
+     "era": 0,
+     "total": 9.7,
+     "colourDistance": 0.2,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "men, barbershop, hair salon, barber, hairstylist, business, beauty, artisan, hai",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:58444",
+     "title": "men, barbershop, hair salon, barber, hairstylist, business, ",
+     "total": 3.4,
+     "relevance": 0.219,
+     "place": 0.002,
+     "quality": 0.818,
+     "era": 0.999,
+     "watermark": 0.252,
+     "offBy": -0.06,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:378917",
+     "title": "classic grooming, men's style, precision hair cut, pro barbe",
+     "total": 4.972,
+     "relevance": 0.296,
+     "place": 0.709,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.096,
+     "offBy": -0.123,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:48968",
+     "title": "barber, barbershop, hairstyle, hand, human hand, man, males,",
+     "total": 4.112,
+     "relevance": 0.261,
+     "place": 0.205,
+     "quality": 1,
+     "era": 0.995,
+     "watermark": 0.013,
+     "offBy": -0.116,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:116192",
+     "title": "hair clipper, hair cutter, vintage, manual, dresser, stylist",
+     "total": 3.914,
+     "relevance": 0.256,
+     "place": 0.055,
+     "quality": 0.99,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.067,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:834280",
+     "title": "haircut, hair cut, beauty salon, comb, scissors, hairdresser",
+     "total": 3.606,
+     "relevance": 0.275,
+     "place": 0.058,
+     "quality": 0.992,
+     "era": 1,
+     "watermark": 0.002,
+     "offBy": -0.088,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0003",
+   "shot": 2,
+   "start": 17.09,
+   "sentence": "A fleet owner behind a barber's chair, but the car was only the first bill.",
+   "queries": [
+    "barber chair",
+    "luxury car bill",
+    "rupee notes"
+   ],
+   "before": null,
+   "after": "pixabay:photo:1017457",
+   "kind": "image",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.3444968333333333,
+    "scale": 0.12,
+    "era": 0,
+    "total": 8.411,
+    "colourDistance": 0.016,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.147,
+    "relevance": 0.235,
+    "place": 0.007,
+    "quality": 0.989,
+    "era": 1,
+    "watermark": 0.004,
+    "offBy": -0.054,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 229,
+    "passed": 9,
+    "refused": {
+     "another country": 40,
+     "off-world": 160,
+     "size unknown": 7,
+     "not footage": 1,
+     "not landscape": 3
+    },
+    "sequence": {
+     "colour": 0.3444968333333333,
+     "scale": 0.12,
+     "era": 0,
+     "total": 8.411,
+     "colourDistance": 0.016,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "barber, shop, chair, barber shop, haircut, hairdresser, beard, barbershop, vinta",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:1017457",
+     "title": "barber, shop, chair, barber shop, haircut, hairdresser, bear",
+     "total": 3.147,
+     "relevance": 0.235,
+     "place": 0.007,
+     "quality": 0.989,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.054,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.597,
+     "relevance": 0.23,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.049,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:29917",
+     "title": "hair salon, mode, room, chairs, indoors, design, modern, fur",
+     "total": 4.117,
+     "relevance": 0.274,
+     "place": 0.08,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.003,
+     "offBy": -0.111,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.458,
+     "relevance": 0.246,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.033,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:1612726",
+     "title": "barbershop, barber, salon, haircut, style, cutting, hair, ma",
+     "total": 3.655,
+     "relevance": 0.275,
+     "place": 0.108,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.001,
+     "offBy": -0.102,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0004",
+   "shot": 1,
+   "start": 18.77,
+   "sentence": "The tax after it, he has said, nearly broke him. So how does one used van become a Rolls-Royce?",
+   "queries": [
+    "tax document",
+    "hands holding paper",
+    "rupee tax form"
+   ],
+   "before": null,
+   "after": "pixabay:photo:468440",
+   "kind": "image",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.30171166666666666,
+    "scale": -0.18,
+    "era": 0,
+    "total": 8.286,
+    "colourDistance": 0.138,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 2.964,
+    "relevance": 0.213,
+    "place": 0.036,
+    "quality": 0.999,
+    "era": 0.999,
+    "watermark": 0.688,
+    "offBy": -0.042,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 233,
+    "passed": 16,
+    "refused": {
+     "off-world": 181,
+     "size unknown": 4,
+     "watermark": 13,
+     "another country": 6,
+     "stranger as the subject": 3,
+     "not landscape": 1
+    },
+    "sequence": {
+     "colour": 0.30171166666666666,
+     "scale": -0.18,
+     "era": 0,
+     "total": 8.286,
+     "colourDistance": 0.138,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "tax, forms, income, business, paperwork, finance, document, accounting, office, ",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:468440",
+     "title": "tax, forms, income, business, paperwork, finance, document, ",
+     "total": 2.964,
+     "relevance": 0.213,
+     "place": 0.036,
+     "quality": 0.999,
+     "era": 0.999,
+     "watermark": 0.688,
+     "offBy": -0.042,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.628,
+     "relevance": 0.233,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.052,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 3.892,
+     "relevance": 0.216,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.003,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:4190944",
+     "title": "audit, auditor, analysis, examination, document, accounting,",
+     "total": 2.887,
+     "relevance": 0.204,
+     "place": 0.062,
+     "quality": 1,
+     "era": 0.965,
+     "watermark": 0.719,
+     "offBy": -0.05,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:761599",
+     "title": "accounting, report, credit card, payment, charge, calculator",
+     "total": 2.875,
+     "relevance": 0.212,
+     "place": 0.008,
+     "quality": 0.997,
+     "era": 0.941,
+     "watermark": 0.411,
+     "offBy": -0.027,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0004",
+   "shot": 2,
+   "start": 22.89,
+   "sentence": "So how does one used van become a Rolls-Royce? Sisser still in hand.",
+   "queries": [
+    "used van",
+    "hands on van",
+    "conversion to rolls‑royce"
+   ],
+   "before": null,
+   "after": "pixabay:video:158112",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.2987843055555556,
+    "scale": 0.12,
+    "era": 0,
+    "total": 9.853,
+    "colourDistance": 0.146,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.034,
+    "relevance": 0.243,
+    "place": 0.309,
+    "quality": 0.995,
+    "era": 1,
+    "watermark": 0.027,
+    "offBy": -0.065,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 228,
+    "passed": 16,
+    "refused": {
+     "off-world": 162,
+     "another country": 28,
+     "size unknown": 6,
+     "not landscape": 6,
+     "watermark": 1
+    },
+    "sequence": {
+     "colour": 0.2987843055555556,
+     "scale": 0.12,
+     "era": 0,
+     "total": 9.853,
+     "colourDistance": 0.146,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "rafting, van, side pan, following, driving, tour, adventure, road",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:158112",
+     "title": "rafting, van, side pan, following, driving, tour, adventure,",
+     "total": 4.034,
+     "relevance": 0.243,
+     "place": 0.309,
+     "quality": 0.995,
+     "era": 1,
+     "watermark": 0.027,
+     "offBy": -0.065,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.767,
+     "relevance": 0.247,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.066,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.595,
+     "relevance": 0.259,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.046,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:47023",
+     "title": "auto rickshaw, driver, road, india, rickshaw, transportation",
+     "total": 4.532,
+     "relevance": 0.264,
+     "place": 1,
+     "quality": 0.177,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.075,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.463,
+     "relevance": 0.223,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.039,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0005",
+   "shot": 2,
+   "start": 30.58,
+   "sentence": "His name is Ramesh Bhechbu.",
+   "queries": [
+    "name plate",
+    "barber shop sign",
+    "handwritten lettering"
+   ],
+   "before": null,
+   "after": "pixabay:photo:1166066",
+   "kind": "image",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.309428,
+    "scale": 0.12,
+    "era": 0,
+    "total": 8.11,
+    "colourDistance": 0.116,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.681,
+    "relevance": 0.207,
+    "place": 0.986,
+    "quality": 0.963,
+    "era": 0.999,
+    "watermark": 0,
+    "offBy": -0.014,
+    "offWhy": "",
+    "tags": 0,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 234,
+    "passed": 4,
+    "refused": {
+     "off-world": 179,
+     "size unknown": 7,
+     "not footage": 3,
+     "not landscape": 6,
+     "another country": 23,
+     "watermark": 5
+    },
+    "sequence": {
+     "colour": 0.309428,
+     "scale": 0.12,
+     "era": 0,
+     "total": 8.11,
+     "colourDistance": 0.116,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "old man, face, portrait, old, elderly, aged, senior, facial expression, male, sa",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:1166066",
+     "title": "old man, face, portrait, old, elderly, aged, senior, facial ",
+     "total": 3.681,
+     "relevance": 0.207,
+     "place": 0.986,
+     "quality": 0.963,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.014,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.489,
+     "relevance": 0.249,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.036,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.456,
+     "relevance": 0.222,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.038,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:5564731",
+     "title": "old man, beard, portrait, face, hand, man, old, aged, senior",
+     "total": 3.747,
+     "relevance": 0.207,
+     "place": 1,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.018,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0006",
+   "shot": 1,
+   "start": 32.49,
+   "sentence": "He founded Ramesh Tours and Travels, a car rental company in Bengaluru, a city once called Bangalore, one note before the numbers.",
+   "queries": [
+    "car rental office",
+    "storefront bengaluru",
+    "sign board"
+   ],
+   "before": null,
+   "after": "pixabay:video:33800",
+   "kind": "video",
+   "scale": "wide",
+   "sequence": {
+    "colour": 0.29507527777777776,
+    "scale": 0.12,
+    "era": 0,
+    "total": 10.816,
+    "colourDistance": 0.157,
+    "at": "wide"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 5.001,
+    "relevance": 0.273,
+    "place": 0.999,
+    "quality": 0.957,
+    "era": 0.992,
+    "watermark": 0.039,
+    "offBy": -0.082,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "wide",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 206,
+    "passed": 10,
+    "refused": {
+     "off-world": 164,
+     "size unknown": 5,
+     "not footage": 1,
+     "watermark": 4,
+     "another country": 12,
+     "not landscape": 2
+    },
+    "sequence": {
+     "colour": 0.29507527777777776,
+     "scale": 0.12,
+     "era": 0,
+     "total": 10.816,
+     "colourDistance": 0.157,
+     "at": "wide"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "vidhana soudha, bengaluru, bangalore, south india, road, traffic",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:33800",
+     "title": "vidhana soudha, bengaluru, bangalore, south india, road, tra",
+     "total": 5.001,
+     "relevance": 0.273,
+     "place": 0.999,
+     "quality": 0.957,
+     "era": 0.992,
+     "watermark": 0.039,
+     "offBy": -0.082,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:255468",
+     "title": "road, city, bengaluru, drone, topview",
+     "total": 4.431,
+     "relevance": 0.225,
+     "place": 0.997,
+     "quality": 0.76,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.049,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.81,
+     "relevance": 0.251,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.07,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:45723",
+     "title": "swami vivekananda, shiva, street, road, bangalore, bengaluru",
+     "total": 4.327,
+     "relevance": 0.235,
+     "place": 0.995,
+     "quality": 0.371,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.043,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.725,
+     "relevance": 0.249,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.065,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0006",
+   "shot": 2,
+   "start": 37.67,
+   "sentence": "He founded Ramesh Tours and Travels, a car rental company in Bengaluru, a city once called Bangalore, one note before the numbers.",
+   "queries": [
+    "car rental office",
+    "storefront bengaluru",
+    "sign board"
+   ],
+   "before": null,
+   "after": "pixabay:video:255468",
+   "kind": "video",
+   "scale": "wide",
+   "sequence": {
+    "colour": 0.33735624999999997,
+    "scale": -0.18,
+    "era": 0,
+    "total": 9.988,
+    "colourDistance": 0.036,
+    "at": "wide"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.431,
+    "relevance": 0.225,
+    "place": 0.997,
+    "quality": 0.76,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.049,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "wide",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 206,
+    "passed": 10,
+    "refused": {
+     "off-world": 164,
+     "size unknown": 5,
+     "not footage": 1,
+     "watermark": 4,
+     "another country": 12,
+     "not landscape": 2
+    },
+    "sequence": {
+     "colour": 0.33735624999999997,
+     "scale": -0.18,
+     "era": 0,
+     "total": 9.988,
+     "colourDistance": 0.036,
+     "at": "wide"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "road, city, bengaluru, drone, topview",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:255468",
+     "title": "road, city, bengaluru, drone, topview",
+     "total": 4.431,
+     "relevance": 0.225,
+     "place": 0.997,
+     "quality": 0.76,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.049,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:45723",
+     "title": "swami vivekananda, shiva, street, road, bangalore, bengaluru",
+     "total": 4.327,
+     "relevance": 0.235,
+     "place": 0.995,
+     "quality": 0.371,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.043,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:33800",
+     "title": "vidhana soudha, bengaluru, bangalore, south india, road, tra",
+     "total": 5.001,
+     "relevance": 0.273,
+     "place": 0.999,
+     "quality": 0.957,
+     "era": 0.992,
+     "watermark": 0.039,
+     "offBy": -0.082,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.81,
+     "relevance": 0.251,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.07,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.725,
+     "relevance": 0.249,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.065,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0007",
+   "shot": 1,
+   "start": 42.85,
+   "sentence": "Dollar figures here are rupees at that year's exchange rate, adjusted to today's money.",
+   "queries": [
+    "rupee notes",
+    "exchange rate table",
+    "financial paperwork"
+   ],
+   "before": null,
+   "after": "pixabay:video:302977",
+   "kind": "video",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.2993289444444444,
+    "scale": 0.12,
+    "era": 0,
+    "total": 11.642,
+    "colourDistance": 0.145,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 5.023,
+    "relevance": 0.289,
+    "place": 0.977,
+    "quality": 0.981,
+    "era": 0.999,
+    "watermark": 0,
+    "offBy": -0.016,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 220,
+    "passed": 26,
+    "refused": {
+     "off-world": 151,
+     "size unknown": 6,
+     "not footage": 2,
+     "another country": 22,
+     "watermark": 3,
+     "not landscape": 1
+    },
+    "sequence": {
+     "colour": 0.2993289444444444,
+     "scale": 0.12,
+     "era": 0,
+     "total": 11.642,
+     "colourDistance": 0.145,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "indian rupee, rupee, 2000 rupee note, money, cash, currency, banknotes, rupee no",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "E"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:302977",
+     "title": "indian rupee, rupee, 2000 rupee note, money, cash, currency,",
+     "total": 5.023,
+     "relevance": 0.289,
+     "place": 0.977,
+     "quality": 0.981,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.016,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:435450",
+     "title": "rupees, money, indian, currency, note, rupee, business, indi",
+     "total": 4.551,
+     "relevance": 0.312,
+     "place": 0.962,
+     "quality": 0.341,
+     "era": 0.998,
+     "watermark": 0.009,
+     "offBy": -0.04,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:1811935",
+     "title": "money, moneycity, 500, rupees, notes, cash, income, manageme",
+     "total": 4.49,
+     "relevance": 0.295,
+     "place": 0.999,
+     "quality": 0.994,
+     "era": 0.788,
+     "watermark": 0.04,
+     "offBy": -0.01,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:523221",
+     "title": "indian currency, money, rupees, currency, business, profit, ",
+     "total": 4.821,
+     "relevance": 0.308,
+     "place": 0.999,
+     "quality": 0.991,
+     "era": 0.999,
+     "watermark": 0.012,
+     "offBy": -0.025,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:3887567",
+     "title": "india, rupee, occupation, indian currency, giving, letter - ",
+     "total": 4.804,
+     "relevance": 0.303,
+     "place": 0.999,
+     "quality": 0.998,
+     "era": 0.998,
+     "watermark": 0.182,
+     "offBy": -0.028,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0007",
+   "shot": 2,
+   "start": 46.903,
+   "sentence": "Dollar figures here are rupees at that year's exchange rate, adjusted to today's money. First the car, a Rolls-Royce Ghost, bought in 2011 by most accounts.",
+   "queries": [
+    "rupee notes",
+    "exchange rate table",
+    "financial paperwork"
+   ],
+   "before": null,
+   "after": "pixabay:photo:435450",
+   "kind": "image",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.30288999999999994,
+    "scale": -0.18,
+    "era": 0,
+    "total": 9.879,
+    "colourDistance": 0.135,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.556,
+    "relevance": 0.312,
+    "place": 0.962,
+    "quality": 0.341,
+    "era": 0.998,
+    "watermark": 0.009,
+    "offBy": -0.04,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 220,
+    "passed": 21,
+    "refused": {
+     "off-world": 156,
+     "size unknown": 6,
+     "not footage": 2,
+     "another country": 22,
+     "watermark": 3,
+     "not landscape": 1
+    },
+    "sequence": {
+     "colour": 0.30288999999999994,
+     "scale": -0.18,
+     "era": 0,
+     "total": 9.879,
+     "colourDistance": 0.135,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "rupees, money, indian, currency, note, rupee, business, india, finance, cash, fi",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:435450",
+     "title": "rupees, money, indian, currency, note, rupee, business, indi",
+     "total": 4.556,
+     "relevance": 0.312,
+     "place": 0.962,
+     "quality": 0.341,
+     "era": 0.998,
+     "watermark": 0.009,
+     "offBy": -0.04,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:302977",
+     "title": "indian rupee, rupee, 2000 rupee note, money, cash, currency,",
+     "total": 4.905,
+     "relevance": 0.284,
+     "place": 0.977,
+     "quality": 0.981,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.01,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:4395464",
+     "title": "rupee, indian, india, money, bank note, bill, business, gand",
+     "total": 4.744,
+     "relevance": 0.298,
+     "place": 0.998,
+     "quality": 0.998,
+     "era": 0.895,
+     "watermark": 0.005,
+     "offBy": -0.043,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:4398432",
+     "title": "rupee, indian, india, money, bank note, bill, business, gand",
+     "total": 4.61,
+     "relevance": 0.299,
+     "place": 0.918,
+     "quality": 0.938,
+     "era": 1,
+     "watermark": 0.009,
+     "offBy": -0.024,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:166483",
+     "title": "currency, notes, rupee, 50, fifty, mahatma gandhi, paper, ca",
+     "total": 4.61,
+     "relevance": 0.297,
+     "place": 1,
+     "quality": 0.994,
+     "era": 0.956,
+     "watermark": 0.059,
+     "offBy": -0.015,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0007",
+   "shot": 3,
+   "start": 50.957,
+   "sentence": "First the car, a Rolls-Royce Ghost, bought in 2011 by most accounts.",
+   "queries": [
+    "rolls‑royce ghost",
+    "2011 model",
+    "luxury car exterior"
+   ],
+   "before": null,
+   "after": "pixabay:video:98022",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.28064574999999997,
+    "scale": 0.12,
+    "era": 0,
+    "total": 10.289,
+    "colourDistance": 0.198,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.688,
+    "relevance": 0.233,
+    "place": 0.057,
+    "quality": 1,
+    "era": 1,
+    "watermark": 0.007,
+    "offBy": -0.055,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 223,
+    "passed": 2,
+    "refused": {
+     "off-world": 195,
+     "size unknown": 5,
+     "not landscape": 10,
+     "watermark": 1,
+     "another country": 5,
+     "not footage": 1
+    },
+    "sequence": {
+     "colour": 0.28064574999999997,
+     "scale": 0.12,
+     "era": 0,
+     "total": 10.289,
+     "colourDistance": 0.198,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "modern, vintage, germany, rolls royce, luxury, phantom, distortion, device, styl",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:98022",
+     "title": "modern, vintage, germany, rolls royce, luxury, phantom, dist",
+     "total": 3.688,
+     "relevance": 0.233,
+     "place": 0.057,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0.007,
+     "offBy": -0.055,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:44911",
+     "title": "rolls royce 3d, black, car, rendering, design, glass, body",
+     "total": 3.78,
+     "relevance": 0.26,
+     "place": 0.013,
+     "quality": 0.737,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.102,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0008",
+   "shot": 2,
+   "start": 60.01,
+   "sentence": "In 2025, he was still cutting hair for the price on screen.",
+   "queries": [
+    "barber scissors",
+    "hands cutting hair",
+    "2025 salon price tag"
+   ],
+   "before": null,
+   "after": "pixabay:video:48968",
+   "kind": "video",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.28931155555555554,
+    "scale": 0.12,
+    "era": 0,
+    "total": 10.685,
+    "colourDistance": 0.173,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.076,
+    "relevance": 0.257,
+    "place": 0.205,
+    "quality": 1,
+    "era": 0.995,
+    "watermark": 0.013,
+    "offBy": -0.112,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 220,
+    "passed": 33,
+    "refused": {
+     "another country": 35,
+     "off-world": 115,
+     "size unknown": 6,
+     "not footage": 4,
+     "stranger as the subject": 11,
+     "watermark": 3,
+     "not landscape": 4
+    },
+    "sequence": {
+     "colour": 0.28931155555555554,
+     "scale": 0.12,
+     "era": 0,
+     "total": 10.685,
+     "colourDistance": 0.173,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "barber, barbershop, hairstyle, hand, human hand, man, males, lifestyles, people,",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:48968",
+     "title": "barber, barbershop, hairstyle, hand, human hand, man, males,",
+     "total": 4.076,
+     "relevance": 0.257,
+     "place": 0.205,
+     "quality": 1,
+     "era": 0.995,
+     "watermark": 0.013,
+     "offBy": -0.112,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:378917",
+     "title": "classic grooming, men's style, precision hair cut, pro barbe",
+     "total": 5.096,
+     "relevance": 0.309,
+     "place": 0.709,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.096,
+     "offBy": -0.135,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:378918",
+     "title": "classic grooming, men's style, precision hair cut, pro barbe",
+     "total": 4.308,
+     "relevance": 0.279,
+     "place": 0.216,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0.023,
+     "offBy": -0.105,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:116192",
+     "title": "hair clipper, hair cutter, vintage, manual, dresser, stylist",
+     "total": 3.946,
+     "relevance": 0.26,
+     "place": 0.055,
+     "quality": 0.99,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.07,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:29917",
+     "title": "hair salon, mode, room, chairs, indoors, design, modern, fur",
+     "total": 3.942,
+     "relevance": 0.256,
+     "place": 0.08,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.003,
+     "offBy": -0.093,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0009",
+   "shot": 1,
+   "start": 63.07,
+   "sentence": "Headlines call him the billionaire barber. No filing we could find backs that up.",
+   "queries": [
+    "newspaper headlines",
+    "billionaire barber",
+    "bold headline"
+   ],
+   "before": null,
+   "after": "pixabay:photo:1591767",
+   "kind": "image",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.34396629166666665,
+    "scale": 0.12,
+    "era": 0,
+    "total": 8.792,
+    "colourDistance": 0.017,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.128,
+    "relevance": 0.23,
+    "place": 0.044,
+    "quality": 0.976,
+    "era": 0.994,
+    "watermark": 0.031,
+    "offBy": -0.052,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 176,
+    "passed": 22,
+    "refused": {
+     "size unknown": 3,
+     "off-world": 107,
+     "another country": 21,
+     "watermark": 9,
+     "not landscape": 1,
+     "stranger as the subject": 4
+    },
+    "sequence": {
+     "colour": 0.34396629166666665,
+     "scale": 0.12,
+     "era": 0,
+     "total": 8.792,
+     "colourDistance": 0.017,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "news, newsletter, newspaper, information, background press, journalist, headline",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:1591767",
+     "title": "news, newsletter, newspaper, information, background press, ",
+     "total": 3.128,
+     "relevance": 0.23,
+     "place": 0.044,
+     "quality": 0.976,
+     "era": 0.994,
+     "watermark": 0.031,
+     "offBy": -0.052,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.766,
+     "relevance": 0.247,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.066,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:378917",
+     "title": "classic grooming, men's style, precision hair cut, pro barbe",
+     "total": 4.068,
+     "relevance": 0.206,
+     "place": 0.709,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.096,
+     "offBy": -0.032,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:47023",
+     "title": "auto rickshaw, driver, road, india, rickshaw, transportation",
+     "total": 4.058,
+     "relevance": 0.218,
+     "place": 1,
+     "quality": 0.177,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.029,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.013,
+     "relevance": 0.222,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.009,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0010",
+   "shot": 1,
+   "start": 68.76,
+   "sentence": "So we follow the money to understand the car, start with a road.",
+   "queries": [
+    "city road",
+    "aerial view",
+    "bengaluru street"
+   ],
+   "before": null,
+   "after": "pixabay:video:154195",
+   "kind": "video",
+   "scale": "wide",
+   "sequence": {
+    "colour": 0.33892531944444443,
+    "scale": 0.12,
+    "era": 0,
+    "total": 11.703,
+    "colourDistance": 0.032,
+    "at": "wide"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 5.444,
+    "relevance": 0.317,
+    "place": 0.985,
+    "quality": 0.986,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.097,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "wide",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 228,
+    "passed": 44,
+    "refused": {
+     "size unknown": 3,
+     "off-world": 119,
+     "not landscape": 7,
+     "watermark": 1,
+     "another country": 45
+    },
+    "sequence": {
+     "colour": 0.33892531944444443,
+     "scale": 0.12,
+     "era": 0,
+     "total": 11.703,
+     "colourDistance": 0.032,
+     "at": "wide"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "highway, road, cars, vehicles, city, mumbai, india, shiva, traffic, speed, trans",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:154195",
+     "title": "highway, road, cars, vehicles, city, mumbai, india, shiva, t",
+     "total": 5.444,
+     "relevance": 0.317,
+     "place": 0.985,
+     "quality": 0.986,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.097,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:176609",
+     "title": "street, road, people, india, shiva, drone, city, indian cult",
+     "total": 5.276,
+     "relevance": 0.303,
+     "place": 0.99,
+     "quality": 0.915,
+     "era": 0.997,
+     "watermark": 0,
+     "offBy": -0.076,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:84222",
+     "title": "road, shiva, street, traffic, buildings, people, india, asia",
+     "total": 5.063,
+     "relevance": 0.294,
+     "place": 0.997,
+     "quality": 0.643,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.11,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:7447800",
+     "title": "road, street, traffic, city, colours, urban, nature, landsca",
+     "total": 4.825,
+     "relevance": 0.304,
+     "place": 0.993,
+     "quality": 0.986,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.111,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:2181888",
+     "title": "asia, asian, auto, bike, building, car wallpapers, bus, busi",
+     "total": 4.819,
+     "relevance": 0.304,
+     "place": 0.997,
+     "quality": 0.964,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.104,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0010",
+   "shot": 2,
+   "start": 72.587,
+   "sentence": "So we follow the money to understand the car, start with a road. Brigade Road in the heart of Bengaluru back when most people still called the city Bangalore.",
+   "queries": [
+    "brigade road",
+    "busy bengaluru",
+    "downtown street india"
+   ],
+   "before": null,
+   "after": "pixabay:video:32287",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.34076816666666665,
+    "scale": 0.12,
+    "era": 0,
+    "total": 11.766,
+    "colourDistance": 0.026,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 5.505,
+    "relevance": 0.321,
+    "place": 1,
+    "quality": 0.997,
+    "era": 1,
+    "watermark": 0.004,
+    "offBy": -0.14,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 201,
+    "passed": 7,
+    "refused": {
+     "size unknown": 7,
+     "off-world": 137,
+     "another country": 38,
+     "not landscape": 3
+    },
+    "sequence": {
+     "colour": 0.34076816666666665,
+     "scale": 0.12,
+     "era": 0,
+     "total": 11.766,
+     "colourDistance": 0.026,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "a street in bangalore, karnataka, south india, people, street",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.505,
+     "relevance": 0.321,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.14,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:8698",
+     "title": "india, crossroads, traffic, busy, shiva, road, street, city,",
+     "total": 4.631,
+     "relevance": 0.278,
+     "place": 0.999,
+     "quality": 0.106,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.058,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.618,
+     "relevance": 0.262,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.048,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:47023",
+     "title": "auto rickshaw, driver, road, india, rickshaw, transportation",
+     "total": 4.267,
+     "relevance": 0.238,
+     "place": 1,
+     "quality": 0.177,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.048,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:7272520",
+     "title": "traffic, city, road, nature, street, rain, hyderabad, india,",
+     "total": 3.262,
+     "relevance": 0.256,
+     "place": 0.034,
+     "quality": 0.727,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.038,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0010",
+   "shot": 3,
+   "start": 76.413,
+   "sentence": "Brigade Road in the heart of Bengaluru back when most people still called the city Bangalore.",
+   "queries": [
+    "brigade road",
+    "historic sign",
+    "bangalore name plaque"
+   ],
+   "before": null,
+   "after": "pixabay:video:32288",
+   "kind": "video",
+   "scale": "wide",
+   "sequence": {
+    "colour": 0.33994654166666666,
+    "scale": 0.12,
+    "era": 0,
+    "total": 11.378,
+    "colourDistance": 0.029,
+    "at": "wide"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 5.518,
+    "relevance": 0.324,
+    "place": 1,
+    "quality": 0.951,
+    "era": 1,
+    "watermark": 0.001,
+    "offBy": -0.129,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "wide",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 220,
+    "passed": 7,
+    "refused": {
+     "size unknown": 3,
+     "off-world": 163,
+     "another country": 34,
+     "not landscape": 4,
+     "watermark": 3
+    },
+    "sequence": {
+     "colour": 0.33994654166666666,
+     "scale": 0.12,
+     "era": 0,
+     "total": 11.378,
+     "colourDistance": 0.029,
+     "at": "wide"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "dharmaraya temple, bangalore, karnataka, street",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:32288",
+     "title": "dharmaraya temple, bangalore, karnataka, street",
+     "total": 5.518,
+     "relevance": 0.324,
+     "place": 1,
+     "quality": 0.951,
+     "era": 1,
+     "watermark": 0.001,
+     "offBy": -0.129,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:33800",
+     "title": "vidhana soudha, bengaluru, bangalore, south india, road, tra",
+     "total": 5.296,
+     "relevance": 0.302,
+     "place": 0.999,
+     "quality": 0.957,
+     "era": 0.992,
+     "watermark": 0.039,
+     "offBy": -0.111,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.449,
+     "relevance": 0.315,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.134,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.835,
+     "relevance": 0.26,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.076,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:8698",
+     "title": "india, crossroads, traffic, busy, shiva, road, street, city,",
+     "total": 4.551,
+     "relevance": 0.27,
+     "place": 0.999,
+     "quality": 0.106,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.05,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0011",
+   "shot": 2,
+   "start": 82.8,
+   "sentence": "By most accounts, the family had a small shop on Brigade Road.",
+   "queries": [
+    "small shop front",
+    "brigade road",
+    "storefront india"
+   ],
+   "before": null,
+   "after": "pixabay:video:275107",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.33522465277777774,
+    "scale": 0.12,
+    "era": 0,
+    "total": 10.337,
+    "colourDistance": 0.042,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.082,
+    "relevance": 0.205,
+    "place": 0.999,
+    "quality": 0.977,
+    "era": 1,
+    "watermark": 0.001,
+    "offBy": -0.004,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 193,
+    "passed": 6,
+    "refused": {
+     "off-world": 145,
+     "stranger as the subject": 2,
+     "size unknown": 3,
+     "not footage": 2,
+     "not landscape": 3,
+     "watermark": 2,
+     "another country": 24
+    },
+    "sequence": {
+     "colour": 0.33522465277777774,
+     "scale": 0.12,
+     "era": 0,
+     "total": 10.337,
+     "colourDistance": 0.042,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "road, highway, street, countryside, roadside, travel, footpath, india, delhi, lo",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:275107",
+     "title": "road, highway, street, countryside, roadside, travel, footpa",
+     "total": 4.082,
+     "relevance": 0.205,
+     "place": 0.999,
+     "quality": 0.977,
+     "era": 1,
+     "watermark": 0.001,
+     "offBy": -0.004,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.254,
+     "relevance": 0.296,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.115,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.6,
+     "relevance": 0.26,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.047,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:2691177",
+     "title": "market, leather, shopping, bags, colourful, brown, udaipur, ",
+     "total": 4.34,
+     "relevance": 0.286,
+     "place": 0.689,
+     "quality": 0.978,
+     "era": 1,
+     "watermark": 0.001,
+     "offBy": -0.048,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:47023",
+     "title": "auto rickshaw, driver, road, india, rickshaw, transportation",
+     "total": 4.169,
+     "relevance": 0.228,
+     "place": 1,
+     "quality": 0.177,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.039,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0012",
+   "shot": 1,
+   "start": 87.33,
+   "sentence": "Reports give his father's name as P-E-G-O-H Paul, a chair, a mirror, a strop, a razor, a pair of scissors.",
+   "queries": [
+    "barber tools",
+    "chair mirror scissors",
+    "vintage barber set"
+   ],
+   "before": null,
+   "after": "pixabay:photo:7576856",
+   "kind": "image",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.2785362222222222,
+    "scale": 0.12,
+    "era": 0,
+    "total": 8.697,
+    "colourDistance": 0.204,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.498,
+    "relevance": 0.267,
+    "place": 0.032,
+    "quality": 0.99,
+    "era": 0.998,
+    "watermark": 0.004,
+    "offBy": -0.104,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 219,
+    "passed": 22,
+    "refused": {
+     "off-world": 142,
+     "another country": 13,
+     "size unknown": 5,
+     "not footage": 3,
+     "stranger as the subject": 14,
+     "watermark": 3,
+     "not landscape": 1
+    },
+    "sequence": {
+     "colour": 0.2785362222222222,
+     "scale": 0.12,
+     "era": 0,
+     "total": 8.697,
+     "colourDistance": 0.204,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "shear, hairdresser, barber, haircut, tool, craft, hairdresser, barber, barber, b",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 2,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:7576856",
+     "title": "shear, hairdresser, barber, haircut, tool, craft, hairdresse",
+     "total": 3.498,
+     "relevance": 0.267,
+     "place": 0.032,
+     "quality": 0.99,
+     "era": 0.998,
+     "watermark": 0.004,
+     "offBy": -0.104,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:3765407",
+     "title": "scissors, buy scissors, buy, hairdressing scissors, working ",
+     "total": 3.206,
+     "relevance": 0.243,
+     "place": 0.055,
+     "quality": 1,
+     "era": 0.743,
+     "watermark": 0,
+     "offBy": -0.082,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:3765408",
+     "title": "scissors, buy scissors, buy, hairdressing scissors, working ",
+     "total": 2.952,
+     "relevance": 0.226,
+     "place": 0.043,
+     "quality": 1,
+     "era": 0.483,
+     "watermark": 0,
+     "offBy": -0.06,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:5170186",
+     "title": "scissors, section, hair, hairstyle, professional, to cut, fa",
+     "total": 3.344,
+     "relevance": 0.249,
+     "place": 0.055,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.092,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.544,
+     "relevance": 0.225,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.044,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0012",
+   "shot": 2,
+   "start": 91.94,
+   "sentence": "Reports give his father's name as P-E-G-O-H Paul, a chair, a mirror, a strop, a razor, a pair of scissors.",
+   "queries": [
+    "mirror strop razor scissors",
+    "barber tools closeup",
+    "hands cutting hair"
+   ],
+   "before": null,
+   "after": "pixabay:photo:4484297",
+   "kind": "image",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.2572480555555556,
+    "scale": 0.12,
+    "era": 0,
+    "total": 8.974,
+    "colourDistance": 0.265,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.397,
+    "relevance": 0.258,
+    "place": 0.016,
+    "quality": 0.999,
+    "era": 1,
+    "watermark": 0.002,
+    "offBy": -0.095,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 217,
+    "passed": 19,
+    "refused": {
+     "off-world": 151,
+     "size unknown": 5,
+     "not footage": 4,
+     "another country": 7,
+     "not landscape": 9,
+     "watermark": 3
+    },
+    "sequence": {
+     "colour": 0.2572480555555556,
+     "scale": 0.12,
+     "era": 0,
+     "total": 8.974,
+     "colourDistance": 0.265,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "barbershop, barber, hair, salon, haircut, hairdresser, shave, razor, beard, scis",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 2,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:4484297",
+     "title": "barbershop, barber, hair, salon, haircut, hairdresser, shave",
+     "total": 3.397,
+     "relevance": 0.258,
+     "place": 0.016,
+     "quality": 0.999,
+     "era": 1,
+     "watermark": 0.002,
+     "offBy": -0.095,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:48968",
+     "title": "barber, barbershop, hairstyle, hand, human hand, man, males,",
+     "total": 3.771,
+     "relevance": 0.227,
+     "place": 0.205,
+     "quality": 1,
+     "era": 0.995,
+     "watermark": 0.013,
+     "offBy": -0.082,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.484,
+     "relevance": 0.219,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.038,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:3765407",
+     "title": "scissors, buy scissors, buy, hairdressing scissors, working ",
+     "total": 3.667,
+     "relevance": 0.289,
+     "place": 0.055,
+     "quality": 1,
+     "era": 0.743,
+     "watermark": 0,
+     "offBy": -0.128,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:3480263",
+     "title": "odisha, india, barber, old, man, village, puri, brown villag",
+     "total": 4.051,
+     "relevance": 0.225,
+     "place": 1,
+     "quality": 0.994,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.036,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0013",
+   "shot": 1,
+   "start": 96.55,
+   "sentence": "A barber shop is a trade done with the hands, one customer at a time all day.",
+   "queries": [
+    "barber shop hands",
+    "customer haircut",
+    "barber chair"
+   ],
+   "before": null,
+   "after": "pixabay:video:38079",
+   "kind": "video",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.3386457083333333,
+    "scale": 0.12,
+    "era": 0,
+    "total": 8.895,
+    "colourDistance": 0.032,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 3.036,
+    "relevance": 0.198,
+    "place": 0.152,
+    "quality": 0.483,
+    "era": 0.998,
+    "watermark": 0,
+    "offBy": -0.016,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 219,
+    "passed": 21,
+    "refused": {
+     "another country": 24,
+     "off-world": 148,
+     "size unknown": 6,
+     "not footage": 4,
+     "not landscape": 5,
+     "watermark": 2
+    },
+    "sequence": {
+     "colour": 0.3386457083333333,
+     "scale": 0.12,
+     "era": 0,
+     "total": 8.895,
+     "colourDistance": 0.032,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "hands, hand cream, cream, health, skin, care",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 1,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:38079",
+     "title": "hands, hand cream, cream, health, skin, care",
+     "total": 3.036,
+     "relevance": 0.198,
+     "place": 0.152,
+     "quality": 0.483,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.016,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:48968",
+     "title": "barber, barbershop, hairstyle, hand, human hand, man, males,",
+     "total": 3.928,
+     "relevance": 0.242,
+     "place": 0.205,
+     "quality": 1,
+     "era": 0.995,
+     "watermark": 0.013,
+     "offBy": -0.097,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:5564731",
+     "title": "old man, beard, portrait, face, hand, man, old, aged, senior",
+     "total": 4.7,
+     "relevance": 0.29,
+     "place": 1,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.101,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:photo:1453064",
+     "title": "barber, chair, salon, hairdresser, shop, beard, male, man, b",
+     "total": 3.594,
+     "relevance": 0.272,
+     "place": 0.078,
+     "quality": 1,
+     "era": 0.997,
+     "watermark": 0.001,
+     "offBy": -0.093,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:58444",
+     "title": "men, barbershop, hair salon, barber, hairstylist, business, ",
+     "total": 3.641,
+     "relevance": 0.243,
+     "place": 0.002,
+     "quality": 0.818,
+     "era": 0.999,
+     "watermark": 0.252,
+     "offBy": -0.084,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0013",
+   "shot": 2,
+   "start": 101.417,
+   "sentence": "A barber shop is a trade done with the hands, one customer at a time all day. Most of what we know about these years comes from interviews he gave decades later to YOR story, the better India and others.",
+   "queries": [
+    "interview handtalk",
+    "older man speaking",
+    "recorder"
+   ],
+   "before": null,
+   "after": null,
+   "kind": null,
+   "scale": null,
+   "sequence": null,
+   "why": null,
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.637,
+     "relevance": 0.234,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.053,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0013",
+   "shot": 3,
+   "start": 106.283,
+   "sentence": "Most of what we know about these years comes from interviews he gave decades later to YOR story, the better India and others.",
+   "queries": [
+    "interview handtalk",
+    "older man speaking",
+    "recorder"
+   ],
+   "before": null,
+   "after": "pixabay:video:47023",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.32410612499999997,
+    "scale": 0.12,
+    "era": 0,
+    "total": 4.845,
+    "colourDistance": 0.074,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.401,
+    "relevance": 0.251,
+    "place": 1,
+    "quality": 0.177,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.062,
+    "offWhy": "",
+    "tags": 0,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 226,
+    "passed": 17,
+    "refused": {
+     "off-world": 171,
+     "size unknown": 5,
+     "not footage": 4,
+     "another country": 2,
+     "not landscape": 7
+    },
+    "sequence": {
+     "colour": 0.32410612499999997,
+     "scale": 0.12,
+     "era": 0,
+     "total": 4.845,
+     "colourDistance": 0.074,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": null,
+    "repicks": 2,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.111,
+     "relevance": 0.281,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.1,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:5564731",
+     "title": "old man, beard, portrait, face, hand, man, old, aged, senior",
+     "total": 4.227,
+     "relevance": 0.243,
+     "place": 1,
+     "quality": 1,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.054,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:47023",
+     "title": "auto rickshaw, driver, road, india, rickshaw, transportation",
+     "total": 4.401,
+     "relevance": 0.251,
+     "place": 1,
+     "quality": 0.177,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.062,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:1145469",
+     "title": "old man, india, sadhu, asia, adult, male, culture, senior, t",
+     "total": 3.982,
+     "relevance": 0.226,
+     "place": 0.998,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.022,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:photo:1166066",
+     "title": "old man, face, portrait, old, elderly, aged, senior, facial ",
+     "total": 3.975,
+     "relevance": 0.222,
+     "place": 0.986,
+     "quality": 0.963,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.029,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0014",
+   "shot": 1,
+   "start": 111.15,
+   "sentence": "On the basics, they mostly agree and then the record turns hard.",
+   "queries": [
+    "record sheet paper",
+    "handwriting closeup",
+    "notes"
+   ],
+   "before": null,
+   "after": "pixabay:video:200024",
+   "kind": "video",
+   "scale": "wide",
+   "sequence": {
+    "colour": 0.3315164027777778,
+    "scale": 0.12,
+    "era": 0,
+    "total": 5.089,
+    "colourDistance": 0.053,
+    "at": "wide"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.637,
+    "relevance": 0.24,
+    "place": 0.999,
+    "quality": 0.872,
+    "era": 0.999,
+    "watermark": 0.008,
+    "offBy": -0.057,
+    "offWhy": "",
+    "tags": 0,
+    "scale": "wide",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 233,
+    "passed": 4,
+    "refused": {
+     "off-world": 178,
+     "size unknown": 6,
+     "not footage": 2,
+     "another country": 4,
+     "watermark": 4,
+     "not landscape": 5
+    },
+    "sequence": {
+     "colour": 0.3315164027777778,
+     "scale": 0.12,
+     "era": 0,
+     "total": 5.089,
+     "colourDistance": 0.053,
+     "at": "wide"
+    },
+    "before": null,
+    "critic": null,
+    "repicks": 3,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.269,
+     "relevance": 0.297,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.116,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.637,
+     "relevance": 0.24,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.057,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:1109588",
+     "title": "turntable, music, laptop, audio, record, sound, vinyl record",
+     "total": 2.03,
+     "relevance": 0.169,
+     "place": 0.204,
+     "quality": 0.615,
+     "era": 0.399,
+     "watermark": 0.087,
+     "offBy": 0,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:1595847",
+     "title": "vinyl, retro, music, disc, record, play, sound, media, tune,",
+     "total": 1.834,
+     "relevance": 0.174,
+     "place": 0.028,
+     "quality": 0.072,
+     "era": 0.996,
+     "watermark": 0.122,
+     "offBy": -0.003,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0015",
+   "shot": 1,
+   "start": 119.25,
+   "sentence": "Almost every account agrees on that age. They do not agree on the year and none of them gives a cause.",
+   "queries": [
+    "handwritten dates",
+    "calendar page",
+    "old paper"
+   ],
+   "before": null,
+   "after": null,
+   "kind": null,
+   "scale": null,
+   "sequence": null,
+   "why": null,
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.827,
+     "relevance": 0.253,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.072,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0016",
+   "shot": 1,
+   "start": 125.98,
+   "sentence": "So this film gives neither. Seven is the age every telling keeps.",
+   "queries": [
+    "age record paper",
+    "handwritten note",
+    "calendar"
+   ],
+   "before": null,
+   "after": "pixabay:video:3175",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.3273285555555555,
+    "scale": 0.12,
+    "era": 0,
+    "total": 4.93,
+    "colourDistance": 0.065,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.483,
+    "relevance": 0.248,
+    "place": 0.999,
+    "quality": 0.406,
+    "era": 0.998,
+    "watermark": 0,
+    "offBy": -0.035,
+    "offWhy": "",
+    "tags": 0,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 234,
+    "passed": 7,
+    "refused": {
+     "off-world": 178,
+     "size unknown": 5,
+     "not footage": 2,
+     "another country": 6,
+     "watermark": 2,
+     "not landscape": 4
+    },
+    "sequence": {
+     "colour": 0.3273285555555555,
+     "scale": 0.12,
+     "era": 0,
+     "total": 4.93,
+     "colourDistance": 0.065,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": null,
+    "repicks": 2,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.927,
+     "relevance": 0.263,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.082,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:200024",
+     "title": "temple, shiva, iskon temple, iskcon, bangalore, shri krishna",
+     "total": 4.506,
+     "relevance": 0.227,
+     "place": 0.999,
+     "quality": 0.872,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.043,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.483,
+     "relevance": 0.248,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.035,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:8698",
+     "title": "india, crossroads, traffic, busy, shiva, road, street, city,",
+     "total": 3.954,
+     "relevance": 0.23,
+     "place": 0.999,
+     "quality": 0.106,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.01,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:photo:9180482",
+     "title": "record shop, vinyl records, music, music store, albums, load",
+     "total": 2.223,
+     "relevance": 0.191,
+     "place": 0.033,
+     "quality": 0.151,
+     "era": 0.998,
+     "watermark": 0.361,
+     "offBy": -0.021,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0017",
+   "shot": 1,
+   "start": 130.92,
+   "sentence": "What a seven year old understood about money is not on record.",
+   "queries": [
+    "child money coin",
+    "child counting rupees",
+    "small hands"
+   ],
+   "before": null,
+   "after": "pixabay:photo:1214945",
+   "kind": "image",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.3216898611111111,
+    "scale": -0.18,
+    "era": 0,
+    "total": 9.469,
+    "colourDistance": 0.081,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.127,
+    "relevance": 0.26,
+    "place": 0.966,
+    "quality": 0.577,
+    "era": 0.898,
+    "watermark": 0.025,
+    "offBy": -0.031,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 204,
+    "passed": 27,
+    "refused": {
+     "off-world": 137,
+     "size unknown": 4,
+     "not landscape": 11,
+     "not footage": 1,
+     "another country": 3,
+     "watermark": 1
+    },
+    "sequence": {
+     "colour": 0.3216898611111111,
+     "scale": -0.18,
+     "era": 0,
+     "total": 9.469,
+     "colourDistance": 0.081,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "money, metal, wood, table, old, indian, asia, rupee, bank, cash, finance, deposi",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 2,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:1214945",
+     "title": "money, metal, wood, table, old, indian, asia, rupee, bank, c",
+     "total": 4.127,
+     "relevance": 0.26,
+     "place": 0.966,
+     "quality": 0.577,
+     "era": 0.898,
+     "watermark": 0.025,
+     "offBy": -0.031,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:4395523",
+     "title": "rupee, indian, india, money, bank note, bill, business, gand",
+     "total": 3.881,
+     "relevance": 0.274,
+     "place": 0.46,
+     "quality": 0.959,
+     "era": 0.983,
+     "watermark": 0.006,
+     "offBy": -0.02,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:10563192",
+     "title": "coins, hand holding coins, coin box, black and white, curren",
+     "total": 3.626,
+     "relevance": 0.27,
+     "place": 0.672,
+     "quality": 0.505,
+     "era": 0.001,
+     "watermark": 0.003,
+     "offBy": -0.067,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:photo:5206872",
+     "title": "coin, india, indian coin, money, rupay, finance, outdoor, ba",
+     "total": 3.697,
+     "relevance": 0.322,
+     "place": 0.191,
+     "quality": 0.007,
+     "era": 0.952,
+     "watermark": 0.072,
+     "offBy": -0.101,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:photo:6815202",
+     "title": "money, bank, finance, save, piggy, coin, pig, currency, inve",
+     "total": 3.528,
+     "relevance": 0.263,
+     "place": 0.107,
+     "quality": 1,
+     "era": 0.976,
+     "watermark": 0.026,
+     "offBy": -0.103,
+     "offWhy": "",
+     "tags": 3
+    }
+   ]
+  },
+  {
+   "scene": "SC0017",
+   "shot": 2,
+   "start": 135.485,
+   "sentence": "What is on record is what happened next to the shop and to the family.",
+   "queries": [
+    "shop exterior",
+    "family storefront",
+    "old sign"
+   ],
+   "before": null,
+   "after": "pixabay:photo:10546407",
+   "kind": "image",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.32538449999999997,
+    "scale": -0.18,
+    "era": 0,
+    "total": 9.308,
+    "colourDistance": 0.07,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.763,
+    "relevance": 0.309,
+    "place": 0.991,
+    "quality": 0.761,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.097,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 221,
+    "passed": 3,
+    "refused": {
+     "off-world": 160,
+     "stranger as the subject": 2,
+     "size unknown": 4,
+     "not footage": 2,
+     "not landscape": 9,
+     "watermark": 5,
+     "another country": 19
+    },
+    "sequence": {
+     "colour": 0.32538449999999997,
+     "scale": -0.18,
+     "era": 0,
+     "total": 9.308,
+     "colourDistance": 0.07,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "market, fabric, textiles, colors, india, traditional, clothing, strings, vibrant",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 3,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:10546407",
+     "title": "market, fabric, textiles, colors, india, traditional, clothi",
+     "total": 4.763,
+     "relevance": 0.309,
+     "place": 0.991,
+     "quality": 0.761,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.097,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.51,
+     "relevance": 0.321,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.14,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.679,
+     "relevance": 0.268,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.055,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0018",
+   "shot": 1,
+   "start": 140.05,
+   "sentence": "A barber shop does not close by itself. The chair, the mirror and the tools were still there on Brigade Road.",
+   "queries": [
+    "barber chair",
+    "mirror",
+    "scissors"
+   ],
+   "before": null,
+   "after": "pixabay:photo:4666064",
+   "kind": "image",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.2664468333333333,
+    "scale": -0.18,
+    "era": 0,
+    "total": 6.205,
+    "colourDistance": 0.239,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 2.119,
+    "relevance": 0.159,
+    "place": 0.008,
+    "quality": 0.993,
+    "era": 1,
+    "watermark": 0.008,
+    "offBy": -0.002,
+    "offWhy": "",
+    "tags": 0,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 215,
+    "passed": 4,
+    "refused": {
+     "another country": 43,
+     "off-world": 136,
+     "size unknown": 5,
+     "not footage": 1,
+     "not landscape": 5
+    },
+    "sequence": {
+     "colour": 0.2664468333333333,
+     "scale": -0.18,
+     "era": 0,
+     "total": 6.205,
+     "colourDistance": 0.239,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "hairdresser, table, shear, hair, haircut, trimmer, hairstyle, fashion, head, hea",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 3,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:4666064",
+     "title": "hairdresser, table, shear, hair, haircut, trimmer, hairstyle",
+     "total": 2.119,
+     "relevance": 0.159,
+     "place": 0.008,
+     "quality": 0.993,
+     "era": 1,
+     "watermark": 0.008,
+     "offBy": -0.002,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.462,
+     "relevance": 0.216,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.035,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:48968",
+     "title": "barber, barbershop, hairstyle, hand, human hand, man, males,",
+     "total": 3.776,
+     "relevance": 0.227,
+     "place": 0.205,
+     "quality": 1,
+     "era": 0.995,
+     "watermark": 0.013,
+     "offBy": -0.082,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:116192",
+     "title": "hair clipper, hair cutter, vintage, manual, dresser, stylist",
+     "total": 3.569,
+     "relevance": 0.222,
+     "place": 0.055,
+     "quality": 0.99,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.032,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0018",
+   "shot": 2,
+   "start": 143.655,
+   "sentence": "The chair, the mirror and the tools were still there on Brigade Road.",
+   "queries": [
+    "barber chair",
+    "mirror",
+    "scissors"
+   ],
+   "before": null,
+   "after": "pixabay:video:378917",
+   "kind": "video",
+   "scale": "close",
+   "sequence": {
+    "colour": 0.28632819444444446,
+    "scale": 0.12,
+    "era": 0,
+    "total": 10.303,
+    "colourDistance": 0.182,
+    "at": "close"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.097,
+    "relevance": 0.209,
+    "place": 0.709,
+    "quality": 0.998,
+    "era": 1,
+    "watermark": 0.096,
+    "offBy": -0.035,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "close",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 215,
+    "passed": 8,
+    "refused": {
+     "another country": 43,
+     "off-world": 135,
+     "size unknown": 5,
+     "not footage": 1,
+     "not landscape": 5
+    },
+    "sequence": {
+     "colour": 0.28632819444444446,
+     "scale": 0.12,
+     "era": 0,
+     "total": 10.303,
+     "colourDistance": 0.182,
+     "at": "close"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "classic grooming, men's style, precision hair cut, pro barbershop, mashhad men s",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 3,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:378917",
+     "title": "classic grooming, men's style, precision hair cut, pro barbe",
+     "total": 4.097,
+     "relevance": 0.209,
+     "place": 0.709,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0.096,
+     "offBy": -0.035,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.755,
+     "relevance": 0.246,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.065,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:47023",
+     "title": "auto rickshaw, driver, road, india, rickshaw, transportation",
+     "total": 4.261,
+     "relevance": 0.237,
+     "place": 1,
+     "quality": 0.177,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.048,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.244,
+     "relevance": 0.234,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.021,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:8698",
+     "title": "india, crossroads, traffic, busy, shiva, road, street, city,",
+     "total": 4.093,
+     "relevance": 0.237,
+     "place": 0.999,
+     "quality": 0.106,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.017,
+     "offWhy": "",
+     "tags": 0
+    }
+   ]
+  },
+  {
+   "scene": "SC0019",
+   "shot": 2,
+   "start": 149.76,
+   "sentence": "His mother was left with the household and with a shop that someone now had to run.",
+   "queries": [
+    "shop interior",
+    "empty chair",
+    "mother’s hands"
+   ],
+   "before": null,
+   "after": null,
+   "kind": null,
+   "scale": null,
+   "sequence": null,
+   "why": null,
+   "top": [
+    {
+     "id": "pixabay:photo:10546407",
+     "title": "market, fabric, textiles, colors, india, traditional, clothi",
+     "total": 4.743,
+     "relevance": 0.307,
+     "place": 0.991,
+     "quality": 0.761,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.095,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.117,
+     "relevance": 0.282,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.101,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.405,
+     "relevance": 0.242,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.029,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0020",
+   "shot": 1,
+   "start": 154.97,
+   "sentence": "Who that was and on what terms depends on the account. For now, hold on to one image.",
+   "queries": [
+    "shop exterior",
+    "empty doorway",
+    "city background"
+   ],
+   "before": null,
+   "after": null,
+   "kind": null,
+   "scale": null,
+   "sequence": null,
+   "why": null,
+   "top": [
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 4.966,
+     "relevance": 0.267,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.086,
+     "offWhy": "",
+     "tags": 0
+    },
+    {
+     "id": "pixabay:video:3175",
+     "title": "india, street, busy, rickshaw, people, indian, asia, shiva, ",
+     "total": 4.074,
+     "relevance": 0.225,
+     "place": 0.999,
+     "quality": 0.406,
+     "era": 0.998,
+     "watermark": 0,
+     "offBy": -0.012,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:photo:10546407",
+     "title": "market, fabric, textiles, colors, india, traditional, clothi",
+     "total": 4.022,
+     "relevance": 0.238,
+     "place": 0.991,
+     "quality": 0.761,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.027,
+     "offWhy": "",
+     "tags": 1
+    }
+   ]
+  },
+  {
+   "scene": "SC0021",
+   "shot": 1,
+   "start": 161.07,
+   "sentence": "A shop on a busy road, a chair under a light and a family that needed that door to stay open.",
+   "queries": [
+    "shop street",
+    "barber chair",
+    "street light"
+   ],
+   "before": null,
+   "after": "pixabay:photo:3576436",
+   "kind": "image",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.3238869861111111,
+    "scale": 0.12,
+    "era": 0,
+    "total": 9.786,
+    "colourDistance": 0.075,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.942,
+    "relevance": 0.315,
+    "place": 0.992,
+    "quality": 0.996,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.089,
+    "offWhy": "",
+    "tags": 1,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 251,
+    "passed": 23,
+    "refused": {
+     "off-world": 170,
+     "size unknown": 9,
+     "another country": 35,
+     "not landscape": 6,
+     "watermark": 1
+    },
+    "sequence": {
+     "colour": 0.3238869861111111,
+     "scale": 0.12,
+     "era": 0,
+     "total": 9.786,
+     "colourDistance": 0.075,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "street, people, city, shopping, stock, urban, commerce, india",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:photo:3576436",
+     "title": "street, people, city, shopping, stock, urban, commerce, indi",
+     "total": 4.942,
+     "relevance": 0.315,
+     "place": 0.992,
+     "quality": 0.996,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.089,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:27510",
+     "title": "showcase, shop, street, urban, shop windows, marketing",
+     "total": 2.873,
+     "relevance": 0.206,
+     "place": 0.032,
+     "quality": 0.203,
+     "era": 1,
+     "watermark": 0.035,
+     "offBy": -0.018,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:267751",
+     "title": "tents, stall, travel, traditional, tourism, street, shop, pe",
+     "total": 3.069,
+     "relevance": 0.215,
+     "place": 0.07,
+     "quality": 0.666,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.002,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.497,
+     "relevance": 0.32,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.139,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:photo:1006222",
+     "title": "india, vendor, shop, market, street, stall, business, sell, ",
+     "total": 4.719,
+     "relevance": 0.292,
+     "place": 0.999,
+     "quality": 0.998,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.112,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0021",
+   "shot": 2,
+   "start": 165.315,
+   "sentence": "A shop on a busy road, a chair under a light and a family that needed that door to stay open. Around them, the city kept moving.",
+   "queries": [
+    "shop street",
+    "city traffic",
+    "moving pedestrians"
+   ],
+   "before": null,
+   "after": "pixabay:video:8698",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.3092028333333333,
+    "scale": -0.18,
+    "era": 0,
+    "total": 10.863,
+    "colourDistance": 0.117,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.534,
+    "relevance": 0.268,
+    "place": 0.999,
+    "quality": 0.106,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.048,
+    "offWhy": "",
+    "tags": 3,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 236,
+    "passed": 29,
+    "refused": {
+     "off-world": 141,
+     "size unknown": 2,
+     "another country": 49,
+     "not landscape": 7,
+     "watermark": 1
+    },
+    "sequence": {
+     "colour": 0.3092028333333333,
+     "scale": -0.18,
+     "era": 0,
+     "total": 10.863,
+     "colourDistance": 0.117,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "india, crossroads, traffic, busy, shiva, road, street, city, transportation, car",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:8698",
+     "title": "india, crossroads, traffic, busy, shiva, road, street, city,",
+     "total": 4.534,
+     "relevance": 0.268,
+     "place": 0.999,
+     "quality": 0.106,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.048,
+     "offWhy": "",
+     "tags": 3
+    },
+    {
+     "id": "pixabay:video:84223",
+     "title": "road, shiva, cars, traffic, people, urban, buildings, lifest",
+     "total": 4.699,
+     "relevance": 0.254,
+     "place": 1,
+     "quality": 0.717,
+     "era": 0.996,
+     "watermark": 0,
+     "offBy": -0.064,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:video:84224",
+     "title": "road, cars, traffic, people, architecture, building, city, s",
+     "total": 3.695,
+     "relevance": 0.195,
+     "place": 0.997,
+     "quality": 0.094,
+     "era": 0.999,
+     "watermark": 0.008,
+     "offBy": -0.02,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:32287",
+     "title": "a street in bangalore, karnataka, south india, people, stree",
+     "total": 5.555,
+     "relevance": 0.326,
+     "place": 1,
+     "quality": 0.997,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.145,
+     "offWhy": "",
+     "tags": 1
+    },
+    {
+     "id": "pixabay:photo:3576436",
+     "title": "street, people, city, shopping, stock, urban, commerce, indi",
+     "total": 5.005,
+     "relevance": 0.322,
+     "place": 0.992,
+     "quality": 0.996,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.095,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0022",
+   "shot": 1,
+   "start": 169.56,
+   "sentence": "Buses, bicycles, hand carts, the steady noise of traffic on a busy commercial road in a growing city and the shop stayed open.",
+   "queries": [
+    "city traffic",
+    "buses bicycles",
+    "hand carts"
+   ],
+   "before": null,
+   "after": "pixabay:video:120678",
+   "kind": "video",
+   "scale": "wide",
+   "sequence": {
+    "colour": 0.3263243472222222,
+    "scale": 0.12,
+    "era": 0,
+    "total": 11.077,
+    "colourDistance": 0.068,
+    "at": "wide"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 4.831,
+    "relevance": 0.31,
+    "place": 0.828,
+    "quality": 0.218,
+    "era": 0.999,
+    "watermark": 0,
+    "offBy": -0.125,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "wide",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 223,
+    "passed": 43,
+    "refused": {
+     "not landscape": 4,
+     "off-world": 123,
+     "another country": 42,
+     "size unknown": 4
+    },
+    "sequence": {
+     "colour": 0.3263243472222222,
+     "scale": 0.12,
+     "era": 0,
+     "total": 11.077,
+     "colourDistance": 0.068,
+     "at": "wide"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "highway, road, shiva, mumbai, india, traffic, travel, city, day, urban, building",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:120678",
+     "title": "highway, road, shiva, mumbai, india, traffic, travel, city, ",
+     "total": 4.831,
+     "relevance": 0.31,
+     "place": 0.828,
+     "quality": 0.218,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.125,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:98177",
+     "title": "traffic, flow, move, automobile, vehicles, traffic jam, city",
+     "total": 3.895,
+     "relevance": 0.259,
+     "place": 0.007,
+     "quality": 0.993,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.04,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:98176",
+     "title": "traffic, flow, move, automobile, vehicle, dare, traffic jam,",
+     "total": 3.776,
+     "relevance": 0.25,
+     "place": 0.017,
+     "quality": 0.962,
+     "era": 1,
+     "watermark": 0.003,
+     "offBy": -0.028,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:154195",
+     "title": "highway, road, cars, vehicles, city, mumbai, india, shiva, t",
+     "total": 5.564,
+     "relevance": 0.329,
+     "place": 0.985,
+     "quality": 0.986,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.109,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:84222",
+     "title": "road, shiva, street, traffic, buildings, people, india, asia",
+     "total": 5.147,
+     "relevance": 0.303,
+     "place": 0.997,
+     "quality": 0.643,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.119,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  },
+  {
+   "scene": "SC0022",
+   "shot": 2,
+   "start": 174.78,
+   "sentence": "Buses, bicycles, hand carts, the steady noise of traffic on a busy commercial road in a growing city and the shop stayed open. That deta-",
+   "queries": [
+    "city traffic",
+    "buses bicycles",
+    "hand carts"
+   ],
+   "before": null,
+   "after": "pixabay:video:84222",
+   "kind": "video",
+   "scale": "medium",
+   "sequence": {
+    "colour": 0.30541505555555554,
+    "scale": 0.12,
+    "era": 0,
+    "total": 11.37,
+    "colourDistance": 0.127,
+    "at": "medium"
+   },
+   "why": {
+    "by": "OpenCLIP hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+    "total": 5.145,
+    "relevance": 0.303,
+    "place": 0.997,
+    "quality": 0.643,
+    "era": 1,
+    "watermark": 0,
+    "offBy": -0.119,
+    "offWhy": "",
+    "tags": 2,
+    "scale": "medium",
+    "provider": "pixabay",
+    "licence": "PIXABAY",
+    "candidates": 223,
+    "passed": 45,
+    "refused": {
+     "not landscape": 4,
+     "off-world": 121,
+     "another country": 42,
+     "size unknown": 4
+    },
+    "sequence": {
+     "colour": 0.30541505555555554,
+     "scale": 0.12,
+     "era": 0,
+     "total": 11.37,
+     "colourDistance": 0.127,
+     "at": "medium"
+    },
+    "before": null,
+    "critic": {
+     "fits": true,
+     "sees": "road, shiva, street, traffic, buildings, people, india, asia, architecture, city",
+     "why": "tags fit (choice 1)",
+     "by": "words"
+    },
+    "repicks": 0,
+    "record": "B"
+   },
+   "top": [
+    {
+     "id": "pixabay:video:84222",
+     "title": "road, shiva, street, traffic, buildings, people, india, asia",
+     "total": 5.145,
+     "relevance": 0.303,
+     "place": 0.997,
+     "quality": 0.643,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.119,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:98177",
+     "title": "traffic, flow, move, automobile, vehicles, traffic jam, city",
+     "total": 3.894,
+     "relevance": 0.259,
+     "place": 0.007,
+     "quality": 0.993,
+     "era": 1,
+     "watermark": 0.004,
+     "offBy": -0.04,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:98176",
+     "title": "traffic, flow, move, automobile, vehicle, dare, traffic jam,",
+     "total": 3.758,
+     "relevance": 0.249,
+     "place": 0.017,
+     "quality": 0.962,
+     "era": 1,
+     "watermark": 0.003,
+     "offBy": -0.027,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:154195",
+     "title": "highway, road, cars, vehicles, city, mumbai, india, shiva, t",
+     "total": 5.556,
+     "relevance": 0.328,
+     "place": 0.985,
+     "quality": 0.986,
+     "era": 1,
+     "watermark": 0,
+     "offBy": -0.108,
+     "offWhy": "",
+     "tags": 2
+    },
+    {
+     "id": "pixabay:video:120678",
+     "title": "highway, road, shiva, mumbai, india, traffic, travel, city, ",
+     "total": 4.802,
+     "relevance": 0.307,
+     "place": 0.828,
+     "quality": 0.218,
+     "era": 0.999,
+     "watermark": 0,
+     "offBy": -0.122,
+     "offWhy": "",
+     "tags": 2
+    }
+   ]
+  }
+ ]
+}

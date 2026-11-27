@@ -59,3 +59,22 @@ test("the brain plug adds Groq to Gemini when GROQ_API_KEY is set, and not with 
   const off = brainFromEnv({ GEMINI_API_KEY: "g", GROQ_API_KEY: "q", GROQ: "off" });
   assert.ok(off.ok && !("fits" in off.model));
 });
+
+test("groqLook: one picture question to the free eyes model; the minute window is waited out", async () => {
+  const { groqLook, GROQ_EYES_MODEL } = await import("./groq.mjs");
+  const sent = [];
+  let n = 0;
+  const fetch = async (/** @type {any} */ _u, /** @type {any} */ init) => {
+    sent.push(JSON.parse(init.body));
+    n += 1;
+    if (n === 1) return new Response("rate limit per minute", { status: 429, headers: { "retry-after": "1" } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"fits": true}' } }] }), { status: 200 });
+  };
+  const look = groqLook({ apiKey: "k", fetch: /** @type {any} */ (fetch), sleep: async () => {} });
+  assert.equal(await look("Does it fit?", "https://x/a.jpg"), '{"fits": true}');
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].model, GROQ_EYES_MODEL);
+  assert.deepEqual(sent[1].messages[0].content[1], { type: "image_url", image_url: { url: "https://x/a.jpg" } });
+  const day = groqLook({ apiKey: "k", fetch: /** @type {any} */ (async () => new Response("limit per day (RPD)", { status: 429 })), sleep: async () => {} });
+  await assert.rejects(day("q", "u"), /429/);
+});
