@@ -111,12 +111,12 @@ test("9:16 layout keeps all text inside the safe area", () => {
   const plan916 = { scenes: [{ kind: "ayah", surah: 93, ayah: 1, start: 0, end: 6, spokenStart: 0.5, spokenEnd: 5.5, endSure: true }] };
   const ass916 = filmText(plan916, uthmani, surahNames, { format: f916, total: 10, translation: "none", highlight: "none" }, { uthmani, simple: [], pickthall });
   assert.match(ass916, /PlayResY: 1920/);
-  // Ayah style MarginV should be 340 for 9:16 format
-  assert.match(ass916, /Style: Ayah,Amiri Quran,80,&H00F0ECE4,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,2.9,3.6,2,86,86,340,-1/, "Ayah style MarginV = 340 for 9:16");
+  // Ayah style MarginV should be 340 for 9:16 format; MarginL/R = round(1080*0.09) = 97
+  assert.match(ass916, /Style: Ayah,Amiri Quran,80,&H00F0ECE4,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,2\.9,3\.6,2,97,97,340,-1/, "Ayah style MarginV = 340 for 9:16");
   // The margin (340) keeps text above the bottom-safe line (1580)
   assert.ok(f916.margin <= safeBottom, "margin 340 keeps text above the 1580 bottom-safe line");
-  // Meaning style MarginV = round(340*0.6) = 204, fontSize = round(80*0.42) = 34
-  assert.match(ass916, /Style: Meaning,Amiri Quran,34,&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,40,40,204,1/, "Meaning style MarginV = 204 (inside safe area) for 9:16");
+  // Meaning style: fontSize = round(80*0.46) = 37, MarginL/R = 50, MarginV = round(340*0.6) = 204
+  assert.match(ass916, /Style: Meaning,Amiri Quran,37,&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,204,1/, "Meaning style MarginV = 204 (inside safe area) for 9:16");
 });
 
 console.log("All quran-typography tests defined successfully");

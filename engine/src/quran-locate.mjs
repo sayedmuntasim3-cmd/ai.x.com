@@ -656,6 +656,11 @@ export function otherSpeech(words, match) {
 
 /**
  * @typedef {{ surah: number, ayah: number, start: number | null, end: number | null, score: number, lastWordScore?: number, words: { start: number, end: number, score: number }[] }} AlignedAyah
+ * Per-word times from forced alignment (align.py). When attached to a LocatedAyah they
+ * drive the word-by-word highlight in the renderer (quran-render.mjs::filmText).
+ */
+/**
+ * @typedef {{ surah: number, ayah: number, start: number, end: number, timing: "recognized" | "estimated" | "aligned", onPause: boolean, joined: boolean, confidence: number, sure: boolean, repeat: boolean, heardShare: number | null, words?: { start: number, end: number, score: number }[] }} LocatedAyah
  */
 
 /** How far two methods may place one ayah end and still agree (seconds), and the least alignment score trusted. */
@@ -796,12 +801,14 @@ export function locateRecitation(o) {
     const snapped = snapToPauses(heard, spans);
     /** @type {Set<string>} */
     const seen = new Set();
+    const alignedByKey = new Map((o.aligned ?? []).map((x) => [x.surah + ":" + x.ayah, x]));
     out.ayat = heard.map((a, k) => {
       const key = a.surah + ":" + a.ayah, repeat = seen.has(key);
       seen.add(key);
       if (repeat) out.repeats.push({ surah: a.surah, ayah: a.ayah, start: snapped[k].start });
       const share = Math.min(1, a.matchedWords / Math.max(1, a.ayahWords));
-      return { surah: a.surah, ayah: a.ayah, start: snapped[k].start, end: snapped[k].end, timing: /** @type {"recognized"} */ ("recognized"), onPause: snapped[k].onPause, joined: !snapped[k].onPause, confidence: r3(share * a.confidence), sure: snapped[k].onPause && share >= GATE.sureHeard, repeat, heardShare: r3(share) };
+      const aligned = alignedByKey.get(key);
+      return { surah: a.surah, ayah: a.ayah, start: snapped[k].start, end: snapped[k].end, timing: /** @type {"recognized"} */ ("recognized"), onPause: snapped[k].onPause, joined: !snapped[k].onPause, confidence: r3(share * a.confidence), sure: snapped[k].onPause && share >= GATE.sureHeard, repeat, heardShare: r3(share), words: aligned ? aligned.words.filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end)) : undefined };
     });
     out.markers = match.markers.filter((m) => m.start !== null && m.end !== null).map((m) => ({ type: m.type, start: r3(/** @type {number} */ (m.start)), end: r3(/** @type {number} */ (m.end)), timing: /** @type {"recognized"} */ ("recognized") }));
     out.other = [...out.other, ...otherSpeech(words, match)];
@@ -829,12 +836,16 @@ export function locateRecitation(o) {
     out.fit = { unitsPerSecond, median: estimate.fit.median, worst: estimate.fit.worst, onPause: estimate.onPause, ends, joined: estimate.joined, openingUnsure: estimate.unsure };
     const why = unitsPerSecond < GATE.slowest ? "slow" : unitsPerSecond > GATE.fastest ? "fast" : estimate.fit.median > GATE.fit ? "lengths" : null;
     if (why) return ask(msg("quran.ask.notFit", { passage: rangesText(given), why }), { recognition, passages: given, fit: out.fit, heard: out.heard });
+    const alignedByKey = new Map((o.aligned ?? []).map((x) => [x.surah + ":" + x.ayah, x]));
     estimate.units.forEach((u, k) => {
       const p = estimate.placed[k];
       // From the pauses alone an end is never sure: on a recitation without pauses between ayat the pauses
       // inside ayat were taken for ayah ends with high confidence (Yusuf 1-40 joined without gaps: 4 wrong "sure"
       // ends). It becomes sure only when an independent method agrees (alignment of the text, below).
-      if (u.kind === "ayah") out.ayat.push({ surah: /** @type {number} */ (u.surah), ayah: /** @type {number} */ (u.ayah), start: p.start, end: p.end, timing: "estimated", onPause: p.onPause, joined: p.joined, confidence: p.confidence, sure: false, repeat: false, heardShare: null });
+      if (u.kind === "ayah") {
+        const aligned = alignedByKey.get(u.surah + ":" + u.ayah);
+        out.ayat.push({ surah: /** @type {number} */ (u.surah), ayah: /** @type {number} */ (u.ayah), start: p.start, end: p.end, timing: "estimated", onPause: p.onPause, joined: p.joined, confidence: p.confidence, sure: false, repeat: false, heardShare: null, words: aligned ? aligned.words.filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end)) : undefined });
+      }
       else out.markers.push({ type: u.kind, start: p.start, end: p.end, timing: "estimated" });
     });
     out.source = "given";
@@ -875,7 +886,7 @@ export function locationToMatch(location, index) {
     const entry = index.ayat.find((e) => e.surah === a.surah && e.ayah === a.ayah);
     const count = entry?.wordCount ?? 1;
     words += count;
-    const timing = { surah: a.surah, ayah: a.ayah, start: a.start, end: a.end, matchedWords: count, ayahWords: count, hasFirstWord: true, hasLastWord: true, complete: true };
+    const timing = { surah: a.surah, ayah: a.ayah, start: a.start, end: a.end, matchedWords: count, ayahWords: count, hasFirstWord: true, hasLastWord: true, complete: true, words: a.words };
     const last = segments[segments.length - 1];
     if (last && last.surah === a.surah && a.ayah === last.toAyah + 1) { last.ayat.push(timing); last.toAyah = a.ayah; last.end = a.end; last.matchedWords += count; last.to = k + 1; }
     else segments.push({ surah: a.surah, fromAyah: a.ayah, toAyah: a.ayah, matchedWords: count, confidence: 1, from: k, to: k + 1, start: a.start, end: a.end, ayat: [timing], ambiguous: false, alternatives: [] });
