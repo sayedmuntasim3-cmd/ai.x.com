@@ -17,6 +17,7 @@
 import { packagingBrief, pillarOf } from "./reference-prior.mjs";
 import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
 import { buildTimeline } from "./timeline.mjs";
+import { roleCraft } from "./role-craft.mjs";
 import { chapterMedia, createUseHistory, shotKey, shotSettled } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
 import { MOTION_LEVELS } from "./motion.mjs";
@@ -326,6 +327,9 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * The stages every film runs, in order, before the per-chapter ones (s5, edit and media, three per
  * chapter). The studio uses it with state.progress to show "stage 7 of 24" instead of a bare spinner.
  */
+/** Script-film stages that carry role craft, and the craft stage each gets (the edit stage shares the voice film's V5 craft). */
+export const ROLE_CRAFT_STAGES = Object.freeze({ s4: "S4", s5: "S5", edit: "V5", "media-judge": "MEDIA" });
+
 export const STAGE_PLAN = Object.freeze(["market", "s01", "research", "sources", "s2", "s3", "s4", "qa", "viewer", "s6", "s7", "originality"]);
 
 /** Stages a chapter adds: its script, its edit plan and its footage search. */
@@ -400,6 +404,9 @@ export async function runFilm(o) {
    * @param {string} stage @param {Block[]} content @param {number} maxTokens @param {{ webSearch?: { maxUses: number }, effort?: string, system?: Block[] }} [extra]
    */
   async function ask(stage, content, maxTokens, extra = {}) {
+    // The squad desks' own standing orders (prompts/4, role-craft.mjs) for the stages whose roles they are.
+    const craftKey = /** @type {Record<string, import("./role-craft.mjs").CraftStage>} */ (ROLE_CRAFT_STAGES)[stage.split(":")[0]];
+    if (craftKey) content = [...content, { text: roleCraft(craftKey) }];
     // Work sent back by Bossism carries its notes to the stage that redoes it (research also to its search plan).
     const noteKey = Object.keys(state.revisionNotes ?? {}).find((k) => stage === k || stage.startsWith(`${k}-`));
     const notes = noteKey ? state.revisionNotes[noteKey] : "";

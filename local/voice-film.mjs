@@ -45,7 +45,7 @@ import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard, respellNames, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
-import { DESIGNED_TYPES, GENRE_RHYTHM, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
+import { DESIGNED_TYPES, GENRE_RHYTHM, auditVoiceFilm, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
 import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom } from "../engine/src/craft-memory.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { archiveKeys } from "../engine/src/open-archives.mjs";
@@ -465,9 +465,13 @@ export async function pictures(o) {
   await writeFile(join(o.out, "edit-C1.json"), JSON.stringify(cut.edit, null, 1));
   planMessages.push(msg("voice.edit", { answered: cut.answered, calls: cut.calls, transitions: cut.stats.transitions, punchIns: cut.stats.punchIns, hits: cut.stats.hits, dropped: cut.stats.dropped }));
   if (cut.stopped) planMessages.push(msg("voice.brainStopped", { reason: cut.stopped }));
+  // The QA squad's pass (prompts/4 squad 8) over the finished plan: its findings join the same problems list, no loop of its own.
+  const qa = await auditVoiceFilm({ brain, shots: plan.shots, scenes: u.scenes, hook: plan.hook });
+  planMessages.push(msg("voice.qa", { found: qa.findings.length, called: qa.called }));
+  if (qa.stopped) planMessages.push(msg("voice.brainStopped", { reason: qa.stopped }));
   if (r.chapterMedia) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
-  return { ok: r.findings.length === 0 && director.findings.length === 0 && plan.findings.length === 0, messages: [...director.messages, ...r.messages, ...planMessages], problems: [...director.findings.map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail), ...plan.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`)], gaps: [] };
+  return { ok: r.findings.length === 0 && director.findings.length === 0 && plan.findings.length === 0, messages: [...director.messages, ...r.messages, ...planMessages], problems: [...director.findings.map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail), ...qa.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`), ...plan.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`)], gaps: [] };
 }
 
 /**

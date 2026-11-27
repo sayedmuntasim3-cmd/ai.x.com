@@ -754,3 +754,52 @@ export async function directEdit(o) {
   const left = uncoveredHolds(holds, edit);
   return { edit: { ...edit, holds: { found: holds.length, uncovered: left.map((h) => h.id) } }, stats: { ...editStats(edit), longHolds: holds.length, uncovered: left.length }, calls, answered, stopped, fromBrain: brainScenes.length };
 }
+
+/** The gates the voiceover QA pass may name (prompts/4 squad 8): hook, loops, cadence, sync, repetition, visual quality. */
+export const QA_GATES = Object.freeze(["G2", "G3", "G4", "G9", "G10", "G15"]);
+
+/** The QA audit's standing prompt: the Quality Checkers' own words (role-craft.mjs V6) on a fixed answer format. */
+export const QA_SYSTEM = [
+  "You are the Quality Checkers of a documentary whose voiceover is recorded and whose picture plan and edit are done. You audit the plan below, as the hook and retention auditor and the sync and cadence auditor.",
+  "You get the film's hook (every shot of its first 60 seconds with the words spoken), the shots per minute across the film, and its longest holds.",
+  "Answer one line per real defect, nothing else, at most 8 lines:",
+  "FINDING | GATE: " + QA_GATES.join(" or ") + " | SCENE: SCxxxx or - for the whole film | DEFECT: what is wrong, with the number or the words | FIX: the one change that repairs it",
+  "If you find no defect, answer exactly: NONE. Never invent a defect the sheet does not show.",
+  roleCraft("V6"),
+].join("\n");
+
+/** The compact sheet the QA pass reads (about 3-6 KB, whatever the film's length). @param {{ shots: any[], scenes: VoiceScene[], hook: any }} o */
+export function qaSheet(o) {
+  const said = new Map(o.scenes.map((s) => [s.sc, s.narration.replace(/\s+/g, " ").slice(0, 90)]));
+  const hook = o.shots.filter((s) => s.start < 60).slice(0, 40).map((s) => `${s.id} ${s.scene} ${s.start.toFixed(1)}-${s.end.toFixed(1)}s ${s.type}/${s.rung} | ${said.get(s.scene) ?? ""}`);
+  const end = o.shots.length ? o.shots[o.shots.length - 1].end : 0;
+  const perMinute = [];
+  for (let m = 0; m * 60 < end && m < 90; m += 1) perMinute.push(o.shots.filter((s) => s.start >= m * 60 && s.start < (m + 1) * 60).length);
+  const longest = [...o.shots].sort((a, b) => b.seconds - a.seconds).slice(0, 8).map((s) => `${s.id} ${s.scene} ${s.seconds}s ${s.type}`);
+  return [`HOOK (first 60 s; code score ${o.hook.score}/10, ${o.hook.beats} beats in 30 s, title at ${o.hook.titleAt ?? "never"} s):`, ...hook, `SHOTS PER MINUTE (minute 1, 2, ...): ${perMinute.join(" ")}`, `LONGEST HOLDS: ${longest.join("; ")}`].join("\n");
+}
+
+/**
+ * The QA pass after the edit: one model call, its findings in the same shape as the code's shot findings
+ * ({ shot, code, detail }) so they join the existing problems list; never a loop of its own.
+ * @param {{ brain?: Model | null, shots: any[], scenes: VoiceScene[], hook: any }} o
+ */
+export async function auditVoiceFilm(o) {
+  /** @type {{ shot: string, code: string, detail: string }[]} */
+  const findings = [];
+  if (!o.brain || !o.shots.length) return { findings, called: 0, stopped: "" };
+  const known = new Set(o.scenes.map((s) => s.sc));
+  let stopped = "";
+  try {
+    const reply = await o.brain.call({ stage: "V6", system: [{ text: QA_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: qaSheet(o) }] }], maxTokens: 1200, effort: "medium" });
+    for (const line of String(reply.text ?? "").split("\n")) {
+      const m = /^FINDING\s*\|\s*GATE:\s*(G\d+)\s*\|\s*SCENE:\s*(\S+)\s*\|\s*DEFECT:\s*(.+?)\s*(?:\|\s*FIX:\s*(.+))?$/.exec(line.trim());
+      if (!m || !QA_GATES.includes(m[1]) || findings.length >= 8) continue;
+      const scene = known.has(m[2]) ? m[2] : "-";
+      findings.push({ shot: scene, code: `qa-${m[1]}`, detail: m[4] ? `${m[3]} Fix: ${m[4]}` : m[3] });
+    }
+  } catch (e) {
+    if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
+  }
+  return { findings, called: 1, stopped };
+}
