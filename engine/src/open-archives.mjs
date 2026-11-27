@@ -29,7 +29,7 @@ export const NO_STORE_SOURCES = Object.freeze(new Set(["nara"]));
 
 /**
  * The archive keys a run may pass to the open archives: only names the archives
- * themselves ask for (EUROPEANA_API_KEY, NARA_API_KEY, ...), never the whole environment.
+ * themselves ask for (EUROPEANA_API_KEY, NARA_API_KEY, DVIDS_API_KEY, ...), never the whole environment.
  * @param {Record<string, string | undefined>} env
  * @returns {Record<string, string>}
  */

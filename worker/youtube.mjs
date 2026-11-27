@@ -109,8 +109,8 @@ export function parseChapters(description) {
 
 /**
  * Read-only metadata for videos by id, or for a channel's latest uploads by @handle (videos.list / channels.list / playlistItems.list).
- * @param {{ apiKey?: string, ids?: unknown, handle?: unknown, max?: unknown, fetch?: typeof fetch }} o
- * @returns {Promise<{ ok: true, channel?: { id: string, title: string }, videos: object[] } | { ok: false, status: number, error: string }>}
+ * @param {{ apiKey?: string, ids?: unknown, handle?: unknown, max?: unknown, pageToken?: unknown, fetch?: typeof fetch }} o
+ * @returns {Promise<{ ok: true, channel?: { id: string, title: string }, videos: object[], nextPageToken?: string } | { ok: false, status: number, error: string }>}
  */
 export async function videoDetails(o) {
   if (!o.apiKey) return { ok: false, status: 503, error: "Connect YouTube first: the YOUTUBE_API_KEY secret (docs/CONNECT.md)." };
@@ -124,6 +124,8 @@ export async function videoDetails(o) {
     let ids = typeof o.ids === "string" ? o.ids.split(",").map((s) => s.trim()).filter(Boolean) : [];
     /** @type {{ id: string, title: string } | undefined} */
     let channel;
+    /** @type {string | undefined} */
+    let nextPageToken;
     if (!ids.length && typeof o.handle === "string") {
       if (!/^@?[\w.\-]{2,60}$/.test(o.handle)) return { ok: false, status: 400, error: "Give a channel handle like @lemmino." };
       const c = await call("channels", { part: "snippet,contentDetails", forHandle: o.handle.startsWith("@") ? o.handle : `@${o.handle}` });
@@ -131,7 +133,9 @@ export async function videoDetails(o) {
       if (!item) return { ok: false, status: 404, error: "No channel with that handle." };
       channel = { id: item.id, title: item.snippet?.title ?? "" };
       const max = Math.min(50, Math.max(1, Math.round(Number(o.max ?? 25))));
-      const pl = await call("playlistItems", { part: "contentDetails", playlistId: item.contentDetails?.relatedPlaylists?.uploads ?? "", maxResults: String(max) });
+      // pageToken walks the uploads playlist (1 quota unit per 50 videos); the answer's nextPageToken says where to continue.
+      const pl = await call("playlistItems", { part: "contentDetails", playlistId: item.contentDetails?.relatedPlaylists?.uploads ?? "", maxResults: String(max), ...(typeof o.pageToken === "string" && /^[\w-]{1,200}$/.test(o.pageToken) ? { pageToken: o.pageToken } : {}) });
+      nextPageToken = typeof pl.nextPageToken === "string" ? pl.nextPageToken : undefined;
       ids = (pl.items ?? []).map((/** @type {any} */ i) => i.contentDetails?.videoId).filter(Boolean);
     }
     if (!ids.length) return { ok: false, status: 400, error: "Give ids (comma separated, up to 50) or a channel handle." };
@@ -141,9 +145,10 @@ export async function videoDetails(o) {
       id: x.id, title: x.snippet?.title ?? "", channelId: x.snippet?.channelId ?? "", channelTitle: x.snippet?.channelTitle ?? "",
       publishedAt: x.snippet?.publishedAt ?? "", views: Number(x.statistics?.viewCount ?? 0), likes: Number(x.statistics?.likeCount ?? 0), comments: Number(x.statistics?.commentCount ?? 0),
       durationSeconds: isoSeconds(x.contentDetails?.duration ?? ""), chapters: parseChapters(x.snippet?.description ?? ""),
+      descriptionOpening: String(x.snippet?.description ?? "").replace(/\s+/g, " ").trim().slice(0, 300),
       thumbnail: x.snippet?.thumbnails?.maxres?.url ?? x.snippet?.thumbnails?.high?.url ?? "", tags: (x.snippet?.tags ?? []).slice(0, 15),
     }));
-    return channel ? { ok: true, channel, videos } : { ok: true, videos };
+    return channel ? { ok: true, channel, videos, ...(nextPageToken ? { nextPageToken } : {}) } : { ok: true, videos };
   } catch (error) {
     const message = error instanceof Error && error.message.startsWith("Video details:") ? error.message : "Video details: YouTube could not be reached. Try again in a minute.";
     return { ok: false, status: 502, error: message };
