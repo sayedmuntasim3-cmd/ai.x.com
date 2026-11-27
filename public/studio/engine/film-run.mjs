@@ -14,6 +14,7 @@
  * - step(name, fn)                                       (Cloudflare Workflows step.do, or fn() in tests)
  * so a run survives restarts: a finished stage is never paid for twice.
  */
+import { packagingBrief, pillarOf } from "./reference-prior.mjs";
 import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
 import { buildTimeline } from "./timeline.mjs";
 import { chapterMedia, createUseHistory, shotKey, shotSettled } from "./film-media.mjs";
@@ -351,7 +352,7 @@ export const STAGE_EFFORT = Object.freeze({ s01: "high", research: "high", s2: "
  * budgetUsd is a hard cap: before every model call the worst case of that call
  * (its whole input at the full input price plus its whole output allowance)
  * is reserved, and a call that could cross the cap is never made.
- * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", researchStrict?: boolean, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", researchStrict?: boolean, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, referencePrior?: object, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -518,9 +519,11 @@ export async function runFilm(o) {
     };
     const marketText = await read("market.json");
 
+    // The outside market's packaging prior for this topic's pillar (engine/data/reference-prior.json): a lean, never a rule.
+    const priorBrief = o.referencePrior ? packagingBrief(o.referencePrior, pillarOf({ title: film.topic })) : "";
     await stage("s01", async () => {
       const demand = proven();
-      const text = await ask("s01", [...(demand ? [{ text: demand }] : []), { text: "Write S0 (section 4: intake, media math, risk scan) and S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it."  + (demand ? " PROVEN_DEMAND lists real videos on this topic that beat their own channels: study why they won (the promise, the stake, the specific detail) and beat them with a better angle; never reuse their wording or structure." : "") }], 24000);
+      const text = await ask("s01", [...(demand ? [{ text: demand }] : []), ...(priorBrief ? [{ text: priorBrief }] : []), { text: "Write S0 (section 4: intake, media math, risk scan) and S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it."  + (demand ? " PROVEN_DEMAND lists real videos on this topic that beat their own channels: study why they won (the promise, the stake, the specific detail) and beat them with a better angle; never reuse their wording or structure." : "") }], 24000);
       await store.put("s01.md", text);
       return { chars: text.length };
     });
@@ -875,6 +878,7 @@ export async function runFilm(o) {
       // Credits for the archive pictures the film uses, built from their licence records, never from memory.
       const credits = pictureCredits((await Promise.all(plan.chapters.map((c) => read(`media-${c.id}.json`)))).filter(Boolean).map((t) => JSON.parse(t)));
       let text = await ask("s7", [
+        ...(priorBrief ? [{ text: priorBrief }] : []),
         { text: (proven() ? proven() + "\nPROVEN_DEMAND shows titles that won on this topic: learn their promise, never their wording.\n" : "") + ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) + (credits ? "\n" + ctx("PICTURE_CREDITS", credits) + "\nThe description's credits block includes every PICTURE_CREDITS line exactly as written (the CC BY licences require it)." : "") },
         { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, written on one line as **Final title: ...**, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") + "\n\n" + PACKAGING_RULES },
       ], 16000);

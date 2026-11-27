@@ -8,21 +8,21 @@ Weights: demand 14%, outliers 14%, competition 7%, usAppeal 12%, visuals 14%, re
 
 | Rank | Topic | Total | Evidence | Dem | Out | Comp | US | Vis | Rel | Ads | Eff | Ever | Story | New | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | New Orleans levee failures in Katrina (2005) | 88.8 | medium | 5 | 4 | 3 | 5 | 5 | 5 | 3 | 3 | 5 | 4 | 5 | accepted |
+| 1 | New Orleans levee failures in Katrina (2005) | 89.8 | medium | 5 | 4 | 3 | 5 | 5 | 5 | 3 | 3 | 5 | 4 | 5 | accepted |
 | 2 | Camp Century, the US base under the Greenland ice | 87 | medium | 4 | 3 | 4 | 5 | 5 | 4 | 5 | 4 | 5 | 5 | 5 | accepted |
-| 3 | Hanford: cleaning up the biggest US nuclear waste site | 85.4 | medium | 4 | 4 | 4 | 5 | 5 | 4 | 4 | 2 | 5 | 4 | 5 | accepted |
-| 4 | St. Francis Dam failure (1928) and the LA Aqueduct | 82.2 | medium | 4 | 4 | 4 | 5 | 3 | 4 | 4 | 3 | 5 | 5 | 5 | accepted |
-| 5 | Hyatt Regency walkway collapse (1981) | 81.6 | medium | 4 | 4 | 3 | 5 | 3 | 5 | 2 | 4 | 5 | 5 | 5 | accepted |
-| 6 | Why American subways cost so much (Second Avenue Subway) | 80.4 | medium | 4 | 5 | 3 | 5 | 3 | 4 | 5 | 3 | 4 | 3 | 5 | accepted |
-| 7 | The US power grid and the 2003 blackout | 78.8 | medium | 4 | 3 | 3 | 5 | 3 | 5 | 5 | 3 | 4 | 4 | 5 | accepted |
-| 8 | I-35W Minneapolis bridge collapse (2007) | 78.4 | medium | 4 | 3 | 3 | 5 | 3 | 5 | 3 | 4 | 5 | 4 | 5 | accepted |
-| 9 | Boston Big Dig (and Seattle's stuck tunnel machine) | 77.2 | medium | 4 | 4 | 3 | 5 | 3 | 4 | 4 | 2 | 4 | 4 | 5 | accepted |
-| 10 | The 2018 Merrimack Valley gas explosions | 76.2 | medium | 3 | 4 | 4 | 5 | 3 | 5 | 2 | 4 | 3 | 4 | 5 | accepted |
-| 11 | Hoover Dam: how it was poured and why it still works | 71.3 | weak | 4 | 2 | 1 | 5 | 5 | 5 | 5 | 4 | 5 | 3 | 5 | accepted |
-| 12 | Tacoma Narrows Bridge (1940) | 70.6 | weak | 4 | 2 | 1 | 4 | 5 | 5 | 5 | 4 | 5 | 4 | 5 | accepted |
-| 13 | Oroville spillway crisis (2017) / Teton Dam | 67.7 | weak | 3 | 2 | 3 | 5 | 4 | 5 | 5 | 4 | 4 | 3 | 5 | accepted |
-| 14 | Chicago's Deep Tunnel flood-control system | 63.2 | weak | 3 | 2 | 4 | 4 | 3 | 4 | 5 | 4 | 5 | 3 | 5 | accepted |
-| - | Oceanwide Plaza, the abandoned LA skyscraper | 68.2 | medium | 4 | 4 | 4 | 5 | 1 | 3 | 4 | 4 | 2 | 3 | 5 | rejected: no-authentic-visuals |
+| 3 | Hanford: cleaning up the biggest US nuclear waste site | 85.8 | medium | 4 | 4 | 4 | 5 | 5 | 4 | 4 | 2 | 5 | 4 | 5 | accepted |
+| 4 | St. Francis Dam failure (1928) and the LA Aqueduct | 83.2 | medium | 4 | 4 | 4 | 5 | 3 | 4 | 4 | 3 | 5 | 5 | 5 | accepted |
+| 5 | Hyatt Regency walkway collapse (1981) | 82.6 | medium | 4 | 4 | 3 | 5 | 3 | 5 | 2 | 4 | 5 | 5 | 5 | accepted |
+| 6 | Why American subways cost so much (Second Avenue Subway) | 81.3 | medium | 4 | 5 | 3 | 5 | 3 | 4 | 5 | 3 | 4 | 3 | 5 | accepted |
+| 7 | The US power grid and the 2003 blackout | 80.8 | medium | 4 | 3 | 3 | 5 | 3 | 5 | 5 | 3 | 4 | 4 | 5 | accepted |
+| 8 | I-35W Minneapolis bridge collapse (2007) | 79.4 | medium | 4 | 3 | 3 | 5 | 3 | 5 | 3 | 4 | 5 | 4 | 5 | accepted |
+| 9 | Boston Big Dig (and Seattle's stuck tunnel machine) | 79.2 | medium | 4 | 4 | 3 | 5 | 3 | 4 | 4 | 2 | 4 | 4 | 5 | accepted |
+| 10 | The 2018 Merrimack Valley gas explosions | 77.2 | medium | 3 | 4 | 4 | 5 | 3 | 5 | 2 | 4 | 3 | 4 | 5 | accepted |
+| 11 | Tacoma Narrows Bridge (1940) | 72.1 | weak | 4 | 2 | 1 | 4 | 5 | 5 | 5 | 4 | 5 | 4 | 5 | accepted |
+| 12 | Hoover Dam: how it was poured and why it still works | 71.7 | weak | 4 | 2 | 1 | 5 | 5 | 5 | 5 | 4 | 5 | 3 | 5 | accepted |
+| 13 | Oroville spillway crisis (2017) / Teton Dam | 69.2 | weak | 3 | 2 | 3 | 5 | 4 | 5 | 5 | 4 | 4 | 3 | 5 | accepted |
+| 14 | Chicago's Deep Tunnel flood-control system | 63.4 | weak | 3 | 2 | 4 | 4 | 3 | 4 | 5 | 4 | 5 | 3 | 5 | accepted |
+| - | Oceanwide Plaza, the abandoned LA skyscraper | 69.4 | medium | 4 | 4 | 4 | 5 | 1 | 3 | 4 | 4 | 2 | 3 | 5 | rejected: no-authentic-visuals |
 
 Columns: Dem demand, Out outlier evidence, Comp competition (5 = little), US appeal, Vis authentic free visuals, Rel source reliability, Ads advertiser fit, Eff effort (5 = low), Ever evergreen, Story narrative, New unlike past films (computed).
 

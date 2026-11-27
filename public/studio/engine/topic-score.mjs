@@ -7,10 +7,14 @@
  *
  * The score ranks topics; it never predicts views.
  *
+ * Optional reference prior (engine/data/reference-prior.json): the title's lean toward what winners of its pillar use moves the total by at most 3 points.
+ *
  * Pure functions (browser + Node). Candidate data lives in
  * docs/research/data/engineering-topics.json; `local/topic-ranking.mjs`
  * writes docs/research/TOPIC_RANKING.md from it.
  */
+
+import { topicLean } from "./reference-prior.mjs";
 
 /** Niche fixed by the owner on 26 Nov 2026 (CLAUDE.md). */
 export const NICHE = "engineering-disasters-megaprojects";
@@ -75,7 +79,7 @@ export function similarityScore(topic, pastFilms = []) {
 /**
  * @typedef {{ value: number, reason: string, evidence?: string }} Factor
  * @typedef {{ id: string, title: string, niche: string, tags?: string[], evidenceStrength?: "strong"|"medium"|"weak", fabricationRisk?: boolean, factors: Record<string, Factor> }} Candidate
- * @typedef {{ id: string, title: string, total: number, factors: Record<string, Factor>, rejected: {id: string, why: string}[], evidenceStrength: string, missing: string[] }} Scored
+ * @typedef {{ id: string, title: string, total: number, factors: Record<string, Factor>, rejected: {id: string, why: string}[], evidenceStrength: string, missing: string[], priorLean?: { pillar: string | null, score: number, points: number, reason: string } }} Scored
  */
 
 /** Clamp a factor value to 0..5 (missing = 0, so a gap never helps). @param {unknown} v */
@@ -87,7 +91,7 @@ function clamp(v) {
 /**
  * Score one candidate. total is 0..100 (weighted mean of factors, x20).
  * Weak evidence costs 10% of the total: it must not outrank stronger proof on hope.
- * @param {Candidate} c @param {{ pastFilms?: {title?: string, tags?: string[]}[], weights?: Record<string, number> }} [o]
+ * @param {Candidate} c @param {{ pastFilms?: {title?: string, tags?: string[]}[], weights?: Record<string, number>, prior?: object }} [o]
  * @returns {Scored}
  */
 export function scoreTopic(c, o = {}) {
@@ -108,15 +112,16 @@ export function scoreTopic(c, o = {}) {
   for (const k of FACTORS) sum += (weights[k] ?? 0) * values[k];
   const strength = c.evidenceStrength ?? "weak";
   const penalty = strength === "weak" ? 0.9 : 1;
-  const total = Math.round(sum * 20 * penalty * 10) / 10;
+  const lean = o.prior ? topicLean(o.prior, c) : null;
+  const total = Math.round((sum * 20 * penalty + (lean?.points ?? 0)) * 10) / 10;
   const rejected = REJECT_RULES.filter((r) => r.test(c, values)).map((r) => ({ id: r.id, why: r.why }));
-  return { id: c.id, title: c.title, total, factors, rejected, evidenceStrength: strength, missing };
+  return { id: c.id, title: c.title, total, factors, rejected, evidenceStrength: strength, missing, ...(lean ? { priorLean: lean } : {}) };
 }
 
 /**
  * Rank candidates: accepted topics first by total (ties: id), rejected after.
  * Deterministic for the same input.
- * @param {Candidate[]} candidates @param {{ pastFilms?: {title?: string, tags?: string[]}[], weights?: Record<string, number> }} [o]
+ * @param {Candidate[]} candidates @param {{ pastFilms?: {title?: string, tags?: string[]}[], weights?: Record<string, number>, prior?: object }} [o]
  */
 export function rankTopics(candidates, o = {}) {
   const scored = candidates.map((c) => scoreTopic(c, o));

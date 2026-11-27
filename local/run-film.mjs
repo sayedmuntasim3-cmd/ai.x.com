@@ -194,6 +194,8 @@ export async function produceFilm(o) {
   const options = {
     film,
     manual,
+    // The outside market's packaging prior (titles, thumbnails, length); optional, a lean for the packaging desk.
+    referencePrior: existsSync(new URL("../engine/data/reference-prior.json", import.meta.url)) ? JSON.parse(readFileSync(new URL("../engine/data/reference-prior.json", import.meta.url), "utf8")) : undefined,
     model: o.ledger ? o.ledger.wrap(brain.model) : brain.model,
     store,
     budgetUsd: o.budgetUsd,

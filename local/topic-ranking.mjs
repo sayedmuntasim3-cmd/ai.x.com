@@ -6,7 +6,8 @@ import { rankTopics, rankingMarkdown, TOPIC_WEIGHTS } from "../engine/src/topic-
 
 const root = new URL("../", import.meta.url);
 const data = JSON.parse(readFileSync(new URL("docs/research/data/engineering-topics.json", root), "utf8"));
-const ranked = rankTopics(data.topics, { pastFilms: data.pastFilms });
+const prior = JSON.parse(readFileSync(new URL("engine/data/reference-prior.json", root), "utf8"));
+const ranked = rankTopics(data.topics, { pastFilms: data.pastFilms, prior });
 const weights = Object.entries(TOPIC_WEIGHTS).map(([k, w]) => `${k} ${Math.round(w * 100)}%`).join(", ");
 const rejected = ranked.filter((s) => s.rejected.length).map((s) => `- ${s.title}: ${s.rejected.map((r) => r.why).join("; ")}.`);
 const md = `# Topic ranking (W7)

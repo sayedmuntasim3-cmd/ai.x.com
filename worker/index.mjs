@@ -67,6 +67,7 @@ import { listFilms } from "./films.mjs";
 import { radarSearch, videoDetails } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
+import REFERENCE_PRIOR from "../engine/data/reference-prior.json";
 import { handleVoice, ledgerAudience } from "./voice-api.mjs";
 import { handleMedia } from "./media-api.mjs";
 
@@ -189,6 +190,8 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       model,
       store,
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
+      // The outside market's packaging prior (titles, thumbnails, length), refreshed weekly by .github/workflows/reference-prior.yml.
+      referencePrior: REFERENCE_PRIOR,
       // The emergency stop, asked before every model call: the key control/stop in the films bucket stops every running film.
       halt: async () => ((await env.FILMS.get("control/stop")) ? "the key control/stop is set in storage" : null),
       media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }) },
