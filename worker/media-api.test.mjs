@@ -41,3 +41,12 @@ test("an answer holding NARA results is never cached (NARA's terms)", async () =
   await Promise.all(waits);
   assert.equal(store.size, 0);
 });
+
+test("LoC refused by the Worker's address is reported as runner-only, not as an error", async () => {
+  const search = async (o) => ({ query: o.query, results: [], sources: [{ id: "loc", status: "error", error: "not authorised" }, { id: "nasa", status: "empty" }] });
+  const req = new Request("https://x.test/api/media/search?q=hoover+dam");
+  const r = await (await handleMedia(req, new URL(req.url), {}, { cache: null, search })).json();
+  assert.equal(r.sources[0].status, "runner-only");
+  assert.equal(r.sources[0].error, undefined);
+  assert.equal(r.sources[1].status, "empty");
+});
