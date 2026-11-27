@@ -155,17 +155,18 @@ export async function sendVoice(c, file) {
 }
 
 /**
- * The free brain through the Worker (POST /api/voice/:id/brain: Groq first, then the Gemini pool, the Worker's own
- * keys), as a model for local/voice-film.mjs. Text only and no web search, said in its capabilities, so every stage
+ * The free brain through the Worker (POST /api/voice/:id/brain: Groq only, the Worker's own key), as a model for
+ * local/voice-film.mjs and render/asset-rank/rerank.mjs. A prompt too big for Groq comes back as an error with
+ * tooLarge (the caller splits its batch); every call's prompt tokens are logged. Text only and no web search, said in its capabilities, so every stage
  * takes its own path (canSee/canSearch). A busy minute is waited out; a used-up day stops with the brains' words.
  * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c
  * @param {{ sleep?: (ms: number) => Promise<void>, waitMs?: number, log?: (line: string) => void }} [o]
  */
 export function workerBrain(c, o = {}) {
   const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const calls = /** @type {{ stage: string, model: string, seconds: number }[]} */ ([]);
+  const calls = /** @type {{ stage: string, model: string, seconds: number, tokens?: number }[]} */ ([]);
   return {
-    name: "zupona-free-brain (Groq, then Gemini, through the Worker)",
+    name: "zupona-free-brain (Groq, through the Worker)",
     capabilities: { vision: false, webSearch: false },
     calls,
     /** @param {any} req */
@@ -176,10 +177,12 @@ export function workerBrain(c, o = {}) {
         const t0 = Date.now();
         try {
           const r = await send(c, "/brain", body);
-          calls.push({ stage: String(req.stage ?? ""), model: String(r.model ?? "?"), seconds: Math.round((Date.now() - t0) / 1000) });
+          calls.push({ stage: String(req.stage ?? ""), model: String(r.model ?? "?"), seconds: Math.round((Date.now() - t0) / 1000), tokens: Number(r.tokens) || 0 });
+          o.log?.(`free brain ${req.stage}: ${r.tokens ?? "?"} prompt tokens, ${r.model}`);
           return { text: String(r.text ?? ""), stopReason: r.stopReason ?? "end_turn", model: r.model, usage: r.usage ?? { input_tokens: 0, output_tokens: 0 } };
         } catch (e) {
           last = e instanceof Error ? e.message : String(e);
+          if (/ 413 /.test(last)) throw Object.assign(new Error(`The prompt is too big for the free brain: ${last.slice(0, 300)}`), { status: 413, tooLarge: true });
           if (/day used up|per day|PerDay|RESOURCE_EXHAUSTED|daily/i.test(last) && !/busy/i.test(last)) throw Object.assign(new Error(`The free brains' daily limit is used up: ${last.slice(0, 300)}`), { status: 429, daily: true });
           if (!/ 429 /.test(last)) throw Object.assign(new Error(last.slice(0, 300)), { status: 400 });
           o.log?.(`free brain busy (${req.stage}); waiting a minute`);

@@ -10,7 +10,7 @@
  * never a generic stock picture (Boss, 21 Nov 2026: abstract film strips, random foreigners, the Amazon for India).
  */
 import { msg } from "./messages.mjs";
-import { brainBatches, nounsAfterDeterminers, wordsPlan } from "./voice-visuals.mjs";
+import { brainBatches, nounsAfterDeterminers, runFitting, wordsPlan } from "./voice-visuals.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 import { checkVoiceChapter, restoreVoiceFields } from "./voice-scenes.mjs";
 import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
@@ -230,9 +230,10 @@ export async function planBeats(o) {
     for (const batch of batches) {
       if (stopped || answered >= (o.maxCalls ?? 40)) break;
       try {
-        const reply = await o.brain.call({ stage: "V3", system: [{ text: DIRECTOR_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${batch.map(lineOf).join("\n")}` }] }], maxTokens: Math.min(16000, 300 + batch.length * 120), effort: "medium" });
-        answered += 1;
-        for (const line of String(reply.text ?? "").split("\n")) { const b = parseBeatLine(line); if (b && !written.has(b.from)) written.set(b.from, b); }
+        answered += await runFitting(batch, async (part) => {
+          const reply = await /** @type {Model} */ (o.brain).call({ stage: "V3", system: [{ text: DIRECTOR_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${part.map(lineOf).join("\n")}` }] }], maxTokens: Math.min(16000, 300 + part.length * 120), effort: "medium" });
+          for (const line of String(reply.text ?? "").split("\n")) { const b = parseBeatLine(line); if (b && !written.has(b.from)) written.set(b.from, b); }
+        });
       } catch (e) {
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
       }
@@ -725,11 +726,14 @@ export async function directEdit(o) {
       calls += 1;
       const scs = new Set(b.map((r) => /^SC\d+/.exec(r)?.[0]));
       try {
-        const reply = await o.brain.call({ stage: "V5", system: [{ text: "You are a documentary film editor. Answer with one JSON block only.", cache: true }], messages: [{ role: "user", content: [{ text: editInstruction(chapter, b.join("\n"), `a ${o.genre ?? "documentary"} voiceover film`, holds.filter((h) => scs.has(h.scene))) }] }], maxTokens: 4000, effort: "medium" });
-        const j = replyJson(String(reply.text ?? ""));
-        const list = Array.isArray(j) ? j : Array.isArray(j?.scenes) ? j.scenes : [];
-        if (j) answered += 1;
-        for (const x of list) if (x && scs.has(x.scene)) brainScenes.push(sceneClock(x, bounds.get(x.scene)));
+        await runFitting(b, async (part) => {
+          const ps = new Set(part.map((r) => /^SC\d+/.exec(r)?.[0]));
+          const reply = await /** @type {Model} */ (o.brain).call({ stage: "V5", system: [{ text: "You are a documentary film editor. Answer with one JSON block only.", cache: true }], messages: [{ role: "user", content: [{ text: editInstruction(chapter, part.join("\n"), `a ${o.genre ?? "documentary"} voiceover film`, holds.filter((h) => ps.has(h.scene))) }] }], maxTokens: 4000, effort: "medium" });
+          const j = replyJson(String(reply.text ?? ""));
+          const list = Array.isArray(j) ? j : Array.isArray(j?.scenes) ? j.scenes : [];
+          if (j) answered += 1;
+          for (const x of list) if (x && ps.has(x.scene)) brainScenes.push(sceneClock(x, bounds.get(x.scene)));
+        });
       } catch (e) {
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
       }
