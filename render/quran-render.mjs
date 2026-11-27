@@ -54,8 +54,8 @@ export function ayahFontSize(text, f) {
 }
 
 /** One grade for the whole film: a little less colour, a little more depth, a soft vignette. */
-export const GRADE = "eq=contrast=1.05:saturation=0.92:gamma=0.95,vignette=angle=PI/5,eq=brightness=0.02,eq=gamma_r=0.98,eq=gamma_b=1.02";
-const CARD = { c0: "0x0d1520", c1: "0x1a2433" };
+export const GRADE = "eq=contrast=1.04:saturation=0.9:gamma=0.98,vignette=angle=PI/5";
+const CARD = { c0: "0x10151c", c1: "0x232d3a" };
 
 /** @param {number} n */
 const r3 = (n) => Math.round(n * 1000) / 1000;
