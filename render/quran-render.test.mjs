@@ -52,7 +52,9 @@ test("the Arabic on screen is the verified text; the basmala written before ayah
   assert.equal(ayahOnScreen(uthmani[0], 1, 1), uthmani[0], "in Al-Fatiha the basmala is ayah 1");
   const plan = { scenes: [{ kind: "ayah", surah: 95, ayah: 1, start: 0, end: 5, spokenStart: 0.5, spokenEnd: 4.5 }, { kind: "ayah", surah: 95, ayah: 2, start: 5, end: 9, spokenStart: 5.4, spokenEnd: 8.6 }] };
   const ass = filmText(plan, uthmani, surahNames, { format: FORMATS["1080p"], total: 10, reciter: "the owner" });
-  assert.match(ass, /Style: Ayah,Amiri Quran,70,.*,-1$/m, "automatic text direction for Arabic");
+  // ASS output uses backslash-n as line separator; split and match individual lines.
+  const assLines = ass.split(String.fromCharCode(92, 110));
+  assert.ok(assLines.some(l => l.startsWith("Style: Ayah,Amiri Quran,70,") && l.endsWith(",-1")), "automatic text direction for Arabic");
   assert.ok(ass.includes(`${fig} ﴿١﴾`));
   assert.match(ass, /سورة التين/, "a recording without a title scene gets the surah's name over its first seconds");
   assert.match(ass, /Recited by the owner/);
@@ -148,5 +150,7 @@ test("the Arabic is written large for a short ayah and smaller for a long one, w
   }
   // The size is written into the ayah's line of the subtitles.
   const ass = filmText({ scenes: [{ kind: "title", surah: 67, ayah: null, start: 0, end: 2 }, { kind: "ayah", surah: 67, ayah: 1, start: 2, end: 9, spokenStart: 2, spokenEnd: 9, endSure: true }] }, uthmani, [], { format: FORMATS["1080p"], total: 20 });
-  assert.match(ass, /\\fs112\}تَبَٰرَكَ/);
+  // ASS output uses backslash-n as line separator.
+  const assLines = ass.split(String.fromCharCode(92, 110));
+  assert.ok(assLines.some(l => l.includes("\\fs112\}") && l.includes("تَبَٰرَكَ")), "fs112 size for short ayah of Al-Mulk");
 });

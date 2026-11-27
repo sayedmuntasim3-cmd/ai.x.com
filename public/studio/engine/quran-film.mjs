@@ -105,6 +105,11 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
     const n = nameOf(s);
     return n ? [n.arabic, n.transliteration].filter(Boolean).join(" · ") : `Surah ${s}`;
   };
+  // Per-word times from the location (forced alignment): they drive the word-by-word highlight in the renderer.
+  // One entry per ayah, in the same order as `ayat`.
+  /** @type {Map<string, { start: number, end: number, score: number }[] | undefined>} */
+  const wordsByKey = new Map();
+  for (const seg of match.segments) for (const a of seg.ayat) if (Array.isArray(a.words)) wordsByKey.set(a.surah + ":" + a.ayah, a.words);
   let sceneStart = 0;
   let previousSurah = 0;
   const basmala = match.markers.find((m) => m.type === "basmala");
@@ -126,7 +131,8 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
       }
       previousSurah = a.surah;
     }
-    scenes.push({ id: "", surah: a.surah, ayah: a.ayah, kind: "ayah", start: r3(sceneStart), end: r3(end), spokenStart: a.start, spokenEnd: a.end, text, label: `${surahTitle(a.surah)} · ${a.surah}:${a.ayah}`, complete: a.complete, estimated: !timed, needsReview: flags });
+    const key = a.surah + ":" + a.ayah;
+    scenes.push({ id: "", surah: a.surah, ayah: a.ayah, kind: "ayah", start: r3(sceneStart), end: r3(end), spokenStart: a.start, spokenEnd: a.end, text, label: `${surahTitle(a.surah)} · ${a.surah}:${a.ayah}`, complete: a.complete, estimated: !timed, needsReview: flags, words: wordsByKey.get(key) ?? undefined });
     sceneStart = end;
   });
   scenes.forEach((s, i) => { s.id = "Q" + String(i + 1).padStart(4, "0"); });
