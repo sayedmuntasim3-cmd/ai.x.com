@@ -650,7 +650,13 @@ export async function rerankRun(o) {
   await writeFile(join(dir, "req.json"), JSON.stringify({ texts, images, cache: env.ZUPONA_RANK_CACHE || undefined }));
   const script = new URL("./rank.py", import.meta.url).pathname;
   const t1 = Date.now();
-  await run(python, [script, "score", join(dir, "req.json"), join(dir, "ans.json")], { maxBuffer: 1 << 26, timeout: 3600_000 });
+  try {
+    await run(python, [script, "score", join(dir, "req.json"), join(dir, "ans.json")], { maxBuffer: 1 << 26, timeout: 3600_000 });
+  } catch (/** @type {any} */ e) {
+    // The first lines of a failed run are only Hugging Face notices; the cause is at the end (film ccd86532 lost it to a 200-character cut).
+    const err = String(e?.stderr ?? "").trim().split("\n").filter((l) => !/unauthenticated|HF_TOKEN|huggingface/i.test(l)).slice(-6).join(" | ");
+    throw new Error(`rank.py ${e?.killed ? `was stopped after ${Math.round((Date.now() - t1) / 1000)} s (${e?.signal ?? "timeout"})` : `exited with code ${e?.code ?? "?"}`}: ${err || "no error text"}`);
+  }
   const ans = await readJson(join(dir, "ans.json"));
   const seeSeconds = (Date.now() - t1) / 1000;
 
@@ -859,6 +865,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const groq = process.env.GROQ_API_KEY && String(process.env.GROQ ?? "").toLowerCase() !== "off" ? String(process.env.GROQ_API_KEY) : "";
   rerankRun({ run: a.run, python: typeof a.python === "string" ? a.python : undefined, sheet: a.sheet === true, brain: groq ? groqModel({ apiKey: groq }) : null, look: groq ? groqLook({ apiKey: groq }) : null, topic: typeof a.topic === "string" ? a.topic : undefined }).catch((e) => {
     // The plan's own picks stay: the film is never stopped by the eyes.
-    console.log(`::warning::The eyes could not rank the pictures (${String(e?.message ?? e).slice(0, 200)}); the plan's picks stay.`);
+    console.log(`::warning::The eyes could not rank the pictures (${String(e?.message ?? e).slice(0, 700)}); the plan's picks stay.`);
   });
 }

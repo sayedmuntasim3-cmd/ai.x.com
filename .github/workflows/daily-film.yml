@@ -17,6 +17,9 @@ on:
   schedule:
     # 10:23 UTC (5:23 am in New York): the film is ready for the US day.
     - cron: "23 10 * * *"
+    # A second ask, four hours later: GitHub may drop a scheduled run under load (27 Nov: the 10:23 run never started).
+    # The Worker answers 409 while today's film is under way, so a second ask never makes a second film.
+    - cron: "23 14 * * *"
   workflow_dispatch:
     inputs:
       voice_id:
