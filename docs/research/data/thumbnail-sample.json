@@ -1,0 +1,553 @@
+{
+ "checked": "2026-11-27",
+ "method": "52 thumbnails (hqdefault, 480x360) downloaded as images only and read by eye in contact sheets by the study author: 7 top outliers, 3 middle and 3 weakest per pillar among videos 60 days to 3 years old. Tags are the author's reading, not machine output; counts are over a small stratified sample, so they show which devices appear, not how often they win.",
+ "videos": [
+  {
+   "id": "lFloLGmPKl0",
+   "pillar": "disasters",
+   "outlier": 6.749,
+   "tags": [
+    "short-text",
+    "real-photo",
+    "damage-visual",
+    "high-contrast-yellow"
+   ]
+  },
+  {
+   "id": "7Tu8ZIbfLis",
+   "pillar": "disasters",
+   "outlier": 6.15,
+   "tags": [
+    "diagram-annotation",
+    "number-or-money",
+    "question-mark",
+    "arrow-callout",
+    "curiosity-label"
+   ]
+  },
+  {
+   "id": "_blF6L04Dfk",
+   "pillar": "disasters",
+   "outlier": 5.365,
+   "tags": [
+    "aerial-wreck-photo",
+    "long-serif-text"
+   ]
+  },
+  {
+   "id": "0kQXOTcEB_E",
+   "pillar": "disasters",
+   "outlier": 5.302,
+   "tags": [
+    "real-photo",
+    "no-text",
+    "single-subject",
+    "scale-contrast"
+   ]
+  },
+  {
+   "id": "6E_FwOz_RtM",
+   "pillar": "disasters",
+   "outlier": 5.224,
+   "tags": [
+    "cgi-render",
+    "face-or-meme",
+    "one-word-overlay",
+    "high-contrast-yellow"
+   ]
+  },
+  {
+   "id": "3oIeLGkSCMA",
+   "pillar": "disasters",
+   "outlier": 4.844,
+   "tags": [
+    "before-after-comparison",
+    "question-text",
+    "high-contrast-yellow",
+    "diagram-annotation"
+   ]
+  },
+  {
+   "id": "r5M7Oq1PCz4",
+   "pillar": "disasters",
+   "outlier": 4.553,
+   "tags": [
+    "cgi-render",
+    "one-word-overlay"
+   ]
+  },
+  {
+   "id": "sgQesoA7rcU",
+   "pillar": "disasters",
+   "outlier": 1.028,
+   "tags": [
+    "map-annotation",
+    "collage"
+   ]
+  },
+  {
+   "id": "Md9uKOK3ysU",
+   "pillar": "disasters",
+   "outlier": 1.014,
+   "tags": [
+    "fire-or-wreck",
+    "question-text",
+    "real-photo"
+   ]
+  },
+  {
+   "id": "YqYGvSckTnI",
+   "pillar": "disasters",
+   "outlier": 1.012,
+   "tags": [
+    "painting-or-illustration",
+    "no-text"
+   ]
+  },
+  {
+   "id": "sFNhVrv6L6o",
+   "pillar": "disasters",
+   "outlier": 0.205,
+   "tags": [
+    "fire-or-wreck",
+    "channel-brand",
+    "short-text",
+    "cgi-render"
+   ]
+  },
+  {
+   "id": "x6z1MdCEeOU",
+   "pillar": "disasters",
+   "outlier": 0.201,
+   "tags": [
+    "short-text",
+    "high-contrast-yellow",
+    "red-text-on-black",
+    "fire-or-wreck"
+   ]
+  },
+  {
+   "id": "N-_kaqLQ2rQ",
+   "pillar": "disasters",
+   "outlier": 0.112,
+   "tags": [
+    "painting-or-illustration",
+    "no-text"
+   ]
+  },
+  {
+   "id": "qJIDOq0ezTs",
+   "pillar": "megaprojects",
+   "outlier": 7.88,
+   "tags": [
+    "map-annotation",
+    "painting-or-illustration",
+    "no-text"
+   ]
+  },
+  {
+   "id": "TkI6Fmet4FE",
+   "pillar": "megaprojects",
+   "outlier": 7.376,
+   "tags": [
+    "black-label-text",
+    "real-photo",
+    "short-text"
+   ]
+  },
+  {
+   "id": "HVsSppFuzv0",
+   "pillar": "megaprojects",
+   "outlier": 6.232,
+   "tags": [
+    "diagram-annotation",
+    "short-text"
+   ]
+  },
+  {
+   "id": "XiUOBdEUqjY",
+   "pillar": "megaprojects",
+   "outlier": 4.497,
+   "tags": [
+    "painting-or-illustration",
+    "no-text",
+    "diagram-annotation"
+   ]
+  },
+  {
+   "id": "S0F4NzdlpAc",
+   "pillar": "megaprojects",
+   "outlier": 3.876,
+   "tags": [
+    "black-label-text",
+    "arrow-callout",
+    "real-photo"
+   ]
+  },
+  {
+   "id": "t1-ui89FsnI",
+   "pillar": "megaprojects",
+   "outlier": 3.448,
+   "tags": [
+    "cgi-render",
+    "one-word-overlay",
+    "large-white-text"
+   ]
+  },
+  {
+   "id": "GWR04xmzMmw",
+   "pillar": "megaprojects",
+   "outlier": 3.348,
+   "tags": [
+    "black-label-text",
+    "real-photo"
+   ]
+  },
+  {
+   "id": "lY1UAnzv0UU",
+   "pillar": "megaprojects",
+   "outlier": 1,
+   "tags": [
+    "face-or-meme",
+    "fire-or-wreck",
+    "painting-or-illustration"
+   ]
+  },
+  {
+   "id": "oj1nglkBjmM",
+   "pillar": "megaprojects",
+   "outlier": 1,
+   "tags": [
+    "black-label-text",
+    "map-annotation"
+   ]
+  },
+  {
+   "id": "As3i0c767vM",
+   "pillar": "megaprojects",
+   "outlier": 1,
+   "tags": [
+    "number-or-money",
+    "cgi-render",
+    "short-text"
+   ]
+  },
+  {
+   "id": "E1V__qHsMR0",
+   "pillar": "megaprojects",
+   "outlier": 0.093,
+   "tags": [
+    "black-label-text",
+    "real-photo",
+    "channel-brand"
+   ]
+  },
+  {
+   "id": "8yFHaGT7NTM",
+   "pillar": "megaprojects",
+   "outlier": 0.078,
+   "tags": [
+    "cgi-render",
+    "face-or-meme",
+    "arrow-callout",
+    "question-text",
+    "number-or-money"
+   ]
+  },
+  {
+   "id": "KpH39_Ky1vg",
+   "pillar": "megaprojects",
+   "outlier": 0.074,
+   "tags": [
+    "black-label-text",
+    "question-text",
+    "real-photo"
+   ]
+  },
+  {
+   "id": "F4EvMVpx1Pw",
+   "pillar": "hidden-infrastructure",
+   "outlier": 6.247,
+   "tags": [
+    "macro-object",
+    "no-text",
+    "cgi-render"
+   ]
+  },
+  {
+   "id": "tt_zIzDWOEc",
+   "pillar": "hidden-infrastructure",
+   "outlier": 4.689,
+   "tags": [
+    "aerial-satellite",
+    "short-text",
+    "high-contrast-yellow"
+   ]
+  },
+  {
+   "id": "fbM3SqXLbgU",
+   "pillar": "hidden-infrastructure",
+   "outlier": 4.091,
+   "tags": [
+    "macro-object",
+    "no-text",
+    "real-photo"
+   ]
+  },
+  {
+   "id": "jHP942Livy0",
+   "pillar": "hidden-infrastructure",
+   "outlier": 4.083,
+   "tags": [
+    "short-text",
+    "real-photo",
+    "curiosity-label"
+   ]
+  },
+  {
+   "id": "rrj-p5nja7o",
+   "pillar": "hidden-infrastructure",
+   "outlier": 3.95,
+   "tags": [
+    "collage",
+    "question-mark",
+    "short-text"
+   ]
+  },
+  {
+   "id": "bnsqSgMFzNE",
+   "pillar": "hidden-infrastructure",
+   "outlier": 3.854,
+   "tags": [
+    "annotation-callouts",
+    "question-text",
+    "real-photo",
+    "arrow-callout"
+   ]
+  },
+  {
+   "id": "PhW2BjFQCZM",
+   "pillar": "hidden-infrastructure",
+   "outlier": 3.797,
+   "tags": [
+    "real-photo",
+    "no-text",
+    "single-subject"
+   ]
+  },
+  {
+   "id": "GK2pZ_oVU1o",
+   "pillar": "hidden-infrastructure",
+   "outlier": 1,
+   "tags": [
+    "short-text",
+    "silhouette-person",
+    "curiosity-label"
+   ]
+  },
+  {
+   "id": "umgi-CbaSRU",
+   "pillar": "hidden-infrastructure",
+   "outlier": 1,
+   "tags": [
+    "arrow-callout",
+    "real-photo",
+    "short-text",
+    "high-contrast-orange"
+   ]
+  },
+  {
+   "id": "mGYCXzpjfaM",
+   "pillar": "hidden-infrastructure",
+   "outlier": 1,
+   "tags": [
+    "aerial-satellite",
+    "black-label-text"
+   ]
+  },
+  {
+   "id": "9K1pr6IEmHI",
+   "pillar": "hidden-infrastructure",
+   "outlier": 0.245,
+   "tags": [
+    "cgi-render",
+    "no-text",
+    "fire-or-wreck"
+   ]
+  },
+  {
+   "id": "9OxEpRqY6b8",
+   "pillar": "hidden-infrastructure",
+   "outlier": 0.144,
+   "tags": [
+    "real-photo",
+    "short-text",
+    "crowd"
+   ]
+  },
+  {
+   "id": "9zI61-duqcw",
+   "pillar": "hidden-infrastructure",
+   "outlier": 0.05,
+   "tags": [
+    "black-label-text",
+    "real-photo",
+    "channel-brand"
+   ]
+  },
+  {
+   "id": "qqFCHxacUww",
+   "pillar": "mysteries",
+   "outlier": 7.446,
+   "tags": [
+    "painting-or-illustration",
+    "no-text"
+   ]
+  },
+  {
+   "id": "JsBZOcqZerk",
+   "pillar": "mysteries",
+   "outlier": 3.202,
+   "tags": [
+    "real-photo",
+    "short-text",
+    "curiosity-label"
+   ]
+  },
+  {
+   "id": "8AbtCE-sePc",
+   "pillar": "mysteries",
+   "outlier": 2.935,
+   "tags": [
+    "cgi-render",
+    "short-text",
+    "curiosity-label"
+   ]
+  },
+  {
+   "id": "plYQ-StbrOE",
+   "pillar": "mysteries",
+   "outlier": 2.813,
+   "tags": [
+    "fire-or-wreck",
+    "real-photo",
+    "short-text",
+    "channel-brand",
+    "high-contrast"
+   ]
+  },
+  {
+   "id": "J5wrYwFObiI",
+   "pillar": "mysteries",
+   "outlier": 2.133,
+   "tags": [
+    "painting-or-illustration",
+    "short-text",
+    "curiosity-label"
+   ]
+  },
+  {
+   "id": "RZg1zOKm5wk",
+   "pillar": "mysteries",
+   "outlier": 2.061,
+   "tags": [
+    "diagram-annotation",
+    "no-text",
+    "painting-or-illustration"
+   ]
+  },
+  {
+   "id": "bFQsYtAPvAY",
+   "pillar": "mysteries",
+   "outlier": 1.931,
+   "tags": [
+    "archival-photo",
+    "question-text",
+    "high-contrast-yellow",
+    "short-text"
+   ]
+  },
+  {
+   "id": "9ZHFdn-dhXo",
+   "pillar": "mysteries",
+   "outlier": 1.132,
+   "tags": [
+    "cgi-render",
+    "no-text",
+    "single-subject"
+   ]
+  },
+  {
+   "id": "P8oc_UXgD2A",
+   "pillar": "mysteries",
+   "outlier": 1.09,
+   "tags": [
+    "screenshot",
+    "short-text"
+   ]
+  },
+  {
+   "id": "a0VPBZbiAdk",
+   "pillar": "mysteries",
+   "outlier": 1.063,
+   "tags": [
+    "channel-brand",
+    "cgi-render",
+    "short-text"
+   ]
+  },
+  {
+   "id": "nXdVG45wveo",
+   "pillar": "mysteries",
+   "outlier": 0.578,
+   "tags": [
+    "macro-object",
+    "short-text",
+    "real-photo"
+   ]
+  },
+  {
+   "id": "To8rpgqvtSc",
+   "pillar": "mysteries",
+   "outlier": 0.417,
+   "tags": [
+    "map-annotation",
+    "collage",
+    "curiosity-label",
+    "short-text"
+   ]
+  },
+  {
+   "id": "n97m8S3jSKI",
+   "pillar": "mysteries",
+   "outlier": 0.34,
+   "tags": [
+    "face-or-meme",
+    "real-photo",
+    "single-subject"
+   ]
+  }
+ ],
+ "notes": {
+  "disasters": [
+   "The winners show the object or the damage itself (a rusted truck, a wreck from the air, a plain hole in sand): one real subject, 0-5 words, often one yellow or white word.",
+   "Winners explain the question with a diagram (seat-price grid with 'FRAUD?', 'what changed' before/after) rather than a fire photo; fire/wreck stock art is common among the weak ones too.",
+   "Channel brands (e.g. Disaster Breakdown) put the brand across the picture; it did not separate winners from the rest in this sample."
+  ],
+  "megaprojects": [
+   "Winners and weak ones both use big renders and maps; what separates them in this sample is a big concrete number or claim ('$1,000,000,000,000 dream', 'Dear God', 'Can it really work?').",
+   "Black label boxes with 2-4 words over a real photo are the rail/transit channels' house style: consistent, readable at small size, mostly typical-to-weak performance.",
+   "Aerial or satellite imagery with one marked line (a Roman canal on a map) works as a no-text curiosity thumbnail."
+  ],
+  "hidden-infrastructure": [
+   "Winners are macro or odd-scale objects with little or no text (a glowing washer, gears, an aqueduct flume): curiosity from an unfamiliar image.",
+   "Annotated street-level or aerial photos with 1-3 callout labels and an arrow ('No sidewalks?', 'Pole?') carry the how-it-works and city angles.",
+   "Weak ones are generic skylines or 'Q&A / how to get involved' pictures with a banner: no single curious object."
+  ],
+  "mysteries": [
+   "Painted ruins, cutaway renders and archival photos with a short curiosity label ('UNDER THE NORTH POLE', 'WHY FAKE THIS?', 'We cracked it') lead.",
+   "Pinboard/map collages with red string signal 'investigation' and repeat across channels.",
+   "Plain text-less reconstructions of lost buildings are typical, not exceptional."
+  ]
+ }
+}
