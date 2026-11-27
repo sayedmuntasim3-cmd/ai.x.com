@@ -154,6 +154,43 @@ export async function sendVoice(c, file) {
   return send(c, "/complete", { parts });
 }
 
+/**
+ * The free brain through the Worker (POST /api/voice/:id/brain: Groq first, then the Gemini pool, the Worker's own
+ * keys), as a model for local/voice-film.mjs. Text only and no web search, said in its capabilities, so every stage
+ * takes its own path (canSee/canSearch). A busy minute is waited out; a used-up day stops with the brains' words.
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c
+ * @param {{ sleep?: (ms: number) => Promise<void>, waitMs?: number, log?: (line: string) => void }} [o]
+ */
+export function workerBrain(c, o = {}) {
+  const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const calls = /** @type {{ stage: string, model: string, seconds: number }[]} */ ([]);
+  return {
+    name: "zupona-free-brain (Groq, then Gemini, through the Worker)",
+    capabilities: { vision: false, webSearch: false },
+    calls,
+    /** @param {any} req */
+    async call(req) {
+      const body = { req: { stage: req.stage, system: req.system, messages: req.messages, maxTokens: req.maxTokens } };
+      let last = "";
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        const t0 = Date.now();
+        try {
+          const r = await send(c, "/brain", body);
+          calls.push({ stage: String(req.stage ?? ""), model: String(r.model ?? "?"), seconds: Math.round((Date.now() - t0) / 1000) });
+          return { text: String(r.text ?? ""), stopReason: r.stopReason ?? "end_turn", model: r.model, usage: r.usage ?? { input_tokens: 0, output_tokens: 0 } };
+        } catch (e) {
+          last = e instanceof Error ? e.message : String(e);
+          if (/day used up|per day|PerDay|RESOURCE_EXHAUSTED|daily/i.test(last) && !/busy/i.test(last)) throw Object.assign(new Error(`The free brains' daily limit is used up: ${last.slice(0, 300)}`), { status: 429, daily: true });
+          if (!/ 429 /.test(last)) throw Object.assign(new Error(last.slice(0, 300)), { status: 400 });
+          o.log?.(`free brain busy (${req.stage}); waiting a minute`);
+          await sleep(o.waitMs ?? 61_000);
+        }
+      }
+      throw Object.assign(new Error(`The free brain stayed busy: ${last.slice(0, 300)}`), { status: 503 });
+    },
+  };
+}
+
 async function main() {
   const a = parseArgs(process.argv.slice(2));
   // The workflow's self-test (voice-film.yml, selftest: yes) has no studio recording: nothing is sent.

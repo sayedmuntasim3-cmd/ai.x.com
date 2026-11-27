@@ -333,10 +333,18 @@ test("the daily film: one a day, the next unused topic, the brain and the voice 
   assert.equal(next.data.topic, "st-francis-dam");
 });
 
-test("an uploaded voice's runner ticket cannot use the daily film's brain or voice routes", async () => {
-  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GROQ_API_KEY: "groq" };
+test("an uploaded voice's runner may ask the free brain (text only, never Claude), but never send a voice", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GROQ_API_KEY: "groq", GEMINI_API_KEY: "gem", GEMINI_POOL: "off", BRAIN: "claude", ANTHROPIC_API_KEY: "paid" };
   const created = await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "a.mp3", bytes: 2000 } });
   const ticket = await makeTicket("owner-token", created.data.id, "runner", 3600);
-  assert.equal((await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { prompt: "x" } })).status, 401);
+  /** @type {any[]} */
+  const sent = [];
+  const net = async (/** @type {string} */ u, /** @type {any} */ init) => { sent.push({ u, body: JSON.parse(init.body) }); return new Response(JSON.stringify({ choices: [{ message: { content: "beats" }, finish_reason: "stop" }] }), { status: 200 }); };
+  const r = await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { req: { stage: "voice-director", system: [{ text: "sys" }, { text: "x", image: "data" }], messages: [{ role: "user", content: [{ text: "plan" }] }], maxTokens: 900 } }, fetch: net });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.text, "beats");
+  assert.ok(sent.every((x) => x.u.includes("api.groq.com")), "never the paid brain");
+  assert.equal(JSON.stringify(sent[0].body).includes("data"), false, "no pictures sent");
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/brain`, { body: { prompt: "x" } })).status, 401);
   assert.equal((await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: 2000 } })).status, 401);
 });
