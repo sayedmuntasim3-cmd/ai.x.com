@@ -44,7 +44,7 @@ import { meaningTable, parseTanzilText, passageMeaning, planMeanings } from "../
 import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
-import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
+import { planVoiceVisuals, quranVisualAdabGuard, respellNames, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
 import { DESIGNED_TYPES, GENRE_RHYTHM, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
 import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom } from "../engine/src/craft-memory.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
@@ -531,6 +531,11 @@ async function main() {
       step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), remap, slice, stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
       for (const m of step2.messages) console.log("- " + m[lang]);
       if (!step2.check.ok) process.exit(1);
+    }
+    // Names misheard by speech-to-text take the topic's spelling, so cards and subtitles agree ("Ramish" -> "Ramesh").
+    if (typeof args.topic === "string" && step2.words?.length) {
+      const fixed = respellNames(step2.words, args.topic);
+      if (fixed) console.log(`- names respelled from the topic: ${fixed}`);
     }
     // With a given passage the text is aligned to the audio when Python can run it (--python, or ZUPONA_PYTHON).
     const python = typeof args.python === "string" ? args.python : process.env.ZUPONA_PYTHON;
