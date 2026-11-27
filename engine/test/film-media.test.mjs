@@ -125,7 +125,7 @@ const COMMONS = { batchcomplete: true, query: { pages: [
 ] } };
 const NASA = { collection: { items: [
   { href: "https://images-assets.nasa.gov/image/as11-40-5903/collection.json", data: [{ nasa_id: "as11-40-5903", media_type: "image", title: "Buzz Aldrin on the Moon", center: "JSC", description: "Astronaut on the lunar surface." }], links: [{ href: "https://images-assets.nasa.gov/image/as11-40-5903/as11-40-5903~thumb.jpg", rel: "preview", render: "image" }] },
-  { href: "https://images-assets.nasa.gov/image/esa-1/collection.json", data: [{ nasa_id: "esa-1", media_type: "image", title: "Comet seen from the Moon", secondary_creator: "ESA/Rosetta", description: "Image courtesy of ESA." }], links: [{ href: "https://images-assets.nasa.gov/image/esa-1/esa-1~thumb.jpg", rel: "preview" }] },
+  { href: "https://images-assets.nasa.gov/image/esa-1/collection.json", data: [{ nasa_id: "esa-1", media_type: "image", title: "Comet near the Moon landing site", secondary_creator: "ESA/Rosetta", description: "Image courtesy of ESA." }], links: [{ href: "https://images-assets.nasa.gov/image/esa-1/esa-1~thumb.jpg", rel: "preview" }] },
 ] } };
 
 test("free archives: Commons and NASA results carry their own rights; share-alike, restricted and third-party items are refused", async () => {
@@ -145,7 +145,7 @@ test("free archives: Commons and NASA results carry their own rights; share-alik
   const verdict = async (/** @type {any} */ c) => { const rights = classifyLicense(c); return rights.allowed && (await verifyArchiveItem({ ...c, layer: 1, rights })); };
   assert.deepEqual(await Promise.all(commons.map(verdict)), [false, true, false, true], "personality-restricted and share-alike files are refused; public domain and CC BY pass");
   assert.equal(classifyLicense(commons[3]).licenseId, "CC-BY");
-  const nasa = await nasaProvider({ fetch: f }).search("moon landing", "image", AbortSignal.timeout(1000));
+  const nasa = await nasaProvider({ fetch: f }).search("moon", "image", AbortSignal.timeout(1000));
   assert.equal(nasa[0].mediaUrl, "https://images-assets.nasa.gov/image/as11-40-5903/as11-40-5903~large.jpg");
   assert.equal(nasa[0].sourcePageUrl, "https://images.nasa.gov/details/as11-40-5903");
   assert.deepEqual(await Promise.all(nasa.map(verdict)), [true, false], "an ESA-credited picture is not NASA's to give");

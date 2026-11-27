@@ -13,22 +13,23 @@ export function mainTerms(query) {
 }
 
 /**
- * True when the text holds at least one main term of the query as a whole word.
- * A query with no usable term keeps everything (nothing to check against).
+ * True when the text holds the query's main terms as whole words: every term for a query of up to three
+ * terms, at least 60% of them for a longer one. A query with no usable term keeps everything.
  * @param {string} query @param {...(string | undefined | null)} texts
  */
 export function isRelevant(query, ...texts) {
   const terms = mainTerms(query);
   if (!terms.length) return true;
   const words = new Set(texts.filter(Boolean).join(" ").toLowerCase().split(/[^\p{L}\p{N}]+/u));
-  return terms.some((t) => words.has(t) || words.has(`${t}s`) || (t.endsWith("s") && words.has(t.slice(0, -1))));
+  const hit = terms.filter((t) => words.has(t) || words.has(`${t}s`) || (t.endsWith("s") && words.has(t.slice(0, -1)))).length;
+  return hit >= (terms.length <= 3 ? terms.length : Math.ceil(terms.length * 0.6));
 }
 
 /**
  * @param {{ spacingMs?: number, tries?: number, maxWaitMs?: number, sleep?: (ms: number) => Promise<void>, now?: () => number }} [o]
  */
 export function createGate(o = {}) {
-  const spacingMs = o.spacingMs ?? 3000;
+  const spacingMs = o.spacingMs ?? 5000;
   const tries = o.tries ?? 3;
   const maxWaitMs = o.maxWaitMs ?? 30_000;
   const sleep = o.sleep ?? ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
@@ -70,5 +71,13 @@ export function createGate(o = {}) {
   return { run };
 }
 
+/**
+ * LoC answers a request it dislikes with 429 and a Cloudflare "Just a moment..." HTML page (no Retry-After).
+ * @param {number} status @param {string} text
+ */
+export function isChallenge(status, text) {
+  return (status === 429 || status === 403 || status === 503) && /just a moment|cf-chl|challenge-platform/i.test(text.slice(0, 3000));
+}
+
 /** One gate for the whole process: the film runner and the archive search share LoC's allowance. */
-export const locGate = createGate();
+export const locGate = createGate({ spacingMs: Number(/** @type {any} */ (globalThis).process?.env?.LOC_SPACING_MS ?? 5000) });
