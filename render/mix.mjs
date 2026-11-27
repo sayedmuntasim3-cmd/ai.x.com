@@ -183,6 +183,90 @@ export function quietExpression(windows, level = 1, o = {}) {
   return expr;
 }
 
+/** The narration's loudness arc: each chapter opens close and soft, and the voice comes up to its full level. */
+export const RIDE = Object.freeze({ openDb: -7, rampMax: 40, sectionMax: 150, rampShare: 0.4, minChapter: 20, maxChapters: 200 });
+
+/**
+ * The fader ridden by hand, as an ffmpeg expression for the narration's `volume=...:eval=frame`.
+ * A narrator held at one level makes a 1.3 LU wall (film ccd86532, 27 Nov); an editor lets every chapter
+ * open softer and lifts the voice into it, which gives the film a loudness range without a compressor.
+ * Chapters are `[start, end)` in film seconds; the opening dips to `openDb` and climbs to 0 dB over
+ * min(rampMax, rampShare of the chapter). Returns "1" when there is nothing to ride.
+ * @param {Window[]} chapters @param {{ openDb?: number, rampMax?: number, rampShare?: number, minChapter?: number, maxChapters?: number }} [o]
+ * @returns {string}
+ */
+export function voiceRideExpression(chapters, o = {}) {
+  const openDb = o.openDb ?? RIDE.openDb;
+  const rampMax = o.rampMax ?? RIDE.rampMax;
+  const rampShare = o.rampShare ?? RIDE.rampShare;
+  const minChapter = o.minChapter ?? RIDE.minChapter;
+  const max = o.maxChapters ?? RIDE.maxChapters;
+  const r = (/** @type {number} */ n) => String(Math.round(n * 1000) / 1000);
+  const terms = chapters
+    .filter((c) => c.end - c.start >= minChapter)
+    .slice(0, max)
+    .map((c) => {
+      const ramp = Math.max(1, Math.min(rampMax, (c.end - c.start) * rampShare));
+      return `between(t,${r(c.start)},${r(c.end)})*${openDb}*(1-clip((t-${r(c.start)})/${r(ramp)},0,1))`;
+    });
+  if (!terms.length) return "1";
+  return `pow(10,(${terms.join("+")})/20)`;
+}
+
+/**
+ * The same ride in JavaScript, in dB at second t, so a test proves the expression's intent.
+ * @param {number} t @param {Window[]} chapters @param {Parameters<typeof voiceRideExpression>[1]} [o]
+ */
+export function voiceRideDbAt(t, chapters, o = {}) {
+  const openDb = o.openDb ?? RIDE.openDb;
+  const rampMax = o.rampMax ?? RIDE.rampMax;
+  const rampShare = o.rampShare ?? RIDE.rampShare;
+  const minChapter = o.minChapter ?? RIDE.minChapter;
+  let db = 0;
+  for (const c of chapters.filter((x) => x.end - x.start >= minChapter).slice(0, o.maxChapters ?? RIDE.maxChapters)) {
+    if (t < c.start || t > c.end) continue;
+    const ramp = Math.max(1, Math.min(rampMax, (c.end - c.start) * rampShare));
+    db += openDb * (1 - Math.min(1, Math.max(0, (t - c.start) / ramp)));
+  }
+  return db;
+}
+
+/** Chapter windows from a timeline's video shots: a chapter runs from its titled shot to the next titled shot (or the end). @param {{ start: number, end: number, chapterTitle?: string }[]} video @returns {Window[]} */
+export function chapterWindows(video) {
+  const shots = [...(video ?? [])].sort((a, b) => a.start - b.start);
+  const marks = shots.filter((v) => v.chapterTitle).map((v) => v.start);
+  const end = shots.length ? Math.max(...shots.map((v) => v.end)) : 0;
+  return marks.map((start, i) => ({ start, end: i + 1 < marks.length ? marks[i + 1] : end }));
+}
+
+/**
+ * The sections the fader rides: the chapters when the film has titled ones, otherwise the score's cues
+ * (a voice film has one chapter and about a cue every four minutes); any section longer than `sectionMax`
+ * is cut into equal parts, so the voice comes up out of a soft opening at least every two and a half minutes.
+ * @param {{ video?: { start: number, end: number, chapterTitle?: string }[], music?: { cue: string, start: number, end: number }[], durationSeconds?: number }} t
+ * @param {{ sectionMax?: number }} [o]
+ * @returns {Window[]}
+ */
+export function rideSections(t, o = {}) {
+  const sectionMax = o.sectionMax ?? RIDE.sectionMax;
+  const total = Number(t.durationSeconds) || Math.max(0, ...(t.video ?? []).map((v) => v.end));
+  let base = chapterWindows(t.video ?? []);
+  if (base.length < 2) {
+    const cues = [...(t.music ?? [])].sort((a, b) => a.start - b.start);
+    const marks = cues.filter((m, i) => i === 0 || m.cue !== cues[i - 1].cue).map((m) => m.start);
+    if (!marks.length || marks[0] > 0) marks.unshift(0);
+    base = marks.map((start, i) => ({ start, end: i + 1 < marks.length ? marks[i + 1] : total }));
+  }
+  /** @type {Window[]} */
+  const out = [];
+  for (const w of base) {
+    const len = w.end - w.start;
+    const parts = Math.max(1, Math.ceil(len / sectionMax));
+    for (let i = 0; i < parts; i += 1) out.push({ start: w.start + (len * i) / parts, end: w.start + (len * (i + 1)) / parts });
+  }
+  return out.filter((w) => w.end > w.start);
+}
+
 /** The quietest point of the plan, in dB below the music's own level; 0 when nothing ducks. */
 export function deepestDuckDb(plan, o = {}) {
   const music = o.music ?? MIX.music;

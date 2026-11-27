@@ -139,11 +139,26 @@ def score(req_path, out_path):
             continue
         info[u] = {"phash": phash(img), "w": img.width, "h": img.height, "col": colour(img)}
         todo.append((u, img, cached, meta))
-    for i in range(0, len(todo), 64):
-        batch = todo[i:i + 64]
+    def encode(batch):
         with torch.no_grad():
             e = model.encode_image(torch.stack([preprocess(b[1]) for b in batch]))
-            e = (e / e.norm(dim=-1, keepdim=True)).numpy()
+            return (e / e.norm(dim=-1, keepdim=True)).numpy()
+
+    for i in range(0, len(todo), 64):
+        batch = todo[i:i + 64]
+        try:
+            e = encode(batch)
+        except Exception as ex:
+            # One bad picture (a broken or odd-mode image) must not take the whole ranking down: retry one by one.
+            print("rank.py: batch failed (%s); encoding one by one" % ex, file=sys.stderr)
+            keep, rows = [], []
+            for b in batch:
+                try:
+                    rows.append(encode([b])[0])
+                    keep.append(b)
+                except Exception:
+                    info.pop(b[0], None)
+            batch, e = keep, rows
         for (u, _, cached, meta), v in zip(batch, e):
             vec[u] = v
             np.save(cached, v)
