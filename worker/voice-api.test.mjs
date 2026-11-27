@@ -372,3 +372,21 @@ test("an uploaded voice's runner may ask the free brain (text only, never Claude
   assert.equal((await call(env, "POST", `/api/voice/${ID}/brain`, { body: { prompt: "x" } })).status, 401);
   assert.equal((await call(env, "POST", `/api/voice/${ID}/voice?ticket=${ticket}`, { body: { bytes: 2000 } })).status, 401);
 });
+
+test("the runner's brain is Groq only: a prompt too big is sent back to be split (413), and a busy Groq never falls to Gemini", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GROQ_API_KEY: "groq", GEMINI_API_KEY: "gem", GEMINI_POOL: "off" };
+  const created = await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "a.mp3", bytes: 2000 } });
+  const ticket = await makeTicket("owner-token", created.data.id, "runner", 3600);
+  /** @type {string[]} */
+  const sent = [];
+  const busy = async (/** @type {string} */ u) => { sent.push(u); return new Response("Rate limit reached: tokens per minute", { status: 429 }); };
+  const big = await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { req: { stage: "V4", system: [{ text: "sys" }], messages: [{ role: "user", content: [{ text: "x".repeat(40000) }] }], maxTokens: 900 } }, fetch: busy });
+  assert.equal(big.status, 413);
+  assert.equal(big.data.tooLarge, true);
+  assert.ok(big.data.tokens > big.data.limit);
+  assert.equal(sent.length, 0, "nothing sent anywhere");
+  const r = await call(env, "POST", `/api/voice/${ID}/brain?ticket=${ticket}`, { body: { req: { stage: "V4", system: [{ text: "sys" }], messages: [{ role: "user", content: [{ text: "plan" }] }], maxTokens: 900 } }, fetch: busy });
+  assert.equal(r.status, 429);
+  assert.match(r.data.error, /busy/);
+  assert.ok(sent.length > 0 && sent.every((u) => u.includes("api.groq.com")), "never Gemini");
+});

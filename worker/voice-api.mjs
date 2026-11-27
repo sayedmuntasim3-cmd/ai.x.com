@@ -33,7 +33,7 @@
 import { msg } from "../engine/src/messages.mjs";
 import { checkMarks } from "../engine/src/quran-marks.mjs";
 import { addAudience, addRecord, emptyLedger, ledgerJson, parseLedger, recordFromReport } from "../engine/src/craft-memory.mjs";
-import { brainFromEnv } from "./brain.mjs";
+import { GROQ_PROMPT_LIMIT, groqMessages, groqModel, promptTokens } from "./groq.mjs";
 import { nextDailyTopic } from "./daily-film.mjs";
 import { checkGithubOidc } from "./github-oidc.mjs";
 
@@ -376,14 +376,22 @@ export async function handleVoice(request, env, url, deps = {}) {
       : { stage: "daily-script", system: [{ text: text(body?.system, 20000) }], messages: [{ role: "user", content: [{ text: text(body?.prompt, 60000) }] }], maxTokens: Number(body?.maxTokens) };
     if (!req.messages.some((m) => m.content.some((c) => c.text))) return json({ error: "Send the prompt." }, 400);
     req.maxTokens = Math.min(Math.max(req.maxTokens || 2000, 256), 16000);
-    const brain = brainFromEnv({ ...env, BRAIN: "", ANTHROPIC_API_KEY: undefined }, { fetch: deps.fetch });
-    if (!brain.ok) return json({ error: brain.error }, 503);
+    // Groq only: Gemini's 20 requests a day are gone long before a 40-minute film is planned, and a call sent there
+    // after Groq's busy minute came back as "daily limit used up" and stopped the film's brain (film ccd86532).
+    if (!env.GROQ_API_KEY || String(env.GROQ ?? "").toLowerCase() === "off") return json({ error: "The free brain (Groq, the GROQ_API_KEY secret) is not set." }, 503);
+    const groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(groqModels.length ? { models: groqModels } : {}), ...(deps.fetch ? { fetch: deps.fetch } : {}) });
+    const tokens = promptTokens(groqMessages(req));
+    // Too big for Groq's minute: the runner splits its batch and asks again (413, never another brain).
+    if (tokens > GROQ_PROMPT_LIMIT) return json({ error: `The prompt is about ${tokens} tokens; the free brain takes ${GROQ_PROMPT_LIMIT}. Split it.`, tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
     try {
-      const r = await brain.model.call({ ...req, webSearch: false });
-      return json({ text: r.text, model: r.model ?? brain.model.name, stopReason: r.stopReason, usage: r.usage ?? null });
+      const r = await groq.call({ ...req, webSearch: false });
+      return json({ text: r.text, model: r.model ?? groq.name, stopReason: r.stopReason, usage: r.usage ?? null, tokens });
     } catch (error) {
-      // The brains' own words (a daily limit, a busy minute), as 429 so the runner itself decides to wait or stop.
-      return json({ error: error instanceof Error ? error.message.slice(0, 600) : String(error) }, 429);
+      const e = /** @type {any} */ (error);
+      if (e?.tooLarge) return json({ error: String(e.message).slice(0, 600), tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
+      // A busy minute or a used-up day, in Groq's own words, as 429 so the runner itself decides to wait or stop.
+      return json({ error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens }, 429);
     }
   }
 

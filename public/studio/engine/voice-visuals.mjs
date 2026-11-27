@@ -274,6 +274,23 @@ function fillLine(line, f) {
 }
 
 /**
+ * Run one brain batch; when the free brain says the prompt is too big for it (tooLarge, the Worker's 413), the
+ * batch is split in half and each half asked again, down to one item. Every other error goes to the caller.
+ * @template T @param {T[]} batch @param {(part: T[]) => Promise<void>} run
+ * @returns {Promise<number>} the number of calls that answered
+ */
+export async function runFitting(batch, run) {
+  try {
+    await run(batch);
+    return 1;
+  } catch (e) {
+    if (!(/** @type {any} */ (e)?.tooLarge) || batch.length < 2) throw e;
+    const half = Math.ceil(batch.length / 2);
+    return (await runFitting(batch.slice(0, half), run)) + (await runFitting(batch.slice(half), run));
+  }
+}
+
+/**
  * The brain's work cut into batches: whole sections (structure.sections, about 90 s each) packed until a
  * batch's lines reach batchChars, so one prompt fits a free brain's limit (Groq: about 7,200 tokens).
  * @param {VoiceScene[]} scenes @param {Structure | null} structure @param {(sc: string) => number} size @param {number} [batchChars]
@@ -327,10 +344,11 @@ export async function planVoiceVisuals(o) {
     for (const batch of batches) {
       if (stopped || answered >= maxCalls) break;
       try {
-        const text = batch.map((s) => lineOf.get(s.sc)).join("\n");
-        const reply = await o.brain.call({ stage: "V4", system: [{ text: VOICE_VISUALS_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: Math.min(32000, 400 + batch.length * 260), effort: "medium" });
-        parts.push(reply.text ?? "");
-        answered += 1;
+        answered += await runFitting(batch, async (part) => {
+          const text = part.map((s) => lineOf.get(s.sc)).join("\n");
+          const reply = await /** @type {Model} */ (o.brain).call({ stage: "V4", system: [{ text: VOICE_VISUALS_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: Math.min(32000, 400 + part.length * 260), effort: "medium" });
+          parts.push(reply.text ?? "");
+        });
       } catch (e) {
         // A used-up day (429) stops the brain for the rest of the film; those scenes are planned from their own words.
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
