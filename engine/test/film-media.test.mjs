@@ -125,7 +125,7 @@ const COMMONS = { batchcomplete: true, query: { pages: [
 ] } };
 const NASA = { collection: { items: [
   { href: "https://images-assets.nasa.gov/image/as11-40-5903/collection.json", data: [{ nasa_id: "as11-40-5903", media_type: "image", title: "Buzz Aldrin on the Moon", center: "JSC", description: "Astronaut on the lunar surface." }], links: [{ href: "https://images-assets.nasa.gov/image/as11-40-5903/as11-40-5903~thumb.jpg", rel: "preview", render: "image" }] },
-  { href: "https://images-assets.nasa.gov/image/esa-1/collection.json", data: [{ nasa_id: "esa-1", media_type: "image", title: "Comet", secondary_creator: "ESA/Rosetta", description: "Image courtesy of ESA." }], links: [{ href: "https://images-assets.nasa.gov/image/esa-1/esa-1~thumb.jpg", rel: "preview" }] },
+  { href: "https://images-assets.nasa.gov/image/esa-1/collection.json", data: [{ nasa_id: "esa-1", media_type: "image", title: "Comet seen from the Moon", secondary_creator: "ESA/Rosetta", description: "Image courtesy of ESA." }], links: [{ href: "https://images-assets.nasa.gov/image/esa-1/esa-1~thumb.jpg", rel: "preview" }] },
 ] } };
 
 test("free archives: Commons and NASA results carry their own rights; share-alike, restricted and third-party items are refused", async () => {

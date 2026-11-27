@@ -10,6 +10,7 @@
  * tests with fakes alike.
  */
 import { openArchivesProvider } from "./open-archives.mjs";
+import { isRelevant, locGate } from "./archive-guard.mjs";
 import { createRateLimiter, fetchShotMedia, ProviderError } from "./documentary-media-fetch.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
@@ -625,6 +626,7 @@ export function nasaProvider(o = {}) {
       return (data?.collection?.items ?? []).flatMap((/** @type {any} */ item) => {
         const d = item.data?.[0];
         if (!d?.nasa_id || d.media_type !== kind) return [];
+        if (!isRelevant(query, d.title, d.description, d.keywords)) return [];
         const id = String(d.nasa_id);
         const preview = (item.links ?? []).find((/** @type {any} */ l) => l.rel === "preview")?.href ?? null;
         const folder = `https://images-assets.nasa.gov/${kind}/${encodeURIComponent(id)}/${encodeURIComponent(id)}`;
@@ -721,12 +723,23 @@ const str = (v) => (Array.isArray(v) ? v.map(String).join(" ") : typeof v === "s
  * @returns {MediaProvider}
  */
 export function locProvider(o = {}) {
-  const get = o.fetch ?? ((url, init) => fetch(url, init));
+  const raw = o.fetch ?? ((url, init) => fetch(url, init));
+  // One shared queue for every LoC call of the process: spaced, backed off on 429/503 (Retry-After honoured,
+  // 3 tries), and the same URL is answered from memory.
+  /** @type {FetchLike} */
+  const get = async (url, init) => {
+    const done = await locGate.run(String(url), async () => {
+      const res = await raw(url, init);
+      if (res.status === 429 || res.status === 503) { const after = Number(res.headers.get("retry-after")); throw new ProviderError("rate_limited", Number.isFinite(after) && after > 0 ? after * 1000 : 0); }
+      return { status: res.status, text: await res.text() };
+    });
+    return new Response(done.text, { status: done.status });
+  };
   return {
     id: "loc", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 20, windowSeconds: 10 },
     async search(query, kind, signal) {
       if (kind !== "image") return [];
-      const res = await archiveGet(get, `https://www.loc.gov/photos/?${new URLSearchParams({ q: query.slice(0, 200), fo: "json", c: String(o.perPage ?? 20), fa: "online-format:image" })}`, { headers: { "user-agent": COMMONS_UA }, signal }, signal);
+      const res = await get(`https://www.loc.gov/photos/?${new URLSearchParams({ q: query.slice(0, 200), fo: "json", c: String(o.perPage ?? 20), fa: "online-format:image" })}`, { headers: { "user-agent": COMMONS_UA }, signal });
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       const hits = (Array.isArray(data?.results) ? data.results : []).filter((/** @type {any} */ r) => typeof r?.id === "string" && Array.isArray(r.image_url) && r.image_url.length).slice(0, o.details ?? 4);
