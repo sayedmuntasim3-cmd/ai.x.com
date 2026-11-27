@@ -55,7 +55,7 @@ function fakeModel() {
   };
 }
 
-test("topic in, MP4 out: run, footage, page, timeline, render, thumbnail and Short fit together", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+test("topic in, MP4 out: run, footage, page, timeline, render, thumbnail and Short fit together", { skip: !hasFfmpeg && "ffmpeg is not installed", timeout: 240_000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "zupona-e2e-"));
   try {
     // 1. The run, with a fake stock provider and a channel.
