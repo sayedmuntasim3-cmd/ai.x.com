@@ -284,7 +284,10 @@ test("one picture the judge cannot open costs only its own shot's review; museum
     "**SC0002** | 0:00:06-0:00:12 | C1 | b | E | C01 | NARR: (wordless) | W 0/0 | ANCHOR: x | SHOTS: (1) R3 a crowd on a beach | SRC: Pexels · Q1 \"crowd beach dawn\" | LOOK: L",
   ].join("\n");
   await chapterMedia({ chapter: "C1", markdown: both, providers: [museum], sleep: async () => {} });
-  assert.deepEqual(searched, ["wheat field painting"], "the B-roll shot never searches the museum");
+  assert.ok(searched.includes("wheat field painting"), "the evidence shot searches its own query");
+  // An archive that answers nothing is asked once more with the shot's two subject words.
+  assert.ok(searched.includes("painted harvest"), "the empty search gets one simpler query");
+  assert.ok(searched.every((q) => !/crowd|beach/.test(q)), "the B-roll shot never searches the museum");
 });
 
 test("a second attempt keeps the shots the first settled and searches only those whose sources could not be reached", async () => {

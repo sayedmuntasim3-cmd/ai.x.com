@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { blurAndFlicker, critique, designedMoments, measurePicture, parsePicture, STANDARD, verdictOf } from "./critic.mjs";
+import { blurAndFlicker, chapterMusic, critique, cutsPerMinute, designedMoments, hookReport, measurePicture, parsePicture, STANDARD, verdictOf } from "./critic.mjs";
 
 /** A timeline of equal shots, as the renderer builds one (only the fields the critic reads). */
 function timeline(shots, extra = {}) {
@@ -68,6 +68,68 @@ test("irrelevant footage and a mono, clipped master block too; a warning only no
   assert.deepEqual([...codes].sort(), ["critic.black", "critic.loudness", "critic.peak", "critic.relevance"]);
   assert.equal(verdictOf(r.findings), "block");
   assert.equal(verdictOf([{ code: "x", severity: "warn", en: "a", bn: "খ" }]), "pass");
+});
+
+test("v2: a held minute and a montage minute are measured from the cut times", () => {
+  const held = timeline([{ start: 0, end: 60 }, { start: 60, end: 120 }, { start: 120, end: 125 }]);
+  const perMinute = cutsPerMinute(held.video);
+  assert.deepEqual(perMinute.map((m) => m.cuts), [0, 1, 1], "the cut at 120 s belongs to the third minute");
+  assert.equal(perMinute[2].full, false, "the last minute is partial, so its silence is not a held minute");
+  const r = critique(held, { master: { integratedLufs: -14, truePeakDbtp: -2, loudnessRangeLu: 8, black: [] } }, { channels: 2 });
+  assert.ok(r.findings.some((f) => f.code === "critic.deadMinute"), "a full minute with no cut is called out");
+  assert.equal(r.measures.deadMinutes, 1);
+
+  const burst = timeline(Array.from({ length: 60 }, (_, i) => ({ start: i * 1.2, end: (i + 1) * 1.2 })));
+  const rb = critique(burst, { master: { integratedLufs: -14, truePeakDbtp: -2, loudnessRangeLu: 8, black: [] } }, { channels: 2 });
+  assert.ok(rb.findings.some((f) => f.code === "critic.frenetic" && f.severity === "block"), "a minute of 49 cuts is a block, not an edit");
+});
+
+test("v2: a run of one shot type is reported as one look", () => {
+  const video = Array.from({ length: 8 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6, shotType: "document" }));
+  const r = critique(timeline(video), {}, {});
+  assert.ok(r.findings.some((f) => f.code === "critic.variety"), "eight document cards in a row are one look");
+  assert.equal(r.measures.longestTypeRun, 8);
+});
+
+test("v2: every chapter turn must be marked by a new cue or a riser that lands on it", () => {
+  const video = [
+    { start: 0, end: 60, type: "clip", chapterTitle: "Chapter 1 · The shop" },
+    { start: 60, end: 120, type: "clip", chapterTitle: "Chapter 2 · The debt" },
+    { start: 120, end: 240, type: "clip", chapterTitle: "Chapter 3 · America" },
+  ];
+  const music = [{ cue: "M01", start: 0, end: 60 }, { cue: "M02", start: 60, end: 120 }, { cue: "M02", start: 120, end: 240 }];
+  const sfx = [{ token: "AUTO-RISER", kind: "hit", scene: "SC1", start: 58.4, end: 60 }];
+  const t = { width: 1920, height: 1080, fps: 30, durationSeconds: 240, video, narration: [], music, sfx };
+  const score = chapterMusic(t);
+  assert.equal(score.turns, 3);
+  assert.deepEqual(score.unmarked.map((u) => u.at), [120], "the third chapter has the same cue and no riser");
+  assert.equal(score.coveredShare, 1);
+  const r = critique(t, { master: { integratedLufs: -14, truePeakDbtp: -2, loudnessRangeLu: 8, black: [] } }, { channels: 2 });
+  assert.ok(r.findings.some((f) => f.code === "critic.chapterMusic" && f.severity === "block"));
+  // A riser on the cut marks the turn: the second chapter is not reported.
+  assert.ok(!score.unmarked.some((u) => u.at === 60));
+  assert.ok(!critique({ ...t, music: music.map((m) => (m.start === 120 ? { ...m, cue: "M03" } : m)), sfx: [] }, { master: { integratedLufs: -14, truePeakDbtp: -2, loudnessRangeLu: 8, black: [] } }, { channels: 2 }).findings.some((f) => f.code === "critic.chapterMusic"));
+});
+
+test("v2: the hook is scored from the picture and the words, and a weak opening is sent back", () => {
+  const shots = Array.from({ length: 8 }, (_, i) => ({ start: i * 3, end: (i + 1) * 3, type: "clip" }));
+  const strong = timeline(shots, { narration: [{ scene: "SC1", start: 0, end: 12, text: "At nineteen he had forty-seven dollars." }] });
+  strong.video[3].counter = true;
+  strong.video[6].title = "The Barber of Memphis";
+  const good = hookReport(strong);
+  assert.ok(good.score >= 9, `a hook with 8 beats, an early title and a short first sentence scores ${good.score}`);
+  assert.equal(good.titleAt, 18);
+  assert.equal(good.firstSentenceWords, 6);
+
+  const slow = timeline(Array.from({ length: 5 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6, type: "clip" })),
+    { narration: [{ scene: "SC1", start: 0, end: 30, text: "This is the story of a man who worked very hard for many years and then everything changed for him in a way nobody expected at all." }] });
+  slow.durationSeconds = 300;
+  slow.video.push({ start: 30, end: 300, type: "clip" });
+  const weak = hookReport(slow);
+  assert.ok(weak.score < 5, `a slow, wordy opening scores ${weak.score}`);
+  const r = critique(slow, { master: { integratedLufs: -14, truePeakDbtp: -2, loudnessRangeLu: 8, black: [] } }, { channels: 2 });
+  assert.ok(r.findings.some((f) => f.code === "critic.hook"), "a weak hook is a finding, not a footnote");
+  assert.equal(r.measures.hookScore, weak.score);
 });
 
 test("a blurred shot and a brightness jump inside a shot are measured, not declared", () => {
