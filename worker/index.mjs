@@ -47,6 +47,7 @@ import { quotaAwareStep, watchFetch } from "./quota-step.mjs";
 /** Nights a film may sleep for Gemini's free daily quota before it stops. */
 const MAX_QUOTA_NIGHTS = 7;
 import { mediaProviders } from "../engine/src/film-media.mjs";
+import { archiveKeys } from "../engine/src/open-archives.mjs";
 import { updatePictureLinks } from "../engine/src/picture-links.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { loadFilmPage, PAGE_CSP, renderFilmPage, renderScriptPage } from "../engine/src/film-page.mjs";
@@ -134,7 +135,7 @@ function planFor(env, film) {
   return preflight(graph, {
     brain: brainHealth(env),
     researchDesk: true,
-    mediaProviders: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }).length,
+    mediaProviders: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }).length,
     youtube: Boolean(env.YOUTUBE_API_KEY),
     autoRender: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO && env.SITE_URL),
     minutes: film.durationSeconds / 60,
@@ -190,7 +191,7 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
       budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : 60,
       // The emergency stop, asked before every model call: the key control/stop in the films bucket stops every running film.
       halt: async () => ((await env.FILMS.get("control/stop")) ? "the key control/stop is set in storage" : null),
-      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }) },
+      media: { providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }) },
       // What the channel's published films taught (where viewers left and stayed), for the writers and the editor.
       lessons: { load: async () => { const o = await env.FILMS.get("channel/lessons.json"); return o ? lessonsText(JSON.parse(await o.text())) : ""; } },
       // The source desk opens every page the research cites.
@@ -340,7 +341,7 @@ export default {
           manual: MANUAL,
           scene: remake[2],
           instruction: typeof body?.instruction === "string" ? body.instruction : "",
-          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY }),
+          providers: mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(/** @type {any} */ (env)) }),
         });
         return json(result, result.ok ? 200 : 422);
       }

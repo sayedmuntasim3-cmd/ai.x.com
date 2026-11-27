@@ -30,3 +30,14 @@ test("the library's routes: sources list, search with cache, other paths left al
   assert.equal(calls, 1, "a repeated search is answered from the cache");
   assert.equal(searchOptions(new URL("https://x.test/?q=" + "a".repeat(500)), {}).query.length, 200);
 });
+
+test("an answer holding NARA results is never cached (NARA's terms)", async () => {
+  const store = new Map();
+  const cache = { match: async (r) => store.get(r.url)?.clone(), put: async (r, res) => { store.set(r.url, res); } };
+  const search = async (o) => ({ query: o.query, results: [{ id: "nara:1", source: "nara" }], sources: [{ id: "nara", status: "ok" }] });
+  const waits = [];
+  const req = new Request("https://x.test/api/media/search?q=hoover+dam");
+  await handleMedia(req, new URL(req.url), {}, { cache, search, waitUntil: (p) => waits.push(p) });
+  await Promise.all(waits);
+  assert.equal(store.size, 0);
+});
