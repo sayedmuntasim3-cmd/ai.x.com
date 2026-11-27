@@ -408,6 +408,7 @@ export const CHOICE_SYSTEM = [
   "List the numbers of the candidates a viewer hearing that line would accept as showing it: the thing, place or action said, or a clear visual image of an abstract line (a clock for time passing, hands searching files for 'no record').",
   "Refuse a candidate whose tags show something unrelated, the same word with another meaning (a 'bill' that is a bird or a person named Bill), a wedding, festival, religious rite or tourist sight the line does not speak of, people, money or streets of another country than the film's, cartoons, or abstract backgrounds.",
   "People: when tags show a person (businessman, seamstress, barber, family, portrait) and name no country, they are usually Western stock models; prefer hands, tools, places and objects, and accept such a person only when no other candidate shows the line.",
+  "Never accept a person's face for a line about the film's real subject or his family (his name, he, his father, his mother): an unknown face shown as the real person is a false record. Show hands, tools, places or objects instead.",
   "Reply with exactly one line per shot and nothing else: ID | numbers that fit, best first, separated by commas (or none)",
 ].join("\n");
 

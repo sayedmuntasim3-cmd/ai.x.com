@@ -156,3 +156,33 @@ test("eyes: green screens, cartoons and weddings are not footage unless the shot
   assert.equal(notFootage("wedding, bride", ["indian wedding hall"]), "");
   assert.equal(notFootage("barber, chair, salon", ["barber chair"]), "");
 });
+
+test("records: every pick is classed A-E; CGI and AI are never evidence", async () => {
+  const { recordClass } = await import("./rerank.mjs");
+  assert.equal(recordClass({ source: "pixabay", title: "rolls royce 3d, black, car, rendering" }, false), "D");
+  assert.equal(recordClass({ source: "pixabay", title: "barber, chair" }, false), "B");
+  assert.equal(recordClass({ source: "wikimedia", title: "Brigade Road 1950" }, true), "A");
+  assert.equal(recordClass({ source: "ai", title: "x" }, false), "E");
+});
+
+test("gaps: a shot with no right picture becomes a card of its own words; the rest of the line is kept", async () => {
+  const { markGaps } = await import("./rerank.mjs");
+  const line = '**SC0005** | 0:00:27.010-0:00:32.490 | C1 | NARR: x | SHOTS: (1) 0:00:27.010-0:00:30.580 R1 document card "Follow the tax bill." (2) 0:00:30.580-0:00:32.490 R2 Ramesh shop sign, 2010s | SRC: a | TYPE: document; live-video | FX: FX-PAPER | TRANS: hard cut';
+  const out = markGaps(line + "\nSC0006 | same", [{ scene: "SC0005", shot: 2, text: "is Ramesh Babu." }]);
+  const [a, b] = out.split("\n");
+  assert.match(a, /\(2\) 0:00:30\.580-0:00:32\.490 R1 kinetic-type card "is Ramesh Babu\." \| SRC/);
+  assert.match(a, /\(1\) 0:00:27\.010-0:00:30\.580 R1 document card "Follow the tax bill\."/);
+  assert.match(a, /TYPE: document; kinetic-type \|/);
+  assert.match(a, /FX: FX-KINETIC FX-PAPER/);
+  assert.equal(b, "SC0006 | same");
+  assert.match(markGaps(line.replace("**SC0005**", "SC0005"), [{ scene: "SC0005", shot: 2, text: "x" }]), /\(2\) \S+ R1 kinetic-type card "x"/);
+});
+
+test("P0: an unknown person is never shown for a line about the film's own man or his family", async () => {
+  const { strangerAsSubject } = await import("./rerank.mjs");
+  assert.equal(strangerAsSubject("is Ramesh Babu. His name", "man, coffee, think, pause"), "stranger as the subject");
+  assert.equal(strangerAsSubject("His mother was left with the household", "clothing, woman, fashion, shop"), "stranger as the subject");
+  assert.equal(strangerAsSubject("he was still cutting hair", "barber, hand, scissors, comb"), "");
+  assert.equal(strangerAsSubject("Bengaluru, India.", "man, street"), "");
+  assert.equal(strangerAsSubject("his shop on a busy road", "street, people, man, market"), "");
+});

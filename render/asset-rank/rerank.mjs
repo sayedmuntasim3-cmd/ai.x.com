@@ -299,6 +299,62 @@ export function tagHits(title, queries) {
 }
 export const TAG_BONUS = 0.4;
 
+/**
+ * What kind of record a pick is (owner's rule, 26 Nov 2026): A authentic historical, B authentic present-day,
+ * C reconstruction, D CGI, E AI. Only A and B may stand as evidence; C-E are illustration and must be shown as such.
+ * @param {{ source?: string, title?: string | null }} c @param {boolean} historic
+ * @returns {"A" | "B" | "C" | "D" | "E"}
+ */
+export function recordClass(c, historic) {
+  const tags = String(c.title ?? "").toLowerCase();
+  if (/\b(ai[- ]generated|generative ai|midjourney|stable diffusion|dall-?e)\b/.test(tags) || /^(ai|fal|generated)$/.test(String(c.source ?? ""))) return "E";
+  if (/\b(3d|render(ing)?|cgi|animation|animated|computer graphics|motion graphics)\b/.test(tags)) return "D";
+  if (/\b(reenactment|re-enactment|reconstruction|costume|actor|staged)\b/.test(tags)) return "C";
+  return historic && ["wikimedia", "nasa", "internet-archive", "loc", "smithsonian", "met", "artic"].includes(String(c.source ?? "")) ? "A" : "B";
+}
+
+/** A card's words: the line heard, cut to what one card can hold. @param {string} text */
+export function cardText(text) {
+  const t = String(text).replace(/\s+/g, " ").replace(/^[,;:\s]+|[,;:\s]+$/g, "").trim();
+  return t.length <= 70 ? t : `${t.slice(0, 67).replace(/\s+\S*$/, "")}…`;
+}
+
+/**
+ * Turn the named shots of a scene plan (s5-C1.md) into kinetic-type cards: the shot's text, its TYPE entry,
+ * and the scene's FX. Other shots and fields are left exactly as they were.
+ * @param {string} markdown @param {{ scene: string, shot: number, text: string }[]} gaps
+ */
+export function markGaps(markdown, gaps) {
+  return markdown.split("\n").map((line) => {
+    const sc = /^\W*(SC\d{4,5})\b/.exec(line)?.[1];
+    const mine = gaps.filter((g) => g.scene === sc);
+    if (!mine.length) return line;
+    let out = line;
+    for (const g of mine) {
+      const card = `R1 kinetic-type card "${cardText(g.text).replace(/"/g, "'")}"`;
+      out = out.replace(new RegExp(`(\\(${g.shot}\\)\\s+(?:\\d+:\\d\\d:\\d\\d(?:\\.\\d+)?-\\d+:\\d\\d:\\d\\d(?:\\.\\d+)?\\s+)?)(.*?)(?=\\s\\(${g.shot + 1}\\)\\s|\\s\\|\\s)`), (_m, head) => head + card);
+      out = out.replace(/(\|\s*TYPE:\s*)([^|]*?)(\s*(?:\||$))/, (_m, a, types, z) => {
+        const list = types.split(/;\s*/);
+        if (list.length >= g.shot) list[g.shot - 1] = "kinetic-type";
+        return a + list.join("; ") + z;
+      });
+    }
+    if (/\|\s*FX:/.test(out)) { if (!/FX-KINETIC/.test(out)) out = out.replace(/(\|\s*FX:\s*)/, "$1FX-KINETIC "); }
+    else out = out.replace(/(\|\s*TYPE:[^|]*)/, "$1 | FX: FX-KINETIC");
+    return out;
+  }).join("\n");
+}
+
+/** A line about the film's own person or family (postmortem P0: an unknown face shown as the real man). */
+const ABOUT_SUBJECT = /\b(he|him|his|she|her|name|named|father|mother|son|wife|family|buyer|owner)\b/i;
+/** Tags that show one person's face or figure (hands and tools are fine). */
+const A_PERSON = /\b(man|woman|person|portrait|face|boy|girl|businessman|businesswoman|male|female|guy|lady|model|selfie|thinking|thoughtful)\b/i;
+
+/** "stranger as the subject" when the line is about the film's person and the tags show a person who is not him. @param {string} heard @param {string | null | undefined} title */
+export function strangerAsSubject(heard, title) {
+  return ABOUT_SUBJECT.test(heard) && A_PERSON.test(String(title ?? "")) && !/\b(crowd|people|street|market|traffic)\b/i.test(String(title ?? "")) ? "stranger as the subject" : "";
+}
+
 /** Stock that is not documentary footage, by its tags (film 993f09ea: green-screen scissors and money). */
 const NOT_FOOTAGE = /\b(green ?screen|greenscreen|chroma ?key|alpha channel|cartoon|clip ?art|vector|illustration|wedding|bride|groom)\b/i;
 
@@ -608,7 +664,7 @@ export async function rerankRun(o) {
     for (const c of candidatesOf.get(s) ?? []) {
       const sim = ans.sim[c.id];
       const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : null;
-      const why = refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]);
+      const why = refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
       const tags = tagHits(c.title, s.queries ?? [s.query ?? ""]);
       const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags, score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
       if (why) { refused[why] = (refused[why] ?? 0) + 1; if (why === "off-world" && score) lastResort.push(row); continue; }
@@ -712,7 +768,7 @@ export async function rerankRun(o) {
       s.review = "eyes";
       s.alternates = p.ranked.filter((x) => x.c.id !== c.id).slice(0, 3).map((x) => x.c.id);
       const critic = verdicts.get(`${s.id}|${c.id}`) ?? null;
-      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0 };
+      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0, record: recordClass(c, p.historic) };
       if (critic?.fits === false) s.review = "critic-miss";
     }
     report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
@@ -731,6 +787,7 @@ export async function rerankRun(o) {
     model: ans.model, world, shots: report.length, picked: picks.length,
     video: picks.filter((r) => r.kind === "video").length,
     flaggedOff: picks.filter((r) => r.why?.offWhy).length,
+    records: Object.fromEntries(["A", "B", "C", "D", "E"].map((k) => [k, picks.filter((r) => r.why?.record === k).length])),
     candidates: { total: images.length, perShotMin: Math.min(...plan.map((p) => p.seen)), perShotMax: Math.max(...plan.map((p) => p.seen)) },
     images: { computed: ans.computed, cached: ans.cached, unseen: ans.unseen ?? 0 },
     seconds: { search: Math.round(searchSeconds), see: Math.round(seeSeconds), look: Math.round(lookSeconds), total: Math.round((Date.now() - t0) / 1000) },
@@ -753,6 +810,20 @@ export async function rerankRun(o) {
       eraMismatch: picks.filter((r) => (r.sequence?.era ?? 0) < 0).length,
     },
   };
+  // A shot no right picture was found for becomes a designed line of its own words (owner's rule: a
+  // marked gap or a card, never an unrelated photo). The plan files say so, so the renderer draws a card.
+  const gaps = plan.filter((p, i) => !chosen[i] && p.s.heard).map((p) => ({ scene: p.s.scene, shot: p.s.shot, text: p.s.heard }));
+  if (gaps.length) {
+    const s5 = join(o.run, "s5-C1.md");
+    if (existsSync(s5)) await writeFile(s5, markGaps(await readFile(s5, "utf8"), gaps));
+    if (shotPlan?.shots) {
+      for (const g of gaps) { const x = shotPlan.shots.find((/** @type {any} */ y) => y.id === `${g.scene}-${g.shot}`); if (x) { x.type = "kinetic-type"; x.subject = cardText(g.text); x.gap = "no picture showed the line"; } }
+      await writeFile(join(o.run, "shots.json"), JSON.stringify(shotPlan, null, 1));
+    }
+    for (const g of gaps) { const m = media.shots.find((/** @type {any} */ y) => y.scene === g.scene && y.shot === g.shot); if (m) { m.status = "gap-card"; delete m.pick; } }
+    log(`Gaps: ${gaps.length} shot(s) had no picture that shows the line; each is now a designed card of its own words (${gaps.map((g) => `${g.scene}-${g.shot}`).join(", ")}).`);
+  }
+  summary.gapCards = gaps.length;
   await writeFile(mediaPath, JSON.stringify(media, null, 1));
   await writeFile(join(o.run, "rank-C1.json"), JSON.stringify({ summary, shots: report }, null, 1));
   log(`Eyes: ${summary.picked}/${summary.shots} shots chosen by OpenCLIP from ${summary.candidates.total} candidates (${summary.candidates.perShotMin}-${summary.candidates.perShotMax} per shot); video ${summary.video}/${summary.picked}; ${summary.flaggedOff} still look off-world; ${summary.images.unseen} thumbnails could not be fetched; ${summary.seconds.total} s (search ${summary.seconds.search} s, seeing ${summary.seconds.see} s).`);
