@@ -205,6 +205,30 @@ test("a stopped film starts again from the saved recording; a film can be delete
   assert.equal((await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER })).status, 404);
 });
 
+test("a film whose runner died (no failure sent) can be started again once GitHub says its run ended", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "story.mp3", bytes: 5000 } });
+  const p = await call(env, "PUT", `/api/voice/${ID}/parts/1`, { headers: OWNER, body: new Uint8Array(5000) });
+  let state = "in_progress";
+  /** @type {string[]} */
+  const asked = [];
+  const gh = async (/** @type {string} */ u, /** @type {any} */ init) => {
+    asked.push(u);
+    if (u.endsWith("/actions/runs/77")) return new Response(JSON.stringify({ status: state }), { headers: { "content-type": "application/json" } });
+    return new Response(null, { status: 204 });
+  };
+  await call(env, "POST", `/api/voice/${ID}/complete`, { headers: OWNER, body: { parts: [p.data] }, fetch: gh });
+  const t = await makeTicket("owner-token", ID, "runner", 60);
+  await call(env, "POST", `/api/voice/${ID}/progress?ticket=${t}`, { body: { stage: "pictures", params: { assets: 3 }, runUrl: "https://github.com/o/r/actions/runs/77" } });
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/retry`, { headers: OWNER, fetch: gh })).status, 409, "still running on GitHub: no retry");
+  assert.ok(asked.some((u) => u === "https://api.github.com/repos/o/r/actions/runs/77"));
+  state = "completed";
+  const again = await call(env, "POST", `/api/voice/${ID}/retry`, { headers: OWNER, fetch: gh });
+  assert.equal(again.status, 202);
+  const rec = await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER });
+  assert.ok(rec.data.progress.some((/** @type {any} */ e) => !e.ok && /runner was shut down/.test(e.message.en)), "the stop is written down");
+});
+
 test("the runner searches Pixabay through the Worker; the key stays on the Worker", async () => {
   const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", PIXABAY_API_KEY: "pk-secret" };
   await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "story.mp3", bytes: 5000 } });
