@@ -65,6 +65,38 @@ export async function verifyArchiveItem(c) {
  * @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike
  */
 
+/** Generic words that say nothing about the picture a shot needs. */
+const GENERIC = new Set(["archival", "archive", "photograph", "photographs", "photo", "photos", "image", "images", "picture", "pictures", "footage", "clip", "clips", "video", "illustration", "engraving", "painting", "portrait", "public", "domain", "drawn", "showing", "view", "shot", "long", "wide", "close", "detail", "century", "nineteenth", "eighteenth", "twentieth", "historic", "historical"]);
+
+/**
+ * A browser User-Agent for archives that answer a bot-looking client with 403 (the Library of Congress and
+ * the Art Institute do; their own API rules do not require an identifying agent).
+ */
+const BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+/**
+ * Ask an archive once; if it refuses with 403/429/5xx or the connection fails, ask once more after a short
+ * wait, with a browser User-Agent. A provider that is simply down still ends as "unavailable" for the trace,
+ * but one that only needed a second look (film 5e58891c: LOC and Artic 7/7 auth_error) gets that look.
+ * @param {FetchLike} get @param {string} url @param {RequestInit} init @param {AbortSignal} [signal] @param {{ browserUa?: boolean }} [o]
+ * @returns {Promise<Response>}
+ */
+async function archiveGet(get, url, init = {}, signal, o = {}) {
+  /** @type {Response | null} */
+  let first = null;
+  let failed = false;
+  try { first = await get(url, init); } catch { failed = true; }
+  if (first && first.ok) return first;
+  if (!failed && first) {
+    const status = first.status;
+    // A plain "no" (400, 404) is final; only a refusal or a server fault is worth a second ask.
+    if (status !== 403 && status !== 429 && status < 500) return first;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const headers = o.browserUa === false ? (init.headers ?? {}) : { accept: "application/json, text/plain, */*", ...(init.headers ?? {}), "user-agent": BROWSER_UA };
+  return get(url, { ...init, headers, ...(signal ? { signal } : {}) });
+}
+
 /** Words that can tie a shot to its query group (codes like OBJ-01, R3 and site names do not count). */
 const IGNORED = new Set(["pexels", "pixabay", "mixkit", "coverr", "videvo", "free", "the", "and", "with", "use", "close", "shot", "same", "https", "www", "com", "video"]);
 /** @param {string} text */
@@ -74,6 +106,45 @@ function wordSet(text) {
 
 /** @param {string} t "0:00:07.4" */
 const clock = (t) => toSeconds(t);
+
+/**
+ * A searchable query for a shot that wrote no SRC group, or whose own queries found nothing: the shot's
+ * description with rungs, years and "archival photograph of" style words removed, two to four words long
+ * ("R2 archival photograph of dense jungle and surveying party along the Isthmus" -> "dense jungle surveying
+ * party"). Search services answer short subject words far better than a full sentence, which is why the
+ * empty searches of film 5e58891c's chapter (Wikimedia 6/6, NASA 7/7 empty) are worth a second, simpler ask.
+ * @param {string} description
+ * @param {number} [max]
+ */
+export function simpleQuery(description, max = 4) {
+  const words = String(description ?? "")
+    .replace(/^R\d\b/, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b\d{4}\b/g, " ")
+    .split(/[^\p{L}\p{N}']+/u)
+    .filter((w) => w.length > 2 && !GENERIC.has(w.toLowerCase()));
+  // Keep the order of the description but drop a repeated word, so "jungle ... jungle" searches once.
+  /** @type {string[]} */
+  const kept = [];
+  for (const w of words) if (!kept.some((k) => k.toLowerCase() === w.toLowerCase())) kept.push(w);
+  return kept.slice(0, max).join(" ");
+}
+
+/**
+ * How much of a shot's own description a candidate's title (or tags, passed in the title) actually names.
+ * A blind brain cannot look at the picture, so this is the only evidence available: the first search
+ * result is not automatically the best one.
+ * @param {string | null | undefined} title
+ * @param {string} shotText
+ */
+export function relevanceScore(title, shotText) {
+  const wanted = wordSet(String(shotText ?? ""));
+  const got = wordSet(String(title ?? ""));
+  if (!wanted.size || !got.size) return 0;
+  let hits = 0;
+  for (const w of wanted) if (got.has(w)) hits += 1;
+  return Math.round((hits / wanted.size) * 100) / 100;
+}
 
 /**
  * The shots of one SHOTS field, "(1) ...; (2) ...", in order. Shot numbers in
@@ -148,7 +219,10 @@ export function stockShots(markdown) {
         const score = [...words].filter((w) => g.words.has(w)).reduce((n, w) => n + (/^\d+$/.test(w) ? 5 : 1), 0); // a clip number is decisive
         if (score > bestScore) { best = g; bestScore = score; }
       }
-      const queries = best ? best.queries : groups.length === stock.length ? groups[i].queries : all;
+      const given = best ? best.queries : groups.length === stock.length ? groups[i].queries : all;
+      // A shot whose SRC group wrote no query still gets searched: its own description becomes the query.
+      const simple = simpleQuery(shot.description);
+      const queries = given.length ? given : simple ? [simple] : [];
       out.push({ scene: s.sc, shot: shot.index, start: shot.start, end: shot.end, rung: shot.rung, description: shot.description, queries });
     });
   }
@@ -208,6 +282,22 @@ export const JUDGE_POOL = 4;
  *   returns, per shot key, the candidate indices that fit the shot, best first ([] = none fits)
  */
 
+/** A moving clip shorter than this is a flicker, not footage. */
+export const MIN_VIDEO_SECONDS = 2;
+
+/**
+ * How well a candidate's length fits the shot it would fill: 0 good (a video at least as long as the
+ * shot, or an unbounded still), 1 usable but shorter than the shot (the shot will have to cut away),
+ * 2 refused (a moving clip too short to show at all). Stills are never length-checked.
+ * @param {import("./documentary-media-fetch.mjs").MediaCandidate} c
+ * @param {number} shotSeconds
+ */
+export function durationFit(c, shotSeconds) {
+  if (c.mediaType !== "video" || c.durationSeconds === null || c.durationSeconds === undefined || !Number.isFinite(c.durationSeconds)) return 0;
+  if (c.durationSeconds < MIN_VIDEO_SECONDS) return 2;
+  return shotSeconds > 0 && c.durationSeconds + 0.5 < shotSeconds ? 1 : 0;
+}
+
 /** The pick record of a candidate (also used by render/asset-rank). @param {import("./documentary-media-fetch.mjs").MediaCandidate} c @returns {MediaPick} */
 export function toPick(c) {
   return {
@@ -240,15 +330,20 @@ export async function chapterMedia(o) {
   const list = stockShots(o.markdown);
   /** One shot's search; shots[at] keeps the film order whatever finishes first. @param {StockShot} shot @param {number} at */
   const one = async (shot, at) => {
+    // The shot's own queries first, then one simpler query built from its description: a full sentence
+    // sent to an archive is often answered with nothing, while its two or three subject words are not.
+    const queries = [...shot.queries];
+    const simple = simpleQuery(shot.description);
+    if (simple && !queries.some((q) => q.toLowerCase() === simple.toLowerCase())) queries.push(simple);
     /** @type {ShotMedia} */
-    const row = { ...shot, status: shot.queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
+    const row = { ...shot, status: queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
     const earlier = o.done?.[shotKey(row)];
     if (earlier) {
       if (earlier.status === "found" && earlier.pick) history.add(earlier.pick.id, shot.start);
       shots[at] = earlier;
       return;
     }
-    search: for (const step of plan(shot.rung)) for (const query of shot.queries) {
+    search: for (const step of plan(shot.rung)) for (const query of queries) {
       const found = await fetchShotMedia(
         { shotId: `${shot.scene}-${shot.shot}`, query, kind: step.kind },
         { providers: step.providers, limiter, used: { has: (id) => history.blocked(id, shot.start) }, verifyItem: verifyArchiveItem, minCandidates: 1, maxWaitMs: o.maxWaitMs, timeoutMs: o.timeoutMs, sleep: o.sleep },
@@ -256,23 +351,33 @@ export async function chapterMedia(o) {
       row.trace.push(...found.trace.map((t) => ({ query, ...t })));
       // Every candidate here passed its item-level rights check inside fetchShotMedia.
       const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId) && (!o.wholeWord || titleHasWords(c.title, query)));
-      if (!free.length) continue;
+      // A clip too short to show is not footage: try the next query/provider. Among the rest, a clip at
+      // least as long as the shot comes first, so a long shot is not filled by a 2-second clip that repeats.
+      const shotSeconds = Math.max(0, shot.end - shot.start);
+      const usable = free.filter((c) => durationFit(c, shotSeconds) < 2);
+      if (usable.length < free.length) row.trace.push({ query, provider: "length", outcome: "too-short", returned: free.length - usable.length, allowed: 0 });
+      if (!usable.length) continue;
+      // Order by length fit, then (when no brain can look at the pictures) by how many of the shot's own
+      // words the candidate's title actually names. The top search result is not automatically the best shot.
+      const rel = new Map(usable.map((c) => [c, relevanceScore(c.title, `${shot.description} ${query}`)]));
+      usable.sort((a, b) => durationFit(a, shotSeconds) - durationFit(b, shotSeconds) || (rel.get(b) ?? 0) - (rel.get(a) ?? 0));
       row.query = query;
-      if (o.judge) { pools.set(row, free); break search; }
+      if (o.judge) { pools.set(row, usable); break search; }
       // A file that cannot be fetched would become a text card in the film: try the next candidate instead.
       if (o.reachable) {
-        let usable = -1;
-        for (let i = 0; i < Math.min(free.length, 4) && usable < 0; i += 1) {
-          const url = free[i].mediaUrl;
-          if (url && (await o.reachable(url).catch(() => false))) usable = i;
-          else row.trace.push({ query, provider: free[i].source, outcome: "unreachable", returned: 1, allowed: 0 });
+        let at = -1;
+        for (let i = 0; i < Math.min(usable.length, 4) && at < 0; i += 1) {
+          const url = usable[i].mediaUrl;
+          if (url && (await o.reachable(url).catch(() => false))) at = i;
+          else row.trace.push({ query, provider: usable[i].source, outcome: "unreachable", returned: 1, allowed: 0 });
         }
-        if (usable < 0) continue;
-        free.unshift(...free.splice(usable, 1));
+        if (at < 0) continue;
+        usable.unshift(...usable.splice(at, 1));
       }
-      const [best, ...rest] = free;
+      const [best, ...rest] = usable;
       row.status = "found";
       row.pick = toPick(best);
+      if (!o.judge) row.why = { by: "code: the shot's own words in the title (the brain cannot judge pictures)", relevance: rel.get(best) ?? 0, provider: best.source };
       row.alternates = rest.slice(0, 3).map((c) => c.id);
       history.add(best.id, shot.start);
       break search;
@@ -467,7 +572,8 @@ export function wikimediaProvider(o = {}) {
         prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "1920",
         iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName|Categories",
       });
-      const res = await get(`https://commons.wikimedia.org/w/api.php?${params}`, { headers: { "user-agent": COMMONS_UA, "api-user-agent": COMMONS_UA }, signal });
+      // Commons requires its own identifying agent, so the retry keeps it (no browser string) and only repeats the ask.
+      const res = await archiveGet(get, `https://commons.wikimedia.org/w/api.php?${params}`, { headers: { "user-agent": COMMONS_UA, "api-user-agent": COMMONS_UA }, signal }, signal, { browserUa: false });
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       const pages = Array.isArray(data?.query?.pages) ? data.query.pages : Object.values(data?.query?.pages ?? {});
@@ -620,7 +726,7 @@ export function locProvider(o = {}) {
     id: "loc", layer: 1, kinds: ["image"], cacheTtlSeconds: 86_400, rate: { capacity: 20, windowSeconds: 10 },
     async search(query, kind, signal) {
       if (kind !== "image") return [];
-      const res = await get(`https://www.loc.gov/photos/?${new URLSearchParams({ q: query.slice(0, 200), fo: "json", c: String(o.perPage ?? 20), fa: "online-format:image" })}`, { headers: { "user-agent": COMMONS_UA }, signal });
+      const res = await archiveGet(get, `https://www.loc.gov/photos/?${new URLSearchParams({ q: query.slice(0, 200), fo: "json", c: String(o.perPage ?? 20), fa: "online-format:image" })}`, { headers: { "user-agent": COMMONS_UA }, signal }, signal);
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       const hits = (Array.isArray(data?.results) ? data.results : []).filter((/** @type {any} */ r) => typeof r?.id === "string" && Array.isArray(r.image_url) && r.image_url.length).slice(0, o.details ?? 4);
@@ -728,7 +834,7 @@ export function articProvider(o = {}) {
     async search(query, kind, signal) {
       if (kind !== "image") return [];
       const params = new URLSearchParams({ q: query.slice(0, 200), "query[term][is_public_domain]": "true", limit: String(o.perPage ?? 20), fields: "id,title,image_id,artist_title,date_display,is_public_domain,thumbnail" });
-      const res = await get(`https://api.artic.edu/api/v1/artworks/search?${params}`, { headers: { "AIC-User-Agent": COMMONS_UA }, signal });
+      const res = await archiveGet(get, `https://api.artic.edu/api/v1/artworks/search?${params}`, { headers: { "AIC-User-Agent": COMMONS_UA }, signal }, signal);
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       const iiif = typeof data?.config?.iiif_url === "string" ? data.config.iiif_url : "https://www.artic.edu/iiif/2";
@@ -763,7 +869,7 @@ export function openverseProvider(o = {}) {
     async search(query, kind, signal) {
       if (kind !== "image") return [];
       const params = new URLSearchParams({ q: query.slice(0, 200), license: "cc0,pdm,by", page_size: String(o.perPage ?? 20), mature: "false" });
-      const res = await get(`https://api.openverse.org/v1/images/?${params}`, { headers: { "user-agent": COMMONS_UA }, signal });
+      const res = await archiveGet(get, `https://api.openverse.org/v1/images/?${params}`, { headers: { "user-agent": COMMONS_UA }, signal }, signal);
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       return (Array.isArray(data?.results) ? data.results : []).flatMap((/** @type {any} */ r) => {

@@ -179,7 +179,7 @@ test("the edit's sound design follows the edit: whoosh into whips, boom under fl
   const c2 = L(4, 9, 14, "SHOTS: (1) R1 card \"FOUR\" | TRANS: white flash").replace("| C1 |", "| C2 |");
   const t = build({ chapters: [{ id: "C1", markdown: c1, title: "One" }, { id: "C2", markdown: c2, title: "Two" }] });
   const auto = t.sfx.filter((e) => e.token.startsWith("AUTO-")).map((e) => [e.token, e.start, e.scene]);
-  assert.deepEqual(auto, [["AUTO-WHOOSH", 3.8, "SC0001"], ["AUTO-IMPACT", 8.05, "SC0003"]], "the riser at 7.4 s and the boom at 9 s are dropped: each would land within 1.5 s of another sound");
+  assert.deepEqual(auto, [["AUTO-WHOOSH", 3.8, "SC0001"], ["AUTO-RISER", 7.4, "SC0003"]], "a chapter's riser is placed first, so the counter's impact 0.65 s later is the sound that is dropped as too crowded");
   const quiet = build({ chapters: [{ id: "C1", markdown: c1 }], autoSound: false });
   assert.equal(quiet.sfx.filter((e) => e.token.startsWith("AUTO-")).length, 0, "it can be switched off");
 });

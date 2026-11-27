@@ -1157,15 +1157,22 @@ export async function renderFilm(o) {
   // One-pass loudnorm can land off target on short or quiet material (a rough own-voice take came out at -15.3 LUFS):
   // a measured master more than 0.5 LU away gets one exact gain step on the audio only (the picture is copied), with a
   // limiter only when the gain would lift the true peak above -1 dBTP; then it is measured again.
-  const fix = master && anySound && t.durationSeconds >= 3 ? loudnessFix(master) : null;
-  if (fix) {
-    const { gain, af } = fix;
-    try {
-      await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
-      renameSync(o.outFile + ".gain.mp4", o.outFile);
-      master = await measureMaster(o.outFile, ffmpeg);
-      log(`master: loudness corrected by ${gain} dB to ${master.integratedLufs} LUFS`);
-    } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); }
+  // The correction is measured, not assumed: each pass copies the picture, lifts or drops only the audio, and
+  // measures the master again. A limiter-led pass can land a little short of the target (the slice report's
+  // -18.2 LUFS against -14), so up to three passes are taken until the master is within 0.5 LU; the last
+  // measurement is what the report and the gate see, and every pass is logged with its number.
+  if (master && anySound && t.durationSeconds >= 3) {
+    for (let pass = 1; pass <= 3; pass += 1) {
+      const fix = loudnessFix(master);
+      if (!fix) break;
+      const { gain, af } = fix;
+      try {
+        await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
+        renameSync(o.outFile + ".gain.mp4", o.outFile);
+        master = await measureMaster(o.outFile, ffmpeg);
+        log(`master: loudness pass ${pass} moved ${gain > 0 ? "+" : ""}${gain} dB to ${master.integratedLufs} LUFS (target -14)`);
+      } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); break; }
+    }
   }
   if (master) {
     const normalised = anySound && t.durationSeconds >= 3;

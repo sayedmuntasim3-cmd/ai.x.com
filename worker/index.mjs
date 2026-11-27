@@ -224,6 +224,10 @@ export class FilmRunWorkflow extends WorkflowEntrypoint {
         permanent: permanentError,
         stop: (message) => new NonRetryableError(message),
         maxNights: MAX_QUOTA_NIGHTS,
+        // QUOTA_MODE=pause (the default): a free daily limit pauses the film with its reset time, shown as
+        // "paused-quota" with every finished stage kept, instead of holding the Workflow open for a day.
+        // QUOTA_MODE=wait keeps the older sleep-until-reset behaviour.
+        pauseOnQuota: String(env.QUOTA_MODE ?? "pause").toLowerCase() !== "wait",
         log: (line) => console.log(`[${film.id}] ${line}`),
       }),
     });
@@ -261,7 +265,10 @@ export default {
       if (voice) return voice;
       if (url.pathname === "/api/health") {
         const brain = brainHealth(env);
-        return json({ brain, claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), localBrain: Boolean(env.BRAIN_URL), searxng: Boolean(env.SEARXNG_URL), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: brain.connected ? brain.model : null });
+        // The media step's real provider list: the archives that need no key, plus each stock provider whose
+        // free key is set. The owner can see at a glance whether Pexels is connected, instead of reading code.
+        const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY });
+        return json({ brain, claude: Boolean(env.ANTHROPIC_API_KEY), gemini: Boolean(env.GEMINI_API_KEY), localBrain: Boolean(env.BRAIN_URL), searxng: Boolean(env.SEARXNG_URL), storage: Boolean(env.FILMS), workflow: Boolean(env.FILM_RUN), token: Boolean(env.STUDIO_TOKEN), pexels: Boolean(env.PEXELS_API_KEY), pixabay: Boolean(env.PIXABAY_API_KEY), github: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO), youtube: Boolean(env.YOUTUBE_API_KEY), smithsonian: Boolean(env.SMITHSONIAN_API_KEY), model: brain.connected ? brain.model : null, media: { providers: media.map((p) => p.id), stock: media.filter((p) => p.id === "pexels" || p.id === "pixabay").map((p) => p.id), videoFirst: true, quotaMode: String(env.QUOTA_MODE ?? "pause").toLowerCase() } });
       }
       if (url.pathname === "/api/estimate" && request.method === "GET") {
         const minutes = Number(url.searchParams.get("minutes") ?? "45");
