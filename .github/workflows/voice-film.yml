@@ -81,6 +81,7 @@ jobs:
     steps:
       - name: Check the inputs
         run: |
+          echo "t0=$(date +%s)" > "$RUNNER_TEMP/film-timing.env"
           echo "::add-mask::$VOICE_TICKET"
           [[ "$VOICE_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::Bad voiceover ID."; exit 1; }
           [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::Bad site."; exit 1; }
@@ -151,6 +152,7 @@ jobs:
           fi
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
+          echo "words=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - name: Keep the picture-ranking model between runs (OpenCLIP, CPU)
         if: inputs.kind == 'narration'
         uses: actions/cache@v4
@@ -174,6 +176,7 @@ jobs:
           else
             echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
           fi
+          echo "pictures=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - name: Quran pictures (adab guard; no living beings, no AI pictures)
         if: inputs.kind == 'quran'
         env:
@@ -210,6 +213,7 @@ jobs:
           mkdir -p music && touch music/.keep
           [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
           echo "args=--run run --one-track $voice --words run/words.json --music music --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
+          echo "prepare=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - uses: actions/upload-artifact@v4
         if: inputs.kind == 'narration'
         with:
@@ -221,6 +225,13 @@ jobs:
           retention-days: 1
           include-hidden-files: true
           if-no-files-found: error
+      - name: Minutes per stage (listen and plan, pictures, prepare; the render parts and the join are their own jobs)
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/film-timing.env" ] || exit 0
+          set -a; . "$RUNNER_TEMP/film-timing.env"; set +a
+          mkdir -p run
+          node -e 'const e=process.env,n=(k)=>e[k]?Number(e[k]):null,m=(a,b)=>a!=null&&b!=null?Math.round((b-a)/6)/10:null;const t={listenAndPlan:m(n("t0"),n("words")),pictures:m(n("words"),n("pictures")),prepare:m(n("pictures")??n("words"),n("prepare"))};require("fs").writeFileSync("run/film-timing.json",JSON.stringify(t,null,1));console.log("Minutes per stage: "+JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Tell the studio what stopped it
         if: failure()
         run: |
