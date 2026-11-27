@@ -388,7 +388,7 @@ export async function planVoiceVisuals(o) {
   if (o.providers?.length) {
     const judge = o.brain && canSee(o.brain) ? o.judge : undefined;
     // Voiceover films: a picture must name what was searched (the archives match "car" to "Carina Nebula").
-    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency });
+    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency, topic: o.topic, holdWeak: true });
     for (const shot of media.shots) {
       const p = plan.find((x) => x.sc === shot.scene);
       if (!p) continue;

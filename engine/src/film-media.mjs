@@ -11,6 +11,7 @@
  */
 import { openArchivesProvider } from "./open-archives.mjs";
 import { isChallenge, isRelevant, locGate } from "./archive-guard.mjs";
+import { queryLadder } from "./picture-ladder.mjs";
 import { createRateLimiter, fetchShotMedia, ProviderError } from "./documentary-media-fetch.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
@@ -61,8 +62,8 @@ export async function verifyArchiveItem(c) {
  * @typedef {{ scene: string, shot: number, start: number, end: number, rung: string | null, description: string, queries: string[] }} StockShot
  * @typedef {{ licenseId: string, name: string, licenseUrl: string | null, attributionRequired: boolean, creator: string | null, sourcePageUrl: string }} LicenceRecord
  * @typedef {{ id: string, source: string, kind?: MediaKind, title?: string, mediaUrl: string | null, previewUrl: string | null, sourcePageUrl: string, creator: string | null, durationSeconds: number | null, width: number | null, height: number | null, licence: LicenceRecord, relevance?: number }} MediaPick
- * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], review?: "fit" | "none-fit" | "unreviewed", trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[], why?: { by?: string, relevance?: number, total?: number, offWhy?: string, scale?: string | null, provider?: string, licence?: string | null, candidates?: number, passed?: number, refused?: number, before?: string | null, sequence?: any } }} ShotMedia
- * @typedef {{ chapter: string, providers: string[], repeatWindowSeconds: number, shots: ShotMedia[], stats: { shots: number, found: number, missing: number, noQuery: number } }} ChapterMedia
+ * @typedef {StockShot & { status: "found" | "missing" | "no-query", query: string | null, pick: MediaPick | null, alternates: string[], review?: "fit" | "none-fit" | "unreviewed", reused?: string, trace: { query: string, provider: string, outcome: string, returned: number, allowed: number }[], why?: { by?: string, relevance?: number, total?: number, offWhy?: string, scale?: string | null, provider?: string, licence?: string | null, candidates?: number, passed?: number, refused?: number, before?: string | null, sequence?: any } }} ShotMedia
+ * @typedef {{ chapter: string, providers: string[], repeatWindowSeconds: number, shots: ShotMedia[], stats: { shots: number, found: number, missing: number, noQuery: number, reused: number } }} ChapterMedia
  * @typedef {(url: string, init?: RequestInit) => Promise<Response>} FetchLike
  */
 
@@ -317,7 +318,7 @@ export function toPick(c) {
  * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
  * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
  * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number, topic?: string, holdWeak?: boolean }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -333,9 +334,11 @@ export async function chapterMedia(o) {
   const one = async (shot, at) => {
     // The shot's own queries first, then one simpler query built from its description: a full sentence
     // sent to an archive is often answered with nothing, while its two or three subject words are not.
-    const queries = [...shot.queries];
+    const own = [...shot.queries];
     const simple = simpleQuery(shot.description);
-    if (simple && !queries.some((q) => q.toLowerCase() === simple.toLowerCase())) queries.push(simple);
+    if (simple && !own.some((q) => q.toLowerCase() === simple.toLowerCase())) own.push(simple);
+    // The ladder anchors bare keywords to the film's subject and adds the subject, its category and its era.
+    const queries = o.topic ? queryLadder({ queries: own, description: shot.description, topic: o.topic }) : own;
     /** @type {ShotMedia} */
     const row = { ...shot, status: queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
     const earlier = o.done?.[shotKey(row)];
@@ -385,6 +388,24 @@ export async function chapterMedia(o) {
     }
     shots[at] = row;
   };
+  /** After the whole chapter: a shot with nothing strong takes a strong pick of the same chapter (held), never a black or random card. */
+  const holdPicks = () => {
+    const strong = shots.filter((r) => r?.status === "found" && r.pick && r.review !== "none-fit");
+    for (const row of shots) {
+      if (!row || row.status === "found" || row.rung === "R1" || !strong.length) continue;
+      // The nearest strong shot in film time, a picture of the same chapter that the viewer has already seen.
+      // One that the 10-minute rule allows here comes first; only when none does, the nearest is held anyway (a repeat beats a card).
+      const byDistance = [...strong].sort((a, b) => Math.abs(a.start - row.start) - Math.abs(b.start - row.start));
+      const near = byDistance.find((r) => r.pick && !history.blocked(r.pick.id, row.start)) ?? /** @type {ShotMedia} */ (byDistance[0]);
+      row.status = "found";
+      row.pick = near.pick;
+      row.alternates = [];
+      row.reused = near.pick?.id;
+      row.why = { by: "reused: no strong picture found for this shot, the nearest strong one of the chapter is held", provider: near.pick?.source };
+      history.add(near.pick?.id ?? "", row.start);
+      row.trace.push({ query: "", provider: "held", outcome: "reused", returned: 1, allowed: 1 });
+    }
+  };
   // Shots are searched a few at a time when asked (voiceover films); each provider's rate limiter still paces it.
   await runPool(list, Math.max(1, o.concurrency ?? 1), one);
 
@@ -425,6 +446,7 @@ export async function chapterMedia(o) {
       history.add(chosen.id, row.start);
     }
   }
+  if (o.holdWeak) holdPicks();
   return {
     chapter: o.chapter,
     providers: o.providers.map((p) => p.id),
@@ -434,6 +456,7 @@ export async function chapterMedia(o) {
       shots: shots.length,
       found: shots.filter((s) => s.status === "found").length,
       missing: shots.filter((s) => s.status === "missing").length,
+      reused: shots.filter((s) => s.reused).length,
       noQuery: shots.filter((s) => s.status === "no-query").length,
     },
   };
