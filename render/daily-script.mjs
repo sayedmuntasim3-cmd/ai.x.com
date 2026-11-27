@@ -164,7 +164,7 @@ export function systemPrompt(topic) {
 }
 
 /** Each Groq model has its own 8,000-token minute (worker/groq.mjs); a call is counted at its prompt plus most of its reply. */
-export const LANE_TOKENS_PER_MINUTE = 7000;
+export const LANE_TOKENS_PER_MINUTE = 5500;
 
 /**
  * Three free models, each with its own minute: a call goes to the model that has room now, so three
@@ -226,7 +226,7 @@ export function makeLanes(o = {}) {
  */
 async function laneCall(c, body, state) {
   const lanes = state.lanes;
-  const tokens = Math.ceil((body.system.length + body.prompt.length) / 3.8) + Math.ceil(body.maxTokens * 0.5);
+  const tokens = Math.ceil((body.system.length + body.prompt.length) / 3.8) + Math.ceil(body.maxTokens * 0.8);
   let last = "";
   for (let attempt = 1; attempt <= 12; attempt += 1) {
     let model;
@@ -370,7 +370,7 @@ export async function writeScript(o) {
 }
 
 /** Findings code can repair itself by dropping a sentence. */
-const FIXABLE = new Set(["critique.inventedNumber", "critique.repetition", "critique.logic", "critique.filler"]);
+const FIXABLE = new Set(["critique.inventedNumber", "critique.repetition", "critique.logic", "critique.filler", "critique.unsourcedName", "critique.unsourcedPlace", "critique.noQuestion"]);
 
 /** Findings about the chain of an act, which a brain may rescue by quoting the sentence code missed. */
 const CHAIN = new Set(["critique.noWhy", "critique.noEvent", "critique.noConsequence", "critique.unanswered"]);
@@ -414,14 +414,18 @@ async function storyCritic(o) {
     // Never stop a film for a fixable line: when only an invented number or a repeat is left (or the rewrites
     // are used up), code drops those sentences itself; it refuses only when more than a tenth of the words would go.
     if (!review.ok && (round >= max || review.findings.every((f) => FIXABLE.has(f.code)))) {
-      const fx = repairScript(acts, { sources: [o.whole], brain: brainRead ?? null });
-      if (fx.ok && fx.removed.length) {
+      // The film's own central question (the topic's, written from the source) opens the film when the writers left it out.
+      const asked = review.findings.some((f) => f.code === "critique.noQuestion") && acts.length ? o.topic.question : "";
+      const withQuestion = asked ? acts.map((a, i) => (i === 0 ? { ...a, text: ((p) => [p[0], asked, ...p.slice(1)].join("\n\n"))(a.text.split(/\n{2,}/)) } : a)) : acts;
+      const fx = repairScript(withQuestion, { sources: [o.whole], title: o.topic.title, brain: brainRead ?? null });
+      if (asked && fx.ok) fx.removed = fx.removed.filter((r) => r.sentence !== asked);
+      if (fx.ok && (fx.removed.length || asked)) {
         const again = critiqueScript({ ...base, acts: fx.acts, ...(brainRead ? { brain: brainRead } : {}) });
         if (again.ok) {
           fx.acts.forEach((a, i) => { o.chapters[i] = { ...o.chapters[i], text: a.text, words: wordCount(a.text) }; });
           rounds.push({ round, repaired: true, share: Math.round(fx.share * 1000) / 10, removed: fx.removed.map((r) => ({ act: r.act, why: r.why, sentence: r.sentence.slice(0, 200) })), ok: true });
           save(true);
-          o.log(`story critic: ${fx.removed.length} sentence(s) dropped by code (${["number", "repeat", "logic", "filler"].map((w) => `${fx.removed.filter((r) => r.why === w).length} ${w}`).join(", ")}), ${(fx.share * 100).toFixed(1)}% of the words; the script passes.`);
+          o.log(`story critic: ${fx.removed.length} sentence(s) dropped by code (${["number", "repeat", "logic", "filler", "name"].map((w) => `${fx.removed.filter((r) => r.why === w).length} ${w}`).join(", ")}), ${(fx.share * 100).toFixed(1)}% of the words; the script passes.`);
           return { summary: { ok: true, rounds: round + 1, repaired: fx.removed.length } };
         }
         o.log(`story critic: dropping ${fx.removed.length} sentence(s) was not enough (${again.findings.map((f) => f.code.replace("critique.", "")).join(", ")} remain).`);

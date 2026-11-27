@@ -352,6 +352,27 @@ function isNameSpan(g) {
 }
 
 /**
+ * Capitalised words inside a sentence that no source has: names, and common places, each with its sentence.
+ * @param {string} text @param {{ nsource: string, title: Set<string> }} ctx
+ * @returns {{ name: string, place: boolean, sentence: string }[]}
+ */
+export function unsourcedNamesIn(text, ctx) {
+  /** @type {{ name: string, place: boolean, sentence: string }[]} */
+  const out = [];
+  for (const s of sentencesOf(text)) {
+    const ws = s.replace(/["“”‘’]/g, " ").split(/\s+/).filter(Boolean);
+    ws.forEach((w, i) => {
+      const bare = w.replace(/^[^A-Za-z]+|[^A-Za-z.]+$/g, "").replace(/\.$/, "").replace(/'s$/, "");
+      if (i === 0 || !/^[A-Z][A-Za-z.'-]+$/.test(bare)) return;
+      const k = bare.toLowerCase();
+      if (COMMON_PROPER.has(k) || ctx.title.has(k) || ctx.nsource.includes(` ${normalize(bare)} `)) return;
+      out.push({ name: bare, place: GEOGRAPHY.has(k), sentence: s });
+    });
+  }
+  return out;
+}
+
+/**
  * The numbers a text states that no source does, each with its sentence.
  * @param {string} text @param {{ known: number[], knownSet: Set<number> }} ctx
  * @returns {{ said: string, sentence: string }[]}
@@ -501,18 +522,9 @@ export function critiqueScript(o) {
       const bad = inventedNumbersIn(a.text, { known, knownSet }).map((f) => `${f.said} ("${f.sentence.slice(0, 90)}")`);
       if (bad.length) add("critique.inventedNumber", "block", a.id, bad, `These numbers in act ${a.id} are not in the sources: ${bad.slice(0, 8).join("; ")}. Use only numbers the SOURCE gives, or cut the sentence.`);
       // Names: capitalised words inside a sentence that no source has.
-      const unknown = new Set();
-      const places = new Set();
-      for (const s of sentencesOf(a.text)) {
-        const ws = s.replace(/["“”‘’]/g, " ").split(/\s+/).filter(Boolean);
-        ws.forEach((w, i) => {
-          const bare = w.replace(/^[^A-Za-z]+|[^A-Za-z.]+$/g, "").replace(/\.$/, "").replace(/'s$/, "");
-          if (i === 0 || !/^[A-Z][A-Za-z.'-]+$/.test(bare)) return;
-          const k = bare.toLowerCase();
-          if (COMMON_PROPER.has(k) || title.has(k) || nsource.includes(` ${normalize(bare)} `)) return;
-          (GEOGRAPHY.has(k) ? places : unknown).add(bare);
-        });
-      }
+      const found = unsourcedNamesIn(a.text, { nsource, title });
+      const unknown = new Set(found.filter((f) => !f.place).map((f) => f.name));
+      const places = new Set(found.filter((f) => f.place).map((f) => f.name));
       if (unknown.size) add("critique.unsourcedName", "block", a.id, [...unknown], `These names in act ${a.id} are in no source: ${[...unknown].slice(0, 10).join(", ")}. Name only people, firms, places and things the SOURCE names.`);
       if (places.size) add("critique.unsourcedPlace", "revise", a.id, [...places], `These places in act ${a.id} are common geography but in no source: ${[...places].slice(0, 10).join(", ")}. Keep a place only where the SOURCE supports it.`);
     }
@@ -569,15 +581,17 @@ export const REPAIR_MAX_SHARE = 0.1;
  * (official names are not repeats); a sentence the story editor (the brain read) named as a logic gap is dropped;
  * a sentence holding a cliche or a hedge is dropped. Questions are never dropped. If more than a tenth of the
  * words would go, nothing is changed and `ok` is false: that script is bad, not fixable.
- * @param {Act[]} acts @param {{ sources: string[], brain?: BrainRead | null }} o
- * @returns {{ ok: boolean, acts: Act[], removed: { act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" }[], share: number }}
+ * @param {Act[]} acts @param {{ sources: string[], title?: string, brain?: BrainRead | null }} o
+ * @returns {{ ok: boolean, acts: Act[], removed: { act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" | "name" }[], share: number }}
  */
 export function repairScript(acts, o) {
   const source = o.sources.join("\n\n");
   const known = numbersIn(source).map((n) => n.value);
   const ctx = { known, knownSet: new Set(known) };
+  const nsource = ` ${normalize(source)} `;
+  const title = new Set(words(o.title ?? ""));
   const n = CRITIC_LIMITS.ngram;
-  /** @type {{ act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" }[]} */
+  /** @type {{ act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" | "name" }[]} */
   const removed = [];
   /** @type {Set<string>} */
   const seen = new Set();
@@ -588,6 +602,7 @@ export function repairScript(acts, o) {
       const isQuestion = /\?["”’]?$/.test(s);
       if (!isQuestion && inventedNumbersIn(s, ctx).length) { removed.push({ act: a.id, sentence: s, why: "number" }); return false; }
       if (isQuestion) return true;
+      if (unsourcedNamesIn(s, { nsource, title }).length) { removed.push({ act: a.id, sentence: s, why: "name" }); return false; }
       const gaps = (o.brain?.chapters ?? []).filter((c) => String(c.chapter) === String(a.id)).flatMap((c) => c.gaps ?? []);
       if (gaps.some((g) => g?.problem && g?.sentence && normalize(s).includes(normalize(g.sentence)))) { removed.push({ act: a.id, sentence: s, why: "logic" }); return false; }
       if (phrasesIn(s, CLICHES).length || phrasesIn(s, HEDGES).length) { removed.push({ act: a.id, sentence: s, why: "filler" }); return false; }
