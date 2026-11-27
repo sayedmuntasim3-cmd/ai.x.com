@@ -30,10 +30,15 @@ def key(url):
     return hashlib.sha1(url.encode("utf-8")).hexdigest()
 
 
+DEADLINE = [None]
+
+
 def fetch(url, folder):
     path = os.path.join(folder, key(url) + ".img")
     if os.path.exists(path) and os.path.getsize(path) > 0:
         return path
+    if DEADLINE[0] and time.time() > DEADLINE[0]:
+        return None  # the time budget is spent: a picture not fetched yet keeps the plan's pick
     # Three tries: a cold run asks a CDN for ~2000 thumbnails and some answer late (film 993f09ea: 1536 of 2098 at one try).
     for attempt in range(3):
         try:
@@ -100,6 +105,8 @@ def score(req_path, out_path):
 
     t0 = time.time()
     req = json.load(open(req_path))
+    # A time budget: the ranking stops taking new pictures when it is spent; what it did not see keeps the plan's pick.
+    DEADLINE[0] = t0 + float(req.get("budget_seconds") or 1500)
     cache = req.get("cache") or os.path.expanduser("~/.cache/zupona/asset-rank")
     thumbs = os.path.join(cache, "thumbs")
     embs = os.path.join(cache, "emb")
@@ -145,6 +152,9 @@ def score(req_path, out_path):
             return (e / e.norm(dim=-1, keepdim=True)).numpy()
 
     for i in range(0, len(todo), 64):
+        if time.time() > DEADLINE[0]:
+            print("rank.py: the time budget is spent; %d picture(s) not looked at" % (len(todo) - i), file=sys.stderr)
+            break
         batch = todo[i:i + 64]
         try:
             e = encode(batch)

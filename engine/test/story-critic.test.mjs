@@ -133,3 +133,38 @@ test("every critic finding has an English and a Bangla message", () => {
     assert.ok(/[ঀ-৿]/.test(m.bn({ chapter: "C1", count: 1, list: "x", question: "q", round: 1, max: 2, codes: "a" })), code);
   }
 });
+
+import { clockTime, inventedNumbersIn, numbersIn as numbersInX, repairScript as repairX, repeatedPassages as repeatsX } from "../src/story-critic.mjs";
+
+test("a clock time said in words matches the digits the source gives", () => {
+  assert.deepEqual(clockTime(["one", "thirty"]), { hour: 1, minute: 30 });
+  assert.deepEqual(clockTime(["eleven", "forty", "five"], " p.m."), { hour: 11, minute: 45 });
+  assert.equal(clockTime(["twelve", "fifty"], " and the bridge"), null, "twelve fifty could be a year");
+  assert.equal(clockTime(["nineteen", "forty"]), null);
+  const said = numbersInX("The call came at one thirty in the morning.").map((n) => n.value);
+  assert.deepEqual(said, [1, 30]);
+  const known = numbersInX("The call came at 1:30 a.m.").map((n) => n.value);
+  assert.equal(inventedNumbersIn("The call came at one thirty in the morning.", { known, knownSet: new Set(known) }).length, 0);
+});
+
+test("an official name said twice is not a repeat; ordinary words said twice are", () => {
+  const name = "The Board of Water and Power Commissioners of the city met.";
+  const acts = [{ id: "C1", text: `${name} Later, the Board of Water and Power Commissioners of the city met again.` }];
+  assert.equal(repeatsX(acts).length, 0);
+  const twice = [{ id: "C1", text: "The engineers checked every rivet along the lower chord of the span that night. Then the engineers checked every rivet along the lower chord of the span again." }];
+  assert.ok(repeatsX(twice).length > 0);
+});
+
+test("the repair drops the invented-number sentence and the second copy, and refuses a script it would gut", () => {
+  const sources = ["The dam failed at 11:57 p.m. in 1928. It held 12,000 acre feet."];
+  const adj = ["tall", "grim", "quiet", "wet", "old", "proud", "tired", "stern", "pale", "brisk", "calm", "weary", "bold", "lean", "stout", "keen", "dim", "warm", "cold", "dry", "slow", "swift", "grey", "bright", "dull"];
+  const noun = ["bolt", "gate", "pier", "ramp", "beam", "shaft", "valve", "spill", "chute", "wall", "dock", "tower", "yard", "mill", "road", "bank", "weir", "lock", "mast", "kiln", "forge", "loft", "barn", "shed", "cart"];
+  const filler = adj.map((a, i) => `The ${a} crew inspected the ${noun[i]} beside the ${noun[(i + 7) % 25]} and wrote it down.`).join(" ");
+  const acts = [{ id: "C1", text: `${filler} The dam failed in 1928 near midnight. The keeper walked the crest at 4821 paces every night before it failed. The engineers checked every rivet along the lower chord of the span that night.\n\nThe engineers checked every rivet along the lower chord of the span that night again. The dam held many acre feet.` }];
+  const fx = repairX(acts, { sources });
+  assert.ok(fx.ok, `share ${fx.share}`);
+  assert.deepEqual(fx.removed.map((r) => r.why).sort(), ["number", "repeat"]);
+  assert.ok(!/4821/.test(fx.acts[0].text) && fx.acts[0].text.includes("The dam failed in 1928"));
+  const gutted = repairX([{ id: "C1", text: "The keeper counted 4821 paces. The keeper counted 9137 paces. A short line." }], { sources });
+  assert.equal(gutted.ok, false);
+});

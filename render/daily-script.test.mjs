@@ -139,3 +139,29 @@ test("the story critic before narration: a padded, question-less script is sent 
   assert.ok(critic.rounds[0].findings.some((/** @type {any} */ f) => f.code === "critique.noQuestion" && f.message.bn));
   assert.ok(fs.existsSync(`${dir}/script-rejected.md`));
 });
+
+import { makeLanes } from "./daily-script.mjs";
+
+test("three models take three big calls at once; the fourth waits for a minute to slide out", async () => {
+  let t = 0;
+  const slept = [];
+  const lanes = makeLanes({ models: ["a", "b", "c"], now: () => t, sleep: async (ms) => { slept.push(ms); t += ms; } });
+  const got = [await lanes.acquire(6500), await lanes.acquire(6500), await lanes.acquire(6500)];
+  assert.deepEqual([...got].sort(), ["a", "b", "c"]);
+  assert.equal(slept.length, 0);
+  const fourth = await lanes.acquire(6500);
+  assert.ok(slept.length >= 1 && t >= 60_000, "the fourth call waited for the first minute to end");
+  assert.ok(["a", "b", "c"].includes(fourth));
+});
+
+test("a busy model rests and a spent model is out", async () => {
+  let t = 0;
+  const lanes = makeLanes({ models: ["a", "b"], now: () => t, sleep: async (ms) => { t += ms; } });
+  lanes.rest("a", 30_000);
+  assert.equal(await lanes.acquire(1000), "b");
+  lanes.spend("b");
+  t += 31_000;
+  assert.equal(await lanes.acquire(1000), "a");
+  lanes.spend("a");
+  await assert.rejects(lanes.acquire(1000), /day is used up/);
+});
