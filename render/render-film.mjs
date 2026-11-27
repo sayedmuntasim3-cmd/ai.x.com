@@ -886,7 +886,12 @@ export async function renderFilm(o) {
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
   });
   // A browser that never started was already reported (designed graphics off); closing it must not throw again.
-  if (browser) await browser.then((b) => b.close(), () => {});
+  // The close is bounded: a wedged browser is left to the process exit, never a hang of the render.
+  if (browser) {
+    /** @type {any} */ let timer;
+    await Promise.race([browser.then((b) => b.close(), () => {}), new Promise((r) => { timer = setTimeout(r, 15_000); })]).catch(() => {});
+    clearTimeout(timer);
+  }
   // 1b. Transitions that need the shot before: a whip, a slide or a zoom from its last frame into this shot.
   // The shot keeps its length (the move happens over its first frames), so the film's clock never shifts.
   for (let i = Math.max(1, first); i < (o.joinParts ? 0 : range.end); i += 1) {

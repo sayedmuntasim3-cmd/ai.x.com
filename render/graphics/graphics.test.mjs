@@ -84,3 +84,58 @@ test("depth: the Edit Director's move picks the camera", () => {
   assert.equal(depthMoveFor({ kind: "hold", amount: 0 }, 0).kind, "rack");
   assert.deepEqual([0, 1, 2].map((i) => depthMoveFor(undefined, i).kind), ["dolly", "orbit", "rack"]);
 });
+
+// A wedged browser page or an ffmpeg that stops reading must fail the graphic in bounded time (the render then
+// draws the ffmpeg card), never hang the film: the CI hang of PR #68 sat in exactly these waits.
+import { renderGraphic } from "./render-graphic.mjs";
+import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+/** A fake browser: `evaluate` can be made to never answer; every screenshot is 1 MB (more than a pipe holds). */
+function fakeBrowser({ wedged = false } = {}) {
+  const closed = { ctx: 0 };
+  const page = {
+    setContent: async () => {},
+    evaluate: async () => (wedged ? new Promise(() => {}) : undefined),
+    screenshot: async () => Buffer.alloc(1 << 20),
+  };
+  return { closed, browser: { newContext: async () => ({ newPage: async () => page, close: async () => { closed.ctx += 1; } }) } };
+}
+
+/** A stand-in ffmpeg: a shell script (it never reads its input, or it exits at once). @param {string} body */
+function fakeFfmpeg(dir, body) {
+  const f = join(dir, "ffmpeg.sh");
+  writeFileSync(f, `#!/bin/sh\n${body}\n`);
+  chmodSync(f, 0o755);
+  return f;
+}
+
+test("graphics: a page that never answers fails in bounded time and the page is closed", { timeout: 20_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-graphic-"));
+  try {
+    const { browser, closed } = fakeBrowser({ wedged: true });
+    const t0 = Date.now();
+    await assert.rejects(renderGraphic({ template: "kinetic", data: { text: "Hoover Dam" }, out: join(dir, "g.mp4"), frames: 3, browser, ffmpeg: fakeFfmpeg(dir, "cat > /dev/null"), timeoutMs: 400 }), /did not finish in time/);
+    assert.ok(Date.now() - t0 < 5_000);
+    assert.equal(closed.ctx, 1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("graphics: an ffmpeg that stops reading (the pipe never drains) fails in bounded time", { timeout: 20_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-graphic-"));
+  try {
+    const { browser } = fakeBrowser();
+    const t0 = Date.now();
+    await assert.rejects(renderGraphic({ template: "kinetic", data: { text: "Hoover Dam" }, out: join(dir, "g.mp4"), frames: 5, browser, ffmpeg: fakeFfmpeg(dir, "exec sleep 30"), timeoutMs: 600 }), /did not finish in time/);
+    assert.ok(Date.now() - t0 < 5_000);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("graphics: an ffmpeg that exits at once is reported as a failed encode, never an unhandled pipe error", { timeout: 20_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-graphic-"));
+  try {
+    const { browser } = fakeBrowser();
+    await assert.rejects(renderGraphic({ template: "kinetic", data: { text: "Hoover Dam" }, out: join(dir, "g.mp4"), frames: 5, browser, ffmpeg: fakeFfmpeg(dir, "echo broken >&2; exit 1"), timeoutMs: 5_000 }), /ffmpeg graphic encode failed: broken/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
