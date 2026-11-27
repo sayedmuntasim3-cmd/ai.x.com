@@ -165,3 +165,21 @@ test("a busy model rests and a spent model is out", async () => {
   lanes.spend("a");
   await assert.rejects(lanes.acquire(1000), /day is used up/);
 });
+
+import { brainCall as brainCallX } from "./daily-script.mjs";
+
+test("a model whose daily tokens ran out rests and comes back; the film is not stopped", async () => {
+  let t = 0;
+  const lanes = makeLanes({ models: ["a", "b"], now: () => t, sleep: async (ms) => { t += ms; } });
+  let aCalls = 0;
+  const fetchBrain = async (_url, init) => {
+    const body = JSON.parse(String(init.body));
+    if (body.model === "a" && aCalls++ < 1) return new Response(JSON.stringify({ error: 'Groq: no model took the request; tried a (day used up)' }), { status: 429 });
+    return new Response(JSON.stringify({ text: `from ${body.model}`, model: body.model }), { status: 200 });
+  };
+  const state = { calls: [], lanes };
+  // "a" is the emptier model first; its day-used-up answer rests it and the call goes to "b".
+  const r = await brainCallX({ site: "https://s", id: "i", ticket: "t", fetch: fetchBrain }, { system: "", prompt: "p", maxTokens: 100 }, state);
+  assert.equal(r.model, "b");
+  assert.ok(!lanes.spent.has("a"), "rested, not out for good");
+});
