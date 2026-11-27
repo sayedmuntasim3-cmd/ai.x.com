@@ -63,12 +63,12 @@ import {
 import { FoxMark, HeroMountains, PosterArt } from "./art";
 import { Select } from "./select";
 import { Library } from "./library";
-import { VoiceFilm } from "./voice-film";
+import { MyFilms, VoiceFilm } from "./voice-film";
+import { MAX_UPLOAD_BYTES, UPLOAD_ACCEPT, pageSay } from "./voice-upload.mjs";
 
 const DRAFT_KEY = "zupona:studio-draft:v1";
 const THEME_KEY = "zupona:theme";
 const IDEA_MAX = 500;
-const MAX_AUDIO_BYTES = 200 * 1024 * 1024;
 const PREVIEW_SECONDS = 12;
 
 const container = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8";
@@ -86,6 +86,11 @@ type Draft = {
   style: StyleId;
   music: MusicId;
   topic: string;
+  /** Voice → Video: a voiceover documentary, or a Quran recitation. */
+  voiceKind: "narration" | "quran";
+  /** Quran only: which surah (1-114) and who recites it. A recitation is never guessed. */
+  surah: string;
+  reciter: string;
   /** true once the visitor picks an idea system by hand; until then it follows the idea's words */
   categoryLocked: boolean;
 };
@@ -99,6 +104,9 @@ const DEFAULT_DRAFT: Draft = {
   style: "cinematic",
   music: "epic",
   topic: "",
+  voiceKind: "narration",
+  surah: "",
+  reciter: "",
   categoryLocked: false,
 };
 
@@ -120,6 +128,9 @@ function readDraft(): Partial<Draft> {
     out.age = pick(saved.age, AGES);
     out.style = pick(saved.style, STYLES);
     out.music = pick(saved.music, MUSIC);
+    if (saved.voiceKind === "narration" || saved.voiceKind === "quran") out.voiceKind = saved.voiceKind;
+    if (typeof saved.surah === "string") out.surah = saved.surah.replace(/\D/g, "").slice(0, 3);
+    if (typeof saved.reciter === "string") out.reciter = saved.reciter.slice(0, 80);
     return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined)) as Partial<Draft>;
   } catch {
     return {};
@@ -226,6 +237,9 @@ export default function Landing() {
     idea: draft.mode === "idea" ? draft.idea.trim() : draft.topic.trim(),
     voiceName: voice?.name,
     voiceUrl: voice?.url,
+    voiceKind: draft.voiceKind,
+    surah: draft.surah,
+    reciter: draft.reciter,
     runtime: formatRuntime(totalSeconds),
     category: category.label,
     age: findOption(AGES, draft.age).label,
@@ -405,7 +419,7 @@ function Composer(props: ComposerProps) {
   const { draft, update, voiceLocked, totalSeconds, credits, onCreate, flash, setError } = props;
   const tabs: { id: Mode; label: string; icon: ReactNode }[] = [
     { id: "idea", label: "Idea", icon: <BulbIcon size={21} /> },
-    { id: "voice", label: "Voiceover", icon: <MicIcon size={21} /> },
+    { id: "voice", label: "Voice → Video", icon: <MicIcon size={21} /> },
   ];
 
   const selectMode = (mode: Mode) => {
@@ -793,8 +807,8 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
       setError("That file doesn't look like audio. Try an MP3, WAV, M4A or OGG file.");
       return;
     }
-    if (file.size > MAX_AUDIO_BYTES) {
-      setError("That file is larger than 200 MB. Try a shorter or compressed recording.");
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError("That file is larger than 2 GB. Export it as MP3 or M4A (a 40-minute MP3 is about 40 MB).");
       return;
     }
     const url = URL.createObjectURL(file);
@@ -810,7 +824,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
       // A recording longer than the studio takes is refused with its real length, never shortened silently.
       if (seconds > MAX_MINUTES * 60) {
         URL.revokeObjectURL(url);
-        setError(`That recording is ${formatRuntime(seconds)} long; the studio takes up to ${MAX_MINUTES / 60} hours. Split it into parts.`);
+        setError(pageSay("voice.page.tooLong", { time: formatRuntime(seconds) }));
         return;
       }
       setError("");
@@ -886,8 +900,57 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
 
   return (
     <div id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" className="mt-6">
-      <p className="text-[17px] font-medium text-ink">Add your narration</p>
-      <p className="mt-1 text-[14px] leading-relaxed text-muted">Zupona builds the visuals around your voice, and the film runs as long as you speak.</p>
+      <p className="text-[17px] font-medium text-ink">Voice → Video</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-muted">Send a recording from your phone and get the film back: the visuals follow your voice, and the film runs as long as you speak.</p>
+
+      {/* Kind: a voiceover documentary, or a Quran recitation. One choice, asked once here. */}
+      <div role="radiogroup" aria-label="Kind" className="mt-3 grid gap-2">
+        {(["narration", "quran"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="radio"
+            aria-checked={draft.voiceKind === k}
+            onClick={() => {
+              update("voiceKind", k);
+              setError("");
+            }}
+            className={`flex h-11 w-full items-center justify-center rounded-full border px-4 text-[14.5px] font-medium transition ${
+              draft.voiceKind === k ? "border-transparent bg-brand-gradient text-white shadow-cta" : "border-line-strong text-ink-2 hover:border-ink/40 hover:text-ink"
+            }`}
+          >
+            {pageSay(k === "quran" ? "voice.page.kindQuran" : "voice.page.kindNarration")}
+          </button>
+        ))}
+      </div>
+
+      {draft.voiceKind === "quran" && (
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-[13px] font-medium text-ink">Surah (1-114)</span>
+            <input
+              inputMode="numeric"
+              value={draft.surah}
+              onChange={(e) => update("surah", e.target.value.replace(/\D/g, "").slice(0, 3))}
+              placeholder="e.g. 93"
+              className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none focus:border-brand"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[13px] font-medium text-ink">Reciter</span>
+            <input
+              value={draft.reciter}
+              maxLength={80}
+              onChange={(e) => update("reciter", e.target.value.slice(0, 80))}
+              placeholder="e.g. Mishary"
+              className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none focus:border-brand"
+            />
+          </label>
+          <p className="col-span-2 text-[12.5px] leading-relaxed text-muted">
+            Say which surah: a recitation is never guessed. The exact Uthmani text is used, and a scholar reviews the film before anything is published.
+          </p>
+        </div>
+      )}
 
       {voice ? (
         <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line-strong bg-canvas/50 p-3">
@@ -948,7 +1011,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
             <WaveformIcon size={22} />
           </span>
           <p className="mt-3 text-[15px] font-medium text-ink">Drop an audio file here</p>
-          <p className="mt-0.5 text-[13px] text-muted">MP3, WAV, M4A or OGG · up to 200 MB</p>
+          <p className="mt-0.5 text-[13px] text-muted">{pageSay("voice.page.fileTypes")}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button type="button" onClick={() => fileRef.current?.click()} className={pillButton}>
               <UploadIcon size={18} /> Choose file
@@ -960,7 +1023,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
           <input
             ref={fileRef}
             type="file"
-            accept="audio/*"
+            accept={UPLOAD_ACCEPT}
             tabIndex={-1}
             aria-hidden="true"
             className="hidden"
@@ -988,6 +1051,8 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
         placeholder="e.g. My grandfather's village on the Padma river"
         className="mt-2 h-12 w-full rounded-2xl border border-line-strong bg-canvas/50 px-4 text-[16px] text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-4 focus:ring-brand/15"
       />
+
+      <MyFilms />
     </div>
   );
 }
@@ -1342,6 +1407,9 @@ type Brief = {
   idea: string;
   voiceName?: string;
   voiceUrl?: string;
+  voiceKind?: "narration" | "quran";
+  surah?: string;
+  reciter?: string;
   runtime: string;
   category: string;
   age: string;
@@ -1678,7 +1746,15 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
   if (brief.mode !== "idea") {
     // Voiceover mode: the creator's own recording becomes the film (src/voice-film.tsx).
     return brief.voiceUrl && brief.voiceName ? (
-      <VoiceFilm open={open} fileName={brief.voiceName} voiceUrl={brief.voiceUrl} topic={brief.idea} />
+      <VoiceFilm
+        open={open}
+        fileName={brief.voiceName}
+        voiceUrl={brief.voiceUrl}
+        topic={brief.idea}
+        kind={brief.voiceKind ?? "narration"}
+        surah={brief.surah ? Number(brief.surah) : null}
+        reciter={brief.reciter ?? ""}
+      />
     ) : (
       <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">Add your voiceover first: upload a file or record it.</p>
     );
