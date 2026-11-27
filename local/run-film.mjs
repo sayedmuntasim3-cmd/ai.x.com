@@ -40,6 +40,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { mediaProviders } from "../engine/src/film-media.mjs";
+import { archiveKeys } from "../engine/src/open-archives.mjs";
 import { estimateRun, newFilm, runFilm } from "../engine/src/film-run.mjs";
 import { privateAddress, publicUrl } from "../engine/src/net-guard.mjs";
 import { researchProviders } from "../engine/src/research-desk.mjs";
@@ -171,7 +172,7 @@ export async function produceFilm(o) {
   print(estimate.usdHigh === 0 ? `Cost: none (${estimate.chapters} chapter${estimate.chapters === 1 ? "" : "s"} on your own machine).` : `Estimated cost: $${estimate.usdLow}-$${estimate.usdHigh}.`);
 
   // Bossism's preflight: refuse what cannot work before anything runs, and name every lowered quality.
-  const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY });
+  const media = mediaProviders({ pexelsKey: env.PEXELS_API_KEY, pixabayKey: env.PIXABAY_API_KEY, smithsonianKey: env.SMITHSONIAN_API_KEY , archiveEnv: archiveKeys(env) });
   const manual = o.manual ?? readFileSync(join(ROOT, "prompts/1-zupona-master-engine-full.txt"), "utf8");
   const plan = preflight(productionGraph(understand({ film })), {
     brain: { connected: true, kind: brain.kind, model: brain.model.name, seesPictures: caps.vision !== false, searchesWeb: caps.webSearch !== false, contextTokens: caps.contextTokens, maxOutputTokens: caps.maxOutputTokens },

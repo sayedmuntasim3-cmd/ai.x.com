@@ -1,0 +1,75 @@
+name: Reference prior (weekly)
+
+# Refreshes engine/data/reference-prior.json from the public YouTube metadata of the niche's channels.
+# Free: GitHub minutes + the Worker's read-only /api/videos route (about 1 quota unit per 50 videos; no search.list,
+# no video download, no Claude tokens). Needs the repository secret STUDIO_TOKEN (the same token the studio uses).
+# The result is pushed to a dated branch bot/reference-prior-YYYYMMDD for review: never straight to main.
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print the plan (channels, quota units); call nothing, push nothing"
+        type: boolean
+        default: true
+      pages:
+        description: "Pages of 50 uploads per channel (needs the Worker with pageToken deployed)"
+        default: "4"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reference-prior
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Plan (dry run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        env:
+          PAGES: ${{ inputs.pages }}
+          DRY_RUN: "1"
+        run: node tools/research/engineering-handles.mjs
+      - name: Collect
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        env:
+          STUDIO_TOKEN: ${{ secrets.STUDIO_TOKEN }}
+          PAGES: ${{ github.event_name == 'workflow_dispatch' && inputs.pages || '4' }}
+          OUT: ${{ runner.temp }}/raw.json
+        run: |
+          test -n "$STUDIO_TOKEN" || { echo "::error::Set the STUDIO_TOKEN repository secret"; exit 1; }
+          node tools/research/engineering-handles.mjs
+      - name: Build the prior and test it
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          node tools/research/build-prior.mjs "$RUNNER_TEMP/raw.json" | tee "$RUNNER_TEMP/top15.md"
+          (cd engine && npm ci --silent && node --test test/reference-prior.test.mjs && npm run sync)
+      - uses: actions/upload-artifact@v4
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        with:
+          name: reference-prior
+          path: |
+            engine/data/reference-prior.json
+            docs/research/data/engineering-reference-videos.json
+            ${{ runner.temp }}/top15.md
+      - name: Push for review
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          git config user.name "reference-prior bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add engine/data/reference-prior.json docs/research/data/engineering-reference-videos.json public/studio/engine 2>/dev/null || true
+          git diff --cached --quiet && { echo "No change."; exit 0; }
+          branch="bot/reference-prior-$(date -u +%Y%m%d)"
+          git checkout -b "$branch"
+          git commit -m "data: weekly reference prior refresh"
+          git push origin "$branch"
