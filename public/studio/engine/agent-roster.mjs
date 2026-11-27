@@ -304,7 +304,9 @@ export function getAgent(id) {
  * - "planned": nothing does it yet.
  * Corrected 12 Nov 2026 against the code: entries that later commits had
  * made untrue were fixed, and "built" was added so code that exists but is
- * not reachable is not counted as working.
+ * not reachable is not counted as working. Checked again 27 Nov 2026: the
+ * voice run (local/voice-film.mjs) and the Quran run and render are wired now,
+ * so roles they call are "code" and no longer "built"/"planned".
  * A role is not a separate program: the film run is about a dozen model
  * stages plus code checks, and each role below names the part that does its job.
  * @type {Readonly<Record<string, readonly ["code" | "model" | "built" | "planned", string]>>}
@@ -321,7 +323,7 @@ export const ROLE_STATUS = Object.freeze({
   "research-source-diversity": ["code", "source-check.mjs counts sites per fact and per film; numbers resting on one site are named in S2, under 4 sites is a gap"],
   "research-freshness": ["planned", "no re-check of facts that change over time yet"],
 
-  "story-transcript-integrity": ["built", "voice-scenes.mjs: checkVoiceChapter finds every changed, added or missing word against the recording's transcript and restoreVoiceFields puts the transcript's words and times back; no film run calls it yet (voice mode is not wired)"],
+  "story-transcript-integrity": ["code", "voice-scenes.mjs: checkVoiceChapter finds every changed, added or missing word against the recording's transcript and restoreVoiceFields puts the transcript's words and times back; every voiceover film runs both through planShots (shot-plan.mjs, called by local/voice-film.mjs)"],
   "story-chapter-arc": ["model", "S3; code checks that the chapters tile the film"],
   "story-opening-hook": ["model", "S3 and S5 (30-second hook rule); code reads the hook (no announcing opener, one concrete number, name or place, a first sentence that lands) and what QA leaves wrong is a gap"],
   "story-open-loops": ["code", "S3 loop ledger; code checks every opened loop is paid"],
@@ -420,9 +422,9 @@ export const ROLE_STATUS = Object.freeze({
   "audience-metadata": ["model", "S7 description, chapters and tags"],
   "audience-panel-review": ["model", "the manual's silent expert panel before each stage; after QA a separate viewer panel (five target viewers, no manual, no plan) cold-reads the first two minutes, says where it would leave, and its fixes are kept only if every code check passes"],
 
-  "intake-transcriber": ["planned", "no speech-to-text yet"],
+  "intake-transcriber": ["code", "the voice run transcribes the uploaded audio: local/voice-film.mjs --stt faster-whisper or pocketsphinx gives words with times, and transcript.mjs reads our own JSON, Whisper JSON, ElevenLabs, SRT or VTT; a script film needs no uploaded audio, so it never transcribes"],
   "intake-language-detector": ["code", "studio: content-intel.mjs"],
-  "intake-recitation-identifier": ["built", "quran.mjs: matchRecitation finds the surah, the ayat and each ayah's times in a transcript against the shipped Tanzil text; there is no speech-to-text yet, so no run calls it"],
+  "intake-recitation-identifier": ["code", "the Quran run: quran.mjs matchRecitation finds the surah, the ayat and each ayah's times against the shipped Tanzil text, quran-locate.mjs locateRecitation turns that into the location the run uses, and a passage that could be more than one place lists every place instead of guessing (local/voice-film.mjs --surah/--ayat)"],
   "intake-content-classifier": ["code", "studio: content-intel.mjs"],
   "intake-intent-interpreter": ["code", "studio: spelling fixes and mode"],
   "intake-fact-fiction-judge": ["code", "studio: true story or invented story"],
@@ -442,14 +444,14 @@ export const ROLE_STATUS = Object.freeze({
   "voice-music-supervisor": ["code", "music-kit.mjs (ElevenLabs Music) or, free, score-plan.mjs + score-synth.mjs: an original track per cue from its brief (mood, mode, tempo, instruments); never where the music policy forbids instruments; the mix ducks it under the voice"],
   "voice-mix-engineer": ["code", "renderer mix"],
 
-  "quran-ayah-aligner": ["built", "quran.mjs matchRecitation and quran-film.mjs planQuranFilm: one scene per ayah from the transcript's word times; not wired to a run or a render yet"],
-  "quran-text-guardian": ["built", "quran-film.mjs: the on-screen text is Tanzil's, verbatim by surah:ayah, and checkQuranFilm refuses a plan with changed text; not wired yet"],
-  "quran-reference-checker": ["built", "quran.mjs: a passage found in several places lists every place and goes to review instead of being guessed; not wired yet"],
+  "quran-ayah-aligner": ["code", "voice-understand.mjs planQuranFilm makes one scene per ayah from the transcript's word times and the run keeps them in understanding.json; quran-render.mjs cuts, dissolves and typesets on those ayah times"],
+  "quran-text-guardian": ["code", "quran-film.mjs: the on-screen text is Tanzil's, verbatim by surah:ayah, and checkQuranFilm refuses a plan with changed text; the Quran run calls it (voice-understand.mjs) and quran-render.mjs sets only that text"],
+  "quran-reference-checker": ["code", "quran.mjs matchRecitation and quran-film.mjs planQuranFilm: a passage that could be more than one place goes to review with every place it could be, and checkQuranFilm checks every planned ayah against the Tanzil text; the Quran run calls both (voice-understand.mjs)"],
   "quran-translation-curator": ["planned", "Quran films are not made yet"],
   "quran-meaning-researcher": ["planned", "Quran films are not made yet"],
   "quran-visual-matcher": ["planned", "Quran films are not made yet"],
   "quran-visual-adab-guard": ["planned", "quran-film.mjs lists the rules (no depiction, no faces), but no picture is chosen for a Quran film yet, so nothing checks one; the owner's questions on imagery are open (docs/STUDIO_STATUS.md section 6)"],
-  "quran-recitation-editor": ["built", "quran-film.mjs: cuts only in the quiet between ayat and checkQuranFilm refuses any cut inside an ayah or any sound under the recitation; not wired yet"],
+  "quran-recitation-editor": ["code", "quran-film.mjs: cuts fall in the quiet between ayat and checkQuranFilm refuses any cut inside an ayah or any sound under the recitation; the run calls checkQuranFilm (voice-understand.mjs) and quran-render.mjs dissolves only on those pauses"],
   "quran-arabic-typographer": ["planned", "Quran films are not made yet"],
   "quran-islamic-reviewer": ["planned", "Quran films are not made yet"],
 

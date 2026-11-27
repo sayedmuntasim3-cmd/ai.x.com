@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { checkMoneyPath, FICTION_LABELS, lintNarration, planStory, usMinimumWage } from "../src/story-mode.mjs";
 import { AGENTS, SQUADS, getAgent } from "../src/agent-roster.mjs";
@@ -125,12 +126,36 @@ test("every agent's real status is recorded: code, a Claude stage, or not built 
   assert.equal(Object.keys(ROLE_STATUS).length, AGENTS.length, "no status for a role that does not exist");
   const all = rosterStatus();
   assert.equal(all.code + all.model + all.built + all.planned, all.total);
-  assert.ok(AGENTS.filter((a) => a.squadId === "quran").every((a) => ["built", "planned"].includes(ROLE_STATUS[a.id][0])), "Quran films are not made yet, so no Quran role is counted as working");
-  assert.ok(["intake-transcriber", "voice-repair-engineer"].every((id) => ROLE_STATUS[id][0] === "planned"), "no speech-to-text and no noise repair exist yet");
+  // 27 Nov 2026: the Quran run and render are wired, so the roles that run calls are code, not built/planned.
+  const quranWired = ["quran-ayah-aligner", "quran-text-guardian", "quran-reference-checker", "quran-recitation-editor"];
+  assert.ok(quranWired.every((id) => ROLE_STATUS[id][0] === "code"), "the roles the Quran run calls are counted as working");
+  const quranUnwired = ["quran-translation-curator", "quran-meaning-researcher", "quran-visual-matcher", "quran-visual-adab-guard", "quran-arabic-typographer", "quran-islamic-reviewer"];
+  assert.ok(quranUnwired.every((id) => ROLE_STATUS[id][0] === "planned"), "a Quran role no run reaches is still planned");
+  assert.equal(ROLE_STATUS["intake-transcriber"][0], "code", "the voice run transcribes its own audio");
+  assert.equal(ROLE_STATUS["voice-repair-engineer"][0], "planned", "no noise repair exists yet");
+  assert.equal(ROLE_STATUS["story-transcript-integrity"][0], "code", "every voiceover film restores and checks the transcript's words");
   assert.ok(["arabic", "bangla"].every((l) => ROLE_STATUS[`versions-${l}-writer`][0] === "planned"), "only English runs today");
   const { planRun } = await import("../src/pipeline.mjs");
   const plan = planRun({ contentType: "documentary" });
   assert.equal(plan.working.total, plan.agentsUsed);
   assert.equal(plan.stageWorking.length, plan.stages.length);
   assert.ok(plan.working.planned > 0, "the plan admits what is not built");
+});
+
+test("a role marked code is reachable from a run, not only tested in its own module", () => {
+  const read = (/** @type {string} */ rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+  const voiceRun = read("../../local/voice-film.mjs");
+  const shotPlan = read("../src/shot-plan.mjs");
+  const understand = read("../src/voice-understand.mjs");
+  // story-transcript-integrity: the voice run's plan restores and checks the transcript's words.
+  assert.match(voiceRun, /planShots\b/, "local/voice-film.mjs plans its shots");
+  assert.match(shotPlan, /restoreVoiceFields\(/, "shot-plan.mjs puts the transcript's words back");
+  assert.match(shotPlan, /checkVoiceChapter\(/, "shot-plan.mjs checks the transcript's words");
+  // intake-transcriber: the voice run transcribes with an STT engine.
+  assert.match(voiceRun, /faster-whisper|pocketsphinx/, "the voice run has a speech-to-text engine");
+  // The Quran roles: the run plans the film per ayah and checks it.
+  assert.match(voiceRun, /quranVisualAdabGuard\(|planQuranFilm\(|locateRecitation\(/, "the Quran run builds its plan");
+  assert.match(understand, /planQuranFilm\(/, "voice-understand.mjs plans one scene per ayah");
+  assert.match(understand, /checkQuranFilm\(/, "voice-understand.mjs checks the Quran plan");
+  assert.match(read("../../render/quran-render.mjs"), /understanding\.json/, "the Quran render reads the ayah plan");
 });
