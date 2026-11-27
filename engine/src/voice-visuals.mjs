@@ -10,6 +10,7 @@
  * Quran recitation has its own rules: quranVisualAdabGuard.
  */
 import { canSee } from "./film-run.mjs";
+import { roleCraft } from "./role-craft.mjs";
 import { chapterMedia, FREE_LICENCES } from "./film-media.mjs";
 import { msg } from "./messages.mjs";
 import { parseSceneLines } from "./scene-lines.mjs";
@@ -346,7 +347,7 @@ export async function planVoiceVisuals(o) {
       try {
         answered += await runFitting(batch, async (part) => {
           const text = part.map((s) => lineOf.get(s.sc)).join("\n");
-          const reply = await /** @type {Model} */ (o.brain).call({ stage: "V4", system: [{ text: VOICE_VISUALS_SYSTEM, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: Math.min(32000, 400 + part.length * 260), effort: "medium" });
+          const reply = await /** @type {Model} */ (o.brain).call({ stage: "V4", system: [{ text: `${VOICE_VISUALS_SYSTEM}\n\n${roleCraft("V4")}`, cache: true }], messages: [{ role: "user", content: [{ text: `${brief}\n\n${text}` }] }], maxTokens: Math.min(32000, 400 + part.length * 260), effort: "medium" });
           parts.push(reply.text ?? "");
         });
       } catch (e) {
