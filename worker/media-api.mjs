@@ -17,6 +17,9 @@ function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
 }
 
+/** NARA's terms forbid caching its results: an answer holding any is never stored. @param {string} text */
+const noStore = (text) => /"source":"nara"/.test(text);
+
 /** Only the string values of the Worker environment (vars and secrets), never bindings. @param {Record<string, unknown>} env */
 function stringEnv(env) {
   return /** @type {Record<string, string>} */ (Object.fromEntries(Object.entries(env).filter(([, v]) => typeof v === "string")));
@@ -75,12 +78,12 @@ export async function handleMedia(request, url, env, deps = {}) {
   if (!stream) {
     const result = await (deps.search ?? searchMedia)(/** @type {any} */ (options), menv);
     const body = JSON.stringify(result);
-    if (result.sources?.some((/** @type {any} */ s) => s.status === "ok" || s.status === "empty")) keep(body, "application/json; charset=utf-8");
+    if (result.sources?.some((/** @type {any} */ s) => s.status === "ok" || s.status === "empty") && !noStore(body)) keep(body, "application/json; charset=utf-8");
     return new Response(body, { headers: { "content-type": "application/json; charset=utf-8", ...headers } });
   }
   const [toClient, toCache] = /** @type {ReadableStream} */ ((deps.stream ?? streamMedia)(/** @type {any} */ (options), menv)).tee();
   if (cache && deps.waitUntil) {
-    deps.waitUntil(new Response(toCache).text().then((text) => { if (/"status":"(ok|empty)"/.test(text)) keep(text, "application/x-ndjson; charset=utf-8"); }));
+    deps.waitUntil(new Response(toCache).text().then((text) => { if (/"status":"(ok|empty)"/.test(text) && !noStore(text)) keep(text, "application/x-ndjson; charset=utf-8"); }));
   } else {
     toCache.cancel().catch(() => {});
   }
