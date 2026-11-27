@@ -24,7 +24,7 @@ import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
 /** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
-import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, rideSections, scoreReport, voiceRideExpression, voiceWindows } from "./mix.mjs";
+import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 import { critique, measureFilm, measurePicture } from "./critic.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1124,21 +1124,19 @@ export async function renderFilm(o) {
   // the music is not following the story there, and the report says so.
   const score = scoreReport({ music: t.music, video: t.video, sfx: t.sfx });
   if (score.unmarked.length) warnings.push(`Music does not mark ${score.unmarked.length} chapter turn(s) at ${score.unmarked.map((x) => `${x.toFixed(1)} s`).join(", ")}: no new cue and no riser.`);
-  // The narrator's fader: every chapter opens softer and the voice comes up (a held level measured 1.3 LU of loudness range).
-  const ride = voiceRideExpression(rideSections(t));
   const parts = [];
   const layers = [];
   if (musicIn > 0) {
-    parts.push(`[1:a]aformat=channel_layouts=stereo,volume='${ride}':eval=frame,asplit=2[voice][key]`);
+    parts.push(`[1:a]aformat=channel_layouts=stereo,asplit=2[voice][key]`);
     parts.push(`[${musicIn}:a]aformat=channel_layouts=stereo,volume='${musicGainExpression(duckPlan)}':eval=frame[bed]`);
     parts.push(`[bed][key]sidechaincompress=threshold=0.03:ratio=12:attack=8:release=320:makeup=1[ducked]`);
     layers.push("[voice]", "[ducked]");
-  } else { parts.push(`[1:a]aformat=channel_layouts=stereo,volume='${ride}':eval=frame[voice]`); layers.push("[voice]"); }
+  } else { parts.push(`[1:a]aformat=channel_layouts=stereo[voice]`); layers.push("[voice]"); }
   if (sfxIn > 0) { parts.push(`[${sfxIn}:a]aformat=channel_layouts=stereo[fx]`); layers.push("[fx]"); }
   parts.push(`${layers.join("")}amix=inputs=${layers.length}:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=15[a]`);
   const mix = extra.length
     ? [...extra.flatMap((f) => ["-i", /** @type {string} */ (f)]), "-filter_complex", parts.join(";"), "-map", "0:v", "-map", "[a]"]
-    : ["-map", "0:v", "-map", "1:a", "-af", `volume='${ride}':eval=frame,loudnorm=I=-14:TP=-1.5:LRA=15`];
+    : ["-map", "0:v", "-map", "1:a", "-af", "loudnorm=I=-14:TP=-1.5:LRA=15"];
   const mux = (/** @type {string[]} */ m) => run(ffmpeg, ["-v", "error", "-y", "-i", videoFile, "-i", narrationFile, ...m, "-c:v", "copy", "-ar", String(SAMPLE_RATE), "-ac", "2", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".part.mp4"]);
   // Loudness normalisation needs sound and at least 3 s; on pure digital silence it yields NaN and the encoder stops.
   const anySound = pieces.some((p) => p.file) || extra.length > 0;

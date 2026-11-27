@@ -80,32 +80,3 @@ test("the ambience of a scene is one level with a hole where the film holds its 
   assert.equal(quietExpression([], 0.12), "0.12");
   assert.equal(quietExpression([{ start: 0, end: 5 }], 0.12, { offset: 9 }), "0.12", "a hole before the piece starts is not in it");
 });
-
-import { chapterWindows, voiceRideDbAt, voiceRideExpression } from "./mix.mjs";
-
-test("the narrator's fader: each chapter opens soft and climbs to full level", () => {
-  const ch = [{ start: 0, end: 100 }, { start: 100, end: 160 }];
-  assert.equal(voiceRideDbAt(0, ch), -7);
-  assert.equal(voiceRideDbAt(40, ch), 0);
-  assert.equal(voiceRideDbAt(60, ch), 0);
-  assert.equal(voiceRideDbAt(100, ch), -7);
-  assert.ok(voiceRideDbAt(112, ch) < 0 && voiceRideDbAt(112, ch) > -7);
-  assert.equal(voiceRideExpression([]), "1");
-  assert.equal(voiceRideExpression([{ start: 0, end: 10 }]), "1", "a chapter under 20 s is left alone");
-  assert.match(voiceRideExpression(ch), /^pow\(10,\(between\(t,0,100\)/);
-});
-
-test("chapter windows run from a titled shot to the next", () => {
-  const w = chapterWindows([{ start: 0, end: 5, chapterTitle: "A" }, { start: 5, end: 40 }, { start: 40, end: 90, chapterTitle: "B" }]);
-  assert.deepEqual(w, [{ start: 0, end: 40 }, { start: 40, end: 90 }]);
-});
-
-import { rideSections } from "./mix.mjs";
-
-test("a voice film with one chapter is ridden by its score cues, cut to sections of at most 150 s", () => {
-  const t = { durationSeconds: 500, video: [{ start: 0, end: 500 }], music: [{ cue: "M01", start: 0, end: 242 }, { cue: "M02", start: 242, end: 500 }] };
-  const w = rideSections(t);
-  assert.ok(w.length >= 4 && w.every((x) => x.end - x.start <= 150.001));
-  assert.equal(w[0].start, 0);
-  assert.ok(Math.abs(w[w.length - 1].end - 500) < 1e-6);
-});
