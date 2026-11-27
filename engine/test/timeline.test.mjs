@@ -202,8 +202,10 @@ test("scene times follow the takes: a long take borrows the spare time of its ch
   const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, edit: /** @type {any} */ ({ chapter: "C1", by: "edit-director", problems: [], scenes: [{ scene: "SC0002", punchIns: [9], shakes: [], hits: [] }] }) }], voice });
   const starts = Object.fromEntries(t.narration.map((n) => [n.scene, [n.start, n.end]]));
   // SC0001 needs 6 s (5.65 + breath), 2 more than written; SC0002 needs 4 of its 6, so it gives 2. The chapter keeps its 13 s.
-  assert.deepEqual(starts.SC0001, [0, 6]);
-  assert.deepEqual(starts.SC0002, [6, 10]);
+  // The narrated span is the take itself, not the scene: the breath the fitter adds after a take is not
+  // narrated time, so a subtitle is never measured against silence it has no words for.
+  assert.deepEqual(starts.SC0001, [0, 5.65]);
+  assert.deepEqual(starts.SC0002, [6, 9.65]);
   assert.equal(t.durationSeconds, 13);
   assert.equal(t.timing?.stretched, 1);
   assert.equal(t.timing?.shortened, 1);

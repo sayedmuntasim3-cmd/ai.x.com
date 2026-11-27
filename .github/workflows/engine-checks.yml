@@ -52,6 +52,8 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
       - run: npm ci
+      - name: Install the graphics engine (Playwright Chromium)
+        run: npx playwright install --with-deps chromium
       - name: Tests (engine, worker, render)
         run: npm test
       - name: Cloudflare build check

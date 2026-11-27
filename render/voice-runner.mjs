@@ -11,11 +11,12 @@
  * Environment: SITE (https://...), VOICE_ID, VOICE_TICKET; RUN_URL (optional, the Actions run page);
  * VOICE_SELFTEST=1 sends nothing (the workflow's self-test).
  */
-import { createWriteStream, existsSync, readFileSync, statSync } from "node:fs";
+import { createWriteStream, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { msg } from "../engine/src/messages.mjs";
 
 /** Must match PART_SIZE in worker/voice-api.mjs (the Worker says it again when an upload opens). */
 const PART_SIZE = 16 * 1024 * 1024;
@@ -40,7 +41,7 @@ const endpoint = (c, path) => `${c.site}/api/voice/${c.id}${path}${path.includes
  * POST JSON to the Worker, retried a few times on a network error or a 5xx.
  * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} path @param {unknown} body @param {string} [method]
  */
-async function send(c, path, body, method = "POST") {
+export async function send(c, path, body, method = "POST") {
   const get = c.fetch ?? fetch;
   let last = "";
   for (let attempt = 1; attempt <= 4; attempt += 1) {
@@ -54,6 +55,27 @@ async function send(c, path, body, method = "POST") {
     await new Promise((r) => setTimeout(r, 2000 * attempt));
   }
   throw new Error(`${method} ${path} failed: ${last}`);
+}
+
+/**
+ * The Craft Ledger through the Worker (R2 channel/craft-ledger.json). Without a report: read it to `out` for
+ * the next shot plan. With a report: record the finished film's critic measures under this recording's id.
+ * Only the critic's verdict and measures travel, never the timeline or licences.
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c
+ * @param {{ out?: string, report?: any, genre?: string }} o
+ */
+export async function ledger(c, o) {
+  if (o.report) {
+    const critic = o.report?.critic ?? null;
+    return send(c, "/ledger", { report: { critic: critic ? { verdict: critic.verdict, measures: critic.measures } : null, durationSeconds: o.report?.durationSeconds ?? null }, ...(o.genre ? { genre: o.genre } : {}) });
+  }
+  const get = c.fetch ?? fetch;
+  const res = await get(endpoint(c, "/ledger"));
+  if (!res.ok) throw new Error(`GET /ledger failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const got = /** @type {any} */ (await res.json());
+  const text = JSON.stringify({ version: got.version, films: got.films ?? [] }, null, 1);
+  if (o.out) writeFileSync(o.out, text + "\n");
+  return { films: (got.films ?? []).length };
 }
 
 /**
@@ -89,7 +111,18 @@ export function summarizeRun(dir) {
 export async function deliver(c, file, o) {
   const bytes = statSync(file).size;
   await send(c, "/progress", { stage: "deliver" });
-  const opened = await send(c, "/film", { bytes });
+  const parts = await uploadParts(c, file, await send(c, "/film", { bytes }), "/film/parts");
+  await send(c, "/film/complete", { parts, seconds: o.seconds });
+  const minutes = o.seconds ? Math.max(1, Math.round(o.seconds / 60)) : 0;
+  await send(c, "/progress", { stage: "done", params: { minutes, ...(o.review ? { review: 1 } : {}) }, ...(o.report ? { report: o.report } : {}) });
+}
+
+/**
+ * Send a file in the pieces an opened upload asked for; returns the parts for "complete".
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} file @param {{ partSize?: number, parts: number }} opened @param {string} path
+ */
+async function uploadParts(c, file, opened, path) {
+  const bytes = statSync(file).size;
   const size = Number(opened.partSize) || PART_SIZE;
   const fh = await open(file, "r");
   const parts = [];
@@ -101,17 +134,61 @@ export async function deliver(c, file, o) {
       const get = c.fetch ?? fetch;
       let done = null;
       for (let attempt = 1; attempt <= 4 && !done; attempt += 1) {
-        const res = await get(endpoint(c, `/film/parts/${n}`), { method: "PUT", body: buf }).catch(() => null);
+        const res = await get(endpoint(c, `${path}/${n}`), { method: "PUT", body: buf }).catch(() => null);
         if (res?.ok) done = await res.json();
         else await new Promise((r) => setTimeout(r, 3000 * attempt));
       }
-      if (!done) throw new Error(`piece ${n} of the film could not be sent`);
+      if (!done) throw new Error(`piece ${n} of ${file} could not be sent`);
       parts.push({ partNumber: done.partNumber, etag: done.etag });
     }
   } finally { await fh.close(); }
-  await send(c, "/film/complete", { parts, seconds: o.seconds });
-  const minutes = o.seconds ? Math.max(1, Math.round(o.seconds / 60)) : 0;
-  await send(c, "/progress", { stage: "done", params: { minutes, ...(o.review ? { review: 1 } : {}) }, ...(o.report ? { report: o.report } : {}) });
+  return parts;
+}
+
+/**
+ * The daily film's narration goes up as the recording; "complete" starts voice-film.yml for it (the Worker).
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} file
+ */
+export async function sendVoice(c, file) {
+  const parts = await uploadParts(c, file, await send(c, "/voice", { bytes: statSync(file).size }), "/parts");
+  return send(c, "/complete", { parts });
+}
+
+/**
+ * The free brain through the Worker (POST /api/voice/:id/brain: Groq first, then the Gemini pool, the Worker's own
+ * keys), as a model for local/voice-film.mjs. Text only and no web search, said in its capabilities, so every stage
+ * takes its own path (canSee/canSearch). A busy minute is waited out; a used-up day stops with the brains' words.
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c
+ * @param {{ sleep?: (ms: number) => Promise<void>, waitMs?: number, log?: (line: string) => void }} [o]
+ */
+export function workerBrain(c, o = {}) {
+  const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const calls = /** @type {{ stage: string, model: string, seconds: number }[]} */ ([]);
+  return {
+    name: "zupona-free-brain (Groq, then Gemini, through the Worker)",
+    capabilities: { vision: false, webSearch: false },
+    calls,
+    /** @param {any} req */
+    async call(req) {
+      const body = { req: { stage: req.stage, system: req.system, messages: req.messages, maxTokens: req.maxTokens } };
+      let last = "";
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        const t0 = Date.now();
+        try {
+          const r = await send(c, "/brain", body);
+          calls.push({ stage: String(req.stage ?? ""), model: String(r.model ?? "?"), seconds: Math.round((Date.now() - t0) / 1000) });
+          return { text: String(r.text ?? ""), stopReason: r.stopReason ?? "end_turn", model: r.model, usage: r.usage ?? { input_tokens: 0, output_tokens: 0 } };
+        } catch (e) {
+          last = e instanceof Error ? e.message : String(e);
+          if (/day used up|per day|PerDay|RESOURCE_EXHAUSTED|daily/i.test(last) && !/busy/i.test(last)) throw Object.assign(new Error(`The free brains' daily limit is used up: ${last.slice(0, 300)}`), { status: 429, daily: true });
+          if (!/ 429 /.test(last)) throw Object.assign(new Error(last.slice(0, 300)), { status: 400 });
+          o.log?.(`free brain busy (${req.stage}); waiting a minute`);
+          await sleep(o.waitMs ?? 61_000);
+        }
+      }
+      throw Object.assign(new Error(`The free brain stayed busy: ${last.slice(0, 300)}`), { status: 503 });
+    },
+  };
 }
 
 async function main() {
@@ -131,6 +208,22 @@ async function main() {
   } else if (a._ === "summary") {
     const only = typeof a.stages === "string" ? a.stages.split(",") : null;
     for (const s of summarizeRun(String(a.run))) if (!only || only.includes(s.stage)) await send(c, "/progress", s);
+  } else if (a._ === "ledger") {
+    // node render/voice-runner.mjs ledger --out run/craft-ledger.json            (read, before the shot plan)
+    // node render/voice-runner.mjs ledger --report out/film.report.json --run run   (record, after the gate)
+    if (typeof a.report === "string") {
+      const report = JSON.parse(readFileSync(a.report, "utf8"));
+      const targets = typeof a.run === "string" && existsSync(join(a.run, "craft-targets.json")) ? JSON.parse(readFileSync(join(a.run, "craft-targets.json"), "utf8")) : null;
+      const done = await ledger(c, { report, genre: targets?.genre ?? report?.critic?.craft?.genre });
+      if (done.note) { const m = msg(done.note.code, done.note.params ?? {}); console.log(`${m.en}\n${m.bn}`); }
+    } else {
+      const done = await ledger(c, { out: String(a.out) });
+      console.log(`craft ledger: ${done.films} film(s) read`);
+    }
+  } else if (a._ === "voice") {
+    // node render/voice-runner.mjs voice --file narration.mp3   (the daily film's narration; the Worker starts the film)
+    const r = await sendVoice(c, String(a.file));
+    console.log(`voice sent; the voiceover film is ${r.status ?? "started"}${r.run?.actionsUrl ? ` (${r.run.actionsUrl})` : ""}`);
   } else if (a._ === "deliver") {
     const report = typeof a.report === "string" && existsSync(a.report) ? JSON.parse(readFileSync(a.report, "utf8")) : null;
     // Quran: the located ayat, so the studio can ask the reviewer for one tap at each ayah end.

@@ -800,13 +800,21 @@ export function buildTimeline(o) {
         const end = spoken ? Math.min(s.end, s.start + spoken) : s.end;
         const placeholders = s.narration.match(PLACEHOLDER) ?? [];
         if (placeholders.length) notes.push(`${s.sc}: narration still has ${placeholders.join(", ")}; resolve the number before recording.`);
-        narration.push({ scene: s.sc, start: s.start, end: s.end, text: s.narration, placeholders });
+        // Speech ends where the voice ends, not where the scene does: the silence after a take is not
+        // narrated time, and a subtitle measured against it reads as a hole that is not there.
+        narration.push({ scene: s.sc, start: s.start, end, text: s.narration, placeholders });
+        /** @type {Caption[]} */
+        let made;
         if (alignment) {
           // The voice's own timings: captions land on the word, sped up exactly as the renderer speeds the voice.
           const tempo = spoken && spoken > s.seconds ? Math.min(MAX_VOICE_TEMPO, spoken / s.seconds) : 1;
           const words = wordsFromAlignment(alignment, s.start, tempo).filter((w) => w.start < s.end).map((w) => ({ ...w, end: Math.min(w.end, s.end) }));
-          captions.push(...(words.length ? captionsFromWords(words) : captionLines(s.narration, s.start, end)));
-        } else captions.push(...captionLines(s.narration, s.start, end));
+          made = words.length ? captionsFromWords(words) : captionLines(s.narration, s.start, end);
+        } else made = captionLines(s.narration, s.start, end);
+        // A caption holds the screen through the pause after its words and to the end of the scene: a hole of
+        // black where the voice is still running is the one subtitle fault a viewer always notices.
+        holdCaptions(made, end);
+        captions.push(...made);
       }
     }
   }
@@ -838,6 +846,22 @@ export function buildTimeline(o) {
     motion: motionReport(moves, governed, profile, level),
     stats: { clips: video.filter((v) => v.type === "clip").length, cards: video.filter((v) => v.type === "card").length, black: video.filter((v) => v.type === "black").length, scenes },
   };
+}
+
+/**
+ * Keep every caption of a scene on screen until the next one starts, and the
+ * last one until the scene ends. The silence between sentences is part of the
+ * scene's speech time, so a caption may not leave a hole there.
+ * @param {Caption[]} captions @param {number} end the scene's end
+ * @returns {Caption[]} the same objects, extended
+ */
+export function holdCaptions(captions, end) {
+  for (let i = 0; i < captions.length; i += 1) {
+    const next = captions[i + 1];
+    const to = next ? next.start : end;
+    if (Number.isFinite(to) && to > captions[i].end) captions[i].end = round3(to);
+  }
+  return captions;
 }
 
 /**

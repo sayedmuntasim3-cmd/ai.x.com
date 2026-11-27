@@ -150,3 +150,52 @@ test("Edit Director on a voiceover chapter: scene-relative times repaired, code 
   assert.equal(q.calls, 1);
   assert.match(q.stopped, /429/);
 });
+
+test("the Edit Director's transition and the shot plan's types reach the renderer's timeline", async () => {
+  const md = [
+    "**SC0001** | 0:00:00-0:00:06 | C1 | NARR: In 1979 he lost his father. | SHOTS: (1) R3 Bengaluru street at dawn | TYPE: live-video",
+    "**SC0002** | 0:00:06-0:00:12 | C1 | NARR: In 1993 he bought a van. | SHOTS: (1) R2 Maruti van in 1993, Bengaluru | TYPE: archival-video",
+  ].join("\n");
+  const edit = { chapter: "C1", scenes: [{ scene: "SC0002", transition: "whip", punchIns: [], shakes: [], hits: [] }] };
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, edit }], autoSound: false });
+  const second = t.video.find((v) => v.scene === "SC0002");
+  assert.ok(second, "the second scene is on the timeline");
+  assert.equal(second.transition, "whip", "the editor's transition is on the shot the renderer draws");
+  assert.equal(second.shotType, "archival-video", "the shot plan's type is on the shot too");
+  assert.equal(t.video.find((v) => v.scene === "SC0001").shotType, "live-video");
+  // Without the edit plan nothing is invented: the script's own TRANS field decides.
+  const plain = buildTimeline({ chapters: [{ id: "C1", markdown: md }], autoSound: false });
+  assert.equal(plain.video.find((v) => v.scene === "SC0002").transition, undefined);
+});
+
+test("a long narration of long sentences: every 45 s gets a moment from the voice's own words (phrases, cross-scene timelines)", async () => {
+  // Ten minutes of long sentences with no commas (as a free narrator's script reads): a whole sentence never fits a card.
+  const long = [
+    "The engineers who designed the slender deck believed that a narrow and shallow girder would be strong enough to carry the traffic across the water for many decades",
+    "Workers on the towers noticed that the roadway rose and fell in the wind long before anyone thought that the motion could become dangerous to the structure",
+    "Construction began in 1938 and the bridge opened to traffic in 1940 after only nineteen months of work on the cables and the deck",
+    "Drivers who crossed the span on windy days described a roller coaster ride because the roadway moved up and down beneath their cars in long slow waves",
+  ];
+  let at = 0;
+  const w2 = [];
+  for (let i = 0; i < 56; i += 1) for (const word of `${long[i % long.length]}.`.split(" ")) { w2.push({ text: word, start: at, end: at + 0.36 }); at += /\.$/.test(word) ? 1.2 : 0.42; }
+  const u2 = understandVoice({ transcript: { words: w2 }, totalSeconds: at + 1 });
+  const sc2 = /** @type {NonNullable<typeof u2.scenes>} */ (u2.scenes);
+  const t2 = "The bridge that moved";
+  const b2 = await planBeats({ scenes: sc2, structure: u2.structure, topic: t2 });
+  const p2 = await planVoiceVisuals({ scenes: sc2, structure: u2.structure, topic: t2 });
+  const plan = planShots({ markdown: p2.markdown, scenes: sc2, beats: b2.beats, world: b2.world, genre: b2.genre, topic: t2, structure: u2.structure });
+  assert.ok(at > 600, `${at} s of voice`);
+  assert.deepEqual(plan.findings.filter((f) => f.code === "design-gap"), []);
+  const designed = plan.shots.filter((s) => DESIGNED_TYPES.includes(s.type));
+  assert.ok(designed.some((s) => s.type === "timeline"), "the years said make a timeline");
+  const said = sc2.map((s) => s.narration).join(" ");
+  for (const s of designed.filter((x) => x.type === "kinetic-type")) assert.ok(said.includes(s.subject), `"${s.subject}" is said`);
+});
+
+test("a card phrase is cut only where the speech breaks, and the one that carries the most is chosen", async () => {
+  const { phraseLine, cardWeight } = await import("../src/shot-plan.mjs");
+  assert.equal(phraseLine("Construction began in September 1938 and the deck was only thirty nine feet wide across the whole span"), "Construction began in September 1938");
+  assert.equal(phraseLine("Two words"), "");
+  assert.ok(cardWeight("Construction began in September 1938") > cardWeight("Despite these measures"));
+});

@@ -6,6 +6,8 @@
  *        [--adab strict|nature|people-distant]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media] [--tighten on|off]
  *        [--marks marks.json]   (Quran: the reviewer's ayah times {start, ends[], by}; they become confirmed ends)
+ *        [--eyes]               (with --media: after the plan, every picture shot is searched again from its own sentence,
+ *                                OpenCLIP chooses, and the critic's free eyes re-pick any miss; render/asset-rank/rerank.mjs)
  *        [--slice 0:00-3:00]    (the test bench: the whole pipeline runs on that stretch of the recording only;
  *                                a --transcript is cut to it and moved to start at 0; slice.json says where it came from)
  * Step 1 (intake): ffmpeg reads any audio file; the original is never changed.
@@ -42,11 +44,14 @@ import { meaningTable, parseTanzilText, passageMeaning, planMeanings } from "../
 import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
-import { planVoiceVisuals, quranVisualAdabGuard, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
-import { DESIGNED_TYPES, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
+import { planVoiceVisuals, quranVisualAdabGuard, respellNames, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
+import { DESIGNED_TYPES, GENRE_RHYTHM, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
+import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom } from "../engine/src/craft-memory.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
-import { groqModel } from "../worker/groq.mjs";
+import { groqLook, groqModel } from "../worker/groq.mjs";
+import { rerankRun } from "../render/asset-rank/rerank.mjs";
+import { workerBrain } from "../render/voice-runner.mjs";
 
 import { planVoice } from "../engine/src/voice-plan.mjs";
 import { ayahEndsOf } from "../engine/src/voice-master.mjs";
@@ -160,6 +165,10 @@ export function voiceBrain(env, o = {}) {
     if (b.ok) return { model: b.model, kind: b.kind === "gemini" && groqOn ? "groq+gemini" : b.kind };
   }
   if (groqOn) return { model: /** @type {any} */ (groqModel({ apiKey: String(env.GROQ_API_KEY), ...(o.fetch ? { fetch: o.fetch } : {}) })), kind: "groq" };
+  // On the GitHub runner the keys stay in the Worker: the free brain is asked through it, with this film's ticket.
+  if (env.SITE && env.VOICE_ID && env.VOICE_TICKET && env.VOICE_SELFTEST !== "1" && String(env.GROQ ?? "").toLowerCase() !== "off") {
+    return { model: /** @type {any} */ (workerBrain({ site: env.SITE, id: env.VOICE_ID, ticket: env.VOICE_TICKET, ...(o.fetch ? { fetch: o.fetch } : {}) }, { log: (l) => console.log(l) })), kind: "worker" };
+  }
   return { model: null, kind: "none" };
 }
 
@@ -401,7 +410,7 @@ export async function understand(o) {
 /**
  * Step 4. With a free brain (voiceBrain: Groq, then the Gemini pool) the plan is written in batches of
  * whole sections; without one, or for scenes past its quota, it comes from each scene's own words.
- * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null }} o
+ * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null, ledger?: import("../engine/src/craft-memory.mjs").Ledger | null, ledgerFile?: string, filmId?: string }} o
  */
 export async function pictures(o) {
   const u = o.understanding;
@@ -429,10 +438,16 @@ export async function pictures(o) {
   const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The shot plan (shots.json): every shot typed, re-cut to the genre's rhythm, designed moments on the voice's own lines.
-  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure });
+  // The Craft Ledger: the targets earlier films taught for this genre (never looser than the house), read by the
+  // shot plan here and by the renderer's critic through craft-targets.json.
+  const doctrine = calibratedDoctrine(o.ledger ?? emptyLedger(), ledgerGenre(director.genre));
+  const rhythm = rhythmFrom(doctrine, GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (director.genre)] ?? GENRE_RHYTHM.documentary);
+  await writeFile(join(o.out, "craft-targets.json"), JSON.stringify({ ...doctrine, rhythm, filmId: o.filmId ?? basename(o.out), ...(o.ledgerFile ? { ledgerFile: o.ledgerFile } : {}) }, null, 1));
+  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure, rhythm });
   const lens = plan.shots.map((x) => x.seconds).sort((a, b) => a - b);
   const designed = plan.shots.filter((x) => DESIGNED_TYPES.includes(x.type));
   const planMessages = [
+    msg("craft.read", { films: doctrine.films, genre: doctrine.genre, learned: Object.values(doctrine.targets).filter((t) => t.source === "learned").length, lo: rhythm.median[0], hi: rhythm.median[1], max: rhythm.max }),
     msg("voice.shotPlan", { shots: plan.shots.length, designed: designed.length, kinds: [...new Set(designed.map((x) => x.type))].join(", ") || "—", median: lens[Math.floor(lens.length / 2)] ?? 0, problems: plan.findings.length }),
     msg("voice.hook", { score: plan.hook.score, beats: plan.hook.beats, titleAt: plan.hook.titleAt === null ? null : Math.round(plan.hook.titleAt), designed: plan.hook.designed }),
   ];
@@ -517,6 +532,11 @@ async function main() {
       for (const m of step2.messages) console.log("- " + m[lang]);
       if (!step2.check.ok) process.exit(1);
     }
+    // Names misheard by speech-to-text take the topic's spelling, so cards and subtitles agree ("Ramish" -> "Ramesh").
+    if (typeof args.topic === "string" && step2.words?.length) {
+      const fixed = respellNames(step2.words, args.topic);
+      if (fixed) console.log(`- names respelled from the topic: ${fixed}`);
+    }
     // With a given passage the text is aligned to the audio when Python can run it (--python, or ZUPONA_PYTHON).
     const python = typeof args.python === "string" ? args.python : process.env.ZUPONA_PYTHON;
     const marks = typeof args.marks === "string" ? JSON.parse(await readFile(resolve(args.marks), "utf8")) : null;
@@ -539,10 +559,33 @@ async function main() {
     const vb = voiceBrain(process.env);
     if (vb.refused) console.log("- " + msg("voice.paidBrainRefused")[lang]);
     else if (vb.model) console.log(`- Brain: ${vb.kind}`);
-    const step4 = await pictures({ out, understanding, brain: vb.model, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
+    // The ledger (--ledger, default out/craft-ledger.json): read here; this film is added to it after the render,
+    // unless --ledger-record off (the studio's runner: the Worker keeps the ledger in R2 and records it there).
+    const ledgerPath = resolve(typeof args.ledger === "string" ? args.ledger : join("out", "craft-ledger.json"));
+    const read = await readFile(ledgerPath, "utf8").then(parseLedger, () => null);
+    for (const n of read?.notes ?? []) console.log("- " + msg(n.code, n.params ?? {})[lang]);
+    const step4 = await pictures({ out, understanding, brain: vb.model, ledger: read?.ledger ?? null, ledgerFile: args["ledger-record"] === "off" ? undefined : ledgerPath, filmId: typeof args["film-id"] === "string" ? args["film-id"] : undefined, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
+    // What the free brain cost this film (measured, so a 40-minute film's need is known against the daily limits).
+    const calls = /** @type {any} */ (vb.model)?.calls;
+    if (Array.isArray(calls)) {
+      const by = calls.reduce((/** @type {Record<string, number>} */ a, /** @type {any} */ x) => ({ ...a, [x.model]: (a[x.model] ?? 0) + 1 }), {});
+      console.log(`- Free brain calls: ${calls.length} (${Object.entries(by).map(([m, n]) => `${m} ${n}`).join(", ") || "none"})`);
+      await writeFile(join(out, "brain-calls.json"), JSON.stringify(calls, null, 1));
+    }
     if (!step4.ok) process.exit(1);
+    if (args.eyes === true && args.media === true && step3.kind !== "quran") {
+      // The eyes never stop the film: without Python, OpenCLIP or the network the plan's picks stay.
+      const groq = process.env.GROQ_API_KEY && String(process.env.GROQ ?? "").toLowerCase() !== "off" ? String(process.env.GROQ_API_KEY) : "";
+      const t = Date.now();
+      try {
+        await rerankRun({ run: out, brain: vb.model, look: groq ? groqLook({ apiKey: groq }) : null, topic: typeof args.topic === "string" ? args.topic : undefined, log: (line) => console.log("- " + line) });
+        console.log(`- Eyes done in ${Math.round((Date.now() - t) / 1000)} s.`);
+      } catch (e) {
+        console.log(`! The eyes could not rank the pictures (${String(/** @type {any} */ (e)?.message ?? e).slice(0, 200)}); the plan's picks stay.`);
+      }
+    }
   } else if (args.master) {
     if (args.kind === "auto") { console.error("--master needs --kind quran or narration when there is no transcript to tell them apart."); process.exit(2); }
     const m = await master({ audio: voicePath, out, kind: /** @type {any} */ (args.kind), space: typeof args.master === "string" ? args.master : undefined, lang, log: (line) => console.log(line) });

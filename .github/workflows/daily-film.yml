@@ -1,0 +1,143 @@
+name: Daily film
+
+# One ~40-minute engineering documentary a day, good or bad, so the platform learns (Craft Ledger).
+# Once a day the schedule below asks the Worker to start the film (POST /api/voice/daily, proving
+# who it is with GitHub's own OIDC token: no stored secret); by hand, the same route with the studio
+# key, or "Run workflow" here with no inputs (the same as the schedule). The Worker picks
+# the next unused topic (worker/daily-film.mjs) and gives this run a ticket for that one film; the
+# runner never holds a key (the brain and the stock keys stay in the Worker).
+# Steps: the script (render/daily-script.mjs: Wikipedia as the only fact source, the free brain
+# through the Worker, Groq first, then the Gemini pool), the free narrator (Kokoro-82M,
+# render/daily-voice.mjs, with the topic's pronunciation list), then the voice goes up like an
+# uploaded voiceover and the Worker starts voice-film.yml for it: speech-to-text, shot plan, pictures,
+# critic, render-chunked.yml and the Craft Ledger run exactly as for an uploaded voice.
+# Nothing is published.
+
+on:
+  schedule:
+    # 10:23 UTC (5:23 am in New York): the film is ready for the US day.
+    - cron: "23 10 * * *"
+  workflow_dispatch:
+    inputs:
+      voice_id:
+        description: "The daily film's ID (set by the Worker; leave empty to start today's film)"
+        default: ""
+      site:
+        description: "Site address"
+        required: true
+        default: "https://ai-x-com.sayedmuntasim3.workers.dev"
+      ticket:
+        description: "The Worker's ticket for this one film (set by the Worker)"
+        default: ""
+      topic_id:
+        description: "Topic id from worker/daily-film.mjs (set by the Worker)"
+        default: ""
+
+run-name: "Daily film ${{ inputs.topic_id || 'start' }}"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-film-${{ inputs.voice_id || 'start' }}
+  cancel-in-progress: false
+
+jobs:
+  # The schedule (or a run with no inputs): the Worker picks the topic and starts this workflow again for that film.
+  start:
+    if: github.event_name == 'schedule' || inputs.voice_id == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    steps:
+      - name: Ask the Worker to start today's film
+        env:
+          SITE: https://ai-x-com.sayedmuntasim3.workers.dev
+        run: |
+          jwt=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=zupona-daily" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).value))')
+          echo "::add-mask::$jwt"
+          code=$(curl -sS -o answer.json -w '%{http_code}' -X POST -H "Authorization: Bearer $jwt" "$SITE/api/voice/daily")
+          cat answer.json; echo
+          # 409: today's film is already under way (not an error).
+          [ "$code" = 202 ] || [ "$code" = 409 ] || { echo "::error::The Worker did not start the daily film ($code)."; exit 1; }
+
+  voice:
+    if: github.event_name == 'workflow_dispatch' && inputs.voice_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SITE: ${{ inputs.site }}
+      VOICE_ID: ${{ inputs.voice_id }}
+      VOICE_TICKET: ${{ inputs.ticket }}
+      TOPIC_ID: ${{ inputs.topic_id }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Check the inputs
+        run: |
+          echo "::add-mask::$VOICE_TICKET"
+          [[ "$VOICE_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::Bad film ID."; exit 1; }
+          [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::Bad site."; exit 1; }
+          [[ "$TOPIC_ID" =~ ^[a-z0-9-]{3,60}$ ]] || { echo "::error::Bad topic id."; exit 1; }
+          echo "start=$(date +%s)" > timing.env
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tell the studio a machine took it
+        run: echo started > .stage && node render/voice-runner.mjs progress --stage started
+      - name: Write the script (free brain through the Worker; Wikipedia facts only)
+        run: |
+          echo script > .stage
+          t=$(date +%s)
+          node render/daily-script.mjs --topic "$TOPIC_ID" --out run 2>&1 | tee step.log
+          test "${PIPESTATUS[0]}" = 0
+          echo "script=$(( $(date +%s) - t ))" >> timing.env
+      - name: Keep the free narrator's model files between runs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/zupona/kokoro
+          key: kokoro-v1.0-7d5df8ec-bca610b8
+      - name: Narrate (the Zupona narrator, Kokoro-82M, Apache-2.0)
+        run: |
+          echo narrate > .stage
+          t=$(date +%s)
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          mkdir -p ~/.cache/zupona/kokoro && (cd ~/.cache/zupona/kokoro && for f in kokoro-v1.0.onnx voices-v1.0.bin; do [ -f "$f" ] || curl -sSfL --retry 3 -o "$f" "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$f"; done)
+          python3 -m venv ~/.venv-narrator && ~/.venv-narrator/bin/pip install -q kokoro-onnx==0.6.1 soundfile
+          node render/daily-voice.mjs --run run --topic "$TOPIC_ID" --out narration.mp3 --python ~/.venv-narrator/bin/python 2>&1 | tee step.log
+          test "${PIPESTATUS[0]}" = 0
+          echo "narrate=$(( $(date +%s) - t ))" >> timing.env
+          minutes=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("run/daily-voice.json","utf8")).minutes)')
+          node render/voice-runner.mjs progress --stage narrate --params "{\"minutes\":$minutes}"
+      - name: Send the voice; the Worker starts the voiceover film (voice-film.yml)
+        run: |
+          echo uploaded > .stage
+          t=$(date +%s)
+          node render/voice-runner.mjs voice --file narration.mp3 2>&1 | tee step.log
+          test "${PIPESTATUS[0]}" = 0
+          echo "upload=$(( $(date +%s) - t ))" >> timing.env
+      - name: Minutes per stage
+        if: always()
+        run: |
+          set -a; . ./timing.env; set +a
+          node -e 'const e=process.env,m=(s)=>s?Math.round(Number(s)/6)/10:null;const t={script:m(e.script),narrate:m(e.narrate),upload:m(e.upload),total:m(Math.floor(Date.now()/1000)-Number(e.start))};require("fs").mkdirSync("run",{recursive:true});require("fs").writeFileSync("run/daily-timing.json",JSON.stringify(t,null,1));console.log(JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Tell the studio what stopped it
+        if: failure()
+        run: |
+          stage=$(cat .stage 2>/dev/null || echo started)
+          why=$( (grep -h '^BLOCK:' step.log 2>/dev/null || tail -n 3 step.log 2>/dev/null) | head -n 3 | tr '\n' ' ' | cut -c1-300)
+          node render/voice-runner.mjs progress --stage "$stage" --error "The daily film stopped${why:+: $why}. Details: $RUN_URL" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-${{ inputs.voice_id }}
+          path: |
+            run/*.json
+            run/*.md
+            run/narration/narration-report.json
+          retention-days: 30
+          if-no-files-found: warn

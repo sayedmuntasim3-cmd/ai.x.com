@@ -111,12 +111,23 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   /** @type {{ term: string, say: string }[]} */
   let lexicon = [];
   let film = /** @type {any} */ ({});
+  /** Scene ids that could not be spoken because their number was never priced. @type {{ scene: string, tokens: string[] }[]} */
+  let unresolved = [];
   if (!args.text) {
     const { loadRunFiles, loadRunText } = await import("./render-film.mjs");
     const { voiceLines, parseLexicon } = await import("./voice.mjs");
+    const { pricedClaims } = await import("../engine/src/claim-values.mjs");
     const from = args.run ? { dir: args.run } : { api: args.api.replace(/\/$/, ""), id: args.id };
-    const v = voiceLines(await loadRunFiles(from));
+    /** @type {Record<string, any> | null} */
+    let claims = null;
+    try {
+      const priced = await loadRunText(from, "claim-values.json");
+      if (priced) claims = pricedClaims(JSON.parse(priced));
+    } catch { claims = null; }
+    const v = voiceLines(await loadRunFiles(from), { claims });
+    if (v.filled) console.log(`numbers filled from claim-values.json: ${v.filled} scene(s)`);
     for (const s of v.skipped) console.warn(`${s.scene}: not narrated (${s.reason})`);
+    unresolved = v.unresolved;
     lines = v.lines;
     lexicon = parseLexicon((await loadRunText(from, "s4.md")) ?? "");
     film = JSON.parse((await loadRunText(from, "film.json")) ?? (await loadRunText(from, "run.json")) ?? "{}");
@@ -126,6 +137,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const r = await narrate({ lines, outDir: args.out, versionId: film.versionId ?? "en-US", contentType: film.contentType ?? "documentary", preset: args.preset ?? film.voicePreset, lexicon, worker, log: (l) => console.log(l) });
   if (r.blocked) { console.error(r.blocked.en); process.exit(1); }
   for (const x of r.refused) console.warn(`${x.scene}: ${x.reason.en}`);
-  console.log(JSON.stringify({ preset: r.preset.id, recorded: r.recorded, kept: r.kept, failed: r.failed, refused: r.refused.length, check: r.check }, null, 1));
-  if (r.failed.length) process.exit(1);
+  console.log(JSON.stringify({ preset: r.preset.id, recorded: r.recorded, kept: r.kept, failed: r.failed, refused: r.refused.length, check: r.check, unresolved }, null, 1));
+  if (unresolved.length) {
+    // A scene that loses its voice is a hole in the film: it is reported and the run fails, never hidden.
+    const line = { count: unresolved.length, scenes: unresolved.map((u) => u.scene).join(", ") };
+    console.error(msg("voice.unresolved", line).en);
+    console.error(msg("voice.unresolved", line).bn);
+  }
+  if (r.failed.length || unresolved.length) process.exit(1);
 }
