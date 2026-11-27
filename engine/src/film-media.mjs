@@ -394,12 +394,15 @@ export async function chapterMedia(o) {
     for (const row of shots) {
       if (!row || row.status === "found" || row.rung === "R1" || !strong.length) continue;
       // The nearest strong shot in film time, a picture of the same chapter that the viewer has already seen.
-      const near = strong.reduce((a, b) => (Math.abs(b.start - row.start) < Math.abs(a.start - row.start) ? b : a));
+      // One that the 10-minute rule allows here comes first; only when none does, the nearest is held anyway (a repeat beats a card).
+      const byDistance = [...strong].sort((a, b) => Math.abs(a.start - row.start) - Math.abs(b.start - row.start));
+      const near = byDistance.find((r) => r.pick && !history.blocked(r.pick.id, row.start)) ?? /** @type {ShotMedia} */ (byDistance[0]);
       row.status = "found";
       row.pick = near.pick;
       row.alternates = [];
       row.reused = near.pick?.id;
       row.why = { by: "reused: no strong picture found for this shot, the nearest strong one of the chapter is held", provider: near.pick?.source };
+      history.add(near.pick?.id ?? "", row.start);
       row.trace.push({ query: "", provider: "held", outcome: "reused", returned: 1, allowed: 1 });
     }
   };

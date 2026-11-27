@@ -417,11 +417,11 @@ test("the media step writes media-C1.json per chapter, never repeats a clip, and
   const c1 = JSON.parse(store.m.get("media-C1.json"));
   const c2 = JSON.parse(store.m.get("media-C2.json"));
   assert.equal(c1.stats.shots + c2.stats.shots, 12);
-  const ids = [...c1.shots, ...c2.shots].filter((/** @type {any} */ s) => s.pick).map((/** @type {any} */ s) => s.pick.id);
-  assert.equal(new Set(ids).size, ids.length, "no clip twice within 10 minutes, across chapters too");
+  const ids = [...c1.shots, ...c2.shots].filter((/** @type {any} */ s) => s.pick && !s.reused).map((/** @type {any} */ s) => s.pick.id);
+  assert.equal(new Set(ids).size, ids.length, "no clip twice within 10 minutes, across chapters too (a held, reused pick is flagged and left out)");
   assert.equal(c1.shots[0].pick.licence.licenseId, "PEXELS");
   assert.equal(c1.shots[0].query, "old mill");
-  assert.equal(state.status, c1.stats.missing + c2.stats.missing ? "done-with-gaps" : "done");
+  assert.equal(state.status, c1.stats.missing + c2.stats.missing + c1.stats.reused + c2.stats.reused ? "done-with-gaps" : "done");
   assert.ok(state.stages["media:C2"].status === "done");
   const before = searches;
   await runFilm({ film: made.film, manual: "M", model, store, media: { providers: [pexels] } });

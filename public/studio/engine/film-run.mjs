@@ -885,6 +885,7 @@ export async function runFilm(o) {
           const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, judge, topic: film.topic, holdWeak: true, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep, done });
           await store.put(partialKey, JSON.stringify(Object.fromEntries(media.shots.filter(shotSettled).map((r) => [shotKey(r), r]))));
           await store.put(key, JSON.stringify(media, null, 1));
+          if (media.stats.reused) state.gaps.push(`${c.id} media: ${media.stats.reused} of ${media.stats.shots} stock shots hold another picture of the chapter (no strong picture of their own was found; see ${key}).`);
           if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no fitting free clip yet (see ${key}).`);
           const blind = !judge && o.media?.review !== false;
           const unreviewed = media.shots.filter((s) => s.review === "unreviewed" || (blind && s.status === "found")).length;
