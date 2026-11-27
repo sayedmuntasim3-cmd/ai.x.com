@@ -36,7 +36,7 @@ export const NO_STORE_SOURCES = Object.freeze(new Set(["nara"]));
 export function archiveKeys(env = {}) {
   /** @type {Record<string, string>} */
   const out = {};
-  for (const s of SOURCES) for (const k of /** @type {any} */ (s).keys ?? []) if (typeof env[k] === "string" && env[k]) out[k] = /** @type {string} */ (env[k]);
+  for (const s of SOURCES) for (const k of /** @type {any} */ (s).keys ?? []) if (typeof env[k] === "string" && env[k].trim()) out[k] = env[k].trim();
   return out;
 }
 

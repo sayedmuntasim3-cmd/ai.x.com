@@ -1,6 +1,6 @@
 name: Archive probe
 # Manual, read-only: asks LoC, DVIDS, Europeana and NASA for three fixed queries from the runner's network
-# and prints counts + 3 titles each. No tokens beyond the archives' own keys (DVIDS_API_KEY, EUROPEANA_API_KEY).
+# and prints counts + 3 titles each. No tokens beyond the archives' own keys (DVIDS, Europeana, Smithsonian, Pixabay, Groq: one call each, status only).
 on:
   workflow_dispatch:
 
@@ -20,4 +20,7 @@ jobs:
         env:
           DVIDS_API_KEY: ${{ secrets.DVIDS_API_KEY }}
           EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
+          SMITHSONIAN_API_KEY: ${{ secrets.SMITHSONIAN_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: node local/archive-probe.mjs

@@ -173,7 +173,8 @@ var SOURCES = [
     holds: "Historic photographs, prints, posters and drawings marked free to use",
     scale: "1M+ online images",
     topics: ["history", "culture"],
-    quality: 0.74
+    quality: 0.74,
+    patient: true
   },
   {
     id: "internet-archive",
@@ -535,9 +536,10 @@ function mergeResults(results, limit) {
 // ../ai.x.com/src/media/http.ts
 var DEFAULT_USER_AGENT = "ZuponaAI-MediaSearch/1.0 (https://ai.zupona.com; documentary image research)";
 var HttpError = class extends Error {
-  constructor(message, status) {
+  constructor(message, status, retryAfterMs) {
     super(message);
     this.status = status;
+    this.retryAfterMs = retryAfterMs;
     this.name = "HttpError";
   }
 };
@@ -571,7 +573,8 @@ function createHttp(options) {
       const res = await doFetch(url, requestInit);
       if (!res.ok) {
         const hint = res.status === 429 ? "rate limited" : res.status === 401 || res.status === 403 ? "not authorised" : `HTTP ${res.status}`;
-        throw new HttpError(hint, res.status);
+        const after = Number(res.headers?.get?.("retry-after"));
+        throw new HttpError(hint, res.status, Number.isFinite(after) && after > 0 ? after * 1e3 : void 0);
       }
       return res;
     } catch (err) {
@@ -1689,7 +1692,7 @@ var nasa = async (ctx) => {
     const d = item.data?.[0];
     const links = item.links ?? [];
     if (!d) continue;
-    if (!isRelevant(ctx.query, d.title, d.description)) continue;
+    if (!isRelevant(ctx.query, d.title)) continue;
     const orig = links.find((l) => l.rel === "canonical" && /\.(jpe?g|png)$/i.test(l.href));
     const largest = links.filter((l) => l.rel === "alternate" && /\.(jpe?g|png)$/i.test(l.href)).sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0];
     const thumb = links.find((l) => l.rel === "preview") ?? links.find((l) => /~small\./.test(l.href));
@@ -1820,6 +1823,7 @@ var RIGHTS = ["no-attribution", "attribution", "share-alike"];
 var TOPICS = ["nature", "ocean", "space", "history", "science", "culture"];
 var DEFAULT_BUDGET = 45;
 var SLOW_DEADLINE = 16e3;
+var PATIENT_DEADLINE = 45e3;
 function disabledList(env) {
   return new Set((env.MEDIA_DISABLED_SOURCES ?? "").split(",").map((s) => s.trim()).filter(Boolean));
 }
@@ -1845,7 +1849,8 @@ function normaliseOptions(opts) {
     timeoutMs: clamp(opts.timeoutMs, 1500, 2e4, 6500)
   };
 }
-async function run(opts, env, deps, onStart, onBatch) {
+async function run(opts, rawEnv, deps, onStart, onBatch) {
+  const env = Object.fromEntries(Object.entries(rawEnv ?? {}).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]));
   const words = terms(opts.query);
   const budget = { left: Number(env.MEDIA_SUBREQUEST_BUDGET) || DEFAULT_BUDGET };
   const wanted = opts.sources ? new Set(opts.sources) : null;
@@ -1865,8 +1870,8 @@ async function run(opts, env, deps, onStart, onBatch) {
   await Promise.all(
     states.filter((s) => s.enabled).map(async (source) => {
       const slow = source.slow && !(source.id === "flickr" && env.FLICKR_API_KEY);
-      const deadline = slow ? SLOW_DEADLINE : opts.timeoutMs + 2500;
-      const http = createHttp({ userAgent: env.MEDIA_USER_AGENT, timeoutMs: slow ? SLOW_DEADLINE - 500 : opts.timeoutMs, budget, fetchImpl: deps.fetch });
+      const deadline = source.patient ? PATIENT_DEADLINE : slow ? SLOW_DEADLINE : opts.timeoutMs + 2500;
+      const http = createHttp({ userAgent: env.MEDIA_USER_AGENT, timeoutMs: source.patient ? PATIENT_DEADLINE - 2e3 : slow ? SLOW_DEADLINE - 500 : opts.timeoutMs, budget, fetchImpl: deps.fetch });
       const ctx = { query: opts.query, terms: words, perSource: opts.perSource, rights: opts.rights, orientation: opts.orientation, minSize: opts.minSize, env, http };
       const report = { id: source.id, name: source.name, status: "ok", count: 0, found: 0, ms: 0 };
       const t0 = Date.now();

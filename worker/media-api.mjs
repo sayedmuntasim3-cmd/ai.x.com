@@ -22,7 +22,7 @@ const noStore = (text) => /"source":"nara"/.test(text);
 
 /** Only the string values of the Worker environment (vars and secrets), never bindings. @param {Record<string, unknown>} env */
 function stringEnv(env) {
-  return /** @type {Record<string, string>} */ (Object.fromEntries(Object.entries(env).filter(([, v]) => typeof v === "string")));
+  return /** @type {Record<string, string>} */ (Object.fromEntries(Object.entries(env).filter(([, v]) => typeof v === "string").map(([k, v]) => [k, /** @type {string} */ (v).trim()])));
 }
 
 /** @param {URL} url @param {Record<string, string>} env */

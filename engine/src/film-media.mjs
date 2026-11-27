@@ -626,7 +626,7 @@ export function nasaProvider(o = {}) {
       return (data?.collection?.items ?? []).flatMap((/** @type {any} */ item) => {
         const d = item.data?.[0];
         if (!d?.nasa_id || d.media_type !== kind) return [];
-        if (!isRelevant(query, d.title, d.description)) return [];
+        if (!isRelevant(query, d.title)) return [];
         const id = String(d.nasa_id);
         const preview = (item.links ?? []).find((/** @type {any} */ l) => l.rel === "preview")?.href ?? null;
         const folder = `https://images-assets.nasa.gov/${kind}/${encodeURIComponent(id)}/${encodeURIComponent(id)}`;
@@ -731,13 +731,21 @@ export function locProvider(o = {}) {
   // that starts when it is sent; the caller's signal only stops a call that has not been sent yet.
   const get = async (url, init) => {
     const caller = init?.signal;
-    const done = await locGate.run(String(url), async () => {
+    /** @type {{ status: number, text: string }} */
+    let done;
+    try {
+      done = await locGate.run(String(url), async () => {
       if (caller?.aborted) throw caller.reason ?? new Error("aborted");
-      const res = await raw(url, { ...init, signal: AbortSignal.timeout(15_000) });
+      const res = await raw(url, { ...init, signal: AbortSignal.timeout(30_000) });
       const text = await res.text();
       if (res.status === 429 || res.status === 503 || isChallenge(res.status, text)) { const after = Number(res.headers.get("retry-after")); throw new ProviderError("rate_limited", Number.isFinite(after) && after > 0 ? after * 1000 : 0); }
       return { status: res.status, text };
     });
+    } catch (e) {
+      // The gate's circuit breaker: LoC asked us to wait longer than we will; answer at once, the shot falls back to other archives.
+      if (/** @type {any} */ (e)?.blocked) throw new ProviderError("rate_limited", /** @type {any} */ (e).retryAfterMs);
+      throw e;
+    }
     return new Response(done.text, { status: done.status });
   };
   return {
