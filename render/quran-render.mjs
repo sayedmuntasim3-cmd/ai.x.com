@@ -46,7 +46,7 @@ const LETTER_WIDTH = 0.145;
  * @param {string} text @param {Format} f @returns {{ size: number, lines: number }}
  */
 export function ayahFontSize(text, f) {
-  const letters = text.replace(/[\\u064B-\\u065F\\u0670\\u06D6-\\u06ED]/g, "").length;
+  const letters = text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "").length;
   const room = f.width * 0.84;
   const linesAt = (/** @type {number} */ size) => Math.ceil((letters * LETTER_WIDTH * size) / room);
   for (let size = f.maxFontSize; size > f.fontSize; size -= 4) if (linesAt(size) <= 3) return { size, lines: linesAt(size) };
@@ -98,7 +98,6 @@ export function moveFilter(move, seconds, f) {
   return `${scale},crop=${W}:${H}:x='${x}':y='(in_h-${H})/2'`;
 }
 
-/**@typedef {{ length: number }} seg @param {{ move: string }} shot @param {{ kind: "video" | "image", url: string, seconds: number | null } | null} asset @param {Format} f @param {string} out */
 /**
  * ffmpeg arguments for one clip.
  * @param {{ length: number }} seg @param {{ move: string }} shot @param {{ kind: "video" | "image", url: string, seconds: number | null } | null} asset
@@ -137,7 +136,7 @@ export function ayahOnScreen(text, surah, ayah) {
 /** @param {number} t */
 const assTime = (t) => { const cs = Math.max(0, Math.round(t * 100)); const h = Math.floor(cs / 360000), m = Math.floor((cs % 360000) / 6000), s = Math.floor((cs % 6000) / 100); return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`; };
 /** @param {string} s */
-const assText = (s) => s.replace(/[{}]/g, "").replace(/\\n/g, "\\\\N");
+const assText = (s) => s.replace(/[{}]/g, "").replace(/\n/g, "\\N");
 
 /**
  * The English meaning of an ayah from the shipped Pickthall 1930 text.
@@ -188,8 +187,7 @@ export function filmText(plan, uthmani, surahNames, o, texts) {
   const highlightOn = o.highlight === "word";
   const lines = ["[Script Info]", "ScriptType: v4.00+", `PlayResX: ${f.width}`, `PlayResY: ${f.height}`, "WrapStyle: 0", "ScaledBorderAndShadow: yes", "", "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Ayah,Amiri Quran,${f.fontSize},&H00F0ECE4,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.09)},${Math.round(f.width * 0.09)},${f.margin},-1`,
-    `Style: AyahHighlighted,Amiri Quran,${f.fontSize},&H00F5F0C8,&H00F5F0C8,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.09)},${Math.round(f.width * 0.09)},${f.margin},-1`,
+    `Style: Ayah,Amiri Quran,${f.fontSize},&H0060C8F0,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.09)},${Math.round(f.width * 0.09)},${f.margin},-1`,
     `Style: Title,Amiri Quran,${f.titleSize},&H00F0ECE4,&H00F0ECE4,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,2,3,5,50,50,0,-1`,
     `Style: Small,Amiri Quran,${Math.round(f.fontSize * 0.55)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,${Math.round(f.margin * 0.6)},1`,
     `Style: Meaning,Amiri Quran,${Math.round(f.fontSize * 0.46)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,${Math.round(f.margin * 0.6)},1`,
@@ -209,7 +207,7 @@ export function filmText(plan, uthmani, surahNames, o, texts) {
       continue;
     }
     if (o.showAyat === false || s.ayah === null || s.spokenStart === null || s.spokenEnd === null) continue;
-// The Arabic is shown only while that ayah is surely being recited: both of its ends confirmed.
+    // The Arabic is shown only while that ayah is surely being recited: both of its ends confirmed.
     const k = plan.scenes.indexOf(s), before = plan.scenes.slice(0, k).reverse().find((x) => x.kind === "ayah");
     if (s.endSure === false || before?.endSure === false) { hidden += 1; continue; }
     const text = ayahOnScreen(uthmani[offsetOf(s.surah) + s.ayah - 1] ?? "", s.surah, s.ayah);
@@ -222,40 +220,24 @@ export function filmText(plan, uthmani, surahNames, o, texts) {
       if (meaning) {
         const meaningShown = assText(meaning);
         lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Meaning,,0,0,${Math.round(f.margin * 0.6)},,{\\fad(600,600)\\fnDejaVu Sans}${meaningShown}`);
-        console.log('[filmText] meaning line for ' + s.surah + ':' + s.ayah + ': ' + meaningShown);
       }
     }
-    if (highlightOn && wordTimesConfident(s)) {
-      // Per-word karaoke: each word is its own event on the same layer, so the current word is golden
-      // (AyahHighlighted style) and the rest are soft white (Ayah style). When the word is spoken,
-      // the highlighted word is visible; before and after it the soft-white ayah is visible.
-      // We build the full ayah once (with ornament), then emit one event per confident word.
-      // Word order in the shown ayah is the same as the Tanzil text order; words here are the recited
-      // tokens aligned to those Quran words.
-      const words = Array.isArray(s.words) ? s.words : [];
-      // For each word we emit a soft-white "rest" event covering the whole ayah except the word's span,
-      // and a highlighted event covering only the word's span. Only the highlighted words are shown at
-      // full brightness; the rest stays soft white. This keeps the whole ayah visible at all times and
-      // never highlights a wrong word.
-      for (const w of words) {
-        if (w.start == null || w.end == null || !Number.isFinite(w.start) || !Number.isFinite(w.end)) continue;
-        const ws = Math.max(s.spokenStart, w.start), we = Math.min(s.spokenEnd + 0.4, w.end);
-        if (we <= ws) continue;
-        // Soft-white ayah rest outside this word.
-        if (ws > s.spokenStart) {
-          lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(ws)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
-        }
-        if (we < s.spokenEnd + 0.4) {
-          lines.push(`Dialogue: 0,${assTime(we)},${assTime(s.spokenEnd + 0.4)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
-        }
-        // Highlighted word only.
-        lines.push(`Dialogue: 0,${assTime(ws)},${assTime(we)},AyahHighlighted,,0,0,0,,{\\fad(300,300)\\blur0.6\\fs${size}}${assText(shown)}`);
-      }
-      // If the first word starts after the ayah start or the last ends before it, the rest events above
-      // already cover the gaps; the loop above also covers them, but keep a final safety cover for the
-      // leading/trailing soft-white ayah in case word coverage is partial.
+    const ayahStart = assTime(s.spokenStart), ayahEnd = assTime(s.spokenEnd + 0.4);
+    const tail = ` ﴿${arabicNumber(s.ayah)}﴾`;
+    const tokens = text.split(/\s+/).filter(Boolean);
+    const ws = highlightOn && wordTimesConfident(s) ? /** @type {{ start: number, end: number }[]} */ (s.words) : [];
+    if (ws.length === tokens.length && tokens.length > 0) {
+      // One event per ayah; each word carries a \kf sweep (centiseconds) from SecondaryColour (soft white) to PrimaryColour (gold).
+      let cursor = s.spokenStart;
+      const karaoke = tokens.map((tok, i) => {
+        const from = Math.max(cursor, ws[i].start), to = Math.max(from, ws[i].end);
+        const lead = Math.round((from - cursor) * 100), dur = Math.round((to - from) * 100);
+        cursor = to;
+        return (lead > 0 ? `{\\k${lead}}` : "") + `{\\kf${dur}}${assText(tok)} `;
+      }).join("").trimEnd();
+      lines.push(`Dialogue: 0,${ayahStart},${ayahEnd},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${karaoke}${assText(tail)}`);
     } else {
-      lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
+      lines.push(`Dialogue: 0,${ayahStart},${ayahEnd},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
     }
   }
   if (hidden) lines.push(`; ${hidden} ayah text(s) not shown: their timing is not confirmed by two methods`);
@@ -263,7 +245,7 @@ export function filmText(plan, uthmani, surahNames, o, texts) {
   const creditParts = ["Quran text: Tanzil.net"];
   if (translationOn) creditParts.push("Translation: M. M. Pickthall (1930)");
   lines.push(`Dialogue: 0,${assTime(Math.max(0, o.total - 6))},${assTime(o.total - 0.5)},Small,,0,0,0,,{\\fad(800,1200)\\fnDejaVu Sans}${assText(creditParts.join("  ·  "))}`);
-  return lines.join("\\n") + "\\n";
+  return lines.join("\n") + "\n";
 }
 
 /** @param {number} n */
@@ -304,7 +286,7 @@ async function frozen(file) {
       p.on("close", () => ok(err));
     });
   });
-  return [...String(log).matchAll(/freeze_start: ([\\d.]+)[\\s\\S]*?freeze_end: ([\\d.]+)/g)].map((m) => ({ start: Number(m[1]), end: Number(m[2]) }));
+  return [...String(log).matchAll(/freeze_start: ([\d.]+)[\s\S]*?freeze_end: ([\d.]+)/g)].map((m) => ({ start: Number(m[1]), end: Number(m[2]) }));
 }
 
 /**
@@ -378,7 +360,7 @@ export async function renderQuranFilm(o) {
     }
     catch (e) {
       // An asset that cannot be read becomes a card, and the report says so.
-      log(`${shot.id}: ${asset ? "the asset could not be read, a card is used" : "card failed"}: ${/** @type {Error} */ (e).message.split("\\n")[0]}`);
+      log(`${shot.id}: ${asset ? "the asset could not be read, a card is used" : "card failed"}: ${/** @type {Error} */ (e).message.split("\n")[0]}`);
       if (!asset) throw e;
       assets.delete(shot.id);
       await run("ffmpeg", clipArgs(seg, shot, null, f, clip));
