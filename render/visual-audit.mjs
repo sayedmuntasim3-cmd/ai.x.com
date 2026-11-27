@@ -78,6 +78,26 @@ export function emptyStretches(samples, o) {
 const round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
 /**
+ * The film's own pixel samples (time, luma entropy, brightness) of a file or address; `seconds` reads only its start.
+ * @param {string} source @param {number} step @param {number} [seconds] @param {number} [from]
+ */
+async function sampleSource(source, step, seconds, from = 0) {
+  const text = await capture("ffmpeg", ["-hide_banner", "-nostats", ...(from ? ["-ss", String(from)] : []), ...(seconds ? ["-t", String(seconds)] : []), "-i", source, "-vf", `fps=${1 / step},scale=320:-2,entropy,signalstats,metadata=print:file=-`, "-an", "-f", "null", "-"]);
+  return parseSamples(text);
+}
+
+/**
+ * The gate's test on one candidate picture or clip, before it is chosen: the first `seconds` of it (the stretch the
+ * shot will show), sampled and judged exactly as a finished film is. No fades are skipped: a shot starts on its picture.
+ * @param {string} source @param {{ seconds: number, from?: number, step?: number }} o
+ */
+export async function auditSource(source, o) {
+  const step = o.step ?? 0.5;
+  const samples = await sampleSource(source, step, o.seconds, o.from);
+  return { samples: samples.length, empty: emptyStretches(samples, { step, total: o.seconds, fadeIn: 0, fadeOut: 0 }) };
+}
+
+/**
  * Audit a film.
  * @param {string} file @param {{ step?: number }} [o]
  */
@@ -87,8 +107,7 @@ export async function auditFilm(file, o = {}) {
   const info = JSON.parse(probe.slice(probe.indexOf("{")));
   const total = Number(info.format?.duration ?? 0);
   const video = (info.streams ?? []).find((/** @type {any} */ s) => s.codec_type === "video") ?? {};
-  const text = await capture("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-vf", `fps=${1 / step},scale=320:-2,entropy,signalstats,metadata=print:file=-`, "-an", "-f", "null", "-"]);
-  const samples = parseSamples(text);
+  const samples = await sampleSource(file, step);
   const frozenLog = await capture("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-vf", "scale=320:-2,freezedetect=n=-60dB:d=2", "-an", "-f", "null", "-"]);
   const frozen = [...frozenLog.matchAll(/freeze_start: ([\d.]+)[\s\S]*?freeze_end: ([\d.]+)/g)].map((m) => ({ start: Number(m[1]), end: Number(m[2]) }));
   const empty = emptyStretches(samples, { step, total });

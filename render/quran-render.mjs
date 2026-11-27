@@ -99,6 +99,18 @@ export function moveFilter(move, seconds, f) {
 }
 
 /**
+ * The stretch of a video a shot shows: it skips the first tenth (titles, a shaky start) but keeps enough to cover the
+ * shot; a video a little shorter than its shot is slowed (at most to two thirds of its speed), never held on a frame.
+ * @param {number | null} assetSeconds @param {number} length @returns {{ start: number, slow: number, seconds: number }}
+ */
+export function videoWindow(assetSeconds, length) {
+  const start = assetSeconds && assetSeconds > length + 2 ? Math.min(assetSeconds * 0.1, assetSeconds - length - 1) : 0;
+  const available = assetSeconds ? assetSeconds - start : length;
+  const slow = available < length ? Math.min(1.5, (length + 0.1) / available) : 1;
+  return { start: r3(start), slow, seconds: Math.min(available, length / slow + 1) };
+}
+
+/**
  * ffmpeg arguments for one clip.
  * @param {{ length: number }} seg @param {{ move: string }} shot @param {{ kind: "video" | "image", url: string, seconds: number | null } | null} asset
  * @param {Format} f @param {string} out
@@ -113,10 +125,9 @@ export function clipArgs(seg, shot, asset, f, out) {
   else if (asset.kind === "image") input = ["-loop", "1", "-framerate", String(f.fps), "-t", String(seg.length + 1), "-i", asset.url];
   else {
     // Skip a video's first tenth (titles, a shaky start), but keep enough to cover the shot.
-    const start = asset.seconds && asset.seconds > seg.length + 2 ? Math.min(asset.seconds * 0.1, asset.seconds - seg.length - 1) : 0;
-    const available = asset.seconds ? asset.seconds - start : seg.length;
-    // A video a little shorter than its shot is slowed (at most to two thirds of its speed), never held on a frame.
-    slow = available < seg.length ? Math.min(1.5, (seg.length + 0.1) / available) : 1;
+    const w = videoWindow(asset.seconds, seg.length);
+    const start = w.start;
+    slow = w.slow;
     input = ["-ss", String(r3(start)), "-t", String(r3(seg.length / slow + 1)), "-i", asset.url];
   }
   // Under the title the picture is a little darker, so the name reads clearly.

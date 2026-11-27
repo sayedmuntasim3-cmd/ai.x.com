@@ -120,3 +120,21 @@ test("a doubtful picture is used only when no clean one is found, and its scene 
   m = await findQuranMedia({ shots: [shot("S001", "mountain", ["mountain"], 0, 9)], providers: [wiki({ mountain: [doubtFrames] })], verify: () => true, inspect: () => ({ warn: ["adab: people may be in the picture (70%)"] }) });
   assert.equal(m.shots[0].check, "WARNING");
 });
+
+test("a candidate whose shown stretch reads empty is passed over for the next; if none is left the strongest is held with a WARNING, never a card", async () => {
+  const dark = (/** @type {string} */ id) => result({ id, title: "mountain at night" });
+  const bright = result({ id: "pexels:bright", title: "mountain at sunrise" });
+  const emptyWhy = (/** @type {number} */ b, /** @type {number} */ d) => `quality: empty stretch 0-9 s of the 9.0 s shown (brightness ${b}, detail ${d})`;
+  const byId = /** @type {Record<string, string | null>} */ ({ "pexels:d1": emptyWhy(27, 0.6), "pexels:d2": emptyWhy(30, 0.66), "pexels:bright": null });
+  const inspect = (/** @type {any} */ r, /** @type {any} */ _q, /** @type {number} */ seconds) => { assert.equal(seconds, 9, "the shot's length reaches the pixel test"); return byId[r.id] ?? null; };
+  let m = await findQuranMedia({ shots: [shot("S001", "mountain", ["mountain"], 0, 9)], providers: [provider("pexels", { mountain: [dark("pexels:d1"), bright] })], verify: () => true, inspect });
+  assert.equal(m.shots[0].asset?.id, "pexels:bright");
+  assert.equal(m.shots[0].check, "PASS");
+  assert.match(m.shots[0].rejected[0].why, /^quality: empty stretch/);
+  // Nothing passes: the strongest (brightest, most detail) is held and marked for review.
+  m = await findQuranMedia({ shots: [shot("S001", "mountain", ["mountain"], 0, 9)], providers: [provider("pexels", { mountain: [dark("pexels:d1"), dark("pexels:d2")] })], verify: () => true, inspect });
+  assert.equal(m.shots[0].status, "found");
+  assert.equal(m.shots[0].asset?.id, "pexels:d2");
+  assert.equal(m.shots[0].check, "WARNING");
+  assert.match(String(m.shots[0].doubts?.[0]), /^held: every candidate left measured as an empty stretch/);
+});
