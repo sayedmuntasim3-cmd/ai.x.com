@@ -9,10 +9,15 @@
  * written from its own part of that text, with no invented quotes (no quotation marks at all).
  * One central question opens the film, every chapter escalates it, the last answers it.
  * When a brain's daily limit is used up the run stops and says so: nothing is padded or invented.
+ * Before anything is narrated the story critic (engine/src/story-critic.mjs) reads the script: a
+ * failing part goes back to the brain with the findings (CRITIC_LIMITS.maxRounds rewrites), and a
+ * script that still fails stops the film with the reason. It is never narrated.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CRITIC_LIMITS, brainPrompt, critiqueScript, parseBrainRead, rewriteNotes } from "../engine/src/story-critic.mjs";
+import { msg } from "../engine/src/messages.mjs";
 import { dailyTopic } from "../worker/daily-film.mjs";
 import { parseArgs, send } from "./voice-runner.mjs";
 
@@ -212,7 +217,8 @@ export async function wikiText(title, get = fetch, sleep = (ms) => new Promise((
 
 /**
  * Write the whole script.
- * @param {{ c: { site: string, id: string, ticket: string, fetch?: typeof fetch }, topic: import("../worker/daily-film.mjs").DailyTopic, out: string, log?: (l: string) => void, get?: typeof fetch, sleep?: (ms: number) => Promise<void>, gapMs?: number }} o
+ * @param {{ c: { site: string, id: string, ticket: string, fetch?: typeof fetch }, topic: import("../worker/daily-film.mjs").DailyTopic, out: string, log?: (l: string) => void, get?: typeof fetch, sleep?: (ms: number) => Promise<void>, gapMs?: number, critic?: boolean, maxRounds?: number }} o
+ *   critic false: skip the story critic (tests of the writing only); maxRounds: rewrites before the film stops
  */
 export async function writeScript(o) {
   const log = o.log ?? console.log;
@@ -261,12 +267,71 @@ export async function writeScript(o) {
     chapters.push({ title: outline[i].title, beat: outline[i].beat, text, words: wordCount(text) });
     log(`part ${i + 1}/${CHAPTERS}: ${wordCount(text)} words (${r.model})`);
   }
-  const words = chapters.reduce((n, ch) => n + ch.words, 0);
-  const script = { topic: o.topic.id, title: o.topic.title, question: o.topic.question, sources: articles.map((a) => ({ title: a.title, url: a.url, license: "CC BY-SA 4.0 (facts paraphrased)" })), words, chapters, calls: state.calls, models: [...new Set(state.calls.map((x) => x.model))], factCheck: { sentencesCut: factChanges, cut: unsupported, how: "each part checked against its own source by the same free brain; flagged sentences are cut (not a human fact-check)" }, minutes: Math.round((Date.now() - t0) / 6000) / 10, notes: words < 5500 ? [`The script is ${words} words, under the 5,500-word target; it is kept (a film every day, good or bad).`] : [] };
   mkdirSync(o.out, { recursive: true });
+  const critic = o.critic === false ? null : await storyCritic({ ...o, log, chapters, sources, whole: sections.map((s) => s.text).join("\n\n"), system, state });
+  const words = chapters.reduce((n, ch) => n + ch.words, 0);
+  const script = { topic: o.topic.id, title: o.topic.title, question: o.topic.question, sources: articles.map((a) => ({ title: a.title, url: a.url, license: "CC BY-SA 4.0 (facts paraphrased)" })), words, chapters, calls: state.calls, models: [...new Set(state.calls.map((x) => x.model))], factCheck: { sentencesCut: factChanges, cut: unsupported, how: "each part checked against its own source by the same free brain; flagged sentences are cut (not a human fact-check)" }, ...(critic ? { critic: critic.summary } : {}), minutes: Math.round((Date.now() - t0) / 6000) / 10, notes: words < 5500 ? [`The script is ${words} words, under the 5,500-word target; it is kept (a film every day, good or bad).`] : [] };
   writeFileSync(join(o.out, "script.json"), JSON.stringify(script, null, 1));
   writeFileSync(join(o.out, "script.md"), `# ${script.title}\n\n${chapters.map((ch) => ch.text).join("\n\n")}\n`);
   return script;
+}
+
+/** Findings about the chain of an act, which a brain may rescue by quoting the sentence code missed. */
+const CHAIN = new Set(["critique.noWhy", "critique.noEvent", "critique.noConsequence", "critique.unanswered"]);
+
+/**
+ * The story critic before narration: code reads the whole script against the whole source; the free
+ * brain reads only the acts code found weak (it can rescue a link only by copying a real sentence).
+ * A failing part is rewritten with its findings and fact-checked again, at most maxRounds times;
+ * a script that still fails stops the film (the error is its reason). critic.json keeps every round.
+ * @param {Parameters<typeof writeScript>[0] & { log: (l: string) => void, chapters: { title: string, beat: string, text: string, words: number }[], sources: string[], whole: string, system: string, state: any }} o
+ */
+async function storyCritic(o) {
+  const max = o.maxRounds ?? CRITIC_LIMITS.maxRounds;
+  /** @type {any[]} */
+  const rounds = [];
+  const save = (/** @type {boolean} */ ok) => writeFileSync(join(o.out, "critic.json"), JSON.stringify({ ok, maxRounds: max, rounds }, null, 1));
+  for (let round = 0; ; round += 1) {
+    const acts = o.chapters.map((ch, i) => ({ id: `C${i + 1}`, text: ch.text }));
+    const base = { acts, sources: [o.whole], question: o.topic.question, title: o.topic.title };
+    let review = critiqueScript(base);
+    const weak = [...new Set(review.findings.filter((f) => CHAIN.has(f.code) && f.chapter).map((f) => /** @type {string} */ (f.chapter)))];
+    if (weak.length) {
+      /** @type {import("../engine/src/story-critic.mjs").BrainRead} */
+      const brain = { chapters: [], answer: null };
+      for (const id of weak) {
+        const p = brainPrompt(acts.filter((a) => a.id === id), id === acts.at(-1)?.id ? o.topic.question : null);
+        const read = parseBrainRead((await brainCall(o.c, { system: p.system, prompt: p.prompt, maxTokens: 1500 }, o.state)).text);
+        if (!read) continue;
+        brain.chapters.push(...read.chapters.map((c) => ({ ...c, chapter: id })));
+        if (read.answer) brain.answer = read.answer;
+      }
+      review = critiqueScript({ ...base, brain });
+    }
+    rounds.push({ round, ok: review.ok, brainRead: weak, findings: review.findings.map((f) => ({ code: f.code, severity: f.severity, chapter: f.chapter, message: f.message, items: f.items })), stats: review.stats });
+    const codes = [...new Set(review.findings.map((f) => f.code.replace("critique.", "")))].join(", ");
+    if (review.ok) {
+      save(true);
+      o.log(msg("critique.passed", { round }).en);
+      return { summary: { ok: true, rounds: round + 1 } };
+    }
+    if (round >= max) {
+      save(false);
+      writeFileSync(join(o.out, "script-rejected.md"), `# ${o.topic.title} (rejected by the story critic; not narrated)\n\n${o.chapters.map((ch) => ch.text).join("\n\n")}\n`);
+      throw new Error(`${msg("critique.stopped", { max, codes }).en} ${review.findings.slice(0, 6).map((f) => f.message.en).join(" ")}`.slice(0, 1200));
+    }
+    const notes = rewriteNotes(review.findings, acts);
+    o.log(msg("critique.rewrite", { count: notes.size, round: round + 1, max, codes }).en);
+    for (const [id, list] of notes) {
+      const i = Number(id.slice(1)) - 1;
+      const ch = o.chapters[i];
+      const r = await brainCall(o.c, { system: o.system, maxTokens: Math.round(ch.words * 1.9) + 300, prompt: `SOURCE:\n${o.sources[i]}\n\nTHIS IS PART ${i + 1} OF ${o.chapters.length}:\n${ch.text}\n\nA story editor sent this part back. Fix every point below; keep everything else that was right and keep about ${ch.words} words. Use only facts the SOURCE states.\n- ${list.join("\n- ")}\n\nAnswer with the whole rewritten part only.` }, o.state);
+      let text = cleanNarration(trimToSentence(r.text, r.stopReason));
+      const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 4000, prompt: `SOURCE:\n${o.sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, o.state);
+      text = cutSentences(text, flagged.text).text;
+      o.chapters[i] = { ...ch, text, words: wordCount(text) };
+    }
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

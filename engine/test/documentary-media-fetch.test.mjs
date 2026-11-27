@@ -187,6 +187,14 @@ await test("a too-short query calls no provider", async () => {
   assert.equal(calls.n, 0); assert.equal(result.candidates.length, 0);
 });
 
+await test("a result marked noStore (NARA's terms) keeps the whole answer out of the cache", async () => {
+  const calls = { n: 0 };
+  const d = deps([provider("open-archives", 1, [item("open-archives", "n1", "Public domain", { noStore: true })], calls)]);
+  await fetchShotMedia({ shotId: "s1", query: "Hoover Dam", kind: "image" }, d);
+  await fetchShotMedia({ shotId: "s2", query: "Hoover Dam", kind: "image" }, d);
+  assert.equal(calls.n, 2);
+  assert.equal(d.cache.store.size, 0);
+});
 console.log(cases.map((c) => c.status + " " + c.name + (c.error ? " — " + c.error : "")).join("\n"));
 const failures = cases.filter((c) => c.status === "FAIL");
 console.log("\n" + (cases.length - failures.length) + "/" + cases.length + " documentary media fetch cases passed.");

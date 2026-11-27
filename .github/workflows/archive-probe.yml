@@ -1,0 +1,23 @@
+name: Archive probe
+# Manual, read-only: asks LoC, DVIDS, Europeana and NASA for three fixed queries from the runner's network
+# and prints counts + 3 titles each. No tokens beyond the archives' own keys (DVIDS_API_KEY, EUROPEANA_API_KEY).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probe the archives
+        env:
+          DVIDS_API_KEY: ${{ secrets.DVIDS_API_KEY }}
+          EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
+        run: node local/archive-probe.mjs
