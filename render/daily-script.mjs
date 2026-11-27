@@ -222,13 +222,13 @@ export function makeLanes(o = {}) {
 /**
  * One brain call on the lane that has room: the model is named to the Worker, which asks only that model.
  * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {{ system: string, prompt: string, maxTokens: number }} body
- * @param {{ calls: { model: string, words: number, seconds: number }[], lanes: ReturnType<typeof makeLanes> }} state
+ * @param {{ calls: { model: string, words: number, seconds: number }[], lanes: ReturnType<typeof makeLanes>, dayHits?: Record<string, number> }} state
  */
 async function laneCall(c, body, state) {
   const lanes = state.lanes;
   const tokens = Math.ceil((body.system.length + body.prompt.length) / 3.8) + Math.ceil(body.maxTokens * 0.8);
   let last = "";
-  for (let attempt = 1; attempt <= 12; attempt += 1) {
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
     let model;
     try { model = await lanes.acquire(tokens); } catch (e) { throw new Error(`The free brains' daily limit is used up: ${last.slice(0, 300) || (e instanceof Error ? e.message : String(e))}`); }
     const t0 = Date.now();
@@ -240,12 +240,19 @@ async function laneCall(c, body, state) {
       last = "empty reply";
     } catch (e) {
       last = e instanceof Error ? e.message : String(e);
-      if (/day used up|per day|RPD|TPD|PerDay/i.test(last) && !/busy/i.test(last)) { lanes.spend(model); continue; }
+      // Groq's daily limit is a rolling window of tokens (200,000 a model: "try again in 20m" measured 27 Nov), not a midnight
+      // reset: the model rests and comes back, 10 minutes longer each time it says so, instead of stopping the film.
+      if (/day used up|per day|RPD|TPD|PerDay/i.test(last) && !/busy/i.test(last)) {
+        const hits = (state.dayHits ??= {});
+        hits[model] = (hits[model] ?? 0) + 1;
+        lanes.rest(model, Math.min(40, 10 * hits[model]) * 60_000);
+        continue;
+      }
       if (/ 4\d\d /.test(last) && !/ 429 /.test(last) && !/ 413 /.test(last)) throw new Error(`The brain refused the request: ${last.slice(0, 400)}`);
       lanes.rest(model);
     }
   }
-  throw new Error(`The free brain did not answer after 12 tries: ${last.slice(0, 400)}`);
+  throw new Error(`The free brain did not answer after 40 tries: ${last.slice(0, 400)}`);
 }
 
 /**
