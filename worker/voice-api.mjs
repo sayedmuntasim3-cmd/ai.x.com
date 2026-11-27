@@ -182,6 +182,21 @@ export function progressEntry(stage, params = {}, error) {
   return { at: new Date().toISOString(), stage, ok: !error, message: { en: m.en, bn: m.bn } };
 }
 
+/**
+ * A runner that dies (shut down, out of memory) never sends its failure, so the film would stay
+ * "running" forever. GitHub knows: the film's own run is finished. @param {any} rec @param {any} env @param {typeof fetch} [f]
+ */
+async function runEnded(rec, env, f = fetch) {
+  const m = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/(\d+)$/.exec(rec.run?.runUrl ?? "");
+  if (!m || m[1] !== env.GITHUB_REPO) return false;
+  const res = await f(`https://api.github.com/repos/${m[1]}/actions/runs/${m[2]}`, {
+    headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "zupona-studio" },
+  }).catch(() => null);
+  if (!res?.ok) return false;
+  const run = await res.json().catch(() => ({}));
+  return run.status === "completed";
+}
+
 /** The status the creator sees, from the last progress entry. @param {any} rec */
 function statusOf(rec) {
   const last = rec.progress?.at(-1);
@@ -463,8 +478,11 @@ export async function handleVoice(request, env, url, deps = {}) {
   if (sub === "retry" && method === "POST") {
     if (!owner) return json({ error: "Wrong studio token." }, 401);
     if (!rec.uploaded) return json({ error: "The recording is not fully uploaded yet." }, 409);
-    if (statusOf(rec) !== "failed") return json({ error: "Only a stopped film can be started again." }, 409);
     if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return json({ error: "GitHub is not connected (GITHUB_TOKEN secret, GITHUB_REPO var)." }, 503);
+    if (statusOf(rec) === "running" && (await runEnded(rec, env, deps.fetch))) {
+      rec.progress.push(progressEntry(rec.progress.at(-1)?.stage ?? "started", {}, "the film machine stopped without reporting (its runner was shut down)."));
+    }
+    if (statusOf(rec) !== "failed") return json({ error: "Only a stopped film can be started again." }, 409);
     rec.retries = (rec.retries ?? 0) + 1;
     delete rec.film;
     delete rec.report;
