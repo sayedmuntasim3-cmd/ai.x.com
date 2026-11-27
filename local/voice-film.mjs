@@ -48,6 +48,7 @@ import { planVoiceVisuals, quranVisualAdabGuard, respellNames, voiceScore, withM
 import { DESIGNED_TYPES, GENRE_RHYTHM, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
 import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom } from "../engine/src/craft-memory.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
+import { archiveKeys } from "../engine/src/open-archives.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
 import { groqLook, groqModel } from "../worker/groq.mjs";
 import { rerankRun } from "../render/asset-rank/rerank.mjs";
@@ -435,7 +436,7 @@ export async function pictures(o) {
   // The Director pass first (beats.json): the world, the genre and a beat sheet; the picture plan is told the world.
   const director = await planBeats({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic });
   await writeFile(join(o.out, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: director.brainFindings }, null, 1));
-  const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
+  const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, archiveEnv: archiveKeys(process.env), fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
   await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The shot plan (shots.json): every shot typed, re-cut to the genre's rhythm, designed moments on the voice's own lines.
   // The Craft Ledger: the targets earlier films taught for this genre (never looser than the house), read by the
