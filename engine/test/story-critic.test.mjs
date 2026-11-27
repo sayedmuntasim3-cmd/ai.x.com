@@ -168,3 +168,16 @@ test("the repair drops the invented-number sentence and the second copy, and ref
   const gutted = repairX([{ id: "C1", text: "The keeper counted 4821 paces. The keeper counted 9137 paces. A short line." }], { sources });
   assert.equal(gutted.ok, false);
 });
+
+test("the repair also drops the sentence the story editor named as a logic gap, and a cliche sentence", () => {
+  const adj = ["tall", "grim", "quiet", "wet", "old", "proud", "tired", "stern", "pale", "brisk", "calm", "weary", "bold", "lean", "stout", "keen", "dim", "warm", "cold", "dry", "slow", "swift", "grey", "bright", "dull"];
+  const noun = ["bolt", "gate", "pier", "ramp", "beam", "shaft", "valve", "spill", "chute", "wall", "dock", "tower", "yard", "mill", "road", "bank", "weir", "lock", "mast", "kiln", "forge", "loft", "barn", "shed", "cart"];
+  const filler = adj.map((a, i) => `The ${a} crew inspected the ${noun[i]} beside the ${noun[(i + 7) % 25]} and wrote it down.`).join(" ");
+  const gap = "When the reservoir filled, it began to push against the wall.";
+  const acts = [{ id: "C1", text: `${filler} ${gap} The dam stands as a testament to the people who built it. The crew went home.` }];
+  const brain = { chapters: [{ chapter: "C1", gaps: [{ sentence: gap, problem: "no cause for the collapse" }] }], answer: null };
+  const fx = repairX(acts, { sources: ["The dam failed."], brain });
+  assert.ok(fx.ok);
+  assert.deepEqual(fx.removed.map((r) => r.why).sort(), ["filler", "logic"]);
+  assert.ok(!fx.acts[0].text.includes("push against") && fx.acts[0].text.includes("The crew went home."));
+});

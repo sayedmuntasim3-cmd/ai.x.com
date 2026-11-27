@@ -566,17 +566,18 @@ export const REPAIR_MAX_SHARE = 0.1;
 /**
  * Never stop a film for a fixable line. After the rewrite rounds, code does the rest: a sentence that holds a
  * number no source has is dropped; the second copy of a repeated passage of eight words or more is dropped
- * (official names are not repeats). Questions are never dropped. If more than a tenth of the words would go,
- * nothing is changed and `ok` is false: that script is bad, not fixable.
- * @param {Act[]} acts @param {{ sources: string[] }} o
- * @returns {{ ok: boolean, acts: Act[], removed: { act: string, sentence: string, why: "number" | "repeat" }[], share: number }}
+ * (official names are not repeats); a sentence the story editor (the brain read) named as a logic gap is dropped;
+ * a sentence holding a cliche or a hedge is dropped. Questions are never dropped. If more than a tenth of the
+ * words would go, nothing is changed and `ok` is false: that script is bad, not fixable.
+ * @param {Act[]} acts @param {{ sources: string[], brain?: BrainRead | null }} o
+ * @returns {{ ok: boolean, acts: Act[], removed: { act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" }[], share: number }}
  */
 export function repairScript(acts, o) {
   const source = o.sources.join("\n\n");
   const known = numbersIn(source).map((n) => n.value);
   const ctx = { known, knownSet: new Set(known) };
   const n = CRITIC_LIMITS.ngram;
-  /** @type {{ act: string, sentence: string, why: "number" | "repeat" }[]} */
+  /** @type {{ act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" }[]} */
   const removed = [];
   /** @type {Set<string>} */
   const seen = new Set();
@@ -587,6 +588,9 @@ export function repairScript(acts, o) {
       const isQuestion = /\?["”’]?$/.test(s);
       if (!isQuestion && inventedNumbersIn(s, ctx).length) { removed.push({ act: a.id, sentence: s, why: "number" }); return false; }
       if (isQuestion) return true;
+      const gaps = (o.brain?.chapters ?? []).filter((c) => String(c.chapter) === String(a.id)).flatMap((c) => c.gaps ?? []);
+      if (gaps.some((g) => g?.problem && g?.sentence && normalize(s).includes(normalize(g.sentence)))) { removed.push({ act: a.id, sentence: s, why: "logic" }); return false; }
+      if (phrasesIn(s, CLICHES).length || phrasesIn(s, HEDGES).length) { removed.push({ act: a.id, sentence: s, why: "filler" }); return false; }
       const toks = capsOf(s);
       /** @type {string[]} */
       const grams = [];
