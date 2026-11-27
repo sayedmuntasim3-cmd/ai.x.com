@@ -38,7 +38,7 @@ export const FORMATS = Object.freeze({
 });
 
 /** Width of one letter or space of Amiri Quran, as a share of the font size (measured: 430 px for 42 letters at 70). */
-const LETTER_WIDTH = 0.15;
+const LETTER_WIDTH = 0.145;
 
 /**
  * The size an ayah is written at: the largest from maxFontSize down to
@@ -54,8 +54,8 @@ export function ayahFontSize(text, f) {
 }
 
 /** One grade for the whole film: a little less colour, a little more depth, a soft vignette. */
-export const GRADE = "eq=contrast=1.04:saturation=0.9:gamma=0.98,vignette=angle=PI/5";
-const CARD = { c0: "0x10151c", c1: "0x232d3a" };
+export const GRADE = "eq=contrast=1.05:saturation=0.92:gamma=0.95,vignette=angle=PI/5,eq=brightness=0.02,eq=gamma_r=0.98,eq=gamma_b=1.02";
+const CARD = { c0: "0x0d1520", c1: "0x1a2433" };
 
 /** @param {number} n */
 const r3 = (n) => Math.round(n * 1000) / 1000;
@@ -188,11 +188,11 @@ export function filmText(plan, uthmani, surahNames, o, texts) {
   const highlightOn = o.highlight === "word";
   const lines = ["[Script Info]", "ScriptType: v4.00+", `PlayResX: ${f.width}`, `PlayResY: ${f.height}`, "WrapStyle: 0", "ScaledBorderAndShadow: yes", "", "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Ayah,Amiri Quran,${f.fontSize},&H00F0ECE4,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.08)},${Math.round(f.width * 0.08)},${f.margin},-1`,
-    `Style: AyahHighlighted,Amiri Quran,${f.fontSize},&H00F5E6B8,&H00F5E6B8,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.08)},${Math.round(f.width * 0.08)},${f.margin},-1`,
-    `Style: Title,Amiri Quran,${f.titleSize},&H00F0ECE4,&H00F0ECE4,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,2,3,5,40,40,0,-1`,
-    `Style: Small,Amiri Quran,${Math.round(f.fontSize * 0.5)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,40,40,${Math.round(f.margin * 0.6)},1`,
-    `Style: Meaning,Amiri Quran,${Math.round(f.fontSize * 0.42)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,40,40,${Math.round(f.margin * 0.6)},1`,
+    `Style: Ayah,Amiri Quran,${f.fontSize},&H00F0ECE4,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.09)},${Math.round(f.width * 0.09)},${f.margin},-1`,
+    `Style: AyahHighlighted,Amiri Quran,${f.fontSize},&H00F5F0C8,&H00F5F0C8,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.09)},${Math.round(f.width * 0.09)},${f.margin},-1`,
+    `Style: Title,Amiri Quran,${f.titleSize},&H00F0ECE4,&H00F0ECE4,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,2,3,5,50,50,0,-1`,
+    `Style: Small,Amiri Quran,${Math.round(f.fontSize * 0.55)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,${Math.round(f.margin * 0.6)},1`,
+    `Style: Meaning,Amiri Quran,${Math.round(f.fontSize * 0.46)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,${Math.round(f.margin * 0.6)},1`,
     "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"];
   const offsetOf = (/** @type {number} */ surah) => { let k = 0; for (let s = 1; s < surah; s += 1) k += AYAT[s - 1]; return k; };
   // A recording that starts at once has no title scene: the surah's name is shown over the first seconds.
