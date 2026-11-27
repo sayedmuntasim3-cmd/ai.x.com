@@ -1064,7 +1064,6 @@ var digitalCommonwealth = async (ctx) => {
 var europeana = async (ctx) => {
   const data = await ctx.http.json(
     `https://api.europeana.eu/record/v2/search.json?${qs({
-      wskey: ctx.env.EUROPEANA_API_KEY,
       query: ctx.query,
       media: true,
       thumbnail: true,
@@ -1072,7 +1071,9 @@ var europeana = async (ctx) => {
       qf: "TYPE:IMAGE",
       rows: Math.min(100, ctx.perSource + 4),
       profile: "rich"
-    })}`
+    })}`,
+    // The key goes in a header, never the URL: Europeana deprecated wskey because URLs leak when shared.
+    { headers: { "x-api-key": ctx.env.EUROPEANA_API_KEY ?? "" } }
   );
   const out = [];
   for (const item of data.items ?? []) {
