@@ -791,3 +791,19 @@ test("the channel's lessons reach S3, every S5 chapter and the Edit Director", a
   for (const st of ["s3", "s5:C1", "s5:C2", "edit:C1"]) assert.match(prompts[st], /CHANNEL_LESSONS[\s\S]*the law of 1972/, st);
   assert.ok(!/CHANNEL_LESSONS/.test(prompts.s01), "only where the film is shaped and cut");
 });
+
+test("script film: S4, S5 and the edit stage carry their roles' own words from prompts/4, as an extra block after the stage's text", async () => {
+  const { roleCraft } = await import("../src/role-craft.mjs");
+  const made = newFilm({ topic: "The old mill", minutes: 2 }, "f-craft");
+  assert.ok(made.ok);
+  const model = scriptedModel();
+  const orig = model.call;
+  /** @type {Map<string, string>} */
+  const sent = new Map();
+  model.call = async (/** @type {any} */ r) => { sent.set(r.stage, r.messages.map((/** @type {any} */ m) => m.content.map((/** @type {any} */ b) => b.text ?? "").join("\n")).join("\n")); return orig(r); };
+  await runFilm({ film: made.film, manual: "MANUAL", model, store: memoryStore() });
+  assert.ok(sent.get("s4").includes(roleCraft("S4")), "S4 gets the audio, motion, map and look desks");
+  assert.ok(sent.get("s5:C1").includes(roleCraft("S5")), "S5 gets the visual, hook, edit-grammar and graphics desks");
+  assert.ok(sent.get("edit:C1").includes(roleCraft("V5")), "the edit stage gets the edit-grammar and cadence desks");
+  assert.ok(!sent.get("s2").includes("ROLE CRAFT"), "a stage with no desk gets none");
+});
