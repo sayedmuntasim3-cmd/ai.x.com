@@ -130,6 +130,7 @@ export const MESSAGES = Object.freeze({
   "critique.inventedQuote": { en: (p) => `Act ${p.chapter}: ${p.count} quote(s) are in no source (invented): ${p.list}.`, bn: (p) => `অংশ ${p.chapter}: ${p.count}টি উদ্ধৃতি কোনো উৎসে নেই (বানানো): ${p.list}।` },
   "critique.inventedNumber": { en: (p) => `Act ${p.chapter}: ${p.count} number(s) are in no source (invented): ${p.list}.`, bn: (p) => `অংশ ${p.chapter}: ${p.count}টি সংখ্যা কোনো উৎসে নেই (বানানো): ${p.list}।` },
   "critique.unsourcedName": { en: (p) => `Act ${p.chapter}: ${p.count} name(s) are in no source: ${p.list}.`, bn: (p) => `অংশ ${p.chapter}: ${p.count}টি নাম কোনো উৎসে নেই: ${p.list}।` },
+  "critique.unsourcedPlace": { en: (p) => `Act ${p.chapter}: ${p.count} place name(s) are common geography but in no source: ${p.list}.`, bn: (p) => `অংশ ${p.chapter}: ${p.count}টি স্থানের নাম পরিচিত ভূগোল, কিন্তু কোনো উৎসে নেই: ${p.list}।` },
   "critique.repetition": { en: (p) => `The script repeats itself (${p.count} repeat(s)): ${p.list}.`, bn: (p) => `স্ক্রিপ্টে একই কথা বারবার (${p.count}টি পুনরাবৃত্তি): ${p.list}।` },
   "critique.filler": { en: (p) => `Filler and cliches (${p.count}): ${p.list}.`, bn: (p) => `ফাঁকা কথা ও ক্লিশে (${p.count}টি): ${p.list}।` },
   "critique.passed": { en: (p) => `The story critic passed the script (round ${p.round}).`, bn: (p) => `গল্প-সমালোচক স্ক্রিপ্টটি পাস করেছে (রাউন্ড ${p.round})।` },

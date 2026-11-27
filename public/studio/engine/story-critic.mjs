@@ -81,6 +81,16 @@ const STOP = new Set("a an the and or but if then so of to in on at by for with 
 
 const MONTHS = "january february march april may june july august september october november december monday tuesday wednesday thursday friday saturday sunday";
 const COMMON_PROPER = new Set(`${MONTHS} i america american americans english god mr mrs ms dr sir st us u.s`.split(" "));
+/**
+ * Common geography: a place every viewer knows is not an invented fact, so it is a soft finding (revise), never
+ * a hard block. People, firms and quotes stay hard blocks. Words of US states, regions, countries, oceans,
+ * big rivers and big cities.
+ */
+const GEOGRAPHY = new Set(`alabama alaska arizona arkansas california colorado connecticut delaware florida georgia hawaii idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri montana nebraska nevada hampshire jersey mexico york carolina dakota ohio oklahoma oregon pennsylvania rhode island tennessee texas utah vermont virginia washington wisconsin wyoming
+north south east west northern southern eastern western northwest northeast southwest southeast midwest midwestern pacific atlantic gulf arctic coast coastal great plains lakes rockies rocky appalachian appalachia new england sound bay valley canyon
+canada canadian mexican britain british england scotland ireland france french germany german italy italian spain spanish china chinese japan japanese india indian russia russian soviet europe european asia asian africa african australia egypt brazil netherlands dutch switzerland swiss sweden norway
+mississippi missouri hudson columbia colorado ohio potomac thames rhine danube nile amazon yangtze
+chicago boston seattle portland francisco angeles los san philadelphia detroit houston dallas miami atlanta denver tacoma london paris berlin tokyo rome moscow`.split(/\s+/));
 
 /** @param {string} t */
 export const normalize = (t) => String(t).toLowerCase().replace(/[’‘]/g, "'").replace(/[‐-―-]/g, " ").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
@@ -417,6 +427,7 @@ export function critiqueScript(o) {
       if (bad.length) add("critique.inventedNumber", "block", a.id, bad, `These numbers in act ${a.id} are not in the sources: ${bad.slice(0, 8).join("; ")}. Use only numbers the SOURCE gives, or cut the sentence.`);
       // Names: capitalised words inside a sentence that no source has.
       const unknown = new Set();
+      const places = new Set();
       for (const s of sentencesOf(a.text)) {
         const ws = s.replace(/["“”‘’]/g, " ").split(/\s+/).filter(Boolean);
         ws.forEach((w, i) => {
@@ -424,10 +435,11 @@ export function critiqueScript(o) {
           if (i === 0 || !/^[A-Z][A-Za-z.'-]+$/.test(bare)) return;
           const k = bare.toLowerCase();
           if (COMMON_PROPER.has(k) || title.has(k) || nsource.includes(` ${normalize(bare)} `)) return;
-          unknown.add(bare);
+          (GEOGRAPHY.has(k) ? places : unknown).add(bare);
         });
       }
-      if (unknown.size) add("critique.unsourcedName", "block", a.id, [...unknown], `These names in act ${a.id} are in no source: ${[...unknown].slice(0, 10).join(", ")}. Name only people, places and things the SOURCE names.`);
+      if (unknown.size) add("critique.unsourcedName", "block", a.id, [...unknown], `These names in act ${a.id} are in no source: ${[...unknown].slice(0, 10).join(", ")}. Name only people, firms, places and things the SOURCE names.`);
+      if (places.size) add("critique.unsourcedPlace", "revise", a.id, [...places], `These places in act ${a.id} are common geography but in no source: ${[...places].slice(0, 10).join(", ")}. Keep a place only where the SOURCE supports it.`);
     }
     factStats.sourceNumbers = knownSet.size;
   }

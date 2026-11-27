@@ -21,7 +21,7 @@ Script: artifact daily-41b3b491 of run 45867027399 (script.json, 5946 words, 8 p
 }
 - [revise] critique.noWhy C7: Act C7 says what happened but never why.
     
-- [block] critique.unsourcedName C2: Act C2: 2 name(s) are in no source: Northwest; Hudson.
+- [revise] critique.unsourcedPlace C2: Act C2: 2 place name(s) are common geography but in no source: Northwest; Hudson.
     Northwest
     Hudson
 - [block] critique.unsourcedName C6: Act C6: 1 name(s) are in no source: Bill.
@@ -31,4 +31,4 @@ Script: artifact daily-41b3b491 of run 45867027399 (script.json, 5946 words, 8 p
     C1: sent shockwaves
 ```
 
-Read by hand: "Bill and Scanlan" is a real error (the source says Billah and Scanlan); "Hudson" and "Pacific Northwest" are not in the sources. C7 also has a logic gap code cannot see ("those steel trusses" refers to a sentence the fact pass cut); the brain pass is built to find such gaps.
+Read by hand: "Bill and Scanlan" is a real error (the source says Billah and Scanlan); "Hudson" and "Pacific Northwest" are not in the sources; as common geography they are a soft finding (revise), not a hard block. C7 also has a logic gap code cannot see ("those steel trusses" refers to a sentence the fact pass cut); the brain pass is built to find such gaps.

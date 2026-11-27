@@ -56,6 +56,17 @@ test("an invented number or name is a hard fail; a hedged rounding of a source n
   assert.ok(!codes(run(hedged)).includes("critique.inventedNumber"));
 });
 
+test("common geography outside the sources is a soft finding; a person or firm stays a hard block", () => {
+  const acts = GOOD.map((a) => (a.id === "C2" ? { ...a, text: `${a.text} Rain clouds came in from the Pacific Northwest, and the dam had been planned by Hartwell Engineering for engineer Joe Brandt.` } : a));
+  const r = run(acts);
+  const place = r.findings.find((x) => x.code === "critique.unsourcedPlace");
+  assert.equal(place?.severity, "revise");
+  assert.deepEqual(place?.items, ["Pacific", "Northwest"]);
+  const name = r.findings.find((x) => x.code === "critique.unsourcedName");
+  assert.equal(name?.severity, "block");
+  assert.deepEqual(name?.items, ["Hartwell", "Engineering", "Joe", "Brandt"]);
+});
+
 test("an act with no why fails with critique.noWhy, and goes back to that act", () => {
   const acts = GOOD.map((a) => (a.id === "C3" ? { ...a, text: "In March nineteen twenty-five heavy rain filled the reservoir in three days. Water rose over the crest. The dam failed, and as a result the valley below was lost." } : a));
   const r = run(acts);
@@ -115,7 +126,7 @@ test("the brain pass: a prompt that asks for exact sentences, a lenient parser, 
 });
 
 test("every critic finding has an English and a Bangla message", () => {
-  for (const code of ["noWhy", "noEvent", "noConsequence", "logic", "noQuestion", "unanswered", "inventedQuote", "inventedNumber", "unsourcedName", "repetition", "filler", "passed", "rewrite", "stopped"]) {
+  for (const code of ["noWhy", "noEvent", "noConsequence", "logic", "noQuestion", "unanswered", "inventedQuote", "inventedNumber", "unsourcedName", "unsourcedPlace", "repetition", "filler", "passed", "rewrite", "stopped"]) {
     const m = MESSAGES[`critique.${code}`];
     assert.ok(m, code);
     assert.ok(m.en({ chapter: "C1", count: 1, list: "x", question: "q", round: 1, max: 2, codes: "a" }).length > 5);
