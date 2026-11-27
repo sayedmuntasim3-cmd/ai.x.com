@@ -270,10 +270,19 @@ export const LanternIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const BridgeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M2.5 17.5h19" />
+    <path d="M6 17.5V8M18 17.5V8" />
+    <path d="M2.5 11.5c3.4 0 4.6-3 9.5-3s6.1 3 9.5 3" />
+    <path d="M9.5 9.9v7.6M14.5 9.9v7.6" />
+  </Icon>
+);
+
 export function CategoryIcon({ id, ...p }: IconProps & { id: CategoryId }) {
   switch (id) {
-    case "nature":
-      return <LeafIcon {...p} />;
+    case "engineering":
+      return <BridgeIcon {...p} />;
     case "ocean":
       return <WaveIcon {...p} />;
     case "space":

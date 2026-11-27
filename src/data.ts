@@ -2,7 +2,7 @@
 // Everything the page shows as a choice lives here, so copy can change without touching layout code.
 
 export type Mode = "idea" | "voice";
-export type CategoryId = "nature" | "ocean" | "space" | "history" | "science" | "culture";
+export type CategoryId = "engineering" | "ocean" | "space" | "history" | "science" | "culture";
 export type AgeId = "all" | "kids" | "teens" | "adults";
 export type StyleId = "cinematic" | "observational" | "archival" | "investigative" | "minimal" | "storybook";
 export type MusicId = "epic" | "ambient" | "orchestral" | "piano" | "mystery" | "none";
@@ -21,13 +21,13 @@ export type Category = Option<CategoryId> & {
 
 export const CATEGORIES: Category[] = [
   {
-    id: "nature",
-    label: "Nature",
-    hint: "Wild places and the life within them",
-    title: "Where the Glaciers Sing",
-    runtime: "58m",
-    subtitle: "A winter on the roof of the world",
-    idea: "A snow leopard mother raising her cubs through one brutal Himalayan winter",
+    id: "engineering",
+    label: "Engineering",
+    hint: "Bridges, dams and the failures behind them",
+    title: "The Bridge That Tore Itself Apart",
+    runtime: "40m",
+    subtitle: "Tacoma Narrows, four months and one wind",
+    idea: "Why the Tacoma Narrows Bridge tore itself apart four months after it opened",
   },
   {
     id: "ocean",
@@ -103,12 +103,22 @@ export const MUSIC: Option<MusicId>[] = [
 
 export const DURATION_PRESETS: Option<string>[] = [
   { id: "3", label: "3 min", hint: "Short" },
-  { id: "5", label: "5 min", hint: "Quick watch" },
   { id: "8", label: "8 min", hint: "Classic" },
   { id: "15", label: "15 min", hint: "Deep dive" },
   { id: "30", label: "30 min", hint: "Episode" },
+  { id: "40", label: "40 min", hint: "Documentary" },
   { id: "60", label: "60 min", hint: "Feature" },
 ];
+
+/** The lengths the studio offers as chips; anything else is a custom length. */
+export const DURATION_CHIPS = [3, 8, 15, 30, 40] as const;
+
+/**
+ * The film preview and the gallery of sample films stay hidden until a real finished
+ * film exists (docs/missions/NEXT_TASKS.md, T6): the page must not show a documentary that was never made.
+ * Flipping this to true puts both sections back.
+ */
+export const SHOW_PREVIEW_AND_GALLERY = false;
 
 /**
  * The idea system a typed idea belongs to, from its words ("Apollo 11" is space, not nature), or
@@ -119,9 +129,9 @@ export function suggestCategory(text: string): CategoryId | null {
   const cues: [CategoryId, RegExp][] = [
     ["space", /\b(space|apollo|nasa|moon|mars|planets?|galax(y|ies)|stars?|astronauts?|rockets?|orbit|universe|black holes?|telescope|voyager|comets?|asteroids?|spacex)\b/g],
     ["ocean", /\b(oceans?|seas?|reefs?|coral|whales?|sharks?|deep sea|marine|tides?|dolphins?|octopus|jellyfish|underwater)\b/g],
-    ["history", /\b(war|wars|battles?|empires?|kings?|queens?|ancient|century|centuries|revolution|dynasty|pharaohs?|medieval|history|civili[sz]ations?|wwi+|world war|1[0-9]{3}s?|canals?|pyramids?|castles?|cathedrals?|railways?|bridges?|dams?|colonial|ruins)\b/g],
-    ["science", /\b(science|physics|chemistry|biology|brain|dna|quantum|atoms?|virus(es)?|robots?|technology|inventions?|medicine|climate|ai|computers?|engineering)\b/g],
-    ["nature", /\b(wildlife|animals?|forests?|lions?|tigers?|elephants?|birds?|mountains?|jungles?|rivers?|deserts?|migration|insects?|nature|wolves|wolf|bears?|leopards?)\b/g],
+    ["history", /\b(war|wars|battles?|empires?|kings?|queens?|ancient|century|centuries|revolution|dynasty|pharaohs?|medieval|history|civili[sz]ations?|wwi+|world war|1[0-9]{3}s?|pyramids?|castles?|cathedrals?|colonial|ruins)\b/g],
+    ["science", /\b(science|physics|chemistry|biology|brain|dna|quantum|atoms?|virus(es)?|robots?|technology|inventions?|medicine|climate|ai|computers?)\b/g],
+    ["engineering", /\b(bridges?|dams?|levees?|canals?|tunnels?|skyscrapers?|subways?|railways?|aqueducts?|engineering|engineers?|megaprojects?|infrastructure|foundations?|collapses?|collapsed|disasters?|failures?|failed|hurricanes?|floods?|flooding|earthquakes?|concrete|steel|tacoma|hoover|suez|panama)\b/g],
     ["culture", /\b(cultures?|festivals?|music|food|traditions?|art|artists?|cities|city|religions?|languages?|fashion|sports?|football|cricket|people of)\b/g],
   ];
   let best: CategoryId | null = null;
@@ -149,9 +159,9 @@ export function stepMinutes(minutes: number, direction: 1 | -1): number {
 
 /** Ideas the "Inspire me" wand types into the box, one category each. */
 export const INSPIRATIONS: { text: string; category: CategoryId }[] = [
-  { text: "The life of a mountain lion in the wild", category: "nature" },
-  { text: "How a single oak tree supports a thousand species", category: "nature" },
-  { text: "The great wildebeest migration, told from the river's edge", category: "nature" },
+  { text: "Why the Tacoma Narrows Bridge tore itself apart four months after it opened", category: "engineering" },
+  { text: "The night the New Orleans levees failed, and who saw it coming", category: "engineering" },
+  { text: "How they poured Hoover Dam into the desert, and what it cost", category: "engineering" },
   { text: "The beauty and fragility of coral reefs", category: "ocean" },
   { text: "Glowing creatures of the deep sea and how they make light", category: "ocean" },
   { text: "The fishing families of the Sundarbans mangrove coast", category: "ocean" },
