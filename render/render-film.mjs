@@ -17,7 +17,7 @@
 import { mapSvg, routeSvgs } from "./maps.mjs";
 import { synthSounds } from "./sfx-synth.mjs";
 import { graphicFor } from "./graphics/from-shot.mjs";
-import { renderGraphic, loadPlaywright } from "./graphics/render-graphic.mjs";
+import { renderGraphicFile, loadPlaywright } from "./graphics/render-graphic.mjs";
 import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 
 /** Levels of the synthesised edit sounds in the effects mix. */
@@ -534,6 +534,7 @@ export async function renderFilm(o) {
   let depthOn = o.depth !== false;
   /** @type {Promise<any> | null} */
   let browser = null;
+  try {
   await pool(o.joinParts ? [] : t.video, limit, async (v, i) => {
     if (i < first || i >= range.end) return;
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
@@ -718,8 +719,8 @@ export async function renderFilm(o) {
             // is awaited: one fallback to the ffmpeg card, never an unhandled rejection that loses the film.
             browser.catch(() => {});
           }
-          await renderGraphic({ template: designed.template, data: designed.data, width: t.width, height: t.height, fps: t.fps, frames: v.frames, out: shot + ".part.mp4", ffmpeg, browser: await browser });
-          renameSync(shot + ".part.mp4", shot);
+          // A temp file of its own, checked, then renamed: a cut-off render never leaves a broken graphic behind.
+          await renderGraphicFile({ template: designed.template, data: designed.data, width: t.width, height: t.height, fps: t.fps, frames: v.frames, file: shot, out: "", ffmpeg, ffprobe, browser: await browser });
         }
         input = ["-i", shot];
         chain.push("setsar=1");
@@ -885,12 +886,15 @@ export async function renderFilm(o) {
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
   });
+  } finally {
+  // On every path (a failed shot included) the browser is closed, so no Chromium outlives the render.
   // A browser that never started was already reported (designed graphics off); closing it must not throw again.
   // The close is bounded: a wedged browser is left to the process exit, never a hang of the render.
   if (browser) {
     /** @type {any} */ let timer;
     await Promise.race([browser.then((b) => b.close(), () => {}), new Promise((r) => { timer = setTimeout(r, 15_000); })]).catch(() => {});
     clearTimeout(timer);
+  }
   }
   // 1b. Transitions that need the shot before: a whip, a slide or a zoom from its last frame into this shot.
   // The shot keeps its length (the move happens over its first frames), so the film's clock never shifts.
