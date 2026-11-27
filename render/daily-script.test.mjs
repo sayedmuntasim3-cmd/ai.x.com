@@ -75,7 +75,7 @@ test("the whole script: outline, eight parts from the source, a short part conti
   });
   const topic = { ...DAILY_TOPICS[0], wiki: ["Test Bridge"] };
   const dir = (await import("node:fs")).mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "daily-"));
-  const s = await writeScript({ c: { site: "https://s", id: "i", ticket: "t", fetch: fetchBrain }, topic, out: dir, get: /** @type {any} */ (async () => new Response(JSON.stringify(article))), sleep: async () => {}, gapMs: 0, log: () => {} });
+  const s = await writeScript({ c: { site: "https://s", id: "i", ticket: "t", fetch: fetchBrain }, topic, out: dir, get: /** @type {any} */ (async () => new Response(JSON.stringify(article))), sleep: async () => {}, gapMs: 0, log: () => {}, critic: false });
   assert.equal(s.chapters.length, 8);
   assert.equal(prompts.length, 18);
   assert.deepEqual(s.factCheck.cut, ["Some drivers were thrown into the water."]);
@@ -105,4 +105,37 @@ test("the Worker's free brain as a model: text only, a busy minute waited out, a
   assert.equal(m.calls.length, 1);
   const spent = workerBrain({ ...c, fetch: /** @type {any} */ (async () => new Response('{"error":"Groq: tried a (day used up); Gemini RESOURCE_EXHAUSTED"}', { status: 429 })) }, { sleep: async () => {}, waitMs: 0 });
   await assert.rejects(spent.call({ stage: "x", system: [], messages: [], maxTokens: 10 }), /daily limit is used up/);
+});
+
+test("the story critic before narration: a padded, question-less script is sent back with its findings, and stops the film when the rewrites do not fix it", async () => {
+  const article = { query: { pages: [{ title: "Test Bridge", extract: `Lead about the bridge. `.repeat(40) + ["Design", "Building", "Wind", "Collapse", "Inquiry", "Cause", "Legacy", "Today"].map((h) => `\n== ${h} ==\n${`${h} facts in detail. `.repeat(300)}`).join("") }] } };
+  const make = (/** @type {(b: any) => string | null} */ rewrite) => {
+    /** @type {any[]} */
+    const prompts = [];
+    const fetch = /** @type {any} */ (async (/** @type {string} */ u, /** @type {any} */ init) => {
+      if (u.includes("/progress")) return new Response("{}");
+      const b = JSON.parse(init.body);
+      prompts.push(b.prompt);
+      const reply = (/** @type {string} */ text) => new Response(JSON.stringify({ text, model: "groq-a" }));
+      if (/List every sentence/.test(b.prompt)) return reply("NONE");
+      if (/Plan the film/.test(b.prompt)) return reply([1, 2, 3, 4, 5, 6, 7, 8].map((i) => `${i}. Title ${i}: beat ${i}`).join("\n"));
+      if (/strict story editor/.test(b.system ?? "") || /copy the exact sentence/.test(b.prompt)) return reply('{"chapters":[],"answer":null}');
+      if (/A story editor sent this part back/.test(b.prompt)) return reply(rewrite(b) ?? "The deck moved in the wind. ".repeat(130));
+      return reply("The deck moved in the wind. ".repeat(130));
+    });
+    return { prompts, fetch };
+  };
+  const topic = { ...DAILY_TOPICS[0], wiki: ["Test Bridge"] };
+  const fs = await import("node:fs");
+  const dir = fs.mkdtempSync((await import("node:path")).join((await import("node:os")).tmpdir(), "daily-"));
+  const bad = make(() => null);
+  await assert.rejects(writeScript({ c: { site: "https://s", id: "i", ticket: "t", fetch: bad.fetch }, topic, out: dir, get: /** @type {any} */ (async () => new Response(JSON.stringify(article))), sleep: async () => {}, gapMs: 0, log: () => {}, maxRounds: 1 }), /still fails the story critic after 1 rewrite.*(repetition|noQuestion)/);
+  // The rewrite request carried the findings; nothing was narrated (no script.json), and every round is kept.
+  assert.ok(bad.prompts.some((p) => /A story editor sent this part back[\s\S]*repeats itself/.test(p)));
+  assert.ok(!fs.existsSync(`${dir}/script.json`));
+  const critic = JSON.parse(fs.readFileSync(`${dir}/critic.json`, "utf8"));
+  assert.equal(critic.ok, false);
+  assert.equal(critic.rounds.length, 2);
+  assert.ok(critic.rounds[0].findings.some((/** @type {any} */ f) => f.code === "critique.noQuestion" && f.message.bn));
+  assert.ok(fs.existsSync(`${dir}/script-rejected.md`));
 });

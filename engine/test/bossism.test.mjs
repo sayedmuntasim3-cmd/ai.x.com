@@ -101,16 +101,21 @@ test("the finished Ramesh Babu film: its unresolved number markers block release
   assert.deepEqual(noEvidence.map((/** @type {any} */ f) => f.target), ["s5:C5"], "C41 cites no page, and C42 is derived from it");
   assert.match(noEvidence[0].message.en, /SC0189:C41.*SC0198:C42/);
   assert.ok(!claims.findings.some((/** @type {any} */ f) => f.code !== "claims.placeholder" && /:C(09|35|65|66)\b/.test(f.message.en)), "UNKNOWN claims narrated as unknown are not defects");
-  assert.equal(v.script, "pass");
+  // The code checks pass; the story critic (gates v5) finds what a hand-made script never checked: padding and unsourced numbers.
+  const script = /** @type {any} */ (review.gates.find((g) => g.id === "script"));
+  assert.equal(script.evidence.errors, 0);
+  assert.deepEqual([...new Set(script.findings.map((/** @type {any} */ f) => f.code.split(".")[0]))], ["critique"]);
+  assert.ok(script.findings.some((/** @type {any} */ f) => f.code === "critique.repetition"));
+  assert.equal(script.evidence.critic.question, "So how does one used van become a Rolls-Royce, scissors still in hand?");
   assert.equal(review.gates.find((g) => g.id === "script")?.evidence.scenes, 270, "the gate ran the checks itself");
   assert.equal(v.research, "block", "this film was written by hand: no research file and no source desk");
   assert.ok(review.gates.find((g) => g.id === "research")?.findings.some((f) => f.code === "research.unchecked"));
   assert.equal(v.visual, "block", "no footage was searched");
   assert.equal(review.release.allowed, false);
-  assert.deepEqual(review.release.blockedBy, ["research", "claims", "story", "visual"], "the viewer panel never read it: the story gate could not run");
+  assert.deepEqual(review.release.blockedBy, ["research", "claims", "script", "story", "visual"], "the viewer panel never read it: the story gate could not run");
   assert.equal(review.gates.find((g) => g.id === "story")?.status, "BLOCKED");
   assert.equal(review.gatesVersion, GATES_VERSION);
-  assert.match(review.release.message.bn, /রিসার্চ, দাবি, গল্প, ছবি/, "the Bengali message names the gates in Bengali");
+  assert.match(review.release.message.bn, /রিসার্চ, দাবি, স্ক্রিপ্ট, গল্প, ছবি/, "the Bengali message names the gates in Bengali");
 });
 
 /** A small finished run in memory, for the gates' findings. */
@@ -475,7 +480,7 @@ test("C2: an edit that drops or breaks a tag is caught by the chapter check, so 
 test("C2: an invented story needs no claim tags, and a review by the previous gates clears nothing", async () => {
   const ledger = ["| **C01** | A wage of the time | 3 shillings | none |", "| **C02** | The town | real | none |"];
   assert.deepEqual((await claimsGate(claimRun({ header: "| ID | Detail | Value | Sources |", ledger, narr: ["He earned three shillings.", "It rained in March."] }), STORY)).codes, []);
-  assert.equal(GATES_VERSION, 4);
+  assert.equal(GATES_VERSION, 5);
   assert.equal(cleared({ at: "2026-01-01T00:00:00.000Z", film: "f", gatesVersion: 2, gates: [], release: releaseDecision([]) }, []).ok, false);
 });
 

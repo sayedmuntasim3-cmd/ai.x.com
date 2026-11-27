@@ -78,11 +78,28 @@ test("the chapter plan must tile the film", () => {
 
 // A scripted model: every stage answers as a real one would, so the whole
 // run, including a repair and a cut-off reply, is exercised without an API key.
-const FILLER = "the river runs past the old mill while the town wakes slowly under a grey sky and the bells ring out across the quiet square today".split(" ");
+// Each scene says one new thing, in a causal chain with one central question (the story critic reads it).
+const STORY = [
+  "the old mill on the river stopped one cold morning, and the town asked one question: why did the wheel of the mill stop?",
+  "for many long years the wheel turned because the river pushed water through a wooden race, and that water ground the grain for bread.",
+  "the miller kept the race clear of mud every spring, so the water reached the wheel fast and the heavy stones turned all year long.",
+  "then a dry summer came and the river ran low for many weeks, which meant the race carried only a thin, slow stream to the wheel.",
+  "the miller wanted more water, so he cut a new channel far upstream, but it drained the old pond that had fed the race for decades.",
+  "as a result the wheel slowed each day, the stones ground less grain, and the bakers bought their flour from the next valley over the hill.",
+  "in the autumn the rains returned, yet the wheel stayed still, because thick mud from the new channel had filled the race below the old pond.",
+  "workers dug out the race by hand for three long weeks, and they found the mud packed so hard that only iron picks could break it.",
+  "the reason was simple: the new channel carried fine silt down from the hills, and the silt settled wherever the moving water slowed down near it.",
+  "so the town closed the new channel, cleared the whole race, and let the river find its own natural path back to the wheel of the mill.",
+  "the wheel of the mill did stop because the new channel drained the pond and filled the race with silt, so no water could reach it.",
+  "from then on the town kept the river in its old bed, and the wheel turned again, grinding grain for the bread of every morning in town.",
+];
 /** @param {number} n @param {number} sec */
 function line(n, sec, words = 25) {
   const t = (/** @type {number} */ s) => `0:${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  const narr = [`Marker${n}`, ...FILLER].slice(0, words).join(" ") + ". {C01}"; // the claim tag every sentence of a true-story film carries
+  const said = STORY[(n - 1) % STORY.length];
+  const cut = [`Marker${n}`, ...said.split(" ")].slice(0, words);
+  const end = cut.length === said.split(" ").length + 1 && said.endsWith("?") ? "?" : ".";
+  const narr = cut.join(" ").replace(/[,.:?;]+$/, "") + `${end} {C01}`; // the claim tag every sentence of a true-story film carries
   return `**SC${String(n).padStart(4, "0")}** | ${t(sec)}-${t(sec + 10)} | C${n <= 6 ? 1 : 2} | beat | E | C01 | NARR: ${narr} | W ${words}/25 | ANCHOR: "river" -> mill | SHOTS: (1) R3 mill | EV: R1 0 / R3 1 | SRC: Pexels · Q1 "old mill" | LOOK: LOOK-M`;
 }
 const chapter = (/** @type {number} */ first, /** @type {number} */ short = 0) =>
@@ -119,9 +136,9 @@ function scriptedModel() {
           const text = r.messages[0].content[0].text;
           const bad = /NARR: (Marker9 [^|]*) \| W 10\/25/.exec(text);
           assert.ok(bad, "the repair sees the failing scene");
-          return reply("```json\n" + JSON.stringify([{ find: `NARR: ${bad[1]} | W 10/25`, replace: `NARR: ${[`Marker9`, ...FILLER].slice(0, 25).join(" ")}. {C01} | W 25/25` }]) + "\n```");
+          return reply("```json\n" + JSON.stringify([{ find: `NARR: ${bad[1]} | W 10/25`, replace: `NARR: ${line(9, 80).split("NARR: ")[1].split(" | W ")[0]} | W 25/25` }]) + "\n```");
         }
-        case "qa": return reply("```json\n" + JSON.stringify({ mustFix: [{ lens: "facts", chapter: "C1", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }], passed: ["p"], notChecked: [] }) + "\n```");
+        case "qa": return reply("```json\n" + JSON.stringify({ mustFix: [{ lens: "facts", chapter: "C1", scene: "SC0002", issue: "x", find: "NARR: Marker2 for many long", replace: "NARR: Marker2 for many good" }], passed: ["p"], notChecked: [] }) + "\n```");
         case "edit:C1":
           assert.ok(r.messages[0].content[0].text.includes("SC0002 0:00:10.0-0:00:20.0"), "the director sees the scene sheet");
           assert.ok(r.messages[0].content[0].text.includes("LONG HOLDS") && r.messages[0].content[0].text.includes("SC0001-1 0:00:00.0-0:00:10.0 (10 s)"), "and the holds code measured");
@@ -160,7 +177,7 @@ test("a whole film runs S0 to S7, repairs a bad chapter, applies QA fixes and re
   assert.deepEqual(model.calls, ["s01", "research", "s2", "s3", "s4", "s4", "s5:C1", "s5:C2", "repair:C2", "qa", "viewer", "edit:C1", "edit:C2", "s6", "s7"]);
   for (const f of ["s01.md", "research.json", "s2.md", "s3.md", "s3-chapters.json", "s4.md", "s5-C1.md", "s5-C2.md", "qa.json", "fix-log.json", "film-check.json", "s6.md", "s7.md", "run.json"]) assert.ok(store.m.has(f), f);
   assert.equal(store.m.get("s4.md"), "## S4\nnarrator\nsound bible\n", "a cut-off reply is continued after its last complete line");
-  assert.ok(store.m.get("s5-C1.md").includes("NARR: Marker2 a"), "the QA fix is applied");
+  assert.ok(store.m.get("s5-C1.md").includes("NARR: Marker2 for many good"), "the QA fix is applied");
   assert.ok(store.m.has("s5-C1.draft.md"), "the pre-fix chapter is kept");
   assert.ok(JSON.parse(store.m.get("film-check.json")).ok);
   assert.equal(state.usage["s4"].calls, 2);
@@ -288,7 +305,7 @@ test("a brain whose window cannot hold the whole film gets QA chapter by chapter
         qaStages.push(r.stage);
         const c = r.stage.slice(3);
         assert.ok(r.messages[0].content[0].text.includes(`<S5_${c}>`) && !r.messages[0].content[0].text.includes(`<S5_${c === "C1" ? "C2" : "C1"}>`), "each QA call reads one chapter");
-        return { text: "```json\n" + JSON.stringify({ mustFix: c === "C1" ? [{ lens: "facts", scene: "SC0002", issue: "x", find: "NARR: Marker2 the", replace: "NARR: Marker2 a" }] : [], passed: ["p"], notChecked: [] }) + "\n```", stopReason: "end_turn", usage: {} };
+        return { text: "```json\n" + JSON.stringify({ mustFix: c === "C1" ? [{ lens: "facts", scene: "SC0002", issue: "x", find: "NARR: Marker2 for many long", replace: "NARR: Marker2 for many good" }] : [], passed: ["p"], notChecked: [] }) + "\n```", stopReason: "end_turn", usage: {} };
       }
       const reply = await base.call(r);
       return /^s5:C[12]$/.test(r.stage) ? { ...reply, text: reply.text + note } : reply;
@@ -303,7 +320,7 @@ test("a brain whose window cannot hold the whole film gets QA chapter by chapter
   assert.equal(qa.mode, "per-chapter");
   assert.match(qa.notChecked[0], /did not compare chapters with each other/, "the lowered check is written down");
   assert.deepEqual(qa.mustFix.map((/** @type {any} */ f) => f.chapter), ["C1"], "a fix keeps the chapter it was found in");
-  assert.match(store.m.get("s5-C1.md"), /NARR: Marker2 a /, "and is applied");
+  assert.match(store.m.get("s5-C1.md"), /NARR: Marker2 for many good /, "and is applied");
 });
 
 test("a run told to stop pauses between stages and resumes from the next one", async () => {
@@ -709,7 +726,7 @@ test("the viewer panel's fix that breaks the word budget is not applied, and a l
   assert.ok(made.ok);
   const base = scriptedModel();
   const model = { ...base, call: async (/** @type {any} */ r) => (r.stage === "viewer"
-    ? { text: "```json\n" + JSON.stringify({ stayScore: 3, why: "nothing happens for a minute", leaves: [], kept: [], fixes: [{ scene: "SC0002", find: "NARR: Marker2 a river runs past the old mill while the town wakes slowly", replace: "NARR: Marker2.", why: "shorter" }] }) + "\n```", stopReason: "end_turn", usage: { input_tokens: 10, output_tokens: 10 } }
+    ? { text: "```json\n" + JSON.stringify({ stayScore: 3, why: "nothing happens for a minute", leaves: [], kept: [], fixes: [{ scene: "SC0002", find: "NARR: Marker2 for many good years the wheel turned because the river pushed water", replace: "NARR: Marker2.", why: "shorter" }] }) + "\n```", stopReason: "end_turn", usage: { input_tokens: 10, output_tokens: 10 } }
     : base.call(r)) };
   const store = memoryStore();
   const state = await runFilm({ film: made.film, manual: "M", model, store });
