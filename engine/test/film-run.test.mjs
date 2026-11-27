@@ -714,6 +714,25 @@ test("the market desk: proven videos on the topic reach S1 and S7, and a title t
   assert.match(String(failing.market), /quota/);
 });
 
+test("the reference prior reaches S1 and S7 for a topic in a pillar, and is silent without one", async () => {
+  const prior = JSON.parse((await import("node:fs")).readFileSync(new URL("../data/reference-prior.json", import.meta.url), "utf8"));
+  const run = async (/** @type {string} */ topic, /** @type {object | undefined} */ referencePrior) => {
+    const made = newFilm({ topic, minutes: 2 }, "prior");
+    assert.ok(made.ok);
+    const base = scriptedModel();
+    /** @type {Record<string, string>} */
+    const prompts = {};
+    const model = { ...base, call: async (/** @type {any} */ r) => { prompts[r.stage] = r.messages[0].content.map((/** @type {any} */ b) => b.text).join("\n"); return base.call(r); } };
+    await runFilm({ film: made.film, manual: "M", model, store: memoryStore(), referencePrior });
+    return prompts;
+  };
+  const withPrior = await run("Why the dam collapsed", prior);
+  assert.match(withPrior.s01, /REFERENCE_PRIOR[\s\S]*pillar "disasters"/);
+  assert.match(withPrior.s7, /REFERENCE_PRIOR/);
+  assert.doesNotMatch((await run("Why the dam collapsed", undefined)).s01, /REFERENCE_PRIOR/);
+  assert.doesNotMatch((await run("The old mill", prior)).s01, /REFERENCE_PRIOR/, "a topic with no pillar keyword gets no brief");
+});
+
 test("the viewer panel's fix that breaks the word budget is not applied, and a low stay score is a gap", async () => {
   const made = newFilm({ topic: "The old mill", minutes: 2 }, "vw");
   assert.ok(made.ok);

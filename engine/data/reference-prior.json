@@ -3,9 +3,9 @@
  "builtAt": "2026-11-27",
  "source": "YouTube Data API through the Worker (/api/videos: uploads playlists + videos.list). No search.list, no video download.",
  "scope": {
-  "videos": 716,
-  "channels": 38,
-  "rawVideosRead": 1906,
+  "videos": 2734,
+  "channels": 39,
+  "rawVideosRead": 6938,
   "winnerOutlier": 1.5,
   "minLongSeconds": 480,
   "freshness": "weight 0 under 14 days, 0.5 under 60, 1 up to 3 years, 0.35 to 5 years, 0.15 older; times the video's views/day vs its channel's median (0.25..4)"
@@ -19,95 +19,95 @@
  "pillars": {
   "disasters": {
    "all": {
-    "n": 251,
+    "n": 972,
     "titleFormulas": {
-     "question": 0.072,
-     "how-it-works": 0,
-     "how-why-what-opener": 0.131,
-     "why-it-failed": 0.042,
-     "number-or-money": 0.373,
-     "year": 0.059,
-     "colon-subtitle": 0.425,
-     "superlative": 0.046,
-     "curiosity-gap": 0.049,
-     "inside-or-behind": 0.04,
-     "named-event": 0.047,
-     "all-caps-word": 0.166,
-     "plain-statement": 0.21
+     "question": 0.08,
+     "how-it-works": 0.001,
+     "how-why-what-opener": 0.126,
+     "why-it-failed": 0.036,
+     "number-or-money": 0.432,
+     "year": 0.117,
+     "colon-subtitle": 0.434,
+     "superlative": 0.067,
+     "curiosity-gap": 0.047,
+     "inside-or-behind": 0.025,
+     "named-event": 0.033,
+     "all-caps-word": 0.221,
+     "plain-statement": 0.161
     },
     "titleWords": {
      "p10": 6,
      "p25": 8,
      "p50": 10,
-     "p75": 13,
-     "p90": 15
+     "p75": 12,
+     "p90": 14
     },
     "titleChars": {
-     "p10": 36,
-     "p25": 46,
-     "p50": 57,
-     "p75": 73,
+     "p10": 39,
+     "p25": 48,
+     "p50": 59,
+     "p75": 74,
      "p90": 85
     },
     "minutes": {
      "p10": 10,
-     "p25": 11.3,
-     "p50": 15.2,
-     "p75": 29.2,
-     "p90": 44.3
+     "p25": 11.7,
+     "p50": 15,
+     "p75": 26.9,
+     "p90": 46.3
     },
     "chapterCount": {
-     "p10": 3,
-     "p25": 6,
+     "p10": 4,
+     "p25": 5,
      "p50": 7,
      "p75": 9,
      "p90": 12
     },
-    "shareWithChapters": 0.11,
+    "shareWithChapters": 0.148,
     "minutesPerChapter": {
-     "p10": 2.1,
-     "p25": 4.2,
-     "p50": 5.5,
-     "p75": 8,
-     "p90": 13.5
+     "p10": 1.8,
+     "p25": 3.3,
+     "p50": 4.4,
+     "p75": 7,
+     "p90": 9.7
     },
     "firstChapterAfterSeconds": {
-     "p10": 47,
-     "p25": 86,
-     "p50": 111,
-     "p75": 196,
-     "p90": 960
+     "p10": 42,
+     "p25": 63,
+     "p50": 92,
+     "p75": 170,
+     "p90": 450
     },
     "ageDays": {
-     "p10": 39,
-     "p25": 76,
-     "p50": 143,
-     "p75": 402,
-     "p90": 922
+     "p10": 76,
+     "p25": 139,
+     "p50": 349,
+     "p75": 748,
+     "p90": 1074
     },
     "freshness": {
-     "under2Months": 0.155,
-     "months2to12": 0.442,
-     "years1to3": 0.215,
-     "over3Years": 0.187
+     "under2Months": 0.047,
+     "months2to12": 0.223,
+     "years1to3": 0.335,
+     "over3Years": 0.394
     }
    },
    "winners": {
-    "n": 71,
+    "n": 277,
     "titleFormulas": {
-     "question": 0.035,
-     "how-it-works": 0,
-     "how-why-what-opener": 0.121,
-     "why-it-failed": 0.023,
-     "number-or-money": 0.306,
-     "year": 0.003,
-     "colon-subtitle": 0.353,
-     "superlative": 0.044,
-     "curiosity-gap": 0.028,
-     "inside-or-behind": 0.026,
-     "named-event": 0.063,
-     "all-caps-word": 0.095,
-     "plain-statement": 0.303
+     "question": 0.059,
+     "how-it-works": 0.001,
+     "how-why-what-opener": 0.107,
+     "why-it-failed": 0.034,
+     "number-or-money": 0.466,
+     "year": 0.147,
+     "colon-subtitle": 0.374,
+     "superlative": 0.077,
+     "curiosity-gap": 0.037,
+     "inside-or-behind": 0.03,
+     "named-event": 0.048,
+     "all-caps-word": 0.189,
+     "plain-statement": 0.166
     },
     "titleWords": {
      "p10": 6,
@@ -117,69 +117,69 @@
      "p90": 14
     },
     "titleChars": {
-     "p10": 36,
-     "p25": 45,
-     "p50": 54,
+     "p10": 38,
+     "p25": 44,
+     "p50": 56,
      "p75": 74,
      "p90": 86
     },
     "minutes": {
-     "p10": 10,
-     "p25": 11.6,
-     "p50": 14.9,
-     "p75": 25.5,
-     "p90": 44.4
+     "p10": 10.2,
+     "p25": 12.7,
+     "p50": 16,
+     "p75": 23.7,
+     "p90": 42.4
     },
     "chapterCount": {
-     "p10": 3,
+     "p10": 4,
      "p25": 4,
-     "p50": 7,
-     "p75": 7,
+     "p50": 6,
+     "p75": 8,
      "p90": 12
     },
-    "shareWithChapters": 0.15,
+    "shareWithChapters": 0.217,
     "minutesPerChapter": {
-     "p10": 3.8,
-     "p25": 5.1,
-     "p50": 6,
-     "p75": 9.7,
+     "p10": 3,
+     "p25": 3.6,
+     "p50": 4.4,
+     "p75": 7.9,
      "p90": 13.5
     },
     "firstChapterAfterSeconds": {
-     "p10": 52,
-     "p25": 102,
-     "p50": 170,
-     "p75": 275,
-     "p90": 1011
+     "p10": 48,
+     "p25": 67,
+     "p50": 99,
+     "p75": 196,
+     "p90": 960
     },
     "ageDays": {
-     "p10": 54,
-     "p25": 80,
-     "p50": 213,
-     "p75": 715,
-     "p90": 1008
+     "p10": 80,
+     "p25": 262,
+     "p50": 605,
+     "p75": 958,
+     "p90": 1269
     },
     "freshness": {
-     "under2Months": 0.155,
-     "months2to12": 0.282,
-     "years1to3": 0.31,
-     "over3Years": 0.254
+     "under2Months": 0.036,
+     "months2to12": 0.152,
+     "years1to3": 0.336,
+     "over3Years": 0.477
     }
    },
    "winnerTitleFormulaLift": {
-    "question": 0.486,
+    "question": 0.737,
     "how-it-works": null,
-    "how-why-what-opener": 0.924,
-    "why-it-failed": 0.548,
-    "number-or-money": 0.82,
-    "year": 0.051,
-    "colon-subtitle": 0.831,
-    "superlative": 0.957,
-    "curiosity-gap": 0.571,
-    "inside-or-behind": 0.65,
-    "named-event": 1.34,
-    "all-caps-word": 0.572,
-    "plain-statement": 1.443
+    "how-why-what-opener": 0.849,
+    "why-it-failed": 0.944,
+    "number-or-money": 1.079,
+    "year": 1.256,
+    "colon-subtitle": 0.862,
+    "superlative": 1.149,
+    "curiosity-gap": 0.787,
+    "inside-or-behind": 1.2,
+    "named-event": 1.455,
+    "all-caps-word": 0.855,
+    "plain-statement": 1.031
    },
    "thumbnails": {
     "sample": 15,
@@ -220,167 +220,167 @@
   },
   "megaprojects": {
    "all": {
-    "n": 150,
+    "n": 529,
     "titleFormulas": {
-     "question": 0.167,
-     "how-it-works": 0.093,
-     "how-why-what-opener": 0.278,
-     "why-it-failed": 0,
-     "number-or-money": 0.144,
-     "year": 0.015,
-     "colon-subtitle": 0.122,
-     "superlative": 0.176,
-     "curiosity-gap": 0.064,
-     "inside-or-behind": 0.014,
-     "named-event": 0.043,
-     "all-caps-word": 0.062,
-     "plain-statement": 0.253
-    },
-    "titleWords": {
-     "p10": 4,
-     "p25": 5,
-     "p50": 7,
-     "p75": 8,
-     "p90": 10
-    },
-    "titleChars": {
-     "p10": 28,
-     "p25": 34,
-     "p50": 43,
-     "p75": 49,
-     "p90": 60
-    },
-    "minutes": {
-     "p10": 10.7,
-     "p25": 12.4,
-     "p50": 17.4,
-     "p75": 22.4,
-     "p90": 33.9
-    },
-    "chapterCount": {
-     "p10": 5,
-     "p25": 7,
-     "p50": 8,
-     "p75": 10,
-     "p90": 13
-    },
-    "shareWithChapters": 0.253,
-    "minutesPerChapter": {
-     "p10": 1.6,
-     "p25": 2,
-     "p50": 2.1,
-     "p75": 2.4,
-     "p90": 3.1
-    },
-    "firstChapterAfterSeconds": {
-     "p10": 39,
-     "p25": 48,
-     "p50": 68,
-     "p75": 96,
-     "p90": 170
-    },
-    "ageDays": {
-     "p10": 46,
-     "p25": 82,
-     "p50": 339,
-     "p75": 696,
-     "p90": 776
-    },
-    "freshness": {
-     "under2Months": 0.14,
-     "months2to12": 0.28,
-     "years1to3": 0.493,
-     "over3Years": 0.087
-    }
-   },
-   "winners": {
-    "n": 34,
-    "titleFormulas": {
-     "question": 0.151,
-     "how-it-works": 0.161,
-     "how-why-what-opener": 0.293,
-     "why-it-failed": 0,
-     "number-or-money": 0.126,
-     "year": 0,
-     "colon-subtitle": 0.033,
+     "question": 0.157,
+     "how-it-works": 0.064,
+     "how-why-what-opener": 0.315,
+     "why-it-failed": 0.005,
+     "number-or-money": 0.186,
+     "year": 0.011,
+     "colon-subtitle": 0.132,
      "superlative": 0.177,
-     "curiosity-gap": 0,
-     "inside-or-behind": 0,
-     "named-event": 0.082,
-     "all-caps-word": 0.029,
-     "plain-statement": 0.262
+     "curiosity-gap": 0.077,
+     "inside-or-behind": 0.023,
+     "named-event": 0.027,
+     "all-caps-word": 0.068,
+     "plain-statement": 0.215
     },
     "titleWords": {
-     "p10": 4,
-     "p25": 5,
+     "p10": 5,
+     "p25": 6,
      "p50": 7,
      "p75": 9,
      "p90": 10
     },
     "titleChars": {
-     "p10": 28,
-     "p25": 31,
-     "p50": 41,
-     "p75": 48,
+     "p10": 30,
+     "p25": 37,
+     "p50": 45,
+     "p75": 51,
      "p90": 61
     },
     "minutes": {
-     "p10": 10.8,
-     "p25": 12.2,
-     "p50": 15.5,
-     "p75": 22.4,
+     "p10": 10.2,
+     "p25": 12.7,
+     "p50": 16.4,
+     "p75": 20.2,
      "p90": 29
     },
     "chapterCount": {
-     "p10": 4,
+     "p10": 5,
      "p25": 7,
      "p50": 8,
-     "p75": 10,
-     "p90": 14
+     "p75": 11,
+     "p90": 13
     },
-    "shareWithChapters": 0.223,
+    "shareWithChapters": 0.351,
     "minutesPerChapter": {
-     "p10": 2.1,
-     "p25": 2.1,
-     "p50": 2.2,
-     "p75": 2.2,
+     "p10": 1.2,
+     "p25": 1.7,
+     "p50": 2.1,
+     "p75": 2.5,
      "p90": 3.1
     },
     "firstChapterAfterSeconds": {
-     "p10": 35,
-     "p25": 39,
-     "p50": 40,
-     "p75": 110,
+     "p10": 45,
+     "p25": 57,
+     "p50": 72,
+     "p75": 88,
+     "p90": 147
+    },
+    "ageDays": {
+     "p10": 67,
+     "p25": 125,
+     "p50": 458,
+     "p75": 892,
+     "p90": 1112
+    },
+    "freshness": {
+     "under2Months": 0.043,
+     "months2to12": 0.174,
+     "years1to3": 0.378,
+     "over3Years": 0.405
+    }
+   },
+   "winners": {
+    "n": 149,
+    "titleFormulas": {
+     "question": 0.195,
+     "how-it-works": 0.088,
+     "how-why-what-opener": 0.364,
+     "why-it-failed": 0.012,
+     "number-or-money": 0.143,
+     "year": 0,
+     "colon-subtitle": 0.114,
+     "superlative": 0.233,
+     "curiosity-gap": 0.064,
+     "inside-or-behind": 0.002,
+     "named-event": 0.036,
+     "all-caps-word": 0.065,
+     "plain-statement": 0.181
+    },
+    "titleWords": {
+     "p10": 5,
+     "p25": 6,
+     "p50": 7,
+     "p75": 9,
+     "p90": 11
+    },
+    "titleChars": {
+     "p10": 30,
+     "p25": 37,
+     "p50": 45,
+     "p75": 51,
+     "p90": 61
+    },
+    "minutes": {
+     "p10": 10.1,
+     "p25": 12.4,
+     "p50": 15.7,
+     "p75": 21.3,
+     "p90": 29.5
+    },
+    "chapterCount": {
+     "p10": 6,
+     "p25": 7,
+     "p50": 8,
+     "p75": 12,
+     "p90": 14
+    },
+    "shareWithChapters": 0.327,
+    "minutesPerChapter": {
+     "p10": 1.1,
+     "p25": 2.1,
+     "p50": 2.2,
+     "p75": 2.7,
+     "p90": 3.2
+    },
+    "firstChapterAfterSeconds": {
+     "p10": 39,
+     "p25": 56,
+     "p50": 74,
+     "p75": 113,
      "p90": 170
     },
     "ageDays": {
-     "p10": 72,
-     "p25": 84,
-     "p50": 633,
-     "p75": 762,
-     "p90": 790
+     "p10": 82,
+     "p25": 219,
+     "p50": 665,
+     "p75": 1038,
+     "p90": 1231
     },
     "freshness": {
-     "under2Months": 0.059,
-     "months2to12": 0.206,
-     "years1to3": 0.647,
-     "over3Years": 0.088
+     "under2Months": 0.013,
+     "months2to12": 0.128,
+     "years1to3": 0.322,
+     "over3Years": 0.537
     }
    },
    "winnerTitleFormulaLift": {
-    "question": 0.904,
-    "how-it-works": 1.731,
-    "how-why-what-opener": 1.054,
+    "question": 1.242,
+    "how-it-works": 1.375,
+    "how-why-what-opener": 1.156,
     "why-it-failed": null,
-    "number-or-money": 0.875,
+    "number-or-money": 0.769,
     "year": null,
-    "colon-subtitle": 0.27,
-    "superlative": 1.006,
-    "curiosity-gap": 0,
-    "inside-or-behind": null,
-    "named-event": 1.907,
-    "all-caps-word": 0.468,
-    "plain-statement": 1.036
+    "colon-subtitle": 0.864,
+    "superlative": 1.316,
+    "curiosity-gap": 0.831,
+    "inside-or-behind": 0.087,
+    "named-event": 1.333,
+    "all-caps-word": 0.956,
+    "plain-statement": 0.842
    },
    "thumbnails": {
     "sample": 13,
@@ -411,167 +411,167 @@
   },
   "hidden-infrastructure": {
    "all": {
-    "n": 169,
+    "n": 675,
     "titleFormulas": {
-     "question": 0.255,
-     "how-it-works": 0.04,
-     "how-why-what-opener": 0.439,
+     "question": 0.273,
+     "how-it-works": 0.048,
+     "how-why-what-opener": 0.411,
      "why-it-failed": 0,
-     "number-or-money": 0.055,
-     "year": 0.005,
-     "colon-subtitle": 0.067,
-     "superlative": 0.026,
-     "curiosity-gap": 0.088,
-     "inside-or-behind": 0.019,
-     "named-event": 0.008,
-     "all-caps-word": 0.082,
-     "plain-statement": 0.322
+     "number-or-money": 0.081,
+     "year": 0.009,
+     "colon-subtitle": 0.112,
+     "superlative": 0.03,
+     "curiosity-gap": 0.123,
+     "inside-or-behind": 0.017,
+     "named-event": 0.005,
+     "all-caps-word": 0.067,
+     "plain-statement": 0.279
     },
     "titleWords": {
-     "p10": 4,
-     "p25": 5,
-     "p50": 7,
-     "p75": 9,
-     "p90": 10
-    },
-    "titleChars": {
-     "p10": 28,
-     "p25": 34,
-     "p50": 43,
-     "p75": 48,
-     "p90": 55
-    },
-    "minutes": {
-     "p10": 11.8,
-     "p25": 12.9,
-     "p50": 17.9,
-     "p75": 23,
-     "p90": 43.5
-    },
-    "chapterCount": {
      "p10": 5,
-     "p25": 9,
-     "p50": 12,
-     "p75": 15,
-     "p90": 18
-    },
-    "shareWithChapters": 0.119,
-    "minutesPerChapter": {
-     "p10": 1.1,
-     "p25": 1.5,
-     "p50": 1.9,
-     "p75": 3.3,
-     "p90": 7.1
-    },
-    "firstChapterAfterSeconds": {
-     "p10": 34,
-     "p25": 55,
-     "p50": 105,
-     "p75": 189,
-     "p90": 455
-    },
-    "ageDays": {
-     "p10": 73,
-     "p25": 129,
-     "p50": 301,
-     "p75": 546,
-     "p90": 849
-    },
-    "freshness": {
-     "under2Months": 0.065,
-     "months2to12": 0.361,
-     "years1to3": 0.515,
-     "over3Years": 0.059
-    }
-   },
-   "winners": {
-    "n": 54,
-    "titleFormulas": {
-     "question": 0.236,
-     "how-it-works": 0.011,
-     "how-why-what-opener": 0.459,
-     "why-it-failed": 0,
-     "number-or-money": 0.057,
-     "year": 0,
-     "colon-subtitle": 0.062,
-     "superlative": 0.026,
-     "curiosity-gap": 0.046,
-     "inside-or-behind": 0,
-     "named-event": 0.011,
-     "all-caps-word": 0.081,
-     "plain-statement": 0.346
-    },
-    "titleWords": {
-     "p10": 4,
      "p25": 6,
-     "p50": 7,
+     "p50": 8,
      "p75": 9,
-     "p90": 9
+     "p90": 11
     },
     "titleChars": {
-     "p10": 28,
-     "p25": 34,
-     "p50": 41,
-     "p75": 47,
-     "p90": 54
+     "p10": 30,
+     "p25": 36,
+     "p50": 45,
+     "p75": 52,
+     "p90": 58
     },
     "minutes": {
      "p10": 11.1,
-     "p25": 12.7,
-     "p50": 17.6,
-     "p75": 23,
-     "p90": 65.5
+     "p25": 13.3,
+     "p50": 16.9,
+     "p75": 21.2,
+     "p90": 29.7
     },
     "chapterCount": {
-     "p10": 5,
-     "p25": 5,
-     "p50": 13,
-     "p75": 15,
+     "p10": 6,
+     "p25": 8,
+     "p50": 10,
+     "p75": 13,
      "p90": 18
     },
-    "shareWithChapters": 0.105,
+    "shareWithChapters": 0.256,
     "minutesPerChapter": {
-     "p10": 1.5,
-     "p25": 3.3,
-     "p50": 3.3,
-     "p75": 7.1,
-     "p90": 7.1
+     "p10": 1.1,
+     "p25": 1.4,
+     "p50": 1.8,
+     "p75": 2.6,
+     "p90": 3.5
     },
     "firstChapterAfterSeconds": {
-     "p10": 55,
-     "p25": 140,
-     "p50": 140,
-     "p75": 455,
-     "p90": 455
+     "p10": 39,
+     "p25": 60,
+     "p50": 83,
+     "p75": 112,
+     "p90": 213
     },
     "ageDays": {
-     "p10": 77,
-     "p25": 274,
-     "p50": 395,
-     "p75": 671,
-     "p90": 899
+     "p10": 109,
+     "p25": 254,
+     "p50": 523,
+     "p75": 899,
+     "p90": 1345
     },
     "freshness": {
-     "under2Months": 0.037,
-     "months2to12": 0.241,
-     "years1to3": 0.667,
-     "over3Years": 0.056
+     "under2Months": 0.018,
+     "months2to12": 0.108,
+     "years1to3": 0.341,
+     "over3Years": 0.533
+    }
+   },
+   "winners": {
+    "n": 246,
+    "titleFormulas": {
+     "question": 0.287,
+     "how-it-works": 0.037,
+     "how-why-what-opener": 0.422,
+     "why-it-failed": 0,
+     "number-or-money": 0.108,
+     "year": 0.01,
+     "colon-subtitle": 0.114,
+     "superlative": 0.033,
+     "curiosity-gap": 0.142,
+     "inside-or-behind": 0.002,
+     "named-event": 0,
+     "all-caps-word": 0.055,
+     "plain-statement": 0.239
+    },
+    "titleWords": {
+     "p10": 5,
+     "p25": 6,
+     "p50": 8,
+     "p75": 9,
+     "p90": 11
+    },
+    "titleChars": {
+     "p10": 31,
+     "p25": 36,
+     "p50": 46,
+     "p75": 54,
+     "p90": 58
+    },
+    "minutes": {
+     "p10": 11.1,
+     "p25": 13.7,
+     "p50": 16.8,
+     "p75": 20.1,
+     "p90": 27.8
+    },
+    "chapterCount": {
+     "p10": 6,
+     "p25": 8,
+     "p50": 10,
+     "p75": 13,
+     "p90": 18
+    },
+    "shareWithChapters": 0.299,
+    "minutesPerChapter": {
+     "p10": 1,
+     "p25": 1.2,
+     "p50": 1.8,
+     "p75": 2.2,
+     "p90": 3.5
+    },
+    "firstChapterAfterSeconds": {
+     "p10": 47,
+     "p25": 62,
+     "p50": 83,
+     "p75": 105,
+     "p90": 243
+    },
+    "ageDays": {
+     "p10": 207,
+     "p25": 384,
+     "p50": 673,
+     "p75": 1011,
+     "p90": 1505
+    },
+    "freshness": {
+     "under2Months": 0.012,
+     "months2to12": 0.053,
+     "years1to3": 0.285,
+     "over3Years": 0.65
     }
    },
    "winnerTitleFormulaLift": {
-    "question": 0.925,
-    "how-it-works": 0.275,
-    "how-why-what-opener": 1.046,
+    "question": 1.051,
+    "how-it-works": 0.771,
+    "how-why-what-opener": 1.027,
     "why-it-failed": null,
-    "number-or-money": 1.036,
+    "number-or-money": 1.333,
     "year": null,
-    "colon-subtitle": 0.925,
-    "superlative": 1,
-    "curiosity-gap": 0.523,
+    "colon-subtitle": 1.018,
+    "superlative": 1.1,
+    "curiosity-gap": 1.154,
     "inside-or-behind": null,
     "named-event": null,
-    "all-caps-word": 0.988,
-    "plain-statement": 1.075
+    "all-caps-word": 0.821,
+    "plain-statement": 0.857
    },
    "thumbnails": {
     "sample": 13,
@@ -606,167 +606,167 @@
   },
   "mysteries": {
    "all": {
-    "n": 31,
+    "n": 122,
     "titleFormulas": {
-     "question": 0.265,
+     "question": 0.285,
      "how-it-works": 0,
-     "how-why-what-opener": 0.501,
+     "how-why-what-opener": 0.362,
      "why-it-failed": 0,
-     "number-or-money": 0.081,
-     "year": 0.016,
-     "colon-subtitle": 0.142,
-     "superlative": 0.014,
-     "curiosity-gap": 0.329,
-     "inside-or-behind": 0,
-     "named-event": 0,
-     "all-caps-word": 0,
-     "plain-statement": 0.177
+     "number-or-money": 0.213,
+     "year": 0.034,
+     "colon-subtitle": 0.203,
+     "superlative": 0.035,
+     "curiosity-gap": 0.279,
+     "inside-or-behind": 0.011,
+     "named-event": 0.011,
+     "all-caps-word": 0.158,
+     "plain-statement": 0.233
     },
     "titleWords": {
      "p10": 5,
      "p25": 7,
-     "p50": 9,
+     "p50": 8,
      "p75": 10,
      "p90": 12
     },
     "titleChars": {
-     "p10": 30,
+     "p10": 35,
      "p25": 42,
-     "p50": 53,
-     "p75": 58,
-     "p90": 78
+     "p50": 52,
+     "p75": 61,
+     "p90": 79
     },
     "minutes": {
-     "p10": 9.5,
-     "p25": 11.8,
+     "p10": 11.1,
+     "p25": 12.7,
      "p50": 16.6,
-     "p75": 24.2,
-     "p90": 47.7
+     "p75": 34.5,
+     "p90": 55.3
     },
     "chapterCount": {
-     "p10": 8,
-     "p25": 9,
-     "p50": 9,
+     "p10": 6,
+     "p25": 7,
+     "p50": 8,
      "p75": 10,
-     "p90": 10
+     "p90": 12
     },
-    "shareWithChapters": 0.219,
+    "shareWithChapters": 0.163,
     "minutesPerChapter": {
      "p10": 1.1,
-     "p25": 1.1,
-     "p50": 1.1,
+     "p25": 1.5,
+     "p50": 2.7,
      "p75": 4.8,
      "p90": 6.3
     },
     "firstChapterAfterSeconds": {
      "p10": 57,
-     "p25": 57,
-     "p50": 57,
+     "p25": 64,
+     "p50": 82,
      "p75": 256,
-     "p90": 256
+     "p90": 327
     },
     "ageDays": {
-     "p10": 54,
-     "p25": 108,
-     "p50": 490,
-     "p75": 701,
-     "p90": 959
+     "p10": 108,
+     "p25": 278,
+     "p50": 570,
+     "p75": 959,
+     "p90": 1093
     },
     "freshness": {
-     "under2Months": 0.065,
-     "months2to12": 0.194,
-     "years1to3": 0.323,
-     "over3Years": 0.419
+     "under2Months": 0.025,
+     "months2to12": 0.131,
+     "years1to3": 0.352,
+     "over3Years": 0.492
     }
    },
    "winners": {
-    "n": 14,
+    "n": 46,
     "titleFormulas": {
-     "question": 0.177,
+     "question": 0.129,
      "how-it-works": 0,
-     "how-why-what-opener": 0.545,
+     "how-why-what-opener": 0.356,
      "why-it-failed": 0,
-     "number-or-money": 0.01,
-     "year": 0,
-     "colon-subtitle": 0.206,
-     "superlative": 0,
-     "curiosity-gap": 0.288,
+     "number-or-money": 0.152,
+     "year": 0.009,
+     "colon-subtitle": 0.159,
+     "superlative": 0.029,
+     "curiosity-gap": 0.2,
      "inside-or-behind": 0,
-     "named-event": 0,
-     "all-caps-word": 0,
-     "plain-statement": 0.134
+     "named-event": 0.006,
+     "all-caps-word": 0.142,
+     "plain-statement": 0.281
     },
     "titleWords": {
      "p10": 5,
-     "p25": 5,
-     "p50": 9,
+     "p25": 7,
+     "p50": 8,
      "p75": 11,
-     "p90": 12
+     "p90": 14
     },
     "titleChars": {
-     "p10": 30,
-     "p25": 32,
-     "p50": 50,
+     "p10": 35,
+     "p25": 42,
+     "p50": 46,
      "p75": 62,
-     "p90": 78
+     "p90": 90
     },
     "minutes": {
-     "p10": 9.5,
-     "p25": 11.6,
+     "p10": 10.8,
+     "p25": 12.3,
      "p50": 15.3,
-     "p75": 17.9,
-     "p90": 47.7
+     "p75": 47.2,
+     "p90": 63.4
     },
     "chapterCount": {
-     "p10": 9,
-     "p25": 9,
+     "p10": 6,
+     "p25": 8,
      "p50": 9,
      "p75": 10,
-     "p90": 10
+     "p90": 13
     },
-    "shareWithChapters": 0.314,
+    "shareWithChapters": 0.192,
     "minutesPerChapter": {
      "p10": 1.1,
      "p25": 1.1,
-     "p50": 1.1,
+     "p50": 2.1,
      "p75": 4.8,
      "p90": 4.8
     },
     "firstChapterAfterSeconds": {
      "p10": 57,
      "p25": 57,
-     "p50": 57,
+     "p50": 82,
      "p75": 256,
-     "p90": 256
+     "p90": 327
     },
     "ageDays": {
-     "p10": 41,
-     "p25": 370,
-     "p50": 490,
-     "p75": 701,
-     "p90": 959
+     "p10": 278,
+     "p25": 446,
+     "p50": 711,
+     "p75": 986,
+     "p90": 1469
     },
     "freshness": {
-     "under2Months": 0.071,
-     "months2to12": 0.071,
-     "years1to3": 0.429,
-     "over3Years": 0.429
+     "under2Months": 0.022,
+     "months2to12": 0.043,
+     "years1to3": 0.413,
+     "over3Years": 0.522
     }
    },
    "winnerTitleFormulaLift": {
-    "question": 0.668,
+    "question": 0.453,
     "how-it-works": null,
-    "how-why-what-opener": 1.088,
+    "how-why-what-opener": 0.983,
     "why-it-failed": null,
-    "number-or-money": 0.123,
-    "year": null,
-    "colon-subtitle": 1.451,
-    "superlative": null,
-    "curiosity-gap": 0.875,
+    "number-or-money": 0.714,
+    "year": 0.265,
+    "colon-subtitle": 0.783,
+    "superlative": 0.829,
+    "curiosity-gap": 0.717,
     "inside-or-behind": null,
     "named-event": null,
-    "all-caps-word": null,
-    "plain-statement": 0.757
+    "all-caps-word": 0.899,
+    "plain-statement": 1.206
    },
    "thumbnails": {
     "sample": 11,
@@ -798,6 +798,6 @@
   }
  },
  "other": {
-  "unassignedCoreChannelVideos": 115
+  "unassignedCoreChannelVideos": 436
  }
 }

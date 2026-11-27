@@ -69,7 +69,7 @@ test("the prior has the four pillars, an honest preamble, and no crash on an emp
 test("the committed prior file is sane and the readers work on it", () => {
   const prior = JSON.parse(readFileSync(new URL("../data/reference-prior.json", import.meta.url), "utf8"));
   assert.equal(prior.version, 1);
-  assert.ok(prior.scope.videos >= 500 && prior.scope.videos <= 1000, `video count ${prior.scope.videos}`);
+  assert.ok(prior.scope.videos >= 500, `video count ${prior.scope.videos}`);
   assert.ok(prior.honesty.some((h) => /first 30 seconds/.test(h)));
   for (const p of PILLARS) {
     const d = prior.pillars[p];
@@ -82,4 +82,44 @@ test("the committed prior file is sane and the readers work on it", () => {
   assert.equal(s.pillar, "disasters");
   assert.ok(s.score > 0 && s.formulas.includes("question"));
   assert.equal(scoreTitle(prior, "my cat photos"), null);
+});
+
+test("rise patterns: niche only, fastest first, every video in exactly one pattern", async () => {
+  const { topRisers, risePatterns, OFF_NICHE_CHANNELS } = await import("../src/reference-prior.mjs");
+  const row = (id, o) => ({ id, title: "Why the dam collapsed", channel: "Practical Engineering", channelFit: "core", pillar: "disasters", ageDays: 200, viewsPerDay: 1000, outlier: 2, minutes: 15, riser: 1, formulas: ["why-it-failed"], ...o });
+  const rows = [row("a", {}), row("b", { viewsPerDay: 5000 }), row("c", { channel: OFF_NICHE_CHANNELS[0] }), row("d", { ageDays: 30 }), row("e", { ageDays: 2000 }), row("f", { title: "Fallout 4 is garbage" }), row("g", { channelFit: "reference" })];
+  const top = topRisers(rows, 10);
+  assert.deepEqual(top.map((r) => r.id), ["b", "a"], "off-niche channels and titles, too-new, too-old and reference channels are out");
+  const groups = risePatterns(top);
+  assert.equal(groups.reduce((n, g) => n + g.n, 0), 2);
+  assert.ok(groups[0].examples.length <= 3);
+  assert.equal(risePatterns([row("n", { ageDays: 90, riser: 4 })])[0].id, "news-peg");
+});
+
+test("applying the prior: a topic's score and the packaging brief change with it", async () => {
+  const { rankTopics, scoreTopic } = await import("../src/topic-score.mjs");
+  const { packagingBrief, topicLean } = await import("../src/reference-prior.mjs");
+  const prior = JSON.parse(readFileSync(new URL("../data/reference-prior.json", import.meta.url), "utf8"));
+  const f = (v) => ({ value: v, reason: "test" });
+  const factors = Object.fromEntries(["demand", "outliers", "competition", "usAppeal", "visuals", "reliability", "advertiserFit", "effort", "evergreen", "narrative"].map((k) => [k, f(4)]));
+  const cand = (id, title) => ({ id, title, niche: "engineering-disasters-megaprojects", tags: [], evidenceStrength: "strong", factors });
+  const a = cand("a", "How the Hoover Dam works");
+  const base = scoreTopic(a);
+  const lean = scoreTopic(a, { prior });
+  assert.equal(base.priorLean, undefined);
+  assert.ok(lean.priorLean && Math.abs(lean.priorLean.points) <= 3, "a nudge of at most 3 points");
+  assert.equal(lean.total, Math.round((base.total + lean.priorLean.points) * 10) / 10);
+  // a hand-made prior in which only the "how-it-works" formula wins: the same topic scores higher; flip the lift and it scores lower
+  const fake = (lift) => ({ pillars: { megaprojects: { all: { n: 100, titleWords: { p10: 3, p50: 6, p90: 12 }, titleFormulas: { "how-it-works": 0.3, "how-why-what-opener": 0.3 } }, winners: { n: 30, titleWords: { p10: 3, p50: 6, p90: 12 }, minutes: { p25: 10, p50: 15, p75: 20 }, titleFormulas: {} }, winnerTitleFormulaLift: { "how-it-works": lift, "how-why-what-opener": lift }, thumbnails: null } } });
+  const up = scoreTopic(cand("m", "How the Panama canal works"), { prior: fake(2) });
+  const down = scoreTopic(cand("m", "How the Panama canal works"), { prior: fake(0.4) });
+  assert.ok(up.total > scoreTopic(cand("m", "How the Panama canal works")).total && down.total < up.total, "the prior moves the score both ways");
+  const ranked = rankTopics([cand("m", "How the Panama canal works"), cand("n", "How the Panama canal works too")], { prior: fake(2) });
+  assert.equal(ranked.length, 2);
+  assert.equal(topicLean(prior, { title: "my cat photos" }), null, "off-niche titles get no lean");
+  const brief = packagingBrief(prior, "disasters");
+  assert.match(brief, /REFERENCE_PRIOR/);
+  assert.match(brief, /never a promise of views/);
+  assert.equal(packagingBrief(prior, null), "");
+  assert.equal(packagingBrief({ pillars: {} }, "disasters"), "");
 });

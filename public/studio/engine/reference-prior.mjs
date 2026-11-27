@@ -252,3 +252,108 @@ export function winnersYoungerThan(prior, pillar, days) {
   if (days <= 1095) return r3(f.under2Months + f.months2to12 + f.years1to3);
   return 1;
 }
+
+// ---------- the fastest risers of our niche, and why they rose ----------
+
+/** Channels whose subject is not engineering disasters / megaprojects / infrastructure (history, science, finance, tech). Dropped from the riser ranking. */
+export const OFF_NICHE_CHANNELS = Object.freeze(["toldinstone", "Kurzgesagt – In a Nutshell", "Veritasium", "LEMMiNO", "Vox", "Tom Scott plus", "Historia Civilis", "PolyMatter", "The Infographics Show", "New Mind", "Mark Felton Productions", "ColdFusion", "Economics Explained", "Technology Connections", "Alec Steele", "RealLifeLore", "SmarterEveryDay", "Thunderf00t", "Mustard", "Engineering Explained"]);
+/** Single videos of an otherwise on-niche channel that are not about engineering disasters, megaprojects or infrastructure (games, brands, internet culture, biology). */
+export const OFF_NICHE_TITLE = /\b(fallout|red bull|dead internet|mirror life|lucid|tesla|porsche|jeep|bugatti|maverick)\b/i;
+
+/**
+ * The n fastest risers: our niche only (core and adjacent channels, a pillar keyword or a core channel),
+ * published 60 days to 3 years ago, ranked by views per day x outlier.
+ * @param {any[]} rows records from buildRecords
+ * @param {number} [n]
+ */
+export function topRisers(rows, n = 200) {
+  return rows
+    .filter((r) => r.channelFit !== "reference" && !OFF_NICHE_CHANNELS.includes(r.channel) && !OFF_NICHE_TITLE.test(r.title) && (r.pillar || r.channelFit === "core") && r.ageDays >= 60 && r.ageDays <= 1095)
+    .map((r) => ({ ...r, riseScore: Math.round(r.viewsPerDay * r.outlier) }))
+    .sort((a, b) => (b.riseScore - a.riseScore) || a.id.localeCompare(b.id))
+    .slice(0, n);
+}
+
+/**
+ * Rise patterns, in priority order: the first whose test passes names the video. Every test reads only what is visible outside
+ * (title, channel, length, date, views); none can see the spoken hook or retention.
+ * @type {ReadonlyArray<{ id: string, name: string, test: (r: any) => boolean, says: string }>}
+ */
+export const RISE_PATTERNS = Object.freeze([
+  { id: "news-peg", name: "Fresh news peg", test: (r) => r.ageDays < 150 && r.riser >= 3, says: "published in the last 5 months and already running 3x or more above its channel's normal views/day: a live event or trend (the peg itself is not in the data; check the date)" },
+  { id: "named-catastrophe", name: "Named catastrophe explained", test: (r) => r.formulas.includes("named-event") && r.pillar === "disasters", says: "a famous failure by name (a dam, a rocket, a plane) with a 'why' or 'what really happened' promise" },
+  { id: "accident-investigation", name: "Accident investigation", test: (r) => ["Mentour Pilot", "Fascinating Horror", "Disaster Breakdown", "blancolirio"].includes(r.channel), says: "an aviation or industrial accident walked through step by step; long, serial, loyal audience" },
+  { id: "why-it-failed", name: "Why it failed / collapsed", test: (r) => r.formulas.includes("why-it-failed") || (r.pillar === "disasters" && r.formulas.includes("how-why-what-opener")), says: "the title is a question about a failure: the viewer wants the cause" },
+  { id: "money-megaproject", name: "Billion-dollar project", test: (r) => r.formulas.includes("number-or-money") && r.pillar === "megaprojects", says: "a project sold by its price tag or scale number, often with a 'no one uses it' or 'will it work' edge" },
+  { id: "superlative-scale", name: "Biggest / longest / impossible", test: (r) => r.formulas.includes("superlative"), says: "a record or an extreme the viewer can picture in one word" },
+  { id: "how-it-works", name: "How the hidden system works", test: (r) => r.formulas.includes("how-it-works") || (r.pillar === "hidden-infrastructure" && r.formulas.includes("how-why-what-opener")), says: "an everyday system (grid, sewer, road, dam) the viewer uses but never saw explained" },
+  { id: "mystery-abandoned", name: "Mystery / unsolved / abandoned", test: (r) => r.pillar === "mysteries", says: "a puzzle or lost thing: an open question in the title" },
+  { id: "contrarian-broken", name: "Contrarian 'it is broken' take", test: (r) => ["Adam Something", "Stewart Hicks", "City Beautiful", "Not Just Bikes", "RMTransit", "Ray Delahanty | CityNerd"].includes(r.channel), says: "an opinionated, often urban or transit angle on why something built is bad; author-led, thumbnail-led" },
+  { id: "long-form", name: "Long-form event (30+ min)", test: (r) => r.minutes >= 30, says: "a feature-length film; the length itself is the promise" },
+  { id: "curiosity-object", name: "Everyday-object curiosity", test: (r) => r.formulas.includes("curiosity-gap") || r.formulas.includes("plain-statement") || r.formulas.includes("question"), says: "a plain, short title about a familiar thing with a hidden catch" },
+  { id: "other", name: "No visible single cause", test: () => true, says: "none of the visible signals above is decisive" },
+]);
+
+/**
+ * Group videos by rise pattern: counts, medians and 3 example rows (the fastest first).
+ * @param {any[]} videos rows from topRisers (with riseScore)
+ */
+export function risePatterns(videos) {
+  /** @type {Map<string, any[]>} */
+  const groups = new Map();
+  for (const v of videos) {
+    const p = RISE_PATTERNS.find((x) => x.test(v)) ?? RISE_PATTERNS[RISE_PATTERNS.length - 1];
+    const list = groups.get(p.id) ?? [];
+    list.push(v);
+    groups.set(p.id, list);
+  }
+  return RISE_PATTERNS.filter((p) => groups.has(p.id)).map((p) => {
+    const vs = /** @type {any[]} */ (groups.get(p.id)).sort((a, b) => b.riseScore - a.riseScore);
+    return { id: p.id, name: p.name, says: p.says, n: vs.length, medianMinutes: r1(median(vs.map((v) => v.minutes))), medianOutlier: r3(median(vs.map((v) => v.outlier))), medianAgeDays: median(vs.map((v) => v.ageDays)), examples: vs.slice(0, 3), ids: vs.map((v) => v.id) };
+  });
+}
+
+// ---------- applying the prior ----------
+
+const PLAIN_FORMULA = /** @type {Record<string, string>} */ ({
+  "how-it-works": "'How X works' / 'how X was built'", "why-it-failed": "'Why X failed/collapsed'", "how-why-what-opener": "a how/why/what opener", question: "a question", "number-or-money": "a number or money amount",
+  superlative: "a superlative (biggest, longest, worst)", "curiosity-gap": "a curiosity gap (secret, hidden, what really happened)", "named-event": "a named event or place", "inside-or-behind": "'Inside ...' / 'The story of ...'", "plain-statement": "a plain statement", "colon-subtitle": "a colon subtitle", year: "a year", "all-caps-word": "one all-caps word",
+});
+
+/**
+ * A short, honest briefing for the packaging step (titles and thumbnails): what the outside market of this pillar looks like.
+ * It is a prior, not a rule: the packaging rules of film-run.mjs win, and nothing here sees the spoken hook or retention.
+ * @param {any} prior @param {string | null | undefined} pillar
+ * @returns {string} empty when there is no usable prior for the pillar
+ */
+export function packagingBrief(prior, pillar) {
+  const p = pillar ? priorFor(prior, pillar) : null;
+  if (!p || p.all.n < 20) return "";
+  const d = p.winners.n >= 8 ? p.winners : p.all;
+  const lifts = Object.entries(p.winnerTitleFormulaLift).filter(([n, v]) => typeof v === "number" && p.all.titleFormulas[n] >= 0.1 && Math.abs(/** @type {number} */ (v) - 1) >= 0.15).sort((a, b) => /** @type {number} */ (b[1]) - /** @type {number} */ (a[1]));
+  const used = Object.entries(p.all.titleFormulas).filter(([n]) => n !== "plain-statement").sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, v]) => `${PLAIN_FORMULA[n] ?? n} ${Math.round(v * 100)}%`);
+  const th = p.thumbnails && p.thumbnails.sample >= 10 ? Object.entries(p.thumbnails.patterns).slice(0, 4).map(([n, c]) => `${n} (${c}/${p.thumbnails.sample})`) : [];
+  const lines = [
+    `REFERENCE_PRIOR (outside market, pillar "${pillar}", ${p.all.n} videos, ${p.winners.n} winners; public metadata only, never a promise of views):`,
+    `- Titles in this pillar run ${d.titleWords.p10}-${d.titleWords.p90} words (median ${d.titleWords.p50}); most used: ${used.join(", ")}.`,
+    lifts.length ? `- Winners over-use: ${lifts.filter(([, v]) => /** @type {number} */ (v) > 1).slice(0, 3).map(([n, v]) => `${PLAIN_FORMULA[n] ?? n} (x${v})`).join(", ") || "nothing clear"}; under-use: ${lifts.filter(([, v]) => /** @type {number} */ (v) < 1).slice(0, 2).map(([n, v]) => `${PLAIN_FORMULA[n] ?? n} (x${v})`).join(", ") || "nothing clear"}.` : "- No title formula separates winners from the rest here.",
+    th.length ? `- Thumbnails read by eye: ${th.join(", ")}.` : "",
+    `- Length: middle half ${d.minutes.p25}-${d.minutes.p75} min (median ${d.minutes.p50}); winners are not longer than the rest.`,
+    `Use it to choose between your own title and thumbnail ideas. The PACKAGING RULES win where they differ, and the title must still be true to the film.`,
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
+/**
+ * How far a candidate topic's title leans toward what winners of its pillar use, as points on the 0..100 topic total
+ * (at most +-3: a nudge, never enough to outrank evidence about sources, visuals or demand).
+ * @param {any} prior @param {{ title?: string, tags?: string[] }} topic
+ * @returns {{ pillar: string | null, score: number, points: number, reason: string } | null}
+ */
+export function topicLean(prior, topic) {
+  const pillar = pillarOf(topic);
+  const s = pillar ? scoreTitle(prior, topic.title ?? "", pillar) : null;
+  if (!s || !pillar) return null;
+  const points = Math.round(Math.max(-3, Math.min(3, (s.score - 1) * 6)) * 10) / 10;
+  return { pillar, score: s.score, points, reason: s.reasons.slice(0, 2).join("; ") || "no clear formula" };
+}
