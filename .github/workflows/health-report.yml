@@ -1,0 +1,44 @@
+name: Health report
+
+# One plain report a day, so the platform can be watched without a paid assistant.
+# It looks at three things and writes ONE issue, titled "Zupona health report":
+#   (a) the Worker's archive list (/api/media/sources): archives switched off, or on but still
+#       missing their key, with the sign-up page;
+#   (b) the latest run of daily-film.yml and voice-film.yml (GitHub API, built-in GITHUB_TOKEN);
+#   (c) the site itself: / and /studio/ must answer 200.
+# While everything is fine the issue is closed by itself; the moment something breaks it is opened
+# (or updated) again. Nothing is published and no secret is printed: the token only travels in a
+# request header, and no key of the platform is read at all.
+
+on:
+  schedule:
+    # 06:17 UTC daily (after the 10:23 UTC daily film of the previous cycle has settled).
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: health-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The report builder (no network)
+        run: node --test local/health-report.test.mjs
+      - name: Check the platform and write the one issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SITE: https://ai-x-com.sayedmuntasim3.workers.dev
+        run: node local/health-report.mjs
