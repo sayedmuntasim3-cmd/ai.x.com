@@ -882,7 +882,7 @@ export async function runFilm(o) {
           // Shots settled by an earlier attempt of this stage are kept (a Worker run may make only 50 requests).
           const partialKey = `media-${c.id}.partial.json`;
           const done = JSON.parse((await store.get(partialKey)) ?? "{}");
-          const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, judge, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep, done });
+          const media = await chapterMedia({ chapter: c.id, markdown: await read(`s5-${c.id}.md`), providers, history, judge, topic: film.topic, holdWeak: true, maxWaitMs: o.media?.maxWaitMs, timeoutMs: o.media?.timeoutMs, sleep: o.media?.sleep, done });
           await store.put(partialKey, JSON.stringify(Object.fromEntries(media.shots.filter(shotSettled).map((r) => [shotKey(r), r]))));
           await store.put(key, JSON.stringify(media, null, 1));
           if (media.stats.missing) state.gaps.push(`${c.id} media: ${media.stats.missing} of ${media.stats.shots} stock shots have no fitting free clip yet (see ${key}).`);
