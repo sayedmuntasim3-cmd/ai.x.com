@@ -1689,7 +1689,7 @@ var nasa = async (ctx) => {
     const d = item.data?.[0];
     const links = item.links ?? [];
     if (!d) continue;
-    if (!isRelevant(ctx.query, d.title, d.description, d.keywords?.join?.(" "))) continue;
+    if (!isRelevant(ctx.query, d.title, d.description)) continue;
     const orig = links.find((l) => l.rel === "canonical" && /\.(jpe?g|png)$/i.test(l.href));
     const largest = links.filter((l) => l.rel === "alternate" && /\.(jpe?g|png)$/i.test(l.href)).sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0];
     const thumb = links.find((l) => l.rel === "preview") ?? links.find((l) => /~small\./.test(l.href));

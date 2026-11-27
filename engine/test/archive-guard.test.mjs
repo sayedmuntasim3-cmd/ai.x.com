@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGate, isRelevant, mainTerms } from "../src/archive-guard.mjs";
+import { createGate, isChallenge, isRelevant, mainTerms } from "../src/archive-guard.mjs";
 
 const clock = () => { let t = 0; const sleeps = []; return { sleeps, now: () => t, sleep: async (ms) => { sleeps.push(ms); t += ms; } }; };
 
@@ -42,4 +42,14 @@ test("relevance: a main query term must be in the text", () => {
   assert.equal(isRelevant("Hoover Dam", "Aerial of Hoover Dam, Nevada"), true);
   assert.equal(isRelevant("levees", "A levee breach"), true);
   assert.equal(isRelevant("a", "anything"), true);
+  // every main term (short query): "dam" alone is not enough
+  assert.equal(isRelevant("Hoover Dam", "Hydroelectric dam in Washington"), false);
+  assert.equal(isRelevant("Teton Dam", "iss057e055571", "Earth observation from the ISS"), false);
+  assert.equal(isRelevant("Teton Dam failure", "Teton Dam failure, Idaho 1976"), true);
+});
+
+test("LoC's Cloudflare challenge page counts as a rate limit", () => {
+  assert.equal(isChallenge(429, "<!DOCTYPE html><html><head><title>Just a moment...</title>"), true);
+  assert.equal(isChallenge(200, "Just a moment"), false);
+  assert.equal(isChallenge(429, "plain"), false);
 });
