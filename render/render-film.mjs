@@ -17,7 +17,7 @@
 import { mapSvg, routeSvgs } from "./maps.mjs";
 import { synthSounds } from "./sfx-synth.mjs";
 import { graphicFor } from "./graphics/from-shot.mjs";
-import { renderGraphic, loadPlaywright } from "./graphics/render-graphic.mjs";
+import { renderGraphicFile, loadPlaywright } from "./graphics/render-graphic.mjs";
 import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 
 /** Levels of the synthesised edit sounds in the effects mix. */
@@ -534,6 +534,7 @@ export async function renderFilm(o) {
   let depthOn = o.depth !== false;
   /** @type {Promise<any> | null} */
   let browser = null;
+  try {
   await pool(o.joinParts ? [] : t.video, limit, async (v, i) => {
     if (i < first || i >= range.end) return;
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
@@ -718,8 +719,8 @@ export async function renderFilm(o) {
             // is awaited: one fallback to the ffmpeg card, never an unhandled rejection that loses the film.
             browser.catch(() => {});
           }
-          await renderGraphic({ template: designed.template, data: designed.data, width: t.width, height: t.height, fps: t.fps, frames: v.frames, out: shot + ".part.mp4", ffmpeg, browser: await browser });
-          renameSync(shot + ".part.mp4", shot);
+          // A temp file of its own, checked, then renamed: a cut-off render never leaves a broken graphic behind.
+          await renderGraphicFile({ template: designed.template, data: designed.data, width: t.width, height: t.height, fps: t.fps, frames: v.frames, file: shot, out: "", ffmpeg, ffprobe, browser: await browser });
         }
         input = ["-i", shot];
         chain.push("setsar=1");
@@ -885,8 +886,16 @@ export async function renderFilm(o) {
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
   });
+  } finally {
+  // On every path (a failed shot included) the browser is closed, so no Chromium outlives the render.
   // A browser that never started was already reported (designed graphics off); closing it must not throw again.
-  if (browser) await browser.then((b) => b.close(), () => {});
+  // The close is bounded: a wedged browser is left to the process exit, never a hang of the render.
+  if (browser) {
+    /** @type {any} */ let timer;
+    await Promise.race([browser.then((b) => b.close(), () => {}), new Promise((r) => { timer = setTimeout(r, 15_000); })]).catch(() => {});
+    clearTimeout(timer);
+  }
+  }
   // 1b. Transitions that need the shot before: a whip, a slide or a zoom from its last frame into this shot.
   // The shot keeps its length (the move happens over its first frames), so the film's clock never shifts.
   for (let i = Math.max(1, first); i < (o.joinParts ? 0 : range.end); i += 1) {
@@ -1148,15 +1157,22 @@ export async function renderFilm(o) {
   // One-pass loudnorm can land off target on short or quiet material (a rough own-voice take came out at -15.3 LUFS):
   // a measured master more than 0.5 LU away gets one exact gain step on the audio only (the picture is copied), with a
   // limiter only when the gain would lift the true peak above -1 dBTP; then it is measured again.
-  const fix = master && anySound && t.durationSeconds >= 3 ? loudnessFix(master) : null;
-  if (fix) {
-    const { gain, af } = fix;
-    try {
-      await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
-      renameSync(o.outFile + ".gain.mp4", o.outFile);
-      master = await measureMaster(o.outFile, ffmpeg);
-      log(`master: loudness corrected by ${gain} dB to ${master.integratedLufs} LUFS`);
-    } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); }
+  // The correction is measured, not assumed: each pass copies the picture, lifts or drops only the audio, and
+  // measures the master again. A limiter-led pass can land a little short of the target (the slice report's
+  // -18.2 LUFS against -14), so up to three passes are taken until the master is within 0.5 LU; the last
+  // measurement is what the report and the gate see, and every pass is logged with its number.
+  if (master && anySound && t.durationSeconds >= 3) {
+    for (let pass = 1; pass <= 3; pass += 1) {
+      const fix = loudnessFix(master);
+      if (!fix) break;
+      const { gain, af } = fix;
+      try {
+        await run(ffmpeg, ["-v", "error", "-y", "-i", o.outFile, "-map", "0", "-c:v", "copy", "-c:s", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", o.outFile + ".gain.mp4"]);
+        renameSync(o.outFile + ".gain.mp4", o.outFile);
+        master = await measureMaster(o.outFile, ffmpeg);
+        log(`master: loudness pass ${pass} moved ${gain > 0 ? "+" : ""}${gain} dB to ${master.integratedLufs} LUFS (target -14)`);
+      } catch (error) { warnings.push(`The loudness correction failed: ${error instanceof Error ? error.message : error}`); break; }
+    }
   }
   if (master) {
     const normalised = anySound && t.durationSeconds >= 3;

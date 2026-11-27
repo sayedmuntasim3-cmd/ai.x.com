@@ -97,6 +97,19 @@ test("video details: chapters are parsed from the description, ids are checked, 
   assert.ok(r.ok);
   assert.equal(r.ok && /** @type {any} */ (r.videos[0]).chapters.length, 3);
   assert.equal(r.ok && /** @type {any} */ (r.videos[0]).durationSeconds, 180);
+  assert.equal(r.ok && /** @type {any} */ (r.videos[0]).descriptionOpening, "0:00 a 1:00 b 2:00 c");
+  // a channel read walks the uploads playlist page by page
+  const urls = /** @type {string[]} */ ([]);
+  const paged = /** @type {typeof globalThis.fetch} */ (async (u) => {
+    const s = String(u); urls.push(s);
+    if (s.includes("/channels?")) return Response.json({ items: [{ id: "UC1", snippet: { title: "Ch" }, contentDetails: { relatedPlaylists: { uploads: "UU1" } } }] });
+    if (s.includes("/playlistItems?")) return Response.json({ items: [{ contentDetails: { videoId: "aaaaaaaaaaa" } }], nextPageToken: "NEXT_1" });
+    return Response.json({ items: [] });
+  });
+  const page = await videoDetails({ apiKey: "K", handle: "@x1", max: 50, pageToken: "TOK_1", fetch: paged });
+  assert.ok(page.ok && /** @type {any} */ (page).nextPageToken === "NEXT_1");
+  assert.ok(urls.some((u) => u.includes("pageToken=TOK_1")));
+  assert.equal((await videoDetails({ apiKey: "K", handle: "@x1", pageToken: "a b", fetch: paged })).ok, true, "a bad token is ignored, not sent");
   assert.equal((await videoDetails({ apiKey: "K", ids: "bad", fetch })).ok, false);
   assert.equal((await videoDetails({ ids: "aaaaaaaaaaa", fetch })).ok, false);
   const bad = await videoDetails({ apiKey: "SECRET", ids: "aaaaaaaaaaa", fetch: async () => new Response("x", { status: 403 }) });

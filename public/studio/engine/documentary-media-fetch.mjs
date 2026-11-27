@@ -231,7 +231,8 @@ async function loadProvider(provider, query, kind, key, deps) {
   try {
     const found = await provider.search(query, kind, AbortSignal.timeout(deps.timeoutMs ?? 9_000));
     const results = Array.isArray(found) ? found : [];
-    if (deps.cache) {
+    // A source whose terms forbid storing its results (noStore) keeps the whole answer out of the cache.
+    if (deps.cache && !results.some((r) => /** @type {any} */ (r).noStore)) {
       try {
         await deps.cache.put(key, JSON.stringify(results), { expirationTtl: provider.cacheTtlSeconds });
       } catch {

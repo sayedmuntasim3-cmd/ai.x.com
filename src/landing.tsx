@@ -1495,6 +1495,8 @@ type FilmView = {
   costUsd: number;
   error?: string;
   warning?: string;
+  progress?: { stage: string | null; running: boolean; done: number; total: number };
+  resumeAt?: string;
 };
 
 const STAGE_NAMES: Record<string, string> = {
@@ -1528,9 +1530,18 @@ const STATUS_TEXT: Record<string, string> = {
   done: "Your film is ready",
   "done-with-gaps": "Your film is ready (a few shots need pictures)",
   paused: "Paused",
+  "paused-quota": "Paused: the free AI limit is used up for today",
   failed: "Stopped",
   "stopped-budget": "Stopped at the budget limit",
 };
+
+/** The reset time in the reader's own clock, or empty when it cannot be read. */
+function resetTime(at?: string) {
+  if (!at) return "";
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) return "";
+  return when.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+}
 
 function readStore(key: string) {
   try {
@@ -1606,8 +1617,10 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
               costUsd: Number(run.costUsd ?? 0),
               error: run.error ? String(run.error) : undefined,
               warning: run.status === "running" && run.lastError ? String(run.lastError.message ?? "") : undefined,
+              progress: run.progress ?? undefined,
+              resumeAt: run.resumeAt ? String(run.resumeAt) : undefined,
             });
-          const finished = ["done", "done-with-gaps", "failed", "stopped-budget", "paused"].includes(String(run.status));
+          const finished = ["done", "done-with-gaps", "failed", "stopped-budget", "paused", "paused-quota"].includes(String(run.status));
           if (finished) return;
         }
       } catch {
@@ -1671,9 +1684,41 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
     );
   }
 
+  // Resume the same film: finished stages are kept and are not paid for again. A new film would throw
+  // away the work already done, so a stopped film is never started over by "Try again".
+  const resume = async () => {
+    const studioKey = key.trim();
+    if (!studioKey) {
+      setAskKey(true);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/films/${film?.id}/resume`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` }, body: "{}" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        writeStore(KEY_STORE, "");
+        setAskKey(true);
+        setError("That studio key is not right. Check it and try again.");
+        return;
+      }
+      if (!res.ok) {
+        setError(String(data.error ?? "The film could not be resumed."));
+        return;
+      }
+      setFilm((now) => (now ? { ...now, status: "queued", error: undefined, resumeAt: undefined } : now));
+    } catch {
+      setError("No connection. Check your internet and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (film) {
     const finished = film.status === "done" || film.status === "done-with-gaps";
-    const stopped = film.status === "failed" || film.status === "stopped-budget" || film.status === "paused";
+    const stopped = film.status === "failed" || film.status === "stopped-budget" || film.status === "paused" || film.status === "paused-quota";
+    const quota = film.status === "paused-quota";
     return (
       <div className="mt-6 rounded-2xl border border-line bg-canvas/50 p-4" aria-live="polite">
         <p className={`${eyebrow} flex items-center gap-1.5`}>
@@ -1683,6 +1728,22 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
         {!finished && !stopped && (
           <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
             You can close this and come back: the film keeps being made. A short film takes a while on the free plan.
+          </p>
+        )}
+        {!finished && !stopped && film.progress && film.progress.total > 0 && (
+          <div className="mt-3">
+            <p className="text-[13px] text-muted">
+              Stage {Math.min(film.progress.done + 1, film.progress.total)} of {film.progress.total}
+              {film.progress.stage ? ` · ${stageName(film.progress.stage)}` : ""}
+            </p>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
+              <span className="block h-full rounded-full bg-brand-gradient" style={{ width: `${Math.round((Math.min(film.progress.done, film.progress.total) / Math.max(1, film.progress.total)) * 100)}%` }} />
+            </div>
+          </div>
+        )}
+        {quota && (
+          <p className="mt-3 text-[14px] leading-relaxed text-ink-2">
+            Your finished stages are saved. The free daily AI limit resets {resetTime(film.resumeAt) ? `around ${resetTime(film.resumeAt)}` : "at midnight California time (early afternoon in Bangladesh)"}; press Resume then and the film goes on from where it stopped.
           </p>
         )}
         {film.stages.length > 0 && (
@@ -1697,11 +1758,11 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
         {film.warning && (
           <p className="mt-3 text-[13px] text-muted">
             {/PerDay|daily limit/i.test(film.warning)
-              ? "Paused for today: the free AI limit is used up. The film goes on by itself when it resets at midnight California time (early afternoon in Bangladesh)."
+              ? "The free AI limit was used up and the stage is being retried. If it stays used up, the film pauses with its work saved."
               : `Waiting and retrying: ${film.warning}`}
           </p>
         )}
-        {stopped && film.error && <p className="mt-3 text-[14px] text-[#c2410c]">{film.error}</p>}
+        {stopped && !quota && film.error && <p className="mt-3 text-[14px] text-[#c2410c]">{film.error}</p>}
         {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <a
@@ -1716,13 +1777,13 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
             type="button"
             disabled={busy}
             onClick={() => {
-              // A stopped film is started again in one tap with the saved key; otherwise back to the form.
-              if (stopped && key.trim()) start();
+              // A stopped film is resumed where it stopped (its finished stages are kept); otherwise back to the form.
+              if (stopped) resume();
               else setFilm(null);
             }}
             className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
           >
-            {stopped ? (busy ? "Starting…" : "Try again") : "Make another"}
+            {stopped ? (busy ? "Resuming…" : quota ? "Resume now" : "Resume") : "Make another"}
           </button>
         </div>
       </div>

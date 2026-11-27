@@ -24,6 +24,7 @@ import { FREE_LICENCES } from "./film-media.mjs";
 import { chapterSpec, isStoryFilm, pictureCredits, titleProblems } from "./film-run.mjs";
 import { msg } from "./messages.mjs";
 import { checkFilm, factualSignals, parseSceneLines } from "./scene-lines.mjs";
+import { critiqueScript } from "./story-critic.mjs";
 
 /** @typedef {import("./film-run.mjs").Film} Film */
 /** @typedef {import("./film-run.mjs").Store} Store */
@@ -59,9 +60,9 @@ export const LIMITS = Object.freeze({
  * values and claims without evidence; 3: every narrated sentence of a true-story
  * film is linked to its claims, and evidence is matched to the claim it supports;
  * 4: every gate reports PASS, FAIL, BLOCKED or NOT APPLICABLE, and a gate that
- * could not run blocks).
+ * could not run blocks; 5: the script gate runs the story critic).
  */
-export const GATES_VERSION = 4;
+export const GATES_VERSION = 5;
 
 /** Gates whose failure stops a release; the others ask for revision and are listed. */
 export const CRITICAL_GATES = Object.freeze(["research", "claims", "script", "rights", "master"]);
@@ -694,7 +695,19 @@ export async function reviewRun({ store, film }) {
       const codes = [...new Set(errors.map((e) => e.code))].join(", ");
       f.push({ code: "script.errors", severity: "block", message: msg("script.errors", { chapter: ch, count: errors.length, codes }), target: `s5:${ch}`, note: `These code checks still fail in ${ch}:\n- ${errors.slice(0, 20).map((e) => `${e.scene ?? ""} ${e.detail}`).join("\n- ")}` });
     }
-    gates.push(gate("script", f, { chapters: plan.length, written: written.length, errors: check ? check.errors.length : null, scenes: check?.stats.scenes ?? null }));
+    // The story critic (story-critic.mjs): a causal chain in every chapter, one central question asked and
+    // answered, no number, name or quote outside the research, no padding. A failing chapter goes back with the findings.
+    /** @type {Record<string, any> | null} */
+    let critic = null;
+    if (written.length === plan.length && plan.length) {
+      const acts = plan.map((c) => ({ id: c.id, text: parseSceneLines(/** @type {string} */ (chapters[c.id])).filter((x) => !x.wordless).map((x) => x.narration.replace(/\[[^\]]*\]/g, " ")).join(" ") }));
+      const research = isStoryFilm(film) ? null : await readJson(store, "research.json");
+      const sources = isStoryFilm(film) ? null : [String((await store.get("s2.md")) ?? ""), JSON.stringify(Array.isArray(research?.facts) ? research.facts : [])];
+      const r = critiqueScript({ acts, sources, title: film.topic });
+      critic = r.stats;
+      for (const x of r.findings) f.push({ code: x.code, severity: x.severity, message: x.message, target: `s5:${x.chapter ?? plan[0].id}`, note: x.note });
+    }
+    gates.push(gate("script", f, { chapters: plan.length, written: written.length, errors: check ? check.errors.length : null, scenes: check?.stats.scenes ?? null, critic }));
   }
 
   // 4. Story: the opening holds a cold audience, the hook is clean, no picture holds too long.
