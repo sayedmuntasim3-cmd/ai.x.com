@@ -478,3 +478,46 @@ Topics 3, 6, 13 and 15 have the weakest evidence; W7 should score them below 1, 
 - Re-run `engineering-handles.mjs` in 30 days; compare the same videos' growth (the outlier score is a snapshot).
 - Find more small/rising channels (found by search once quota resets; handles are the cheap path).
 - W7 can read `data/engineering-videos.json` (`angle`, `class`, `confidence`) as its evidence table.
+
+## 7. Reference prior at scale (27 Nov 2026)
+
+Goal: an outside "reference prior" for the four pillars, kept apart from our own films' craft (`engine/src/craft-memory.mjs`). Metadata only; no video was downloaded; no `search.list`.
+
+**What was done.** `tools/research/engineering-handles.mjs` (extended, not copied) read the uploads of 44 channels through `GET /api/videos?handle=` (playlistItems + videos.list, about 1 quota unit per 50 videos; ~190 units for this run). 1,906 videos were read; `tools/research/build-prior.mjs` kept the long ones (8+ min) of the niche: **716 videos from 38 channels** (disasters 251, megaprojects 150, hidden infrastructure 169, mysteries 31; 115 more from core channels fit no pillar keyword). The worker route gained `pageToken` and `descriptionOpening` (`worker/youtube.mjs`); the deployed Worker does not have them until this PR is deployed, so this run had the latest 50 uploads per channel and **`descriptionOpening` is empty in the committed rows**. After deploy, the weekly workflow reads up to 4 pages per channel.
+**Files.** `engine/data/reference-prior.json` (the prior); `docs/research/data/engineering-reference-videos.json` (one slim row per video: title, thumbnail URL, length, chapter starts and titles, upload date, views, views/day, outlier, weight); `docs/research/data/thumbnail-sample.json` (the 52 thumbnails I looked at, with my tags). Reader: `engine/src/reference-prior.mjs` (`pillarOf`, `lengthPlan`, `scoreTitle`, `winnersYoungerThan`; pure, tested in `engine/test/reference-prior.test.mjs`). Weekly refresh: `.github/workflows/reference-prior.yml` (needs the repo secret `STUDIO_TOKEN`).
+**Outlier and weight.** Outlier = views ÷ the channel's median views of its long uploads aged 60 days to 5 years. Weight = freshness (0 under 14 days, 0.5 under 60, 1 up to 3 years, 0.35 to 5 years, 0.15 older) × the video's views/day against its channel's median (clamped 0.25–4) × channel fit (core 1, adjacent 0.7, reference 0.4). "Winner" = outlier ≥ 1.5.
+
+### Top 15 outliers (60 days to 3 years old, all pillars)
+
+| # | Video | Channel | Pillar | Published | Views | /day | Min | Outlier |
+|---|---|---|---|---|---|---|---|---|
+| 1 | [Three Unfinished Roman Megaprojects](https://youtu.be/qJIDOq0ezTs) | toldinstone | megaprojects | 2026-09-12 | 928k | 12k | 12.4 | 7.88x |
+| 2 | [Why Roman Cities were Abandoned in the Middle Ages](https://youtu.be/qqFCHxacUww) | toldinstone | mysteries | 2025-07-25 | 877k | 2k | 9.5 | 7.446x |
+| 3 | [The $6 Billion Transit Project with No Ridership](https://youtu.be/TkI6Fmet4FE) | RMTransit | megaprojects | 2024-11-23 | 563k | 767 | 10.9 | 7.376x |
+| 4 | [Tesla Cybertruck: A Tragedy On Four Wheels](https://youtu.be/lFloLGmPKl0) | Adam Something | disasters | 2024-03-21 | 4.4M | 5k | 12.6 | 6.749x |
+| 5 | [The Forbidden Knowledge of Washers](https://youtu.be/F4EvMVpx1Pw) | New Mind | hidden-infrastructure | 2025-04-01 | 2.7M | 4k | 23.1 | 6.247x |
+| 6 | [How Reality TV Houses Are Built to Break People](https://youtu.be/HVsSppFuzv0) | Stewart Hicks | megaprojects | 2024-10-24 | 4.0M | 5k | 17.4 | 6.232x |
+| 7 | [Why Almost Every Airline Has Sued This One Website](https://youtu.be/7Tu8ZIbfLis) | Half as Interesting | disasters | 2026-08-05 | 2.6M | 23k | 9.6 | 6.15x |
+| 8 | [This Led To The Sterile Cockpit Rule: Eastern Airlines 212   Fascinati](https://youtu.be/_blF6L04Dfk) | Fascinating Horror | disasters | 2026-09-08 | 2.4M | 30k | 11.6 | 5.365x |
+| 9 | [Why Are Beach Holes So Deadly?](https://youtu.be/0kQXOTcEB_E) | Practical Engineering | disasters | 2025-04-01 | 7.2M | 12k | 16.2 | 5.302x |
+| 10 | [Pangeos Terayacht: An $8 Billion Engineering Disaster](https://youtu.be/6E_FwOz_RtM) | Adam Something | disasters | 2024-02-23 | 3.4M | 3k | 12.7 | 5.224x |
+| 11 | [The Invention that Accidentally Made McMansions](https://youtu.be/3oIeLGkSCMA) | Stewart Hicks | disasters | 2024-12-12 | 3.1M | 4k | 14.2 | 4.844x |
+| 12 | [Should Cities be Circles?](https://youtu.be/tt_zIzDWOEc) | City Beautiful | hidden-infrastructure | 2024-02-28 | 601k | 599 | 12.6 | 4.689x |
+| 13 | [Tech Bros Invented Trains And It Broke Me](https://youtu.be/r5M7Oq1PCz4) | Adam Something | disasters | 2024-06-12 | 3.0M | 3k | 14.7 | 4.553x |
+| 14 | [All Dams Are Temporary](https://youtu.be/XiUOBdEUqjY) | Practical Engineering | megaprojects | 2025-03-04 | 6.1M | 10k | 16.5 | 4.497x |
+| 15 | [Did This Small Mistake Kill Everyone? - The Heartbreaking Story of Air](https://youtu.be/wSmtnuFoAv0) | Disaster Breakdown | - | 2024-05-17 | 1.5M | 2k | 43.8 | 4.368x |
+
+(Row 15 has no pillar keyword in its title; it is kept as a core-channel video. "Roman megaprojects" and "Roman cities abandoned" come from a history channel: adjacent, not core.)
+
+### What the prior says (facts from the 716; the reading is mine)
+- **Length.** Median 15–18 min in every pillar; the middle half runs 11–29 min (disasters have a long tail: p75 29 min, mostly aviation-accident channels). Winners are not longer than the rest: their medians are the same or 1–2 min shorter.
+- **Chapters.** Only 11–25% of videos carry 3+ description chapters (the channels mostly do not use them), so the rhythm numbers rest on few videos: median 7–12 chapters, about one every 2 min (megaprojects, hidden infrastructure) to 5 min (disasters); the first chapter after the intro starts at about 1–2 min. Mysteries winners use chapters more (31% vs 22%), on 14 winners only.
+- **Titles.** Median 7 words for megaprojects and hidden infrastructure, 9 for mysteries, 10 for disasters (which carry more subtitles and money: 43% have a colon, 37% a number or money amount). How/why/what openers are 28% of megaproject, 44% of hidden-infrastructure and 50% of mystery titles; winners lean to "how it works" (×1.7 in megaprojects). Plain statements lead among disaster winners (×1.4). Differences of ±10% are noise at these sizes.
+- **Freshness.** Of the winners, 65–67% are 1–3 years old in megaprojects and hidden infrastructure, but only 31% in disasters (15% under 2 months, 28% 2–12 months): disasters turn over fastest. Mystery winners are half older than 3 years (14 videos: weak evidence).
+- **Thumbnails (52 looked at by eye; tags in `thumbnail-sample.json`).** Short text (≤5 words) or no text at all; one clear subject (damage, a wreck from the air, a strange object, a before/after pair); high-contrast yellow or white words; arrows and circles on real photos for how-it-works; a big number or claim for megaprojects ("$1,000,000,000,000 dream", "Dear God"); black label boxes with 2–4 words are a rail-channel house style; channel brands across the picture did not separate winners from losers; weak ones are generic skylines, Q&A banners and stock art without a question. Per pillar: see `thumbnails` in the prior.
+
+### Honest limits
+1. **The spoken first 30 seconds and audience retention are not visible from outside.** Nothing here says how winners open or hold viewers; the prior only shows what was clicked (title, thumbnail, length) and how much it was watched in total.
+2. Pillars are title keywords; some are wrong (a history or housing video lands in "megaprojects"); mysteries has only 31 videos. Channels are my list: aviation-accident and city/transit channels are over-represented, and very small rising channels are missing.
+3. Views/day is lifetime views over age, not the recent rate. Channel median is from at most the last 50 uploads. No private analytics. Thumbnail tags are my reading of 52 images, not counts of what wins.
+4. **No view count is promised.** The prior is a starting lean for the topic engine and the Craft Ledger until our own films have data; `scoreTitle` returns a lean, never a forecast.

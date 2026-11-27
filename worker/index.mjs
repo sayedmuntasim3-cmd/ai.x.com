@@ -283,7 +283,7 @@ export default {
         // Read-only video metadata (ids or a @handle), same key and same studio token as /api/ideas.
         if (!env.STUDIO_TOKEN) return json({ error: "Set the STUDIO_TOKEN secret first, so nobody else can spend your YouTube quota." }, 503);
         if (!sameToken((request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, ""), env.STUDIO_TOKEN)) return json({ error: "Wrong studio token." }, 401);
-        const result = await videoDetails({ apiKey: env.YOUTUBE_API_KEY, ids: url.searchParams.get("ids") ?? undefined, handle: url.searchParams.get("handle") ?? undefined, max: url.searchParams.get("max") ?? undefined });
+        const result = await videoDetails({ apiKey: env.YOUTUBE_API_KEY, ids: url.searchParams.get("ids") ?? undefined, handle: url.searchParams.get("handle") ?? undefined, max: url.searchParams.get("max") ?? undefined, pageToken: url.searchParams.get("pageToken") ?? undefined });
         return result.ok ? json(result) : json({ error: result.error }, result.status);
       }
       if (url.pathname === "/api/films" && request.method === "GET") {
