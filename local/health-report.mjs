@@ -187,12 +187,24 @@ async function github({ repo, token, fetch }, path, init = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-/** The open report issue, or null. @param {{ repo: string, token: string, fetch: typeof fetch }} io */
-export async function findIssue(io) {
-  const list = await github(io, "/issues?state=open&per_page=100");
-  const found = (Array.isArray(list) ? list : []).find((/** @type {any} */ i) => i.title === ISSUE_TITLE && !i.pull_request);
-  return found ?? null;
+/**
+ * The report issues among an issue list, oldest first, so a second copy made by a race is visible
+ * and can be closed instead of drifting into two reports.
+ * @param {any[]} list
+ */
+export function uniqueIssues(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((i) => i && i.title === ISSUE_TITLE && !i.pull_request)
+    .sort((a, b) => Number(a.number) - Number(b.number));
 }
+
+/** Every open report issue, oldest first. @param {{ repo: string, token: string, fetch: typeof fetch }} io */
+export async function findIssues(io) {
+  return uniqueIssues(await github(io, "/issues?state=open&per_page=100"));
+}
+
+/** The one open report issue, or null. @param {{ repo: string, token: string, fetch: typeof fetch }} io */
+export const findIssue = async (io) => (await findIssues(io))[0] ?? null;
 
 /**
  * Make GitHub show the report: one issue, updated while broken, closed when fixed.
@@ -200,25 +212,29 @@ export async function findIssue(io) {
  * @param {ReturnType<typeof buildReport>} report
  */
 export async function publishIssue(io, report) {
-  const existing = await findIssue(io);
+  const open = await findIssues(io);
+  const existing = open[0] ?? null;
   const plan = issuePlan({ exists: Boolean(existing), ok: report.ok });
-  const footer = `\n\n---\n${report.summaryBn}`;
+  /** @type {string | null} */
+  let url = null;
   if (plan === "create") {
     const created = await github(io, "/issues", { method: "POST", body: JSON.stringify({ title: report.title, body: report.body }) });
-    return { plan, url: created?.html_url ?? null };
-  }
-  if (plan === "update") {
+    url = created?.html_url ?? null;
+  } else if (plan === "update" && existing) {
     const updated = await github(io, `/issues/${existing.number}`, { method: "PATCH", body: JSON.stringify({ body: report.body }) });
-    return { plan, url: updated?.html_url ?? existing.html_url ?? null };
-  }
-  if (plan === "close") {
+    url = updated?.html_url ?? existing.html_url ?? null;
+  } else if (plan === "close" && existing) {
     const closed = await github(io, `/issues/${existing.number}`, {
       method: "PATCH",
-      body: JSON.stringify({ state: "closed", body: `${report.body}${footer}` }),
+      body: JSON.stringify({ state: "closed", body: `${report.body}\n\n---\n${report.summaryBn}` }),
     });
-    return { plan, url: closed?.html_url ?? existing.html_url ?? null };
+    url = closed?.html_url ?? existing.html_url ?? null;
   }
-  return { plan, url: null };
+  // A duplicate made by two runs at once is closed rather than left as a second report.
+  for (const extra of existing ? open.slice(1) : []) {
+    await github(io, `/issues/${extra.number}`, { method: "PATCH", body: JSON.stringify({ state: "closed", body: `Duplicate of #${existing.number}.\n\n${report.summaryBn}` }) });
+  }
+  return { plan, url, closedDuplicates: existing ? open.slice(1).map((i) => i.number) : [] };
 }
 
 // --- the run ----------------------------------------------------------------------

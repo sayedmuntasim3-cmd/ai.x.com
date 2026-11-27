@@ -1,7 +1,7 @@
 // Simulated: no request leaves the machine. The live run is .github/workflows/health-report.yml.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildReport, issuePlan, readRun, readSources, readSite, runLine, sourceProblems, ISSUE_TITLE } from "./health-report.mjs";
+import { buildReport, issuePlan, readRun, readSources, readSite, runLine, sourceProblems, uniqueIssues, ISSUE_TITLE } from "./health-report.mjs";
 
 /** A healthy platform: every archive on, both runs green, both addresses answering. */
 function healthy(extra = {}) {
@@ -117,6 +117,18 @@ test("the site check wants a 200 and records what it actually got", async () => 
   assert.deepEqual(await readSite({ url: "https://site.test/studio/", fetch: ok }), { url: "https://site.test/studio/", status: 200, ok: true });
   const down = /** @type {typeof fetch} */ (async () => new Response("", { status: 500 }));
   assert.equal((await readSite({ url: "https://site.test/", fetch: down })).ok, false);
+});
+
+test("one issue only: a second copy made by a race is found, so the oldest is kept and the rest close", () => {
+  const list = [
+    { number: 80, title: ISSUE_TITLE, pull_request: false },
+    { number: 79, title: ISSUE_TITLE, pull_request: false },
+    { number: 78, title: "T5: a daily health report in one issue", pull_request: true },
+    { number: 10, title: "Something else" },
+  ];
+  assert.deepEqual(uniqueIssues(list).map((i) => i.number), [79, 80]);
+  assert.deepEqual(uniqueIssues([]), []);
+  assert.deepEqual(uniqueIssues(/** @type {any} */ (null)), []);
 });
 
 test("a missing archive list is one problem, not an empty success", () => {
