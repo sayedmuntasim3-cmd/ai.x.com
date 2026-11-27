@@ -786,14 +786,15 @@ export function openverseProvider(o = {}) {
 /**
  * The providers a run can use: the free archives (no key; the Smithsonian
  * with its free key) and whichever stock keys are set.
- * @param {{ pexelsKey?: string, pixabayKey?: string, smithsonianKey?: string, fetch?: FetchLike, archives?: boolean }} keys
+ * archiveEnv: the open archives' own keys (EUROPEANA_API_KEY, NARA_API_KEY, ...), see archiveKeys().
+ * @param {{ pexelsKey?: string, pixabayKey?: string, smithsonianKey?: string, fetch?: FetchLike, archives?: boolean, archiveEnv?: Record<string, string> }} keys
  * @returns {MediaProvider[]}
  */
 export function mediaProviders(keys) {
   /** @type {MediaProvider[]} */
   const out = [];
   if (keys.archives !== false) {
-    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), internetArchiveProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }), openArchivesProvider({ fetch: keys.fetch }));
+    out.push(wikimediaProvider({ fetch: keys.fetch }), nasaProvider({ fetch: keys.fetch }), internetArchiveProvider({ fetch: keys.fetch }), locProvider({ fetch: keys.fetch }), metProvider({ fetch: keys.fetch }), articProvider({ fetch: keys.fetch }), openverseProvider({ fetch: keys.fetch }), openArchivesProvider({ fetch: keys.fetch, env: keys.archiveEnv }));
     if (keys.smithsonianKey) out.push(smithsonianProvider({ apiKey: keys.smithsonianKey, fetch: keys.fetch }));
   }
   if (keys.pexelsKey) out.push(pexelsProvider({ apiKey: keys.pexelsKey, fetch: keys.fetch }));

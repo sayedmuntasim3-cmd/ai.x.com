@@ -24,6 +24,22 @@ function licenceText(code, label, url) {
   return { license: label, licenseUrl: url ?? null };
 }
 
+/** Sources whose terms forbid caching their results (NARA: "Please do not cache or store any content returned by the API"). */
+export const NO_STORE_SOURCES = Object.freeze(new Set(["nara"]));
+
+/**
+ * The archive keys a run may pass to the open archives: only names the archives
+ * themselves ask for (EUROPEANA_API_KEY, NARA_API_KEY, ...), never the whole environment.
+ * @param {Record<string, string | undefined>} env
+ * @returns {Record<string, string>}
+ */
+export function archiveKeys(env = {}) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const s of SOURCES) for (const k of /** @type {any} */ (s).keys ?? []) if (typeof env[k] === "string" && env[k]) out[k] = /** @type {string} */ (env[k]);
+  return out;
+}
+
 /**
  * @param {{ env?: Record<string, string | undefined>, fetch?: import("./film-media.mjs").FetchLike, perSource?: number, limit?: number }} [o]
  * @returns {import("./documentary-media-fetch.mjs").MediaProvider}
@@ -51,6 +67,7 @@ export function openArchivesProvider(o = {}) {
         height: r.height ?? null,
         attributionRequired: r.license.attribution,
         restrictions: null,
+        ...(NO_STORE_SOURCES.has(String(/** @type {any} */ (r).source)) ? { noStore: true } : {}),
       }));
     },
   };
