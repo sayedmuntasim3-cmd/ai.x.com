@@ -38,6 +38,9 @@ export function createGate(o = {}) {
   const cache = new Map();
   let tail = Promise.resolve();
   let lastStart = -Infinity;
+  let blockedUntil = 0;
+  /** @param {number} ms */
+  const blockedError = (ms) => Object.assign(new Error(`rate limited until ${new Date(now() + ms).toISOString()} (Retry-After ${Math.round(ms / 1000)} s)`), { status: 429, blocked: true, retryAfterMs: ms });
   /** @param {any} e */
   const limited = (e) => e?.status === 429 || e?.status === 503 || e?.status === "rate_limited";
   /** @param {any} e @param {number} attempt */
@@ -51,13 +54,19 @@ export function createGate(o = {}) {
   function run(key, fn) {
     const hit = cache.get(key);
     if (hit) return hit;
+    // Circuit breaker: after a Retry-After longer than we are willing to wait, answer at once until it passes.
+    if (now() < blockedUntil) return Promise.reject(blockedError(blockedUntil - now()));
     const job = tail.then(async () => {
       for (let attempt = 0; ; attempt += 1) {
+        if (now() < blockedUntil) throw blockedError(blockedUntil - now());
         const wait = lastStart + spacingMs - now();
         if (wait > 0) await sleep(wait);
         lastStart = now();
         try { return await fn(); } catch (e) {
-          if (!limited(e) || attempt + 1 >= tries) throw e;
+          if (!limited(e)) throw e;
+          const asked = Number(/** @type {any} */ (e)?.retryAfterMs) || 0;
+          if (asked > maxWaitMs) { blockedUntil = now() + asked; throw blockedError(asked); }
+          if (attempt + 1 >= tries) throw e;
           await sleep(waitFor(e, attempt));
           lastStart = now();
         }
@@ -68,7 +77,7 @@ export function createGate(o = {}) {
     job.catch(() => cache.delete(key));
     return job;
   }
-  return { run };
+  return { run, blockedUntil: () => (now() < blockedUntil ? blockedUntil : 0) };
 }
 
 /**

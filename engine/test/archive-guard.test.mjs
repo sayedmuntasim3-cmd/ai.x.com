@@ -53,3 +53,17 @@ test("LoC's Cloudflare challenge page counts as a rate limit", () => {
   assert.equal(isChallenge(200, "Just a moment"), false);
   assert.equal(isChallenge(429, "plain"), false);
 });
+
+test("circuit breaker: a Retry-After beyond maxWait blocks the gate at once, without waiting", async () => {
+  const c = clock();
+  const gate = createGate({ spacingMs: 1000, maxWaitMs: 30_000, ...c });
+  let calls = 0;
+  await assert.rejects(gate.run("a", async () => { calls += 1; throw Object.assign(new Error("x"), { status: 429, retryAfterMs: 1_129_000 }); }), (e) => e.blocked === true && /rate limited until/.test(e.message));
+  assert.equal(calls, 1);
+  assert.ok(!c.sleeps.some((ms) => ms > 1000), "no long sleep");
+  await assert.rejects(gate.run("b", async () => { calls += 1; return 1; }), (e) => e.blocked === true);
+  assert.equal(calls, 1, "the next call is refused without being sent");
+  assert.ok(gate.blockedUntil() > 0);
+  c.sleep(1_200_000);
+  assert.equal(await gate.run("c", async () => "back"), "back");
+});
