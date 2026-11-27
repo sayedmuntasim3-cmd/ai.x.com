@@ -181,3 +181,14 @@ test("the repair also drops the sentence the story editor named as a logic gap, 
   assert.deepEqual(fx.removed.map((r) => r.why).sort(), ["filler", "logic"]);
   assert.ok(!fx.acts[0].text.includes("push against") && fx.acts[0].text.includes("The crew went home."));
 });
+
+test("the repair drops a sentence with a name or place no source has", () => {
+  const adj = ["tall", "grim", "quiet", "wet", "old", "proud", "tired", "stern", "pale", "brisk", "calm", "weary", "bold", "lean", "stout", "keen", "dim", "warm", "cold", "dry", "slow", "swift", "grey", "bright", "dull"];
+  const noun = ["bolt", "gate", "pier", "ramp", "beam", "shaft", "valve", "spill", "chute", "wall", "dock", "tower", "yard", "mill", "road", "bank", "weir", "lock", "mast", "kiln", "forge", "loft", "barn", "shed", "cart"];
+  const filler = adj.map((a, i) => `The ${a} crew inspected the ${noun[i]} beside the ${noun[(i + 7) % 25]} and wrote it down.`).join(" ");
+  const acts = [{ id: "C1", text: `${filler} The foreman wrote to Edison about the plan. The crew went home.` }];
+  const fx = repairX(acts, { sources: ["The foreman Mulholland built the dam."], title: "The Dam" });
+  assert.ok(fx.ok);
+  assert.deepEqual(fx.removed.map((r) => r.why), ["name"]);
+  assert.ok(!fx.acts[0].text.includes("Edison"));
+});
