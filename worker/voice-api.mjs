@@ -33,7 +33,7 @@
 import { msg } from "../engine/src/messages.mjs";
 import { checkMarks } from "../engine/src/quran-marks.mjs";
 import { addAudience, addRecord, emptyLedger, ledgerJson, parseLedger, recordFromReport } from "../engine/src/craft-memory.mjs";
-import { GROQ_PROMPT_LIMIT, groqMessages, groqModel, promptTokens } from "./groq.mjs";
+import { GROQ_MODELS, GROQ_PROMPT_LIMIT, groqMessages, groqModel, promptTokens } from "./groq.mjs";
 import { nextDailyTopic } from "./daily-film.mjs";
 import { checkGithubOidc } from "./github-oidc.mjs";
 
@@ -96,9 +96,9 @@ const ID = /^[0-9a-f-]{36}$/;
 /** The stages the runner reports, in order (each has a message voice.stage.<stage>). */
 export const VOICE_STAGES = /** @type {const} */ (["script", "narrate", "uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
 
-/** @param {unknown} body @param {number} [status] */
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+/** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
+function json(body, status = 200, headers = {}) {
+  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 }
 
 /** @param {string} a @param {string} b */
@@ -380,7 +380,12 @@ export async function handleVoice(request, env, url, deps = {}) {
     // after Groq's busy minute came back as "daily limit used up" and stopped the film's brain (film ccd86532).
     if (!env.GROQ_API_KEY || String(env.GROQ ?? "").toLowerCase() === "off") return json({ error: "The free brain (Groq, the GROQ_API_KEY secret) is not set." }, 503);
     const groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(groqModels.length ? { models: groqModels } : {}), ...(deps.fetch ? { fetch: deps.fetch } : {}) });
+    // The runner names the model it is pacing (render/voice-runner.mjs workerBrain). This route makes one
+    // attempt on one model and never sleeps: a Worker forgets the previous request, so the minute's budget
+    // and the retries live with the runner, which hands back the wait in Retry-After.
+    const asked = String(/** @type {any} */ (body)?.model ?? "").trim();
+    const pinned = GROQ_MODELS.includes(asked);
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(pinned ? { models: [asked] } : groqModels.length ? { models: groqModels } : {}), retries: 1, pace: false, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
     const tokens = promptTokens(groqMessages(req));
     // Too big for Groq's minute: the runner splits its batch and asks again (413, never another brain).
     if (tokens > GROQ_PROMPT_LIMIT) return json({ error: `The prompt is about ${tokens} tokens; the free brain takes ${GROQ_PROMPT_LIMIT}. Split it.`, tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
@@ -391,7 +396,13 @@ export async function handleVoice(request, env, url, deps = {}) {
       const e = /** @type {any} */ (error);
       if (e?.tooLarge) return json({ error: String(e.message).slice(0, 600), tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
       // A busy minute or a used-up day, in Groq's own words, as 429 so the runner itself decides to wait or stop.
-      return json({ error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens }, 429);
+      // The wait Groq named travels back in Retry-After, and a used-up day says so, so the runner can pace.
+      const waitMs = Number(e?.retryAfterMs) || 0;
+      return json(
+        { error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens, daily: Boolean(e?.daily), retryAfterMs: waitMs || null, spentModels: e?.spentModels ?? [] },
+        429,
+        waitMs ? { "retry-after": String(Math.max(1, Math.ceil(waitMs / 1000))) } : {},
+      );
     }
   }
 
