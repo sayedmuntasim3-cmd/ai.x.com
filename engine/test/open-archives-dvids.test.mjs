@@ -52,3 +52,26 @@ test("DVIDS skips items marked copyrighted or courtesy, and items without a full
   const res = await run(f.fetch, { DVIDS_API_KEY: "k" });
   assert.deepEqual(res.results.map((r) => r.id.split(":").slice(-2).join(":")), ["image:4"]);
 });
+
+test("DVIDS search request has the shape the API accepts (type[] list, valid sort, key as api_key)", async () => {
+  const f = fakeFetch({ "image:1": asset("image:1") });
+  await run(f.fetch, { DVIDS_API_KEY: "k" });
+  const u = new URL(f.urls[0] ?? "");
+  assert.equal(u.origin + u.pathname, "https://api.dvidshub.net/search");
+  assert.deepEqual(u.searchParams.getAll("type[]"), ["image", "video"]);
+  assert.equal(u.searchParams.get("q"), "hoover dam");
+  assert.equal(u.searchParams.get("sort"), "score", "sort=relevance is not a DVIDS value (400)");
+  assert.ok(["date", "publishdate", "timestamp", "score", "rating"].includes(u.searchParams.get("sort") ?? ""));
+  assert.equal(u.searchParams.get("api_key"), "k");
+  assert.ok(Number(u.searchParams.get("max_results")) <= 50);
+  const a = new URL(f.urls[1] ?? "");
+  assert.equal(a.pathname, "/asset");
+  assert.equal(a.searchParams.get("id"), "image:1");
+});
+
+test("NASA results that do not mention the query are dropped", async () => {
+  const item = (id, title) => ({ data: [{ nasa_id: id, title, description: "A technician at KSC", media_type: "image" }], links: [{ rel: "canonical", href: `https://a.test/${id}.jpg` }] });
+  const fetch = async () => json({ collection: { items: [item("a", "Saturn Apollo Program"), item("b", "Hoover Dam from above")] } });
+  const res = await searchMedia({ query: "Hoover Dam", sources: ["nasa"], rights: "attribution", minSize: 0, perSource: 6, limit: 10, timeoutMs: 3000 }, {}, { fetch });
+  assert.deepEqual(res.results.map((r) => r.title), ["Hoover Dam from above"]);
+});

@@ -1,5 +1,7 @@
 // Generated from sayedmuntasim3-cmd/ai.x.com src/media (branch ccr-c21902ce-p7sii2) with esbuild. Do not edit by hand.
 
+import { isRelevant, locGate } from "./archive-guard.mjs";
+
 // ../ai.x.com/src/media/catalog.ts
 var SOURCES = [
   // Encyclopedic
@@ -860,9 +862,8 @@ var encyclopedic = { "wikimedia-commons": commons, wikipedia, openverse };
 // ../ai.x.com/src/media/providers/libraries.ts
 var iiif = (base, box) => `${base.replace(/\/$/, "")}/full/!${box},${box}/0/default.jpg`;
 var loc = async (ctx) => {
-  const data = await ctx.http.json(
-    `https://www.loc.gov/photos/?${qs({ q: ctx.query, fo: "json", c: Math.min(100, ctx.perSource * 2), at: "results" })}`
-  );
+  const locUrl = `https://www.loc.gov/photos/?${qs({ q: ctx.query, fo: "json", c: Math.min(100, ctx.perSource * 2), at: "results" })}`;
+  const data = await locGate.run(locUrl, () => ctx.http.json(locUrl));
   const out = [];
   for (const r of data.results ?? []) {
     if (r.access_restricted || !r.image_url?.length) continue;
@@ -1209,7 +1210,7 @@ var DVIDS_NOT_FREE = /©|\bcopyright(ed)?\b|all rights reserved|used with permis
 var dvids = async (ctx) => {
   const key = ctx.env.DVIDS_API_KEY ?? "";
   const search = await ctx.http.json(
-    `https://api.dvidshub.net/search?${qs({ q: ctx.query, "type[]": ["image", "video"], max_results: Math.min(50, ctx.perSource * 2 + 4), sort: "relevance", api_key: key })}`
+    `https://api.dvidshub.net/search?${qs({ q: ctx.query, "type[]": ["image", "video"], max_results: Math.min(50, ctx.perSource * 2 + 4), sort: "score", sortdir: "desc", api_key: key })}`
   );
   const hits = (search.results ?? []).filter((h) => h?.id && /^(image|video):/.test(h.id)).slice(0, ctx.perSource + 2);
   const assets = await Promise.all(
@@ -1688,6 +1689,7 @@ var nasa = async (ctx) => {
     const d = item.data?.[0];
     const links = item.links ?? [];
     if (!d) continue;
+    if (!isRelevant(ctx.query, d.title, d.description, d.keywords?.join?.(" "))) continue;
     const orig = links.find((l) => l.rel === "canonical" && /\.(jpe?g|png)$/i.test(l.href));
     const largest = links.filter((l) => l.rel === "alternate" && /\.(jpe?g|png)$/i.test(l.href)).sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0];
     const thumb = links.find((l) => l.rel === "preview") ?? links.find((l) => /~small\./.test(l.href));
