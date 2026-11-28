@@ -7,6 +7,13 @@ Merge and deploy: the owner gave written permission on 20 Nov 2026 ("মার�
 production. Never force-push, reset or delete branches; on a real conflict with the other session's work, ask him.
 
 ## Owner's decisions (newest first; never undo without him)
+- 28 Nov 2026: the platform has TWO equal products: Voiceover → video and Idea → video. The Boss drives both
+  every day without being asked; never let one sit while working on the other. Target: by 2 Dec the owner
+  uploads a voice himself and gets a world-class film automatically, for his YouTube channel (no view counts
+  are ever promised). Freebuff gets BIG tasks (round-two pack: N1 G1 C1 S1 T1 E1 U1 M1 L1 Q4); Claude is for
+  decisions, review, merges and watching every finished film frame by frame. Workers are archived the moment
+  they report. Nobody changes the landing page look (colours, fonts, layout, the "Idea | Voiceover" switch)
+  without asking him first (a worker replaced the switch on 28 Nov; it was restored in PR #104).
 - 26 Nov 2026: the Boss has full authority over the platform (after the owner). Every film follows
   `docs/OWNER_BRIEF.md`. Check every instruction, even the owner's own prompt: if it is wrong, correct it and do better.
   Main target: English documentaries for a USA audience. The niche is FIXED: Engineering Disasters & Megaprojects
