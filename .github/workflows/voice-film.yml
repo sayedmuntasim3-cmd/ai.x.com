@@ -48,6 +48,9 @@ on:
       selftest:
         description: 'Self-test: "yes" makes a short spoken sample here and sends nothing to the studio'
         default: ""
+      swaps:
+        description: 'My films: {"swaps":[{"shotId":"SC0003-2","pick":{...}}]} — only the parts holding those shots are rendered again'
+        default: ""
 
 run-name: "Voiceover film ${{ inputs.voice_id }}"
 
@@ -66,6 +69,9 @@ jobs:
       args: ${{ steps.prepare.outputs.args }}
       # How many runners render the picture: from the film's own length (a 40-minute film gets 16).
       parts: ${{ steps.prepare.outputs.parts }}
+      # A re-make renders only these parts (empty: every part, a first cut).
+      parts_only: ${{ steps.prepare.outputs.parts_only }}
+      reuse_film: ${{ steps.prepare.outputs.reuse_film }}
     env:
       SITE: ${{ inputs.site }}
       VOICE_ID: ${{ inputs.voice_id }}
@@ -74,6 +80,7 @@ jobs:
       EXT: ${{ inputs.ext }}
       TOPIC: ${{ inputs.topic }}
       QURAN: ${{ inputs.quran }}
+      SWAPS: ${{ inputs.swaps }}
       RESOLUTION: ${{ inputs.resolution }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ZUPONA_PYTHON: python
@@ -134,7 +141,25 @@ jobs:
             exit 0
           fi
           node render/voice-runner.mjs fetch --out "in.$EXT" 2>&1 | tee step.log && test "${PIPESTATUS[0]}" = 0
+      - name: Re-make from the saved edit pack (only the swapped shots change)
+        if: inputs.kind == 'narration' && inputs.swaps != ''
+        run: |
+          echo words > .stage
+          node render/voice-runner.mjs editpack --out pack.json 2>&1 | tee step.log
+          node -e 'require("fs").writeFileSync("swaps.json", process.env.SWAPS)' || { echo "::error::The swaps are not valid JSON."; exit 1; }
+          mkdir -p run
+          # The pack's script, words and picks, with the new pictures in place of the old ones.
+          node render/edit-pack.mjs --pack pack.json --swaps swaps.json --out run --plan plan.json 2>&1 | tee -a step.log
+          cp pack.json run/render-pack.json
+          cp plan.json run/render-plan.json
+          # The same recording through the film's own intake, pause tightening and mastering, so the
+          # words' saved times still sit on the same audio.
+          node render/edit-pack.mjs --master-in "in.$EXT" --run run --space dry 2>&1 | tee voice-film.log step.log
+          test "${PIPESTATUS[0]}" = 0
+          echo "words=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
+          echo "pictures=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - name: Listen, write down every word, understand, master, find pictures
+        if: inputs.swaps == ''
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
@@ -184,7 +209,8 @@ jobs:
             asset-rank-v1
             asset-rank-
       - name: Look at the pictures (OpenCLIP chooses on-topic, in the film's world)
-        if: inputs.kind == 'narration'
+        # A re-make keeps every picture the person did not swap: the eyes never re-pick them.
+        if: inputs.kind == 'narration' && inputs.swaps == ''
         env:
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -247,11 +273,22 @@ jobs:
           mkdir -p music && touch music/.keep
           [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
           echo "args=--run run --one-track $voice --words run/words.json --music music --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
+          # A re-make: the parts holding the swapped shots, and the old film for every other part.
+          parts_only=""
+          reuse_film=""
+          if [ -n "$SWAPS" ]; then
+            parts_only=$(node -e 'const p=JSON.parse(require("fs").readFileSync("run/render-plan.json","utf8"));console.log((p.changed??[]).join(","))')
+            reuse_film="$SITE/api/voice/$VOICE_ID/film?ticket=$VOICE_TICKET"
+          fi
+          echo "parts_only=$parts_only" >> "$GITHUB_OUTPUT"
+          echo "reuse_film=$reuse_film" >> "$GITHUB_OUTPUT"
           # The picture renders in parts on parts runners at once: one part per 2.5 minutes of film, 2 to 16
           # (a 40-minute film: 16 parts, about 10 minutes of picture instead of 18 in 8). The parts meet on shot
           # boundaries and are joined with concat -c copy, so the frames are the same as one render.
           seconds=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$voice" 2>/dev/null || echo 0)
           parts=$(node -e 'const s=Number(process.argv[1])||0;console.log(Math.min(16,Math.max(2,Math.round(s/150))))' "$seconds")
+          # A re-make splits the picture exactly as the film it changes was split (the pack's own parts).
+          if [ -n "$SWAPS" ]; then parts=$(node -e 'const p=JSON.parse(require("fs").readFileSync("run/render-pack.json","utf8"));console.log(Math.min(16,Math.max(1,(p.parts??[]).length||8)))'); fi
           echo "parts=$parts" >> "$GITHUB_OUTPUT"
           echo "The film is ${seconds} s long: $parts render parts." | tee -a "$GITHUB_STEP_SUMMARY"
           echo "prepare=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
@@ -308,8 +345,12 @@ jobs:
       # As many parts as the film's length earns (2-16): a long film's picture must not sit on one runner.
       parts: ${{ fromJSON(needs.film.outputs.parts || '8') }}
       # Before the film is blocked: fix the failing shots twice, then hand over a draft with reasons.
-      autofix: 2
+      # A re-make has only its changed parts at hand: the auto-fix rounds (which draw and join every part) are for a first cut.
+      autofix: ${{ needs.film.outputs.reuse_film != '' && 0 || 2 }}
       out_artifact: film-${{ inputs.voice_id }}
+      parts_only: ${{ needs.film.outputs.parts_only }}
+      reuse_url: ${{ needs.film.outputs.reuse_film }}
+      reuse_changed: ${{ needs.film.outputs.parts_only }}
 
   finish:
     needs: [film, render]
@@ -364,6 +405,19 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: prep-${{ inputs.voice_id }}
+      - name: Save the edit pack (every shot, its words, six free pictures)
+        # "My films" reads this to show the shots and offers the swaps; the film is delivered either
+        # way, so a packing problem is a warning, never a stopped film.
+        continue-on-error: true
+        env:
+          SITE: ${{ inputs.site }}
+          VOICE_ID: ${{ inputs.voice_id }}
+          VOICE_TICKET: ${{ inputs.ticket }}
+          PARTS: ${{ needs.film.outputs.parts || '8' }}
+        run: |
+          # The pack records the parts the picture was really rendered in, so a re-make splits it the same way.
+          node render/edit-pack.mjs --run run --film-id "$VOICE_ID" --parts "$PARTS" --out run/edit-pack.json 2>&1 | tee -a step.log
+          node render/voice-runner.mjs editpack --file run/edit-pack.json || echo "::warning::The edit pack was not saved; the film is delivered."
       - name: Shorts (three vertical cuts of the strongest moments; never fails the film)
         continue-on-error: true
         run: |

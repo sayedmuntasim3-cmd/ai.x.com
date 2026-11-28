@@ -7,6 +7,8 @@
  *   node render/voice-runner.mjs progress --stage words [--params '{"count":123}'] [--error "..."]
  *   node render/voice-runner.mjs summary --run voice-run [--stages pictures]   (intake, words, understand, master, pictures, from the run's files)
  *   node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json [--review]
+ *   node render/voice-runner.mjs editpack --file run/edit-pack.json   (save the finished film's edit pack)
+ *   node render/voice-runner.mjs editpack --out pack.json            (read it back for a swap re-make)
  *
  * Environment: SITE (https://...), VOICE_ID, VOICE_TICKET; RUN_URL (optional, the Actions run page);
  * VOICE_SELFTEST=1 sends nothing (the workflow's self-test).
@@ -85,6 +87,26 @@ export async function ledger(c, o) {
   const text = JSON.stringify({ version: got.version, films: got.films ?? [] }, null, 1);
   if (o.out) writeFileSync(o.out, text + "\n");
   return { films: (got.films ?? []).length };
+}
+
+/**
+ * The film's edit pack through the Worker ("My films", E1): the runner saves it when the film finishes
+ * (--file), and reads it back for a re-make (--out). It is the studio's own data; the ticket is the key.
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c
+ * @param {{ file?: string, out?: string }} o
+ */
+export async function editPack(c, o) {
+  if (o.file) {
+    const pack = JSON.parse(readFileSync(o.file, "utf8"));
+    const done = await send(c, "/edit", pack);
+    return { saved: true, shots: Number(done.shots) || 0 };
+  }
+  const get = c.fetch ?? fetch;
+  const res = await get(`${endpoint(c, "/edit")}`);
+  if (!res.ok) throw new Error(`GET /edit failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const text = await res.text();
+  if (o.out) writeFileSync(o.out, text);
+  return { shots: (JSON.parse(text)?.shots ?? []).length };
 }
 
 /**
@@ -280,6 +302,16 @@ async function main() {
     // node render/voice-runner.mjs voice --file narration.mp3   (the daily film's narration; the Worker starts the film)
     const r = await sendVoice(c, String(a.file));
     console.log(`voice sent; the voiceover film is ${r.status ?? "started"}${r.run?.actionsUrl ? ` (${r.run.actionsUrl})` : ""}`);
+  } else if (a._ === "editpack") {
+    // node render/voice-runner.mjs editpack --file run/edit-pack.json   (the film is delivered; save its shots)
+    // node render/voice-runner.mjs editpack --out pack.json            (a swap re-make reads them back)
+    if (typeof a.file === "string") {
+      const done = await editPack(c, { file: a.file });
+      console.log(`edit pack saved: ${done.shots} shots`);
+    } else {
+      const done = await editPack(c, { out: String(a.out ?? "pack.json") });
+      console.log(`edit pack read: ${done.shots} shots`);
+    }
   } else if (a._ === "deliver") {
     const report = typeof a.report === "string" && existsSync(a.report) ? JSON.parse(readFileSync(a.report, "utf8")) : null;
     // Quran: the located ayat, so the studio can ask the reviewer for one tap at each ayah end.
@@ -296,7 +328,7 @@ async function main() {
     const blocks = a.draft === true ? (report?.critic?.findings ?? []).filter((/** @type {any} */ f) => f.severity === "block").map((/** @type {any} */ f) => ({ code: String(f.code), en: String(f.en ?? f.code), bn: String(f.bn ?? f.code) })).slice(0, 3) : [];
     await deliver(c, String(a.file), { seconds: report?.durationSeconds ?? (Number(a.seconds) || null), review: a.review === true, report: small, ...(a.draft === true ? { draft: true, blocks } : {}) });
     console.log("delivered");
-  } else throw new Error("Use fetch, progress, summary or deliver.");
+  } else throw new Error("Use fetch, progress, summary, ledger, editpack or deliver.");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e.message); process.exit(1); });
