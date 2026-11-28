@@ -91,7 +91,7 @@ type Draft = {
 };
 
 const DEFAULT_DRAFT: Draft = {
-  mode: "voice",
+  mode: "idea",
   idea: "",
   minutes: 8,
   category: "engineering",
@@ -403,9 +403,9 @@ type ComposerProps = {
 
 function Composer(props: ComposerProps) {
   const { draft, update, voiceLocked, totalSeconds, credits, onCreate, flash, setError } = props;
-  const tabs: { id: Mode; label: string; hint: string; icon: ReactNode }[] = [
-    { id: "voice", label: "I have a voice recording", hint: "Your voice becomes the film", icon: <MicIcon size={24} /> },
-    { id: "idea", label: "I have an idea", hint: "We write the story for you", icon: <BulbIcon size={24} /> },
+  const tabs: { id: Mode; label: string; icon: ReactNode }[] = [
+    { id: "idea", label: "Idea", icon: <BulbIcon size={21} /> },
+    { id: "voice", label: "Voiceover", icon: <MicIcon size={21} /> },
   ];
 
   const selectMode = (mode: Mode) => {
@@ -430,11 +430,11 @@ function Composer(props: ComposerProps) {
       }`}
     >
       {/* Mode tabs */}
-      <div role="tablist" aria-label="How do you want to start?" className="relative grid grid-cols-2 gap-1 rounded-[22px] bg-sunken p-1">
+      <div role="tablist" aria-label="How do you want to start?" className="relative grid grid-cols-2 rounded-full bg-sunken p-1">
         <span
           aria-hidden="true"
-          className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-[18px] bg-brand-gradient shadow-cta transition-transform duration-300 ease-[cubic-bezier(.3,.7,.2,1)] ${
-            draft.mode === "idea" ? "translate-x-[calc(100%+4px)]" : ""
+          className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-brand-gradient shadow-cta transition-transform duration-300 ease-[cubic-bezier(.3,.7,.2,1)] ${
+            draft.mode === "voice" ? "translate-x-full" : ""
           }`}
         />
         {tabs.map((tab) => {
@@ -452,18 +452,17 @@ function Composer(props: ComposerProps) {
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
                   e.preventDefault();
-                  const next = tab.id === "voice" ? "idea" : "voice";
+                  const next = tab.id === "idea" ? "voice" : "idea";
                   selectMode(next);
                   document.getElementById(`tab-${next}`)?.focus();
                 }
               }}
-              className={`relative z-10 flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-[18px] px-2 py-3 text-center transition-colors duration-300 ${
+              className={`relative z-10 flex h-12 items-center justify-center gap-2.5 rounded-full text-[16px] font-medium transition-colors duration-300 ${
                 selected ? "text-white" : "text-muted hover:text-ink"
               }`}
             >
               <span className={selected ? "text-white" : ""}>{tab.icon}</span>
-              <span className="text-[15px] font-semibold leading-tight sm:text-[16px]">{tab.label}</span>
-              <span className={`hidden text-[12px] leading-tight min-[400px]:block ${selected ? "text-white/85" : "text-muted"}`}>{tab.hint}</span>
+              {tab.label}
             </button>
           );
         })}
