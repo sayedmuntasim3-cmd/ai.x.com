@@ -1,0 +1,44 @@
+name: YouTube watch
+
+# Every day Gemini watches up to 15 not-yet-watched winning films of the niche (free: the Worker's Gemini key, the owner's
+# 20 requests a day per model; films do not use Gemini). The run measures them, recomputes the medians and commits
+# engine/src/watch-measured.mjs (the numbers PRACTICE_TARGETS uses from 20 films on) and docs/research/YOUTUBE_WATCH_MEASURED.md.
+# Auth to the Worker is GitHub's own identity token (no stored secret). Code: local/youtube-watch.mjs, engine/src/youtube-watch.mjs.
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: youtube-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The pure parts (no network)
+        run: node --test engine/test/youtube-watch.test.mjs local/youtube-watch.test.mjs
+      - name: Watch up to 15 films, recompute the medians
+        env:
+          SITE: https://ai-x-com.sayedmuntasim3.workers.dev
+        run: node local/youtube-watch.mjs
+      - name: Check the engine still loads, then commit the numbers
+        run: |
+          node --test engine/test/reference-bar.test.mjs
+          if git diff --quiet; then echo "nothing new"; exit 0; fi
+          git config user.name "zupona-youtube-watch"
+          git config user.email "actions@users.noreply.github.com"
+          git add engine/src/watch-measured.mjs public/studio/engine/watch-measured.mjs docs/research/YOUTUBE_WATCH_MEASURED.md
+          git commit -m "YouTube watch: measured numbers from Gemini's daily films"
+          git pull --rebase origin main && git push origin HEAD:main
