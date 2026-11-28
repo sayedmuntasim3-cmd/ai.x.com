@@ -179,8 +179,12 @@ jobs:
           gate && passed=1
           for round in $(seq 1 "$AUTOFIX"); do
             [ "$passed" = 1 ] && break
-            node render/autofix.mjs --run run --report out/film.report.json --parts "$PARTS" --round "$round" --out out/autofix.json 2>&1 | tee autofix.log
-            [ "${PIPESTATUS[0]}" = 0 ] || { echo "Round $round: nothing this loop can fix."; break; }
+            # Not a pipe into tee: under `set -e -o pipefail` a "nothing to fix" exit (2) would stop the whole step,
+            # and a blocked film must still go on to be delivered as a marked draft.
+            rc=0
+            node render/autofix.mjs --run run --report out/film.report.json --parts "$PARTS" --round "$round" --out out/autofix.json > autofix.log 2>&1 || rc=$?
+            cat autofix.log
+            [ "$rc" = 0 ] || { echo "Round $round: nothing this loop can fix."; break; }
             parts=$(node -e 'const j=require("./out/autofix.json");const r=(j.rounds||[]).find((x)=>x.round===Number(process.argv[1]));console.log(((r&&r.parts)||[]).join(" "))' "$round")
             [ -n "$parts" ] || break
             for p in $parts; do

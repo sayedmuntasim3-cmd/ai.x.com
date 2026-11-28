@@ -58,3 +58,16 @@ test("the viewer panel runs on a free brain and is reported, not applied", async
   assert.equal(p.pass, false);
   assert.equal(p.found, 1);
 });
+
+test("missingCues: a designed moment with no sound gets a cue in the nearest gap between words, never inside a word", async () => {
+  const { missingCues, settleSound } = await import("../src/timeline.mjs");
+  const words = [];
+  for (let t = 0; t < 30; t += 1.5) words.push({ text: t === 0 ? "w." : "w", start: t, end: t + 0.4 });
+  const video = [{ start: 0, end: 10, type: "clip" }, { start: 10, end: 20, type: "card", kinetic: true, scene: "SC2" }];
+  const cues = missingCues([], words, video);
+  assert.equal(cues.length, 1);
+  assert.ok(Math.abs(cues[0].start - 10) <= 1.5);
+  assert.ok(!words.some((w) => w.start < cues[0].end && w.end > cues[0].start - 0.05), "in a gap, not on a word");
+  assert.equal(missingCues([{ token: "AUTO-IMPACT", kind: "hit", scene: "", start: 10.5, end: 11.6 }], words, video).length, 0, "already covered");
+  assert.equal(settleSound([], words, video).clear.sounds.length, 1);
+});
