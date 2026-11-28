@@ -186,3 +186,22 @@ test("P0: an unknown person is never shown for a line about the film's own man o
   assert.equal(strangerAsSubject("Bengaluru, India.", "man, street"), "");
   assert.equal(strangerAsSubject("his shop on a busy road", "street, people, man, market"), "");
 });
+
+test("taste: a picture is used once in the whole film, and crops of one mosaic are one picture", async () => {
+  const { sameMosaic } = await import("./rerank.mjs");
+  assert.equal(sameMosaic("Apollo 11 Lunar Panorama AS11-40-5878", "Apollo 11 lunar panorama crop 2"), true);
+  assert.equal(sameMosaic("Apollo 11 Lunar Panorama", "Saturn V on the pad"), false);
+  const a = { id: "a", title: "Moon panorama, Tranquility Base" }, b = { id: "b", title: "Moon panorama (detail), Tranquility Base" }, c = { id: "c", title: "Crew walkout" };
+  const shots = [
+    { start: 0, ranked: [{ c: a, total: 3, phash: "ffffffffffffffff" }] },
+    { start: 5000, ranked: [{ c: b, total: 3, phash: "0f0f0f0f0f0f0f0f" }, { c, total: 1, phash: "00000000ffffffff" }] },
+  ];
+  assert.deepEqual(chooseSequence(shots).map((p) => p?.c.id), ["a", "c"], "even 5000 s later, and with a different hash, the same mosaic does not return");
+});
+
+test("taste: a broadcaster's footage is refused for its logo", () => {
+  const ok = { mediaType: "video", width: 1920, height: 1080, rights: { allowed: true, licenseId: "PDM-1.0" } };
+  assert.equal(refusal({ ...ok, title: "KQED_20190720_030000_Moon landing" }, { watermark: 0 }), "broadcast logo");
+  assert.equal(refusal({ ...ok, title: "CNN Special: Apollo 11" }, { watermark: 0 }), "broadcast logo");
+  assert.equal(refusal({ ...ok, title: "Apollo 11 launch, NASA" }, { watermark: 0 }), "");
+});

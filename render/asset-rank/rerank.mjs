@@ -22,6 +22,8 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { fitAdjust, planFit } from "../../engine/src/shot-fit.mjs";
+import { NEAR_COPY_BITS, logoSource } from "../picture-taste.mjs";
 import { FREE_LICENCES, REPEAT_WINDOW_SECONDS, internetArchiveProvider, nasaProvider, pixabayProvider, pexelsProvider, toPick, verifyArchiveItem, wikimediaProvider } from "../../engine/src/film-media.mjs";
 import { createRateLimiter, fetchShotMedia } from "../../engine/src/documentary-media-fetch.mjs";
 import { chooseByWords, judgePicture } from "../critic.mjs";
@@ -454,6 +456,8 @@ export function hamming(a, b) {
  */
 export function refusal(c, score, world = {}) {
   if (!c.rights?.allowed || !FREE_LICENCES.includes(c.rights.licenseId)) return "licence";
+  // A broadcaster's footage carries the station's logo in a corner (the first two shots of film e0b87efb): never shown.
+  if (logoSource(/** @type {any} */ (c))) return "broadcast logo";
   if (!c.width || !c.height) return "size unknown";
   if (c.width < (c.mediaType === "video" ? MIN_VIDEO_WIDTH : MIN_STILL_WIDTH)) return "too small";
   if (c.width / c.height < MIN_ASPECT) return "not landscape";
@@ -516,13 +520,24 @@ export function sequenceBonus(prev, x, historic) {
 }
 
 /**
- * Choose in film order: the best-scoring candidate not used, and not a near copy of a pick, within the
+ * Crops and near copies of one stitched panorama are one picture: both titles say panorama / mosaic and open with the same two words.
+ * @param {string | null | undefined} a @param {string | null | undefined} b
+ */
+export function sameMosaic(a, b) {
+  const MOSAIC = /\b(?:panorama|panoramic|mosaic|stitched|pan)\b/i;
+  if (!a || !b || !MOSAIC.test(a) || !MOSAIC.test(b)) return false;
+  const head = (/** @type {string} */ t) => t.toLowerCase().replace(/[^a-z ]+/g, " ").split(/\s+/).filter(Boolean).slice(0, 2).join(" ");
+  return head(a) === head(b);
+}
+
+/**
+ * Choose in film order (a picture is used at most once in the whole film, whatever the window): the best-scoring candidate not used, and not a near copy of a pick, within the
  * repeat window; colour, scale and era of the shot before it settle the near-ties. @template {{ id: string }} C
  * @param {{ start: number, historic?: boolean, ranked: { c: C, total: number, phash?: string, col?: number[] | null, scale?: string, era?: number }[] }[]} shots @param {number} [windowSeconds]
  * @returns {({ c: C, total: number, phash?: string, sequence?: { colour: number, scale: number, era: number, total: number, colourDistance: number | null, at: string } } | null)[]}
  */
-export function chooseSequence(shots, windowSeconds = REPEAT_WINDOW_SECONDS) {
-  /** @type {{ id: string, at: number, phash?: string }[]} */
+export function chooseSequence(shots, windowSeconds = Infinity) {
+  /** @type {{ id: string, at: number, phash?: string, title?: string }[]} */
   const used = [];
   /** @type {{ col?: number[] | null, scale?: string } | null} */
   let prev = null;
@@ -534,14 +549,14 @@ export function chooseSequence(shots, windowSeconds = REPEAT_WINDOW_SECONDS) {
     let best = -Infinity;
     let note = { colour: 0, scale: 0, era: 0 };
     for (const x of s.ranked) {
-      if (near.some((u) => u.id === x.c.id || (u.phash && x.phash && hamming(u.phash, x.phash) <= DUPLICATE_BITS))) continue;
+      if (near.some((u) => u.id === x.c.id || (u.phash && x.phash && hamming(u.phash, x.phash) <= Math.max(DUPLICATE_BITS, NEAR_COPY_BITS)) || sameMosaic(u.title, /** @type {any} */ (x.c).title))) continue;
       const extra = sequenceBonus(prev, x, Boolean(s.historic));
       const total = x.total + extra.colour + extra.scale + extra.era;
       if (total > best) { best = total; pick = x; note = extra; }
     }
     if (pick) {
       const previous = prev;
-      used.push({ id: pick.c.id, at: s.start, phash: pick.phash });
+      used.push({ id: pick.c.id, at: s.start, phash: pick.phash, title: /** @type {any} */ (pick.c).title });
       const chosen = pick;
       prev = chosen;
       return { ...chosen, sequence: { ...note, total: r3(best), colourDistance: previous ? r3(colourDistance(previous.col, chosen.col)) : null, at: chosen.scale ?? "" } };
@@ -705,6 +720,8 @@ export async function rerankRun(o) {
   const ans = await readJson(join(dir, "ans.json"));
   const seeSeconds = (Date.now() - t1) / 1000;
 
+  // The shot's own sentence first, in story order (engine/src/shot-fit.mjs): launch lines get launch pictures, the Moon only when the words reach it.
+  const fitOf = planFit(shots);
   const plan = shots.map((/** @type {any} */ s) => {
     const beat = beatAt(beats, s.start, s.end);
     const historic = historicEra(beat?.era || world.era);
@@ -719,7 +736,8 @@ export async function rerankRun(o) {
       const aboutIt = !s.named || aboutNames(c, s.names ?? []);
       const why = (s.named && !aboutIt && stock ? "off-subject" : "") || refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
       const tags = tagHits(c.title, s.queries ?? [s.query ?? ""]);
-      const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags + (s.named ? (stock ? -STOCK_NAMED_COST : aboutIt ? ARCHIVE_NAMED_EDGE : 0) : 0), score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
+      const fit = fitAdjust(/** @type {any} */ (fitOf.get(s)), `${c.title ?? ""} ${(c.tags ?? []).join?.(" ") ?? ""}`);
+      const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags + fit + (s.named ? (stock ? -STOCK_NAMED_COST : aboutIt ? ARCHIVE_NAMED_EDGE : 0) : 0), score: { .../** @type {any} */ (score), tags, fit, stage: fitOf.get(s)?.stage ?? null }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
       if (why) { refused[why] = (refused[why] ?? 0) + 1; if (why === "off-world" && score) lastResort.push(row); continue; }
       ranked.push(row);
     }
@@ -827,14 +845,15 @@ export async function rerankRun(o) {
     report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
   });
   // No off-topic fallback: a named shot with no relevant pick of its own holds the nearest strong pick of the film, never a random picture.
+  // The same for any shot no picture fits (owner's rule: never a card of white text on empty black): it holds the nearest strong pick, moving.
   const strong = plan.map((p, i) => ({ s: p.s, pick: chosen[i] })).filter((x) => x.pick && (!x.s.named || aboutNames(/** @type {any} */ (x.pick).c, x.s.names ?? [])));
   for (let i = 0; i < plan.length; i += 1) {
     const s = plan[i].s;
-    if (!s.named || chosen[i] || !strong.length) continue;
+    if (chosen[i] || !strong.length) continue;
     const near = [...strong].sort((a, b) => Math.abs(a.s.start - s.start) - Math.abs(b.s.start - s.start))[0];
     s.pick = { .../** @type {any} */ (near.s.pick) };
-    s.status = "found"; s.review = "held"; s.reused = near.s.pick?.id;
-    s.why = { by: "held: no relevant picture found for this named shot, the nearest strong pick is held", provider: near.s.pick?.source ?? null };
+    s.status = "found"; s.review = "held"; s.held = true; s.reused = near.s.pick?.id;
+    s.why = { by: "held: no picture fits this shot, the nearest strong pick is held", provider: near.s.pick?.source ?? null };
     log(`Held: ${s.id} found nothing relevant for ${(s.names ?? []).slice(0, 2).join(" / ")}; it holds ${near.s.id}.`);
   }
   const picks = report.filter((r) => r.after);

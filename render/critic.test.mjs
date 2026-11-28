@@ -315,3 +315,24 @@ test("voice-film captions are held through the pauses, so the speech between sen
   assert.ok(held.maxGap < 1, `longest hole ${held.maxGap} s`);
   assert.equal(held.overlap, 0);
 });
+
+test("picture taste: small pictures in black, a repeated picture, a logo and text on black each block, in both languages", () => {
+  const t = timeline([{ start: 0, end: 4 }, { start: 4, end: 8 }]);
+  const clean = critique(t, {}, { taste: { unfilled: [], repeats: [], logos: [], cards: [] } });
+  for (const code of ["critic.unfilled", "critic.samePicture", "critic.logo", "critic.textOnBlack"]) assert.ok(!clean.findings.some((f) => f.code === code), `${code} stays quiet on a clean film`);
+  const r = critique(t, {}, { taste: { unfilled: [{ id: "s2", filled: 0.4 }], repeats: [{ a: "s1", b: "s2", bits: 2, consecutive: true }], logos: [{ id: "s1", corner: "top-left" }], cards: [{ id: "s4" }] } });
+  assert.equal(r.verdict, "block");
+  for (const code of ["critic.unfilled", "critic.samePicture", "critic.logo", "critic.textOnBlack"]) {
+    const f = r.findings.find((x) => x.code === code);
+    assert.ok(f && f.severity === "block", `${code} blocks`);
+    assert.ok(f.en.length > 20 && /[ঀ-৿]/.test(f.bn), `${code} says why in English and Bangla`);
+  }
+  assert.equal(r.measures.unfilledShots, 1);
+  assert.equal(r.measures.samePictures, 1);
+});
+
+test("picture taste: no evidence (an older render) adds nothing, so the gate is only stricter", () => {
+  const t = timeline([{ start: 0, end: 4 }]);
+  const a = critique(t, {}, {});
+  assert.ok(!a.findings.some((f) => /^critic\.(unfilled|samePicture|logo|textOnBlack)$/.test(f.code)));
+});
