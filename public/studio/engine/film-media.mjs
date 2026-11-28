@@ -318,7 +318,7 @@ export function toPick(c) {
  * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
  * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
  * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number, topic?: string, holdWeak?: boolean }} o
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number, topic?: string, subject?: string, holdWeak?: boolean }} o
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -338,7 +338,8 @@ export async function chapterMedia(o) {
     const simple = simpleQuery(shot.description);
     if (simple && !own.some((q) => q.toLowerCase() === simple.toLowerCase())) own.push(simple);
     // The ladder anchors bare keywords to the film's subject and adds the subject, its category and its era.
-    const queries = o.topic ? queryLadder({ queries: own, description: shot.description, topic: o.topic }) : own;
+    // Always through the ladder: with no subject at all it still drops a bare common word ("eight", "clock") sent alone.
+    const queries = queryLadder({ queries: own, description: shot.description, topic: o.topic ?? "", subject: o.subject });
     /** @type {ShotMedia} */
     const row = { ...shot, status: queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
     const earlier = o.done?.[shotKey(row)];

@@ -204,7 +204,7 @@ test("free brain: one call per batch; a used-up day stops it and the rest come f
       return meddlingBrain.call(r);
     },
   };
-  const r = await planVoiceVisuals({ scenes, structure: u.structure, brain: dayOver, batchChars: 1 });
+  const r = await planVoiceVisuals({ scenes, structure: u.structure, brain: dayOver, batchChars: 1, topic: "The mill" });
   assert.equal(calls, 2, "no call after the day is over");
   assert.equal(r.brainUsed, true);
   const codes = r.messages.map((m) => m.code);

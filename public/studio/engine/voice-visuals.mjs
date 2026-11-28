@@ -16,6 +16,7 @@ import { msg } from "./messages.mjs";
 import { parseSceneLines } from "./scene-lines.mjs";
 import { checkQuranFilm, RECITATION_AUDIO } from "./quran-film.mjs";
 import { checkVoiceChapter, restoreVoiceFields, voiceSkeleton } from "./voice-scenes.mjs";
+import { cleanSubject, subjectFromTranscript } from "./picture-ladder.mjs";
 
 /** @typedef {import("./voice-scenes.mjs").VoiceScene} VoiceScene */
 /** @typedef {import("./film-run.mjs").Model} Model */
@@ -322,6 +323,26 @@ export function brainBatches(scenes, structure, size, batchChars = 14000) {
 }
 
 /**
+ * What a film with no topic typed is about, found from its own words before any picture is searched: names, places and
+ * years first (no model), then one small free-brain call for "the subject in 6 words or fewer"; when that fails or answers
+ * with something that is not a subject, the first result stands.
+ * @param {{ text: string, brain?: Model | null }} o
+ * @returns {Promise<{ subject: string, by: "names" | "brain" | "none" }>}
+ */
+export async function filmSubject(o) {
+  const text = String(o.text ?? "").replace(/\s+/g, " ").trim();
+  const names = subjectFromTranscript(text);
+  if (o.brain && text) {
+    try {
+      const reply = await o.brain.call({ stage: "V4", system: [{ text: "You name what a recording is about. Answer with the subject only: at most 6 words, specific (the event, person or place with its year when known), no sentence, no quotes." }], messages: [{ role: "user", content: [{ text: `Names and places found in it: ${names || "none"}.\n\nTranscript:\n${text.slice(0, 4000)}\n\nThe subject in 6 words or fewer:` }] }], maxTokens: 40, effort: "low" });
+      const subject = cleanSubject(reply.text ?? "");
+      if (subject) return { subject, by: "brain" };
+    } catch { /* the names stand */ }
+  }
+  return names ? { subject: names, by: "names" } : { subject: "", by: "none" };
+}
+
+/**
  * reachable: checks that a picture's file can be fetched before it is chosen (the runner can afford the request).
  * worldNote: the Director pass's world (shot-plan.mjs worldBrief), so every shot names the right place, era and money.
  * @param {{ scenes: VoiceScene[], structure?: Structure | null, topic?: string, worldNote?: string, brain?: Model | null, providers?: import("./film-media.mjs").MediaProvider[], chapter?: string, batchChars?: number, maxCalls?: number, judge?: import("./film-media.mjs").MediaJudge, reachable?: (url: string) => Promise<boolean>, concurrency?: number }} o
@@ -331,11 +352,14 @@ export async function planVoiceVisuals(o) {
   const scenes = o.scenes;
   const structure = o.structure ?? null;
   const messages = [];
+  // No topic typed: the subject is found from the words before any picture is searched, and every query carries it.
+  const found = o.topic ? { subject: "", by: /** @type {const} */ ("none") } : await filmSubject({ text: scenes.map((s) => s.narration).join(" "), brain: o.brain });
+  const subject = o.topic || found.subject;
   const skeleton = voiceSkeleton(scenes, chapter).split("\n").map((l) => l.replace("| SHOTS: TODO", "| SHOTS: TODO | SRC: TODO")).join("\n");
   let written = "";
   let brainUsed = false;
   if (o.brain) {
-    const brief = (o.topic ? `The film is about: ${o.topic}. ` : "") + (o.worldNote ? `${o.worldNote} ` : "") + (structure ? `Topic words: ${structure.topicWords.map((t) => t.word).join(", ")}. Names: ${structure.entities.map((e) => e.name).join(", ") || "none"}. Dates: ${structure.dates.map((d) => d.text).join("; ") || "none"}.` : "");
+    const brief = (subject ? `The film is about: ${subject}. ` : "") + (o.worldNote ? `${o.worldNote} ` : "") + (structure ? `Topic words: ${structure.topicWords.map((t) => t.word).join(", ")}. Names: ${structure.entities.map((e) => e.name).join(", ") || "none"}. Dates: ${structure.dates.map((d) => d.text).join("; ") || "none"}.` : "");
     const lineOf = new Map(skeleton.split("\n").map((l) => [/SC\d{4,5}/.exec(l)?.[0] ?? "", l]));
     const batches = brainBatches(scenes, structure, (sc) => (lineOf.get(sc) ?? "").length, o.batchChars);
     const maxCalls = o.maxCalls ?? 40;
@@ -372,7 +396,7 @@ export async function planVoiceVisuals(o) {
   const lines = scenes.map((s) => {
     const w = byId.get(s.sc);
     const usable = w && !/TODO/.test(w.raw) && w.fields.SHOTS && w.fields.SRC;
-    return usable ? w.raw : fillLine(/** @type {string} */ (skeletonLines.get(s.sc)), wordsPlan(s, structure, o.topic));
+    return usable ? w.raw : fillLine(/** @type {string} */ (skeletonLines.get(s.sc)), wordsPlan(s, structure, subject));
   });
   const markdown = lines.join("\n");
   const findings = checkVoiceChapter(markdown, scenes);
@@ -389,7 +413,7 @@ export async function planVoiceVisuals(o) {
   if (o.providers?.length) {
     const judge = o.brain && canSee(o.brain) ? o.judge : undefined;
     // Voiceover films: a picture must name what was searched (the archives match "car" to "Carina Nebula").
-    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency, topic: o.topic, holdWeak: true });
+    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency, topic: o.topic, subject: o.topic ? undefined : found.subject, holdWeak: true });
     for (const shot of media.shots) {
       const p = plan.find((x) => x.sc === shot.scene);
       if (!p) continue;

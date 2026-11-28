@@ -234,7 +234,8 @@ export function subtitleFit(narration, captions, seconds) {
  * Read a timeline and the render's report and return every finding.
  * @param {any} timeline
  * @param {any} report
- * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any }} [evidence]
+ * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any, voiceFilm?: boolean }} [evidence]
+ *   voiceFilm: the film is the length of the recording the owner gave (one narration track): a short one is a note, not a block
  *   craft: the Craft Ledger's calibrated targets for this genre (craft-memory.mjs calibratedDoctrine): a note per
  *   measure short of its target and the craft index 0-100 in `craft`. Notes only: the floor above decides blocks.
  * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any>, craft?: ReturnType<typeof craftReport> }}
@@ -254,7 +255,7 @@ export function critique(timeline, report = {}, evidence = {}) {
   const longest = lengths.length ? Math.max(...lengths) : 0;
   const shortShare = total ? lengths.filter((n) => n < 1.5).reduce((a, b) => a + b, 0) / total : 0;
   if (seconds && seconds < STANDARD.minSeconds) {
-    add({ ...msg("critic.short", { value: round(seconds, 1), min: STANDARD.minSeconds }), severity: "block", value: round(seconds, 1) });
+    add({ ...msg("critic.short", { value: round(seconds, 1), min: STANDARD.minSeconds }), severity: evidence.voiceFilm ? "note" : "block", value: round(seconds, 1) });
   }
   if (lengths.length && (avg < STANDARD.avgShot[0] || avg > STANDARD.avgShot[1])) {
     add({ ...msg("critic.shotLength", { value: round(avg), low: STANDARD.avgShot[0], high: STANDARD.avgShot[1] }), severity: "block", value: round(avg) });
