@@ -366,3 +366,15 @@ test("speed: a thumbnail embedded before is never downloaded again (the cache is
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("frameFault: a black frame and a small picture inside black are refused before they are chosen", async () => {
+  const { frameFault } = await import("./rerank.mjs");
+  const tile = (/** @type {(x: number, y: number) => number} */ f) => { const g = new Uint8Array(64 * 36); for (let y = 0; y < 36; y += 1) for (let x = 0; x < 64; x += 1) g[y * 64 + x] = f(x, y); return { gray: Buffer.from(g).toString("base64") }; };
+  let s = 7;
+  const noise = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return 60 + (s % 140); };
+  assert.equal(frameFault(tile(() => noise())), "", "a busy full-frame picture is fine");
+  assert.equal(frameFault(tile(() => 2)), "frame: black");
+  assert.match(frameFault(tile((x, y) => (x > 18 && x < 46 && y > 10 && y < 26 ? noise() : 0))), /^frame: fills \d+%$/);
+  assert.equal(frameFault(null), "");
+  assert.equal(frameFault({ gray: "AAAA" }), "", "a tile of the wrong size is not judged");
+});

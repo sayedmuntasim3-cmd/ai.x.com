@@ -17,6 +17,9 @@
  */
 
 /** @type {readonly BarRule[]} */
+import { applyMeasured } from "./youtube-watch.mjs";
+import { WATCH_MEASURED } from "./watch-measured.mjs";
+
 export const REFERENCE_BAR = Object.freeze([
   { id: "firstMinuteCut", rule: 1, label: "a cut at least every 6 s in the first minute", measure: "firstMinuteMaxShot", op: "<=", limit: 6, unit: "s", status: "floor" },
   { id: "first3MaxShot", rule: 1, label: "no shot longer than 6 s in the first 3 minutes", measure: "first3MaxShot", op: "<=", limit: 6, unit: "s", status: "floor" },
@@ -96,7 +99,7 @@ export function barBrief() {
  * "bar" = the reference bar, "plan" = FIRST_VIDEO_PLAN (an estimate there too), "radar" = sourced from the 467-video
  * title/length study, "estimate" = our own opinion, "measured" = counted from public metadata of the reference films (chapter timestamps, lengths). Replace an estimate when a real measurement lands.
  */
-export const PRACTICE_TARGETS = Object.freeze({
+const BASE_TARGETS = {
   lengthMinutes: /** @type {[number, number]} */ ([14, 16]), // plan section 5; radar: 1M+ median 21 min, small-channel hits 8-14 min
   wpm: /** @type {[number, number]} */ ([140, 165]), // estimate: ordinary documentary narration
   hookBySeconds: 30, // bar rule 3, plan point 1
@@ -113,7 +116,10 @@ export const PRACTICE_TARGETS = Object.freeze({
   firstChapterTurnBySeconds: 70, // MEASURED, same 172 films: the median second chapter starts at 69 s
   endingSeconds: 30, // plan point 13
   endingSources: 3, // bar rule 9
-});
+};
+
+/** The numbers a film aims for: the base above, with the numbers Gemini measured in winning films laid over them once 20+ films are in (watch-measured.mjs, rewritten daily). */
+export const PRACTICE_TARGETS = Object.freeze(applyMeasured(BASE_TARGETS, WATCH_MEASURED));
 
 const NUMBER_WORDS = /\b(\d[\d,.]*|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)(?:[- ](?:one|two|three|four|five|six|seven|eight|nine|hundred|thousand|million))*)\b/i;
 /** A sentence that carries something new: a number, a date, or a question. @param {string} text */

@@ -174,3 +174,9 @@ test("the report keeps the rounds even when none were needed", () => {
   assert.deepEqual(merged.autofix, { rounds: [], roundsTried: 0, changedShots: 0 });
   assert.equal(merged.critic.verdict, "pass");
 });
+
+test("a black stretch names the picture shots over it, and a film with one non-shot block is still fixed for its shot blocks", () => {
+  const report = { shots: [{ id: "S1", type: "clip", start: 0, end: 10, url: "a" }, { id: "S2", type: "clip", start: 10, end: 20, url: "b" }, { id: "S3", type: "card", start: 20, end: 24 }], master: { black: [{ start: 15.1, end: 18.6, duration: 3.5 }] } };
+  assert.deepEqual([...failingShots(report).entries()], [["S2", ["critic.black"]]]);
+  assert.equal(shotLevelOnly([{ severity: "block", code: "critic.cues" }, { severity: "block", code: "critic.black" }]), false, "mixed blocks are not shot-level only");
+});

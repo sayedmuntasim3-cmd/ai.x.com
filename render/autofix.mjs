@@ -95,6 +95,10 @@ export function failingShots(report) {
   for (const f of picture.flicker ?? []) add(f.id, "critic.flicker");
   for (const b of picture.blurred ?? []) add(b.id, "critic.blurred");
   for (const d of picture.dark ?? []) add(d.id, "critic.dark");
+  // A stretch of black the script did not ask for: the picture shots that sit over it.
+  for (const b of report?.master?.black ?? []) {
+    for (const s of shots) if (PICTURED.has(String(s.type)) && Number(s.start) < Number(b.end) && Number(s.end) > Number(b.start)) add(s.id, "critic.black");
+  }
   // Picture taste: a picture that does not fill the frame, a burned-in logo, the later one of two copies of one picture.
   const taste = report?.taste ?? {};
   for (const u of taste.unfilled ?? []) add(u.id, "critic.unfilled");
@@ -317,8 +321,10 @@ export async function main(argv, deps = {}) {
     print(`No ${existsSync(mediaPath) ? "candidates-C1.json" : "media-C1.json"} in ${values.run}: nothing to re-pick from.`);
     return 2;
   }
-  if (!shotLevelOnly(report.critic?.findings)) {
-    print("The gate's blocks are not about single shots; a re-pick cannot answer them.");
+  // A film blocked on a mix of things: the shot-level blocks are answered here, the rest stay in the draft's reasons. Only a
+  // film with no shot-level block at all is handed over as it is (a re-pick would change nothing).
+  if (!blocksOf(report.critic?.findings).some((f) => SHOT_CODES.includes(String(f.code)))) {
+    print("None of the gate's blocks is about a single shot; a re-pick cannot answer them.");
     return 2;
   }
   const failing = failingShots(report);

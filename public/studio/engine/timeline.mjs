@@ -930,6 +930,40 @@ export function placeEffects(sounds, words, o = {}) {
 }
 
 /**
+ * The cues a film still lacks: one short sound in the speech gap nearest each designed moment that has no sound within 1.5 s.
+ * Never inside a word, never in the first spoken line, whatever the 8 s spacing says (a cue on a designed moment is the
+ * critic's own floor).
+ * @param {SoundEvent[]} sounds @param {TimedWord[]} words @param {{ start: number, end: number, scene?: string, type?: string, moment?: any, kinetic?: any, counter?: any, chart?: any, map?: any, chapterTitle?: string }[]} video
+ * @returns {SoundEvent[]}
+ */
+export function missingCues(sounds, words, video) {
+  const spoken = (words ?? []).filter((w) => w && w.end > w.start).sort((a, b) => a.start - b.start);
+  if (!spoken.length) return [];
+  const firstLineEnd = sentencesOfWords(spoken)[0]?.end ?? spoken[0].end;
+  /** @type {SoundEvent[]} */
+  const added = [];
+  const all = () => [...sounds, ...added].filter((e) => e.kind !== "bed");
+  for (const v of video) {
+    if (v.type === "black" || !(v.counter || v.kinetic || v.chart || v.map || v.chapterTitle || (v.moment && !v.moment.failed))) continue;
+    const at = Number(v.moment?.at ?? v.start);
+    if (all().some((e) => Math.abs(e.start - at) <= 1.5 || (e.start <= at + 0.2 && e.end >= at))) continue;
+    const token = v.moment?.kind === "title" || v.chapterTitle ? "AUTO-IMPACT" : "AUTO-WHOOSH";
+    const len = SOUND_SECONDS[token];
+    for (let k = 0; k <= 28; k += 1) {
+      for (const sign of k === 0 ? [0] : [-1, 1]) {
+        const start = Math.round((at + sign * k * 0.05 * 1) * 100) / 100 + 0;
+        if (start < firstLineEnd || start < 0 || start > at + 1.4 || start < at - 1.4) continue;
+        if (spoken.some((w) => w.start < start + len && w.end > start - 0.05)) continue;
+        added.push({ token, kind: "hit", scene: v.scene ?? "", start, end: Math.round((start + len) * 1000) / 1000 });
+        k = 99;
+        break;
+      }
+    }
+  }
+  return added;
+}
+
+/**
  * The story's rules for sound, in one place: hits off the words, none in the first spoken line, one per 8 s
  * (placeEffects), and a quiet breath before the lines that turn the story (at most one per 20 s). Called when
  * the timeline is built, and again by the renderer once a recording's own word times replace the estimates.
@@ -938,6 +972,10 @@ export function placeEffects(sounds, words, o = {}) {
  */
 export function settleSound(sfx, words, video, o = {}) {
   const clear = words.length ? placeEffects(sfx, words, { whole: o.whole }) : keepOffSpeech(sfx, words);
+  // Every designed moment (title, kinetic line, counter, chart, map) gets its cue: the sound rules above may have moved or
+  // left out the one the edit asked for, and the critic wants one within 1.5 s of each. The cue goes in the nearest gap
+  // between words; where there is none (the first spoken line, a run of speech) it stays uncovered and the critic says so.
+  if (words.length) clear.sounds = [...clear.sounds, ...missingCues(clear.sounds, words, video)];
   const left = sfx.length - clear.sounds.length - clear.dropped.length;
   /** @type {{ start: number, end: number }[]} */
   const breaths = [];
