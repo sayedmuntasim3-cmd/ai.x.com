@@ -17,6 +17,7 @@
 import { packagingBrief, pillarOf } from "./reference-prior.mjs";
 import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
 import { buildTimeline } from "./timeline.mjs";
+import { runScriptAgents } from "./script-agents.mjs";
 import { roleCraft } from "./role-craft.mjs";
 import { chapterMedia, createUseHistory, shotKey, shotSettled } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
@@ -29,6 +30,7 @@ import { splitManual } from "./lean-manual.mjs";
 import { bindToCorpus, corpusBudget, corpusText, gatherCorpus, queryInstruction, writeInstruction } from "./research-desk.mjs";
 import { checkSources, sourceGaps } from "./source-check.mjs";
 import { getVersion } from "./versions.mjs";
+import { barBrief } from "./reference-bar.mjs";
 
 /** Versions the run can produce today. Arabic and Bangla follow once English works end to end. */
 export const RUN_VERSIONS = Object.freeze(["en-US"]);
@@ -148,7 +150,7 @@ export function filmBrief(film) {
     "6. Retention: a 30-second hook (four beats, fast cuts), a reset about every 3 minutes, a pattern interrupt about every 25 seconds, a midpoint turn, an 80% cliffhanger, every open loop paid.",
     "7. Written to be felt, not only understood: every chapter has one scene built to move the viewer (a loss, a sacrifice, a choice, a reunion or a reveal). Before it the music drops or goes silent and the narration slows into short sentences; the picture holds; the music swells after. Specific sensory detail beats adjectives. People want something concrete, fear something specific and pay a price for what they get. The lesson lands through what happens and is never stated. End on an image and one line the viewer repeats.",
     ...(lookFor(film.formatId) === "cinematic" ? ["8. Performance: every scene line adds DELIVERY: one to three ElevenLabs v3 tags in square brackets for the narrator, matching the scene's emotion ([softly], [serious], [warm], [whispers], [sighs], [hopeful], [excited], [pause]). They direct the voice and are never read aloud; they never count toward W."] : []),
-    ...(story ? ["", "STORY RULES:", ...STORY_RULES.map((r, i) => `S${i + 1}. ${r}`)] : []),
+    ...(story ? ["", "STORY RULES:", ...STORY_RULES.map((r, i) => `S${i + 1}. ${r}`)] : ["", barBrief()]),
     "",
     `VERSION LOCK: audience ${v.audience}; language ${v.register}; currency ${v.currency} (an amount that began in another currency is shown in dollars first, with the original small beneath and the conversion basis in the ledger). Narration pace ${v.narrationWpm.target} words per minute. Codes, IDs, search queries and file or grade terms stay in English. Never mention any other version.`,
   ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n");
@@ -1019,6 +1021,12 @@ export async function runFilm(o) {
       const hookLeft = hookFindings(parseSceneLines((await read(`s5-${plan.chapters[0]?.id}.md`)) || chapters[0]?.markdown || ""));
       state.gaps.push(...hookLeft.map((h) => `hook (${h.code}): ${h.detail}`));
       qa.codeCraft = { hook: hook.map((h) => h.code), hookLeft: hookLeft.map((h) => h.code), cardShare: mix };
+      // The crew's script agents (script-agents.mjs, free code, the same ones a voiceover film runs): freshness, geography, named
+      // sources, clarity, on the chapters as they stand after the fixes. Reported in crew.json; never a gap, so no film is held for a style note.
+      /** @type {{ sc: string, start: number, end: number, narration: string }[]} */
+      const crewLines = [];
+      for (const c of plan.chapters) for (const sl of parseSceneLines((await read(`s5-${c.id}.md`)) || chapters.find((x) => x.id === c.id)?.markdown || "")) crewLines.push({ sc: sl.sc, start: sl.start, end: sl.end, narration: sl.narration });
+      await store.put("crew.json", JSON.stringify(runScriptAgents(crewLines), null, 1));
       await store.put("qa.json", JSON.stringify(qa, null, 1));
       await store.put("fix-log.json", JSON.stringify(fixLog, null, 1));
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };

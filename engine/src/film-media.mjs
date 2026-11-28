@@ -596,12 +596,21 @@ const COMMONS_UA = "ZuponaStudio/1.0 (documentary media search; https://github.c
 export function wikimediaProvider(o = {}) {
   const get = o.fetch ?? ((url, init) => fetch(url, init));
   const perPage = o.perPage ?? 20;
-  return {
+  return /** @type {MediaProvider} */ (/** @type {any} */ ({
     id: "wikimedia", layer: 1, kinds: ["image", "video"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 60 },
-    async search(query, kind, signal) {
+    async search(/** @type {string} */ query, /** @type {"image" | "video"} */ kind, /** @type {AbortSignal | undefined} */ signal) {
+      // The words themselves, and the Commons category of that name (missions, events and places are filed by category:
+      // "Apollo 11", "Chernobyl disaster"): a short query asks both, and the second finds what no title says.
+      const asks = [query.slice(0, 200)];
+      if (query.trim().split(/\s+/).length <= 5 && !/["]/.test(query)) asks.push(`incategory:"${query.replace(/\b(19|20)\d\d\b/g, " ").replace(/\s+/g, " ").trim()}"`);
+      const seen = new Set();
+      const lists = await Promise.all(asks.map((ask) => this.ask(ask, kind, signal).catch((/** @type {any} */ e) => { if (ask === asks[0]) throw e; return []; })));
+      return lists.flat().filter((/** @type {any} */ c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+    },
+    async ask(/** @type {string} */ ask, /** @type {"image" | "video"} */ kind, /** @type {AbortSignal | undefined} */ signal) {
       const params = new URLSearchParams({
         action: "query", format: "json", formatversion: "2", generator: "search", gsrnamespace: "6", gsrlimit: String(perPage),
-        gsrsearch: `${query.slice(0, 200)} filetype:${kind === "video" ? "video" : "bitmap"}`,
+        gsrsearch: `${ask} filetype:${kind === "video" ? "video" : "bitmap"}`,
         prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "1920",
         iiextmetadatafilter: "LicenseShortName|License|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions|ImageDescription|ObjectName|Categories",
       });
@@ -636,7 +645,7 @@ export function wikimediaProvider(o = {}) {
         }];
       });
     },
-  };
+  }));
 }
 
 /**
@@ -652,13 +661,17 @@ export function nasaProvider(o = {}) {
   return {
     id: "nasa", layer: 1, kinds: ["image", "video"], cacheTtlSeconds: 86_400, rate: { capacity: 60, windowSeconds: 60 },
     async search(query, kind, signal) {
-      const res = await get(`https://images-api.nasa.gov/search?${new URLSearchParams({ q: query.slice(0, 200), media_type: kind, page_size: String(perPage) })}`, { signal });
+      // A year in the words ("Apollo 11 launch 1969") is a filter the library has, not a word its titles carry.
+      const year = /\b(19[4-9]\d|20[0-4]\d)\b/.exec(query)?.[1];
+      const q = (year ? query.replace(year, " ") : query).replace(/\s+/g, " ").trim().slice(0, 200) || query.slice(0, 200);
+      const res = await get(`https://images-api.nasa.gov/search?${new URLSearchParams({ q, media_type: kind, page_size: String(perPage), ...(year ? { year_start: year, year_end: year } : {}) })}`, { signal });
       if (!res.ok) throw httpError(res);
       const data = /** @type {any} */ (await res.json());
       return (data?.collection?.items ?? []).flatMap((/** @type {any} */ item) => {
         const d = item.data?.[0];
         if (!d?.nasa_id || d.media_type !== kind) return [];
-        if (!isRelevant(query, d.title)) return [];
+        // NASA titles are often a frame number (AS11-40-5903): the description and the keywords say what the picture is.
+        if (!isRelevant(q, d.title, plain(d.description).slice(0, 300), (Array.isArray(d.keywords) ? d.keywords : []).join(" "))) return [];
         const id = String(d.nasa_id);
         const preview = (item.links ?? []).find((/** @type {any} */ l) => l.rel === "preview")?.href ?? null;
         const folder = `https://images-assets.nasa.gov/${kind}/${encodeURIComponent(id)}/${encodeURIComponent(id)}`;
@@ -691,7 +704,7 @@ export function internetArchiveProvider(o = {}) {
   const perPage = o.perPage ?? 12;
   const details = o.details ?? 4;
   /** Collections the archive itself says are public domain (Prelinger = "films from the Prelinger Archives"). */
-  const PUBLIC = ["prelinger", "publicmovies", "public_domain_movies", "publicdomainmovies", "feature_films", "classic_tv", "film_noir", "avgeeks"];
+  const PUBLIC = ["nasa", "prelinger", "publicmovies", "public_domain_movies", "publicdomainmovies", "feature_films", "classic_tv", "film_noir", "avgeeks"];
   /** @type {Map<string, any>} */
   const metaCache = new Map();
   return {
@@ -964,4 +977,13 @@ export function mediaProviders(keys) {
   if (keys.pexelsKey) out.push(pexelsProvider({ apiKey: keys.pexelsKey, fetch: keys.fetch }));
   if (keys.pixabayKey) out.push(pixabayProvider({ apiKey: keys.pixabayKey, fetch: keys.fetch }));
   return out;
+}
+
+/**
+ * Whether an address is a picture file (a still), by its path. A picture with no kind written must not be
+ * treated as footage: the renderer loops footage, and a looped photograph never ends.
+ * @param {string | null | undefined} url
+ */
+export function isImageUrl(url) {
+  try { return /\.(jpe?g|png|webp|gif|tiff?|bmp)$/i.test(new URL(String(url)).pathname); } catch { return false; }
 }

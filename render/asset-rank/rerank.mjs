@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { fitAdjust, planFit } from "../../engine/src/shot-fit.mjs";
-import { NEAR_COPY_BITS, logoSource } from "../picture-taste.mjs";
+import { MIN_FILLED, NEAR_COPY_BITS, contentBox, logoSource } from "../picture-taste.mjs";
 import { FREE_LICENCES, REPEAT_WINDOW_SECONDS, internetArchiveProvider, nasaProvider, pixabayProvider, pexelsProvider, toPick, verifyArchiveItem, wikimediaProvider } from "../../engine/src/film-media.mjs";
 import { createRateLimiter, fetchShotMedia } from "../../engine/src/documentary-media-fetch.mjs";
 import { chooseByWords, judgePicture } from "../critic.mjs";
@@ -605,6 +605,27 @@ export function refusal(c, score, world = {}) {
 }
 
 /**
+ * What the candidate's own frame shows before it is chosen (the 64x36 gray tile rank.py keeps): a black or empty frame, or a
+ * picture that sits small inside a black or white border. The same tests the critic runs on the finished film (picture-taste.mjs:
+ * the clean box under MIN_FILLED), so a shot is not chosen to fail the gate later. Empty text = fine, or no tile to look at.
+ * @param {{ gray?: string | null } | null | undefined} img
+ */
+export function frameFault(img) {
+  if (!img?.gray) return "";
+  const gray = new Uint8Array(Buffer.from(img.gray, "base64"));
+  const w = 64, h = 36;
+  if (gray.length !== w * h) return "";
+  let sum = 0, sq = 0;
+  for (const g of gray) { sum += g; sq += g * g; }
+  const mean = sum / gray.length, sd = Math.sqrt(Math.max(0, sq / gray.length - mean * mean));
+  if (mean < 14 && sd < 12) return "frame: black";
+  if (sd < 3 && (mean < 30 || mean > 235)) return "frame: empty";
+  const box = contentBox(gray, w, h, { floor: 0.15 });
+  if (box.trimmed && box.w * box.h < MIN_FILLED) return `frame: fills ${Math.round(box.w * box.h * 100)}%`;
+  return "";
+}
+
+/**
  * The scale of a shot, as a picture reads it: a wide establishing frame, a medium frame with one subject,
  * or a close detail. Three CLIP prompts, one argmax; no second pass over the pictures.
  */
@@ -913,11 +934,11 @@ export async function rerankRun(o) {
       const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : byText ? { total: 0, place: 0.5, quality: 0.5, era: 0.5, watermark: 0, offBy: -1, offWhy: "", by: "text" } : null;
       const stock = STOCK_SOURCES.includes(String(c.source));
       const aboutIt = !s.named || aboutNames(c, s.names ?? []);
-      const why = (s.named && !aboutIt && stock ? "off-subject" : "") || refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
+      const why = (s.named && !aboutIt && stock ? "off-subject" : "") || refusal(c, score, world) || frameFault(ans.images?.[c.id]) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
       const tags = tagHits(c.title, s.queries ?? [s.query ?? ""]);
       const fit = fitAdjust(/** @type {any} */ (fitOf.get(s)), `${c.title ?? ""} ${(c.tags ?? []).join?.(" ") ?? ""}`);
       const row = { c, total: (/** @type {any} */ (score)?.total ?? 0) + TAG_BONUS * tags + fit + (s.named ? (stock ? -STOCK_NAMED_COST : aboutIt ? ARCHIVE_NAMED_EDGE : 0) : 0), score: { .../** @type {any} */ (score), tags, fit, stage: fitOf.get(s)?.stage ?? null }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
-      if (why) { refused[why] = (refused[why] ?? 0) + 1; if (why === "off-world" && score) lastResort.push(row); continue; }
+      if (why) { refused[why] = (refused[why] ?? 0) + 1; if ((why === "off-world" || why.startsWith("frame:")) && score) lastResort.push(row); continue; }
       ranked.push(row);
     }
     // Never an empty shot: when everything was refused as off-world, the least off-world come back, pushed down.
@@ -1033,7 +1054,9 @@ export async function rerankRun(o) {
       s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0, record: recordClass(c, p.historic), textMatch: textPicks.has(p.s) };
       if (critic?.fits === false) s.review = "critic-miss";
     }
-    report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
+    report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, // The candidates keep their own picture and licence: "My films" offers them as swaps, and only a
+      // free-licence clip with a picture may be offered (engine/src/edit-pack.mjs checks it again).
+      top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), previewUrl: x.c.previewUrl ?? null, mediaUrl: x.c.mediaUrl ?? null, source: x.c.source ?? null, sourcePageUrl: x.c.sourcePageUrl ?? null, kind: x.c.mediaType ?? x.c.kind ?? null, licence: x.c.rights?.licenseId ?? x.c.licence?.licenseId ?? (typeof x.c.licence === "string" ? x.c.licence : null), ...x.score })) });
   });
   // No off-topic fallback: a named shot with no relevant pick of its own holds the nearest strong pick of the film, never a random picture.
   // The same for any shot no picture fits (owner's rule: never a card of white text on empty black): it holds the nearest strong pick, moving.

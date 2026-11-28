@@ -39,6 +39,18 @@ export const SHOT_CODES = Object.freeze([
   "critic.black",
   "critic.media",
   "critic.frozen",
+  // Picture taste (#123) and the crew's picture agents (render/film-agents.mjs): each is one shot's own picture.
+  "critic.unfilled",
+  "critic.samePicture",
+  "critic.logo",
+  "critic.tilted",
+  "critic.exposure",
+  "critic.cast",
+  "critic.artifact",
+  "critic.glitch",
+  "critic.hold",
+  "critic.openBlack",
+  "critic.pictureOutOfPlace",
 ]);
 
 /** A shot type that needs a picture to draw (a card draws itself). Same list as the critic's. */
@@ -83,6 +95,18 @@ export function failingShots(report) {
   for (const f of picture.flicker ?? []) add(f.id, "critic.flicker");
   for (const b of picture.blurred ?? []) add(b.id, "critic.blurred");
   for (const d of picture.dark ?? []) add(d.id, "critic.dark");
+  // A stretch of black the script did not ask for: the picture shots that sit over it.
+  for (const b of report?.master?.black ?? []) {
+    for (const s of shots) if (PICTURED.has(String(s.type)) && Number(s.start) < Number(b.end) && Number(s.end) > Number(b.start)) add(s.id, "critic.black");
+  }
+  // Picture taste: a picture that does not fill the frame, a burned-in logo, the later one of two copies of one picture.
+  const taste = report?.taste ?? {};
+  for (const u of taste.unfilled ?? []) add(u.id, "critic.unfilled");
+  for (const l of taste.logos ?? []) add(l.id, "critic.logo");
+  for (const r of taste.repeats ?? []) add(r.b, "critic.samePicture");
+  // The crew's picture agents name the failing shot and its code themselves; only blocks are re-picked.
+  for (const r of report?.agents?.results ?? []) for (const f of r.findings ?? []) if (f.severity === "block" && SHOT_CODES.includes(String(f.code))) add(f.shot, String(f.code));
+  for (const f of report?.agents?.plan ?? []) if (f.severity === "block" && SHOT_CODES.includes(String(f.code))) add(f.shot, String(f.code));
   // The same picture used more than the limit, and the same picture back inside the window.
   /** @type {Map<string, any[]>} */
   const uses = new Map();
@@ -297,8 +321,10 @@ export async function main(argv, deps = {}) {
     print(`No ${existsSync(mediaPath) ? "candidates-C1.json" : "media-C1.json"} in ${values.run}: nothing to re-pick from.`);
     return 2;
   }
-  if (!shotLevelOnly(report.critic?.findings)) {
-    print("The gate's blocks are not about single shots; a re-pick cannot answer them.");
+  // A film blocked on a mix of things: the shot-level blocks are answered here, the rest stay in the draft's reasons. Only a
+  // film with no shot-level block at all is handed over as it is (a re-pick would change nothing).
+  if (!blocksOf(report.critic?.findings).some((f) => SHOT_CODES.includes(String(f.code)))) {
+    print("None of the gate's blocks is about a single shot; a re-pick cannot answer them.");
     return 2;
   }
   const failing = failingShots(report);

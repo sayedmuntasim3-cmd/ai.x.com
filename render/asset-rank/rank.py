@@ -124,6 +124,12 @@ def colour(img):
     return [round(hue, 1), round(chroma / n, 3), round(light / n, 3)]
 
 
+def gray_tile(img):
+    """The picture as a 64x36 gray tile (base64): the frame checks in rerank.mjs (black, unfilled) read it. Costs 2.3 KB a picture."""
+    import base64
+    return base64.b64encode(img.convert("L").resize((64, 36)).tobytes()).decode("ascii")
+
+
 def score(req_path, out_path):
     import numpy as np
     import open_clip
@@ -187,7 +193,7 @@ def score(req_path, out_path):
             img = Image.open(f).convert("RGB")
         except Exception:
             continue
-        info[u] = {"phash": phash(img), "w": img.width, "h": img.height, "col": colour(img)}
+        info[u] = {"phash": phash(img), "w": img.width, "h": img.height, "col": colour(img), "gray": gray_tile(img)}
         todo.append((u, img, cached, meta))
     def encode(batch):
         with torch.no_grad():
@@ -229,7 +235,7 @@ def score(req_path, out_path):
     for im in images:
         u = im.get("url")
         if u in vec:
-            out["images"][im["id"]] = {"ok": True, "phash": info[u]["phash"], "col": info[u].get("col")}
+            out["images"][im["id"]] = {"ok": True, "phash": info[u]["phash"], "col": info[u].get("col"), "gray": info[u].get("gray")}
             out["sim"][im["id"]] = [round(float(x), 4) for x in (t @ vec[u])]
         else:
             out["images"][im["id"]] = {"ok": False}

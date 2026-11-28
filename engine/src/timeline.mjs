@@ -8,8 +8,9 @@
  * 45-minute film never drifts by a frame however many cuts it has.
  */
 import { EDIT_SOUNDS } from "./edit-director.mjs";
-import { shotParts } from "./film-media.mjs";
+import { isImageUrl, shotParts } from "./film-media.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
+import { sentencesOfWords, storyMap } from "./story-map.mjs";
 import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionReport, sceneIntent, writtenMove } from "./motion.mjs";
 
 /**
@@ -38,7 +39,7 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
  * @typedef {{ token: string, kind: "bed" | "hit", scene: string, start: number, end: number }} SoundEvent
  *   bed: ambience under the whole scene; hit: a one-shot from start (end is the scene's end)
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, sound?: { moved: { token: string, from: number, to: number }[], dropped: { token: string, at: number }[] }, motion?: ReturnType<typeof motionReport> }} Timeline
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], breaths?: { start: number, end: number }[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, sound?: { moved: { token: string, from: number, to: number }[], dropped: { token: string, at: number }[] }, motion?: ReturnType<typeof motionReport> }} Timeline
  */
 
 /** The shot plan's closed vocabulary (engine/src/shot-plan.mjs SHOT_TYPES; kept here so the timeline imports nothing from it). */
@@ -475,10 +476,11 @@ export function spokenWords(captions) {
  * next one — leads it, a beat earlier, the way a whoosh is laid into a cut. It
  * is dropped when neither place is free: a masked word is worse than no sound.
  * A riser is left alone: its climax is the cut, where the words pause anyway.
- * @param {SoundEvent[]} sounds @param {TimedWord[]} words @param {{ attack?: number, after?: number, maxShift?: number, crowding?: number }} [o]
+ * @param {SoundEvent[]} sounds @param {TimedWord[]} words @param {{ attack?: number, after?: number, maxShift?: number, crowding?: number, whole?: boolean }} [o] whole: the whole word is protected, not only its vowel
  * @returns {{ sounds: SoundEvent[], moved: { token: string, from: number, to: number }[], dropped: SoundEvent[] }}
  */
 export function keepOffSpeech(sounds, words, o = {}) {
+  const whole = o.whole === true;
   const attack = o.attack ?? SPEECH.attack;
   const after = o.after ?? SPEECH.after;
   const maxShift = o.maxShift ?? SPEECH.maxShift;
@@ -486,6 +488,7 @@ export function keepOffSpeech(sounds, words, o = {}) {
   // The peak of a word is its vowel, not its edges: a sound may sit in the release of a word (that is what
   // "on the word" means in an edit), never over the middle of it.
   const peakiest = (/** @type {TimedWord} */ w) => {
+    if (whole) return { start: w.start, end: w.end };
     const d = w.end - w.start;
     return { start: w.start + 0.15 * d, end: w.start + 0.75 * d };
   };
@@ -751,7 +754,7 @@ export function buildTimeline(o) {
           const shotSeconds = frames / fps;
           const sourceIn = clipSeconds > shotSeconds ? Math.round(Math.min(3, (clipSeconds - shotSeconds) / 2) * 100) / 100 : 0;
           // A still photograph (an archive picture) always moves: the renderer gives it a slow push, pull or pan.
-          const still = row.pick.kind === "image";
+          const still = row.pick.kind === "image" || (!row.pick.kind && isImageUrl(row.pick.mediaUrl));
           // A still's move is decided from the scene (motion.mjs); footage keeps its own movement.
           const move = still ? decideMove({ intent: sceneIntent(s, { shotText: shot.text, chapterOpen: lead && opening, chapterClose: closing }), seconds: frames / fps, written: writtenMove(s.fields.MOTION ?? ""), profile, level, previous: moves, index: moves.length }) : null;
           if (move) moves.push(move);
@@ -846,12 +849,18 @@ export function buildTimeline(o) {
     sfx.push({ token: "AUTO-IMPACT", kind: "hit", scene, start: round3(t), end: round3(t + SOUND_SECONDS["AUTO-IMPACT"]) });
   }
   // Nothing lands on a spoken word: a hit that would mask a word moves to the gap after it, or is left out.
-  const clear = keepOffSpeech(sfx, spokenWords(captions));
+  // Then the story's rules (engine/src/story-map.mjs): no hit in the first spoken line, at most one per 8 s,
+  // and a breath before a reveal.
+  const words = spokenWords(captions);
+  const settled = settleSound(sfx, words, video);
+  const clear = settled.clear;
+  const breaths = settled.breaths;
+  if (settled.left > 0) notes.push(`sound: ${settled.left} hit(s) left out (first spoken line, or less than 8 s after the last hit).`);
   if (clear.moved.length) notes.push(`sound: ${clear.moved.length} hit(s) moved off a spoken word (${clear.moved.map((m) => `${m.token} ${m.from}s to ${m.to}s`).join(", ")}).`);
   if (clear.dropped.length) notes.push(`sound: ${clear.dropped.length} hit(s) left out, no gap to move to off the words (${clear.dropped.map((d) => `${d.token} at ${d.start}s`).join(", ")}).`);
   if (fit && (fit.report.stretched || fit.report.shortened)) notes.push(`timing: scenes fitted to the voice (${fit.report.stretched} longer, ${fit.report.shortened} shorter; ${fit.report.plannedSeconds} s planned, ${fit.report.fittedSeconds} s fitted). No take is sped up or cut.`);
   return {
-    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx: clear.sounds, look: o.look ?? "documentary", notes,
+    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx: clear.sounds, look: o.look ?? "documentary", notes, ...(breaths.length ? { breaths } : {}),
     ...(clear.moved.length || clear.dropped.length ? { sound: { moved: clear.moved, dropped: clear.dropped.map((d) => ({ token: d.token, at: d.start })) } } : {}),
     ...(fit ? { timing: fit.report } : {}),
     motion: motionReport(moves, governed, profile, level),
@@ -892,3 +901,99 @@ export function toSrt(captions) {
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 /** @param {number} n */
 function round3(n) { return Math.round(n * 1000) / 1000; }
+
+/**
+ * Place effect hits so none lands inside a spoken word, none lands in the first
+ * spoken line, and no two land closer than `minGap` seconds (default 8). Hits
+ * that cannot be moved into a free gap are dropped. A riser (a build into a cut,
+ * not a hit) is exempt from the speech check and the spacing, but not from the
+ * first-line rule.
+ * @param {any[]} sounds @param {any[]} words @param {{ minGap?: number, firstLineEnd?: number, whole?: boolean }} [o] whole: no hit anywhere inside a word (use it with a recording's own word times)
+ */
+export function placeEffects(sounds, words, o = {}) {
+  const minGap = o.minGap ?? 8;
+  const spoken = (words ?? []).filter((w) => w && w.end > w.start).sort((a, b) => a.start - b.start);
+  const firstLineEnd = o.firstLineEnd ?? (spoken.length ? (sentencesOfWords(spoken)[0]?.end ?? spoken[0].end) : 0);
+  // nothing during the first spoken line
+  let filtered = (sounds ?? []).filter((e) => e && (e.kind === "bed" || !(e.start < firstLineEnd)));
+  const r = keepOffSpeech(filtered, spoken, { whole: o.whole === true });
+  // spacing
+  const kept = [];
+  for (const e of r.sounds.sort((a, b) => a.start - b.start)) {
+    // A sound the script itself asks for (SND-...) is the writer's choice: it keeps its place.
+    if (e.kind === "bed" || e.token === "AUTO-RISER" || !String(e.token).startsWith("AUTO-")) { kept.push(e); continue; }
+    const last = kept.filter((k) => k.kind !== "bed" && k.token !== "AUTO-RISER" && String(k.token).startsWith("AUTO-")).slice(-1)[0];
+    if (last && Math.abs(e.start - last.start) < minGap) continue;
+    kept.push(e);
+  }
+  return { sounds: kept, moved: r.moved, dropped: r.dropped };
+}
+
+/**
+ * The cues a film still lacks: one short sound in the speech gap nearest each designed moment that has no sound within 1.5 s.
+ * Never inside a word, never in the first spoken line, whatever the 8 s spacing says (a cue on a designed moment is the
+ * critic's own floor).
+ * @param {SoundEvent[]} sounds @param {TimedWord[]} words @param {{ start: number, end: number, scene?: string, type?: string, moment?: any, kinetic?: any, counter?: any, chart?: any, map?: any, chapterTitle?: string }[]} video
+ * @returns {SoundEvent[]}
+ */
+export function missingCues(sounds, words, video) {
+  const spoken = (words ?? []).filter((w) => w && w.end > w.start).sort((a, b) => a.start - b.start);
+  if (!spoken.length) return [];
+  const firstLineEnd = sentencesOfWords(spoken)[0]?.end ?? spoken[0].end;
+  /** @type {SoundEvent[]} */
+  const added = [];
+  const all = () => [...sounds, ...added].filter((e) => e.kind !== "bed");
+  for (const v of video) {
+    if (v.type === "black" || !(v.counter || v.kinetic || v.chart || v.map || v.chapterTitle || (v.moment && !v.moment.failed))) continue;
+    const at = Number(v.moment?.at ?? v.start);
+    if (all().some((e) => Math.abs(e.start - at) <= 1.5 || (e.start <= at + 0.2 && e.end >= at))) continue;
+    const token = v.moment?.kind === "title" || v.chapterTitle ? "AUTO-IMPACT" : "AUTO-WHOOSH";
+    const len = SOUND_SECONDS[token];
+    for (let k = 0; k <= 28; k += 1) {
+      for (const sign of k === 0 ? [0] : [-1, 1]) {
+        const start = Math.round((at + sign * k * 0.05 * 1) * 100) / 100 + 0;
+        if (start < firstLineEnd || start < 0 || start > at + 1.4 || start < at - 1.4) continue;
+        if (spoken.some((w) => w.start < start + len && w.end > start - 0.05)) continue;
+        added.push({ token, kind: "hit", scene: v.scene ?? "", start, end: Math.round((start + len) * 1000) / 1000 });
+        k = 99;
+        break;
+      }
+    }
+  }
+  return added;
+}
+
+/**
+ * The story's rules for sound, in one place: hits off the words, none in the first spoken line, one per 8 s
+ * (placeEffects), and a quiet breath before the lines that turn the story (at most one per 20 s). Called when
+ * the timeline is built, and again by the renderer once a recording's own word times replace the estimates.
+ * @param {SoundEvent[]} sfx @param {TimedWord[]} words @param {{ start: number, end: number, chapterTitle?: string }[]} video @param {{ whole?: boolean }} [o]
+ * @returns {{ clear: ReturnType<typeof keepOffSpeech>, breaths: { start: number, end: number }[], left: number }}
+ */
+export function settleSound(sfx, words, video, o = {}) {
+  const clear = words.length ? placeEffects(sfx, words, { whole: o.whole }) : keepOffSpeech(sfx, words);
+  // Every designed moment (title, kinetic line, counter, chart, map) gets its cue: the sound rules above may have moved or
+  // left out the one the edit asked for, and the critic wants one within 1.5 s of each. The cue goes in the nearest gap
+  // between words; where there is none (the first spoken line, a run of speech) it stays uncovered and the critic says so.
+  if (words.length) clear.sounds = [...clear.sounds, ...missingCues(clear.sounds, words, video)];
+  const left = sfx.length - clear.sounds.length - clear.dropped.length;
+  /** @type {{ start: number, end: number }[]} */
+  const breaths = [];
+  if (words.length) for (const w of storyMap(words, video).revealWindows) if (w.end - w.start >= 0.4 && (!breaths.length || w.start - breaths[breaths.length - 1].end >= 20)) breaths.push(w);
+  return { clear, breaths, left };
+}
+
+/**
+ * A timeline whose captions now carry a recording's real word times: settle its sound against them.
+ * @param {Timeline} t
+ */
+export function resettleSound(t) {
+  const s = settleSound(t.sfx, spokenWords(t.captions), t.video, { whole: true });
+  t.sfx = s.clear.sounds;
+  if (s.breaths.length) t.breaths = s.breaths; else delete t.breaths;
+  if (s.clear.moved.length) t.notes.push(`sound: ${s.clear.moved.length} hit(s) moved off a spoken word (real word times).`);
+  if (s.left > 0 || s.clear.dropped.length) t.notes.push(`sound: ${s.left + s.clear.dropped.length} hit(s) left out against the recording's own words.`);
+  return t;
+}
+
+export * from "./story-map.mjs";

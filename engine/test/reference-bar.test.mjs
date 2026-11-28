@@ -37,5 +37,39 @@ test("reports feed the checker only what they carry; the brief names every rule;
   assert.deepEqual(barMeasuresFromReport({ audio: { integratedLufs: -14.2, longestSilence: 0.4 } }), { longestSilence: 0.4, integratedLufs: -14.2 });
   assert.deepEqual(barMeasuresFromReport(null), {});
   for (const r of REFERENCE_BAR) assert.ok(barBrief().includes(r.label));
-  assert.equal(PRACTICE_SCORECARD, null);
+  assert.equal(PRACTICE_SCORECARD.passMark, 22);
+  assert.equal(PRACTICE_SCORECARD.measures.length, 15);
+});
+
+import { PRACTICE_TARGETS, practiceCheck, practiceMeasures } from "../src/reference-bar.mjs";
+
+test("practiceMeasures reads a timeline and never invents what it cannot see", () => {
+  assert.deepEqual(practiceMeasures(null), {});
+  const t = {
+    durationSeconds: 120,
+    video: [{ type: "clip", start: 0, end: 4 }, { type: "card", start: 4, end: 10, map: { lat: 1, lon: 1, label: "x" } }, { type: "clip", start: 10, end: 120 }],
+    narration: [
+      { start: 0, end: 20, text: "April twentieth, two thousand ten. A pressure test said the well was safe." },
+      { start: 20, end: 60, text: "Why did they read it twice? Nobody asked." },
+      { start: 60, end: 120, text: "The crew kept working through the night with the old plan in hand." },
+    ],
+  };
+  const m = practiceMeasures(t);
+  assert.equal(m.lengthMinutes, 2);
+  assert.equal(m.firstNumberAt, 0);
+  assert.equal(m.firstQuestionAt, 20);
+  assert.equal(m.firstGraphicAt, 4);
+  assert.equal(m.longestWithoutNewBeat, 100);
+  assert.equal(m.avgShotSeconds, 40);
+  assert.equal(m.wpm, 17);
+});
+
+test("practiceCheck: pass, fail, unknown; advisory rows only", () => {
+  const rows = Object.fromEntries(practiceCheck({ wpm: 150, avgShotSeconds: 12, firstGraphicAt: 60 }).map((r) => [r.id, r.result]));
+  assert.equal(rows.wpm, "pass");
+  assert.equal(rows.avgShot, "fail");
+  assert.equal(rows.firstGraphic, "pass");
+  assert.equal(rows.length, "unknown");
+  assert.ok(PRACTICE_TARGETS.maxShotSeconds <= 6);
+  assert.match(barBrief(), /PRACTICE_TARGETS/);
 });

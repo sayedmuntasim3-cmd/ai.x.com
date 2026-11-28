@@ -24,8 +24,9 @@ import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
 /** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
-import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
+import { curtainWindows, deepestDuckDb, gainPlan, mergeWindows, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 import { critique, designedMoments, measureFilm, measurePicture } from "./critic.mjs";
+import { measureAgents } from "./film-agents.mjs";
 import { holdOverCards, measureTaste, prepareStill } from "./picture-taste.mjs";
 import { attachMoments, momentSounds, planMoments } from "../engine/src/voice-moments.mjs";
 import { spawn } from "node:child_process";
@@ -300,7 +301,7 @@ export function retryAfterSeconds(v, now = Date.now()) {
  * @typedef {import("../engine/src/timeline.mjs").Timeline} Timeline
  * oneTrack: the voice system's path: one recording is the whole narration, laid from 0:00, never sped up,
  *   slowed, cut or re-ordered (the timeline was built on its own word times); per-scene voice is ignored.
- * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[], edits?: any[], craft?: any }} RenderOptions
+ * @typedef {{ timeline: Timeline, workDir: string, outFile: string, oneTrack?: { file: string }, voice?: Record<string, string>, music?: Record<string, string>, sfx?: Record<string, string>, fetchClip?: (url: string) => Promise<string>, fontFile?: string, concurrency?: number, ffmpeg?: string, ffprobe?: string, log?: (line: string) => void, part?: { index: number, count: number }, joinParts?: string[], edits?: any[], craft?: any, agentsPlan?: any[] }} RenderOptions
  *   edits: the Edit Director's plans (edit-C1.json ...), so the critic can say whether what the editor asked for reached the film.
  */
 
@@ -1110,7 +1111,7 @@ export async function renderFilm(o) {
   const extra = [musicFile, sfxFile].filter((f) => f !== null);
   const musicIn = musicFile ? 2 : -1;
   const sfxIn = sfxFile ? (musicFile ? 3 : 2) : -1;
-  const duckPlan = gainPlan({ voice: voiceWindows(pieces), curtains: curtainWindows(sounds) });
+  const duckPlan = gainPlan({ voice: voiceWindows(pieces), curtains: mergeWindows([...curtainWindows(sounds), ...(t.breaths ?? [])], 0.2) });
   // The duck is what the voice does to the music; the curtains are separate holes in the plan.
   const duckDb = deepestDuckDb(duckPlan.filter((w) => w.gain > 0));
   // Does the score follow the cut? A chapter's turn is marked by a new cue or a riser; where neither is,
@@ -1190,10 +1191,16 @@ export async function renderFilm(o) {
   /** @type {Awaited<ReturnType<typeof measureTaste>> | null} */
   let taste = null;
   try { taste = await measureTaste(o.outFile, t, { ffmpeg }); } catch (error) { warnings.push(`Picture taste could not be measured (${error instanceof Error ? error.message.slice(0, 120) : error}).`); }
+  // The crew's picture and edit agents (render/film-agents.mjs): exposure, white balance, artifacts, glitches, tilt, grade jumps,
+  // opening and closing, drawn cards; plus the plan-level findings the voice run saved (a picture from another part of the story).
+  /** @type {Awaited<ReturnType<typeof measureAgents>> | null} */
+  let crew = null;
+  try { crew = await measureAgents(o.outFile, t, { ffmpeg }); } catch (error) { warnings.push(`The crew's picture agents could not run (${error instanceof Error ? error.message.slice(0, 120) : error}).`); }
+  const agents = crew || o.agentsPlan?.length ? { ...(crew ?? { results: [] }), plan: o.agentsPlan ?? [] } : null;
   // The eyes' per-shot relevance (M3) reaches the gate too, not only the `why` field of a media file.
   // The critic also reads which scenes really carry a voice (a single recording voices them all) and the edit plans,
   // so a scene that lost its narration or a transition the editor asked for cannot pass unnoticed.
-  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(o.oneTrack ? { voiceFilm: true } : {}), ...(taste ? { taste } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(o.oneTrack ? { voiceFilm: true } : {}), ...(taste ? { taste } : {}), ...(agents ? { agents } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
   if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
@@ -1214,6 +1221,10 @@ export async function renderFilm(o) {
   if (picture) {
     const at = (/** @type {{ id: string }} */ f) => { const v = t.video.find((/** @type {any} */ x) => String(x.id) === String(f.id)); return v ? { shotType: v.shotType, type: v.type, still: Boolean(v.still), url: v.url, chapterTitle: v.chapterTitle } : {}; };
     /** @type {any} */ (report).picture = { samples: picture.samples, flicker: picture.flicker.slice(0, 60).map((f) => ({ ...f, ...at(f) })), blurred: picture.blurred.slice(0, 40).map((b) => ({ ...b, ...at(b) })), dark: (picture.dark ?? []).slice(0, 40).map((d) => ({ ...d, ...at(d) })) };
+  }
+  if (agents) {
+    /** @type {any} */ (report).agents = agents;
+    for (const r of agents.results) for (const f of r.findings) log(`Crew: ${r.role} ${f.severity} at ${f.shot}: ${f.reason}`);
   }
   if (taste) {
     /** @type {any} */ (report).taste = taste;
@@ -1312,8 +1323,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (timeline.timing) console.log(`timing: ${timeline.timing.plannedSeconds} s planned, ${timeline.timing.fittedSeconds} s fitted to the voice (${timeline.timing.stretched} scenes longer, ${timeline.timing.shortened} shorter)`);
   console.log(`look: ${look}`);
   if (oneTrack && typeof args.words === "string") {
-    const { captionsForVoice } = await import("../engine/src/timeline.mjs");
+    const { captionsForVoice, resettleSound } = await import("../engine/src/timeline.mjs");
     timeline.captions = captionsForVoice(JSON.parse(readFileSync(args.words, "utf8")).words, timeline.durationSeconds);
+    // The captions now hold the recording's own word times: the hits and the breaths are placed against those.
+    resettleSound(timeline);
   }
   // AI scenes made by ai-scenes.mjs replace their cards (stories with one cast).
   let aiShots = 0;
@@ -1368,13 +1381,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   // The Craft Ledger's targets for this film (written by local/voice-film.mjs): the critic notes each measure short of them.
   const craftFile = args.run ? join(args.run, "craft-targets.json") : null;
   const craft = craftFile && existsSync(craftFile) ? JSON.parse(readFileSync(craftFile, "utf8")) : null;
+  const plannedFile = args.run ? join(args.run, "agents-plan.json") : null;
+  const agentsPlan = plannedFile && existsSync(plannedFile) ? (JSON.parse(readFileSync(plannedFile, "utf8")).shotFindings ?? []) : [];
   const workDir = args.work ?? ".render";
   // Chunked render: --part i/N renders that part's picture only; --join a.mp4,b.mp4,... joins the parts and mixes the sound.
   const partArg = typeof args.part === "string" ? /^(\d+)\/(\d+)$/.exec(args.part) : null;
   if (args.part && !partArg) throw new Error(`--part must look like 2/8, not "${args.part}".`);
   const part = partArg ? { index: Number(partArg[1]) - 1, count: Number(partArg[2]) } : undefined;
   const joinParts = typeof args.join === "string" ? args.join.split(",").map((f) => f.trim()).filter(Boolean) : undefined;
-  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), ...(process.argv.includes("--no-graphics") ? { graphics: false } : {}), edits: chapters.map((c) => c.edit).filter(Boolean), ...(craft ? { craft } : {}), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
+  const report = await renderFilm({ timeline, oneTrack, voice: oneTrack ? {} : voice, music: musicFolder(args.music), sfx: sfxFolder(args.sfx), workDir, outFile: args.out, fontFile: args.font, requireGraphics: process.argv.includes("--require-graphics"), ...(process.argv.includes("--no-graphics") ? { graphics: false } : {}), edits: chapters.map((c) => c.edit).filter(Boolean), ...(craft ? { craft } : {}), ...(agentsPlan.length ? { agentsPlan } : {}), log: (l) => console.log(l), ...(part ? { part } : {}), ...(joinParts ? { joinParts } : {}) });
   if (part) { console.log(JSON.stringify(report, null, 1)); process.exit(0); }
   // M6: the timeline (shot times, types, scene ids) is written next to the film, so the contact sheets
   // and the weak-shot loop are drawn from what was actually rendered, not from a second reading of the script.

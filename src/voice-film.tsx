@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon } from "./icons";
 import { OWN_MEDIA_ACCEPT, validateOwnMediaFiles } from "./own-media.mjs";
+import { alternativesFor, candidateFromSearch, dropSwap, filterShots, packCheck, remakeState, setSwap, shotList, swapOf, swapPlan } from "./shot-swap.mjs";
 import { DRAFT_LABEL, cardOf } from "./film-label.mjs";
 
 /**
@@ -288,6 +289,8 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
   const resolver = useRef<((k: string) => void) | null>(null);
   const [list, setList] = useState<VoiceView[] | null>(null);
   const [hasKey, setHasKey] = useState(false);
+  // The film whose shots are open for a swap (E1), or null.
+  const [swapping, setSwapping] = useState(false);
 
   const askKey = (err = "") =>
     new Promise<string>((resolve) => {
@@ -571,8 +574,32 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
       }}
       onRetry={retry}
       onDownload={download}
+      onSwap={(v) => {
+        setError("");
+        setFilm(v);
+        setSwapping(true);
+      }}
     />
   );
+
+  if (shown && swapping) {
+    return (
+      <div>
+        <ShotSwapper
+          film={shown}
+          withKey={withKey}
+          onStarted={(v) => {
+            setSwapping(false);
+            setFilm(v);
+            setRound((r) => r + 1);
+            loadList(false);
+          }}
+          onClose={() => setSwapping(false)}
+        />
+        {dialogEl}
+      </div>
+    );
+  }
 
   if (shown) {
     const finished = FINISHED.includes(shown.status);
@@ -619,7 +646,15 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
               }}
             />
           ) : null}
+          {remakeState(shown).kind === "remaking" && (
+            <p className="mt-3 rounded-xl bg-brand/10 px-3 py-2 text-[13px] leading-relaxed text-brand-ink">{remakeState(shown).stage}</p>
+          )}
           {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
+          {finished && shown.film ? (
+            <button type="button" onClick={() => setSwapping(true)} className="mt-4 flex h-11 w-full items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40">
+              Swap a shot
+            </button>
+          ) : null}
           <div className="mt-4 grid grid-cols-2 gap-3">
             {shown.download ? (
               <a href={shown.download} className="inline-flex h-11 items-center justify-center rounded-full bg-ink text-[14px] font-medium text-canvas transition hover:opacity-90">
@@ -749,6 +784,246 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
   );
 }
 
+/** The pack's format the page can read (engine/src/edit-pack.mjs). */
+const EDIT_VERSION = 1;
+
+type ShotRow = ReturnType<typeof shotList>[number];
+type Swap = { shotId: string; candidate: { id: string; source: string | null; licence: string | null; thumbnailUrl: string | null; mediaUrl: string | null; sourcePageUrl: string | null; title: string } };
+
+/**
+ * "Swap a shot": every shot of a finished film with its time and its words, six free pictures
+ * for the one that is wrong, a search in the archives, and one button that re-makes only the
+ * parts of the film holding the swapped shots. Phone first, in the same card style as the rest.
+ */
+function ShotSwapper({ film, withKey, onStarted, onClose }: { film: VoiceView; withKey: (run: (key: string) => Promise<Response>) => Promise<Response | null>; onStarted: (v: VoiceView) => void; onClose: () => void }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [pack, setPack] = useState<any>(null);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState("");
+  const [query, setQuery] = useState("");
+  const [ask, setAsk] = useState("");
+  const [swaps, setSwaps] = useState<Swap[]>([]);
+  const [found, setFound] = useState<{ for: string; phase: "idle" | "loading" | "done" | "error"; items: ReturnType<typeof candidateFromSearch>[]; note: string }>({ for: "", phase: "idle", items: [], note: "" });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let stop = false;
+    setPack(null);
+    setError("");
+    setSwaps([]);
+    (async () => {
+      const res = await withKey((k) => fetch(`/api/voice/${film.id}/edit?lean=1`, { cache: "no-store", headers: { authorization: `Bearer ${k}` } }));
+      if (!res) return;
+      const data = await res.json().catch(() => ({}));
+      if (stop) return;
+      if (!res.ok) {
+        setError(String(data.error ?? "The shots of this film could not be read."));
+        return;
+      }
+      const check = packCheck(data, EDIT_VERSION);
+      if (!check.ok) setError(check.error);
+      else setPack(data);
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [film.id]);
+
+  const shots: ShotRow[] = pack ? filterShots(shotList(pack), query) : [];
+  const plan = pack ? swapPlan(pack, swaps) : { count: 0, text: "" };
+
+  /** The archives' own search (the visual library's one route), read while it streams. */
+  const search = async (shotId: string, words: string) => {
+    const q = words.trim().slice(0, 120);
+    if (q.length < 2) {
+      setFound({ for: shotId, phase: "error", items: [], note: "Write a few words to search for." });
+      return;
+    }
+    setFound({ for: shotId, phase: "loading", items: [], note: "" });
+    const params = new URLSearchParams({ q, stream: "1", per: "8", limit: "36" });
+    if (film.topic) params.set("topic", film.topic);
+    try {
+      const res = await fetch(`/api/media/search?${params}`);
+      if (!res.ok || !res.body || !(res.headers.get("content-type") ?? "").includes("ndjson")) throw new Error("The picture search is not available on this copy of the site.");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const items: ReturnType<typeof candidateFromSearch>[] = [];
+      const seen = new Set<string>();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl = 0;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let event: { type?: string; results?: unknown[] } = {};
+          try { event = JSON.parse(line); } catch { continue; }
+          if (event.type !== "source" || !Array.isArray(event.results)) continue;
+          for (const r of event.results) {
+            const c = candidateFromSearch(r);
+            if (c && !seen.has(c.id)) { seen.add(c.id); items.push(c); }
+          }
+        }
+      }
+      setFound({ for: shotId, phase: "done", items: items.slice(0, 36), note: items.length ? "" : "No free picture for those words. Try other words." });
+    } catch (e) {
+      setFound({ for: shotId, phase: "error", items: [], note: e instanceof Error ? e.message : "The archives could not be reached." });
+    }
+  };
+
+  const send = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await withKey((k) => fetch(`/api/voice/${film.id}/swaps`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${k}` }, body: JSON.stringify({ swaps: swaps.map((s) => ({ shotId: s.shotId, candidate: s.candidate })) }) }));
+      if (!res) return;
+      const data = (await res.json().catch(() => ({}))) as VoiceView & { error?: string };
+      if (!res.ok || !data.id) {
+        setError(String(data.error ?? "The film could not be re-made. Try again in a minute."));
+        return;
+      }
+      onStarted(data);
+    } catch {
+      setError("No connection. Check your internet and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const thumb = (src: string | null, alt: string) =>
+    src ? <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-sunken text-[10px] text-muted">No picture</span>;
+
+  return (
+    <div>
+      <div className="mt-6 rounded-2xl border border-line bg-canvas/50 p-4" aria-live="polite">
+        <p className={eyebrow}>Fix one picture</p>
+        <h3 className="mt-1 text-[17px] font-medium text-ink">Swap a shot</h3>
+        <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+          Tap a shot to see six other free pictures for it, or search the archives. Only the part of the film holding the shots you change is rendered again.
+        </p>
+        {!pack && !error && <p className="mt-3 text-[13.5px] text-muted">Opening the shots…</p>}
+        {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
+        {pack && (
+          <div className="mt-3">
+            <label className="block">
+              <span className="sr-only">Find a shot by its words</span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value.slice(0, 120))}
+                placeholder="Find a shot by its words"
+                className="h-11 w-full rounded-2xl border border-line-strong bg-surface px-4 text-[15px] text-ink outline-none focus:border-brand focus:ring-4 focus:ring-brand/15"
+              />
+            </label>
+            <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-surface">
+              {shots.map((s) => {
+                const swap = swapOf(swaps, s.id);
+                return (
+                  <li key={s.id}>
+                    <button type="button" onClick={() => { setOpen(open === s.id ? "" : s.id); setAsk(""); setFound({ for: s.id, phase: "idle", items: [], note: "" }); }} className="flex w-full items-center gap-3 p-3 text-left" aria-expanded={open === s.id}>
+                      <span className="h-10 w-16 shrink-0 overflow-hidden rounded-lg border border-line">{thumb(swap ? swap.candidate.thumbnailUrl : s.thumbnail, `Shot at ${s.time}`)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2 text-[12.5px] text-muted">
+                          <span className="rounded-full bg-sunken px-2 py-0.5 font-medium text-ink-2">{s.time}</span>
+                          <span>{s.span}</span>
+                          {swap && <span className="rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand-ink">New</span>}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[14px] text-ink">{s.words || s.id}</span>
+                      </span>
+                      <span className="shrink-0 text-[12.5px] text-brand-ink">{open === s.id ? "Close" : `${s.candidates} ideas`}</span>
+                    </button>
+                    {open === s.id && (
+                      <div className="border-t border-line bg-canvas/40 p-3">
+                        {alternativesFor(pack, s.id).length ? (
+                          <>
+                            <p className="text-[12.5px] font-medium text-ink-2">Six free pictures for this shot</p>
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                              {alternativesFor(pack, s.id).map((c) => {
+                                const picked = swapOf(swaps, s.id)?.candidate.id === c.id;
+                                return (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => setSwaps((list) => (picked ? dropSwap(list, s.id) : setSwap(list, s.id, c)))}
+                                    className={`overflow-hidden rounded-xl border text-left ${picked ? "border-brand ring-2 ring-brand/30" : c.current ? "border-line-strong" : "border-line"}`}
+                                    aria-pressed={picked}
+                                  >
+                                    <span className="block aspect-video w-full overflow-hidden bg-sunken">{thumb(c.thumbnailUrl, c.title || c.id)}</span>
+                                    <span className="block px-1.5 py-1 text-[10.5px] leading-tight text-muted">
+                                      {c.current ? "In the film" : `${c.source ?? "archive"} · ${c.licence ?? ""}`}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-[12.5px] text-muted">This shot has no saved alternatives; search the archives below.</p>
+                        )}
+                        <div className="mt-3 flex gap-2">
+                          <input
+                            value={found.for === s.id ? ask : ""}
+                            onChange={(e) => { setAsk(e.target.value.slice(0, 120)); }}
+                            onFocus={() => setAsk(s.words.slice(0, 120))}
+                            placeholder="Search the archives (free pictures only)"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-line-strong bg-surface px-3 text-[14px] text-ink outline-none focus:border-brand"
+                          />
+                          <button type="button" aria-label="Search the archives for this shot" onClick={() => void search(s.id, ask || s.words)} className="h-10 shrink-0 rounded-xl border border-line-strong px-3 text-[13.5px] font-medium text-ink transition hover:border-ink/40">
+                            {found.for === s.id && found.phase === "loading" ? "Searching…" : "Search"}
+                          </button>
+                        </div>
+                        {found.for === s.id && found.note && <p className="mt-1.5 text-[12.5px] text-muted">{found.note}</p>}
+                        {found.for === s.id && found.items.length > 0 && (
+                          <div className="mt-2 grid grid-cols-3 gap-2">
+                            {found.items.filter(Boolean).map((c) => {
+                              if (!c) return null;
+                              const picked = swapOf(swaps, s.id)?.candidate.id === c.id;
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setSwaps((list) => (picked ? dropSwap(list, s.id) : setSwap(list, s.id, c)))}
+                                  className={`overflow-hidden rounded-xl border text-left ${picked ? "border-brand ring-2 ring-brand/30" : "border-line"}`}
+                                  aria-pressed={picked}
+                                >
+                                  <span className="block aspect-video w-full overflow-hidden bg-sunken">{thumb(c.thumbnailUrl, c.title || c.id)}</span>
+                                  <span className="block px-1.5 py-1 text-[10.5px] leading-tight text-muted">{c.source ?? "archive"} · {c.licence ?? ""}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {shots.length === 0 && <p className="mt-2 text-[13.5px] text-muted">No shot holds those words.</p>}
+            <div className="mt-4 rounded-2xl border border-line bg-surface p-3">
+              <p className="text-[13px] text-ink-2">{plan.text || "Pick a new picture for at least one shot."}</p>
+              <button
+                type="button"
+                onClick={send}
+                disabled={busy || swaps.length === 0}
+                className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-brand-gradient text-[15px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60"
+              >
+                {busy ? "Sending…" : swaps.length ? `Re-make film (${swaps.length})` : "Re-make film"}
+              </button>
+              <p className="mt-2 text-center text-[12px] text-muted">The release check and the licence list run again on the new film, exactly as they did the first time.</p>
+            </div>
+          </div>
+        )}
+      </div>
+      <button type="button" onClick={onClose} className="mt-3 w-full text-center text-[14px] font-medium text-brand-ink underline-offset-4 hover:underline">
+        Back to the film
+      </button>
+    </div>
+  );
+}
+
 /** "My films": every voiceover film of this studio, so the page can be closed and opened later. */
 function MyFilms({
   list,
@@ -759,6 +1034,7 @@ function MyFilms({
   onOpen,
   onRetry,
   onDownload,
+  onSwap,
 }: {
   list: VoiceView[] | null;
   hasKey: boolean;
@@ -768,6 +1044,7 @@ function MyFilms({
   onOpen: (v: VoiceView) => void;
   onRetry: (id: string) => void;
   onDownload: (id: string) => void;
+  onSwap: (v: VoiceView) => void;
 }) {
   if (!list) {
     if (hasKey) return null;
@@ -806,9 +1083,14 @@ function MyFilms({
                     </button>
                   </span>
                 ) : finished && f.film ? (
-                  <button type="button" onClick={() => onDownload(f.id)} className="h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas transition hover:opacity-90">
-                    Download
-                  </button>
+                  <div className="flex shrink-0 flex-col gap-1.5">
+                    <button type="button" onClick={() => onDownload(f.id)} className="h-9 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas transition hover:opacity-90">
+                      Download
+                    </button>
+                    <button type="button" onClick={() => onSwap(f)} className="h-9 rounded-full border border-line-strong px-4 text-[13px] font-medium text-ink transition hover:border-ink/40">
+                      Swap a shot
+                    </button>
+                  </div>
                 ) : stopped ? (
                   <button type="button" disabled={busy} onClick={() => onRetry(f.id)} className="h-9 shrink-0 rounded-full border border-line-strong px-4 text-[13px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60">
                     Try again

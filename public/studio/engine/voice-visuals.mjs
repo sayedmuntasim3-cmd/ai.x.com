@@ -13,6 +13,7 @@ import { canSee } from "./film-run.mjs";
 import { roleCraft } from "./role-craft.mjs";
 import { chapterMedia, FREE_LICENCES } from "./film-media.mjs";
 import { msg } from "./messages.mjs";
+import { barBrief } from "./reference-bar.mjs";
 import { parseSceneLines } from "./scene-lines.mjs";
 import { checkQuranFilm, RECITATION_AUDIO } from "./quran-film.mjs";
 import { checkVoiceChapter, restoreVoiceFields, voiceSkeleton } from "./voice-scenes.mjs";
@@ -36,6 +37,7 @@ export const VOICE_VISUALS_SYSTEM = [
   "- LOOK: colour and movement in a few words.",
   "Never invent facts the voice does not say. Never show a person's face as if it were someone named unless the archive item is that person.",
   "Answer with the scene lines only, one per line, nothing else.",
+  barBrief(),
 ].join("\n");
 
 /** Words a stock archive cannot picture: reporting, hedging, counting, filler. Searching them returns random pictures. */
@@ -469,22 +471,27 @@ export function quranVisualAdabGuard(o) {
 
 /**
  * A quiet score for a narration voiceover, so a long film does not sit in silence under the voice: an opening cue,
- * steady cues about every 4 minutes (cut at a scene edge), and a closing cue. The free score
+ * a new cue at each chapter turn (`turns`: the story map's section starts, at least `leastSeconds` apart; the
+ * music changes where the story does), steady cues about every 4 minutes otherwise (cut at a scene edge), and a closing cue. The free score
  * (render/score-synth.mjs) composes them; the renderer lays them as a low bed under the voice. Never for the Quran:
  * nothing is laid under a recitation (musicPlanFor refuses it too).
  * @param {{ sc: string, start: number, end: number }[]} scenes
- * @param {{ kind?: "narration" | "quran", everySeconds?: number }} [o]
+ * @param {{ kind?: "narration" | "quran", everySeconds?: number, turns?: number[], leastSeconds?: number }} [o]
  * @returns {{ s4: string, cueOf: Map<string, string> } | null}
  */
 export function voiceScore(scenes, o = {}) {
   if (o.kind === "quran" || !scenes.length) return null;
   const every = o.everySeconds ?? 240;
+  const least = o.leastSeconds ?? 45;
+  const turns = [...(o.turns ?? [])].filter(Number.isFinite).sort((a, b) => a - b);
   const total = scenes[scenes.length - 1].end;
   /** @type {{ cue: string, start: number, end: number, sc: string[] }[]} */
   const cues = [];
   for (const s of scenes) {
     const last = cues[cues.length - 1];
-    if (!last || (s.start - last.start >= every && total - s.start >= 60)) cues.push({ cue: `M${String(cues.length + 1).padStart(2, "0")}`, start: s.start, end: s.end, sc: [s.sc] });
+    // A turn is crossed when the first turn not yet used by the current cue lies at or before this scene.
+    const turned = !!last && turns.some((t) => t > last.start + 0.001 && t <= s.start + 0.001) && s.start - last.start >= least && total - s.start >= 30;
+    if (!last || turned || (s.start - last.start >= every && total - s.start >= 60)) cues.push({ cue: `M${String(cues.length + 1).padStart(2, "0")}`, start: s.start, end: s.end, sc: [s.sc] });
     else { last.end = s.end; last.sc.push(s.sc); }
   }
   const moods = (/** @type {number} */ i, /** @type {number} */ n) =>

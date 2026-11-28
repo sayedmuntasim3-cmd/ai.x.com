@@ -35,6 +35,18 @@ on:
         description: "Name of the artifact the finished film is uploaded as"
         type: string
         default: "film"
+      parts_only:
+        description: 'A re-make: render only these parts ("2,5"); empty renders every part'
+        type: string
+        default: ""
+      reuse_url:
+        description: "A re-make: the previous film's own URL (with its ticket); its unchanged parts stand in for the fresh ones"
+        type: string
+        default: ""
+      reuse_changed:
+        description: "A re-make: the parts that were rendered again (the same list as parts_only)"
+        type: string
+        default: ""
     outputs:
       artifact:
         description: "The artifact holding out/film.mp4, its report and captions"
@@ -52,9 +64,17 @@ jobs:
       - id: plan
         env:
           PARTS: ${{ inputs.parts }}
+          ONLY: ${{ inputs.parts_only }}
         run: |
           [[ "$PARTS" =~ ^[0-9]+$ ]] && (( PARTS >= 1 && PARTS <= 16 )) || { echo "::error::parts must be 1-16."; exit 1; }
-          echo "parts=$(seq -s, 1 "$PARTS" | sed 's/^/[/;s/$/]/')" >> "$GITHUB_OUTPUT"
+          if [ -n "$ONLY" ]; then
+            # A re-make renders only the parts holding the swapped shots (render/edit-pack.mjs chose them).
+            [[ "$ONLY" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "::error::parts_only must be a comma list of part numbers."; exit 1; }
+            for n in ${ONLY//,/ }; do (( n >= 1 && n <= PARTS )) || { echo "::error::part $n is not one of 1-$PARTS."; exit 1; }; done
+            echo "parts=[$ONLY]" >> "$GITHUB_OUTPUT"
+          else
+            echo "parts=$(seq -s, 1 "$PARTS" | sed 's/^/[/;s/$/]/')" >> "$GITHUB_OUTPUT"
+          fi
 
   part:
     needs: plan
@@ -102,6 +122,8 @@ jobs:
     env:
       ARGS: ${{ inputs.args }}
       PARTS: ${{ inputs.parts }}
+      REUSE_URL: ${{ inputs.reuse_url }}
+      REUSE_CHANGED: ${{ inputs.reuse_changed }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -121,7 +143,20 @@ jobs:
           pattern: ${{ inputs.out_artifact }}-part-*
           path: parts
           merge-multiple: true
+      - name: A re-make joins the new parts with the old film's own picture
+        if: inputs.reuse_url != ''
+        run: |
+          # Only the parts holding the swapped shots were rendered again; every other part of the
+          # picture is the old film's own frames (parts meet on shot boundaries, so a cut is exact)
+          # and the sound is the old mix, whose shot lengths did not change. The release gate then
+          # measures this new file exactly as it measures a first cut.
+          echo "::add-mask::$REUSE_URL"
+          mkdir -p out
+          curl -fsSL "$REUSE_URL" -o old.mp4
+          node render/edit-pack.mjs --join --pack run/render-pack.json --old old.mp4 --parts parts --changed "$REUSE_CHANGED" --out out/film.mp4
+          ls -l out/film.mp4
       - name: Join the parts and mix the sound once
+        if: inputs.reuse_url == ''
         run: |
           [[ "$ARGS" =~ ^[A-Za-z0-9_./=:,\ -]+$ ]] || { echo "::error::Bad render arguments."; exit 1; }
           list=$(for i in $(seq 1 "$PARTS"); do if [ -f "parts/part-$i.mp4" ]; then printf 'parts/part-%s.mp4,' "$i"; fi; done)
@@ -144,8 +179,12 @@ jobs:
           gate && passed=1
           for round in $(seq 1 "$AUTOFIX"); do
             [ "$passed" = 1 ] && break
-            node render/autofix.mjs --run run --report out/film.report.json --parts "$PARTS" --round "$round" --out out/autofix.json 2>&1 | tee autofix.log
-            [ "${PIPESTATUS[0]}" = 0 ] || { echo "Round $round: nothing this loop can fix."; break; }
+            # Not a pipe into tee: under `set -e -o pipefail` a "nothing to fix" exit (2) would stop the whole step,
+            # and a blocked film must still go on to be delivered as a marked draft.
+            rc=0
+            node render/autofix.mjs --run run --report out/film.report.json --parts "$PARTS" --round "$round" --out out/autofix.json > autofix.log 2>&1 || rc=$?
+            cat autofix.log
+            [ "$rc" = 0 ] || { echo "Round $round: nothing this loop can fix."; break; }
             parts=$(node -e 'const j=require("./out/autofix.json");const r=(j.rounds||[]).find((x)=>x.round===Number(process.argv[1]));console.log(((r&&r.parts)||[]).join(" "))' "$round")
             [ -n "$parts" ] || break
             for p in $parts; do
