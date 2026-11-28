@@ -25,7 +25,8 @@ const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45,
 /** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
 import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
-import { critique, measureFilm, measurePicture } from "./critic.mjs";
+import { critique, designedMoments, measureFilm, measurePicture } from "./critic.mjs";
+import { attachMoments, momentSounds, planMoments } from "../engine/src/voice-moments.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -539,7 +540,7 @@ export async function renderFilm(o) {
     if (i < first || i >= range.end) return;
     // v: bump whenever the way a shot is drawn changes, so cached shots from an older look are redone.
     // The Edit Director's moves join the key only when a shot has them, so every other cached shot stays valid.
-    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
+    const moves = { ...(v.punchIns?.length || v.shakes?.length ? { punchIns: v.punchIns ?? [], shakes: v.shakes ?? [] } : {}), ...(v.fileHash ? { file: v.fileHash } : {}), ...(v.chart ? { chart: v.chart } : {}), ...(v.highlight ? { highlight: v.highlight } : {}), ...(v.still && v.frame ? { frame: v.frame } : {}), ...(v.still && v.focus ? { focus: v.focus } : {}), ...(v.moment ? { moment: [v.moment.template, v.moment.data, Math.round((v.moment.at - v.start) * 100), Math.round(v.moment.seconds * 100), 2] } : {}), ...(v.still && v.move ? { move: [v.move.kind, v.move.amount, v.move.dir, v.move.ease, v.move.why.startsWith("reduced")] } : {}) };
     const graphic = graphicsOn && v.type === "card" ? graphicFor(v, { counterParts }) : null;
     const designed = graphic && !graphic.alpha ? graphic : null;
     // The look of an M4 shot joins the key only for shots it draws, so every other cached shot stays valid.
@@ -882,7 +883,31 @@ export async function renderFilm(o) {
     const encode = (/** @type {string} */ f) => run(ffmpeg, ["-v", "error", "-y", ...input, "-frames:v", String(v.frames), complex ? "-filter_complex" : "-vf", f, "-threads", "2", ...enc, file + ".part.mp4"]);
     // Centred lines (text_align) need ffmpeg 6.1+; older builds centre the block instead.
     try { await encode(vf); } catch (error) { if (!vf.includes("text_align")) throw error; await encode(vf.replaceAll(":text_align=C", "")); }
-    renameSync(file + ".part.mp4", file);
+    // A designed moment (engine/src/voice-moments.mjs): its graphic is drawn with alpha by the browser and laid over the finished
+    // picture at its own time. When it cannot be drawn the shot is kept plain, the moment leaves the film's record, and it says so.
+    if (v.moment && type === "clip") {
+      try {
+        if (!graphicsOn || !pw) throw new Error("the graphics browser is off");
+        const m = v.moment;
+        const frames = Math.max(1, Math.round(m.seconds * t.fps));
+        const mov = join(dirs.cards, `${hash({ g: [m.template, m.data], n: frames, w: t.width, h: t.height, fps: t.fps, a: 1, v: 1 })}-moment.mov`);
+        if (!existsSync(mov)) {
+          if (!browser) { browser = pw.chromium.launch(); browser.catch(() => {}); }
+          await renderGraphicFile({ template: m.template, data: m.data, width: t.width, height: t.height, fps: t.fps, frames, alpha: true, file: mov, out: "", ffmpeg, ffprobe, browser: await browser });
+        }
+        const delay = Math.max(0, m.at - v.start).toFixed(3);
+        const over = file + ".moment.mp4";
+        await run(ffmpeg, ["-v", "error", "-y", "-i", file + ".part.mp4", "-i", mov, "-filter_complex", `[1:v]format=yuva444p10le,setpts=PTS-STARTPTS+${delay}/TB[m];[0:v]format=yuv420p[b];[b][m]overlay=eof_action=pass:format=auto,format=yuv420p[o]`, "-map", "[o]", "-frames:v", String(v.frames), "-threads", "2", ...enc, over]);
+        renameSync(over, file + ".part.mp4");
+        stats.momentsDrawn = (stats.momentsDrawn ?? 0) + 1;
+      } catch (error) {
+        warnings.push(`${v.id}: the ${v.moment.kind} moment could not be drawn (${error instanceof Error ? error.message.slice(0, 160) : error}); the picture stays plain.`);
+        v.moment.failed = true;
+        // Not kept under the moment's own name: a later run must try the overlay again, not reuse a plain picture.
+        segments[i] = file.replace(/\.mp4$/, "-plain.mp4");
+      }
+    }
+    renameSync(file + ".part.mp4", segments[i]);
     stats.segmentsRendered += 1;
     if ((stats.segmentsRendered + stats.segmentsCached) % 50 === 0) log(`picture: ${stats.segmentsRendered + stats.segmentsCached}/${t.video.length}`);
   });
@@ -1328,6 +1353,23 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     }
     const own = applyOwnPictures(timeline, ownPictureFolder(args.pictures));
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
+  }
+  // Designed moments for a voice film, found in its words (engine/src/voice-moments.mjs): names, big numbers, dates, places,
+  // quotes and a title, laid over the existing pictures. The brain's own designed shots are kept and the plan fills the gaps.
+  if (oneTrack && typeof args.words === "string" && !process.argv.includes("--no-moments")) {
+    if (!loadPlaywright() || process.argv.includes("--no-graphics")) {
+      timeline.notes.push("moments: no graphics browser on this machine, so the words' own designed moments were not planned.");
+    } else {
+      const spoken = JSON.parse(readFileSync(args.words, "utf8")).words ?? [];
+      const brain = designedMoments(timeline.video);
+      const plan = planMoments({ words: spoken, duration: timeline.durationSeconds, topic: filmInfo.topic ?? filmInfo.film?.topic, existing: brain.map((v) => ({ start: Number(v.start), end: Number(v.end) })), hasTitle: timeline.video.some((v) => v.chapterTitle || v.shotType === "title") });
+      const fitted = attachMoments(timeline.video, plan.moments);
+      timeline.sfx.push(...momentSounds(fitted.placed));
+      timeline.sfx.sort((a, b) => a.start - b.start);
+      // timeline.moments is the film report's record of every moment: what the words gave, where it went, what was dropped and why.
+      timeline.moments = { brainPlanned: brain.length, placed: fitted.placed, dropped: fitted.dropped, skipped: plan.skipped, stats: plan.stats };
+      console.log(`moments: ${fitted.placed.length} placed from the words (${fitted.placed.map((p) => p.kind).join(", ") || "none"}), ${brain.length} already planned, ${fitted.dropped.length + plan.skipped.length} left out`);
+    }
   }
   // The Craft Ledger's targets for this film (written by local/voice-film.mjs): the critic notes each measure short of them.
   const craftFile = args.run ? join(args.run, "craft-targets.json") : null;
