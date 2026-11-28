@@ -40,7 +40,7 @@ import { msg } from "../engine/src/messages.mjs";
 import { alignScript, checkTranscript, normalizeTranscript } from "../engine/src/transcript.mjs";
 import { understandVoice } from "../engine/src/voice-understand.mjs";
 import { buildQuranIndex } from "../engine/src/quran.mjs";
-import { locateRecitation } from "../engine/src/quran-locate.mjs";
+import { locateRecitation, spansFromWords } from "../engine/src/quran-locate.mjs";
 import { meaningTable, parseTanzilText, passageMeaning, planMeanings } from "../engine/src/quran-meaning.mjs";
 import { directQuranFilm, shotTable } from "../engine/src/quran-director.mjs";
 import { voiceSpans } from "../engine/src/voice-analyze.mjs";
@@ -406,7 +406,10 @@ export async function speechToText(o) {
   const args = ["-I", script, o.wav, "--engine", o.engine, "--out", o.out];
   if (o.model) args.push("--model", o.model);
   // ZUPONA_STT_BATCH: batched decoding (the film machine sets 8: about 7x faster at the same word error).
-  if (process.env.ZUPONA_STT_BATCH) args.push("--batch", String(Number(process.env.ZUPONA_STT_BATCH) || 8));
+  // Not for the Quran recognizer: measured 28 Nov 2026 on a 12-minute recitation, tarteel-ai/whisper-base-ar-quran
+  // with batch 8 returned no words at all on CPU, while plain decoding of the same audio returned 67 words in 146 s.
+  const quranModel = /quran/i.test(String(o.model ?? ""));
+  if (process.env.ZUPONA_STT_BATCH && !quranModel) args.push("--batch", String(Number(process.env.ZUPONA_STT_BATCH) || 8));
   if (o.language) args.push("--language", o.language);
   if (o.clips?.length) args.push("--clips", o.clips.join(","));
   await run(o.python ?? process.env.ZUPONA_PYTHON ?? "python3", args, { maxBuffer: 1 << 24, timeout: 6 * 3600 * 1000 });
@@ -498,10 +501,15 @@ export async function understand(o) {
   const q = needQuran ? await loadQuran() : null;
   const hasGiven = Boolean(o.given && [o.given.surah, o.given.passage].some((v) => typeof v === "string" || typeof v === "number"));
   const arabic = /^ar/.test(String(o.transcript?.language ?? ""));
+  // No surah and no passage: the passage is found from the words the recognizer heard,
+  // across surah boundaries (locateRecitation). With no recording beside the words, the
+  // words' own times give the stretches (a transcript-only run: the test bench).
+  const words = o.transcript?.words ?? null;
+  const locatable = Boolean(q && (o.sttWav || words?.length));
   let location = null;
-  if (q && o.sttWav && (o.kind === "quran" || hasGiven || arabic)) {
-    const voice = await readSpans(o.sttWav);
-    const aligned = hasGiven && o.python ? await alignText({ index: q.index, given: o.given, surahNames: q.surahNames, wav: o.sttWav, out: o.out, python: o.python }) : null;
+  if (q && locatable && (o.kind === "quran" || hasGiven || arabic)) {
+    const voice = o.sttWav ? await readSpans(o.sttWav) : { spans: spansFromWords(/** @type {{ start?: number, end?: number }[]} */ (words)), seconds: o.totalSeconds };
+    const aligned = hasGiven && o.python && o.sttWav ? await alignText({ index: q.index, given: o.given, surahNames: q.surahNames, wav: o.sttWav, out: o.out, python: o.python }) : null;
     location = locateRecitation({ index: q.index, surahNames: q.surahNames, spans: voice.spans, totalSeconds: voice.seconds, given: hasGiven ? o.given : null, words: o.transcript?.words ?? null, opening: o.opening, closing: o.closing, aligned });
     // The reviewer's marks (taps at each ayah end) are confirmed times: they replace the machine's guesses.
     if (o.marks && location?.ok) {
@@ -615,26 +623,42 @@ export async function master(o) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (typeof args.audio !== "string") {
+  const audio = typeof args.audio === "string" ? args.audio : null;
+  // A transcript alone (--transcript, no --audio): the test bench. The words and
+  // their own times are the whole evidence, so no voice check runs and no film is
+  // planned; it is how a recitation's location is tried without a recording
+  // (node local/voice-film.mjs --kind quran --transcript quran-words.json).
+  const transcriptOnly = !audio && typeof args.transcript === "string";
+  if (!audio && !transcriptOnly) {
     console.error("Usage: node local/voice-film.mjs --audio <file> [--kind narration|quran|auto] [--out <dir>] [--master [clean|mosque-hall|grand-hall|dry|warm-room]]");
     process.exit(2);
   }
-  const out = resolve(typeof args.out === "string" ? args.out : join("voice-runs", basename(args.audio).replace(/\.[^.]+$/, "")));
+  const out = resolve(typeof args.out === "string" ? args.out : join("voice-runs", basename(audio ?? String(args.transcript)).replace(/\.[^.]+$/, "")));
   const lang = args.lang === "bn" ? "bn" : "en";
   const slice = parseSlice(args.slice);
   if (slice && args.script) { console.error("--slice cannot be used with --script (the script is the whole film's words)."); process.exit(2); }
+  if (slice && transcriptOnly) { console.error("--slice needs --audio (there is no recording to cut)."); process.exit(2); }
   if (slice && !(await hasFfmpeg())) { console.error(msg("voice.noFfmpeg")[lang]); process.exit(1); }
   // The test bench: from here on, the recording is the slice.
-  const source = slice ? await cutSlice({ audio: resolve(args.audio), out, slice }) : resolve(args.audio);
+  const source = !audio ? "" : slice ? await cutSlice({ audio: resolve(audio), out, slice }) : resolve(audio);
   if (slice) console.log(`Slice ${args.slice}: ${slice.end - slice.start} s of ${basename(String(args.audio))} -> ${source}`);
-  let step1 = await intake({ audio: source, out });
+  /** @type {{ ok: boolean, report: any, analysisWav?: string, sttWav?: string, messages: any[] }} */
+  let step1;
+  if (transcriptOnly) {
+    await mkdir(out, { recursive: true });
+    const t = normalizeTranscript(await readFile(resolve(String(args.transcript)), "utf8"), { name: String(args.transcript) });
+    const ends = (t.words ?? []).map((w) => Number(w.end) || 0);
+    step1 = { ok: true, report: { durationSeconds: Math.round((Math.max(0, ...ends) + 0.5) * 10) / 10, messages: [] }, messages: [msg("voice.transcriptOnly")] };
+  } else {
+    step1 = await intake({ audio: source, out });
+  }
   for (const m of step1.messages) console.log("- " + m[lang]);
   if (!step1.ok || !step1.report) process.exit(1);
   // The run folder's fingerprint and what an earlier run already finished. A re-run of the same recording and
   // brief continues from there (a 40-minute film's speech-to-text alone takes hours); another brief starts fresh.
   const fingerprint = {
-    audio: basename(source),
-    bytes: (await stat(source)).size,
+    audio: source ? basename(source) : null,
+    bytes: source ? (await stat(source)).size : 0,
     topic: typeof args.topic === "string" ? args.topic : null,
     kind: args.kind,
     slice: slice ? `${slice.start}-${slice.end}` : null,
@@ -690,6 +714,11 @@ async function main() {
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);
     if (!step3.ok) process.exit(/** @type {any} */ (step3).question ? 3 : 1);
+    if (transcriptOnly) {
+      // The test bench stops here: pictures and the master need the recording.
+      console.log(`Saved in ${out}`);
+      return;
+    }
     let understanding = step3;
     // Retakes: now that the words are timed and the passage is located, the failed takes a hafiz leaves (a
     // stumble, a restart, a word broken and said again) are cut and only the last complete take stays. The same

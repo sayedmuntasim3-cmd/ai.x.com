@@ -138,8 +138,10 @@ export async function checkTicket(secret, id, ticket, purposes, now = Date.now()
 }
 
 /**
- * What the creator asked for, checked. Quran recitation needs the surah: the
- * engine never guesses which passage a recitation is.
+ * What the creator asked for, checked. A Quran recitation may come without a
+ * surah: the film machine then finds every surah and ayah from the recording's
+ * own words (engine/src/quran-locate.mjs) and asks instead of guessing, so the
+ * creator only has to upload the audio. A surah that is given is checked.
  * @param {any} body
  * @returns {{ ok: true, value: { fileName: string, ext: keyof typeof AUDIO_TYPES, bytes: number, kind: "narration" | "quran", topic: string, surah: number | null, ayat: string, reciter: string } } | { ok: false, error: string }}
  */
@@ -160,8 +162,9 @@ export function checkVoiceRequest(body) {
   let ayat = "";
   let reciter = "";
   if (kind === "quran") {
-    surah = Number(body?.surah);
-    if (!Number.isInteger(surah) || surah < 1 || surah > 114) return { ok: false, error: "Say which surah is recited (1-114): a recitation is never guessed." };
+    const asked = body?.surah === undefined || body?.surah === null || String(body.surah).trim() === "" ? null : Number(body.surah);
+    surah = asked;
+    if (asked !== null && (!Number.isInteger(asked) || asked < 1 || asked > 114)) return { ok: false, error: "The surah must be a number from 1 to 114, or left empty: then the recording is read and every surah and ayah is found for you." };
     ayat = String(body?.ayat ?? "").trim();
     if (ayat && !/^\d{1,3}(-\d{1,3})?$/.test(ayat)) return { ok: false, error: "Ayat must look like 1-11 (or leave it empty for the whole surah)." };
     reciter = String(body?.reciter ?? "").replace(/[^\p{L}\p{M} .'-]/gu, "").trim().slice(0, 80);

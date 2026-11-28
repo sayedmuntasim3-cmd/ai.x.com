@@ -53,11 +53,16 @@ async function call(env, method, path, o = {}) {
   return { status: res.status, headers: res.headers, data: type.startsWith("application/json") ? await res.json() : new Uint8Array(await res.arrayBuffer()) };
 }
 
-test("requests are checked: audio only, a surah for Quran, sizes", () => {
+test("requests are checked: audio only, an optional surah for Quran, sizes", () => {
   assert.equal(checkVoiceRequest({ fileName: "story.mp3", bytes: 5e6 }).ok, true);
   assert.match(/** @type {any} */ (checkVoiceRequest({ fileName: "story.exe", bytes: 5e6 })).error, /audio file/);
   assert.match(/** @type {any} */ (checkVoiceRequest({ fileName: "a.wav", bytes: 3e9 })).error, /2 GB/);
-  assert.match(/** @type {any} */ (checkVoiceRequest({ fileName: "a.wav", bytes: 5e6, kind: "quran" })).error, /surah/);
+  // No surah typed: the recording is read and its surahs and ayat are found (never guessed).
+  const auto = /** @type {any} */ (checkVoiceRequest({ fileName: "taraweeh.mp3", bytes: 5e6, kind: "quran" }));
+  assert.equal(auto.ok, true);
+  assert.equal(auto.value.surah, null);
+  assert.equal(/** @type {any} */ (checkVoiceRequest({ fileName: "taraweeh.mp3", bytes: 5e6, kind: "quran", surah: "" })).value.surah, null);
+  assert.match(/** @type {any} */ (checkVoiceRequest({ fileName: "a.wav", bytes: 5e6, kind: "quran", surah: 200 })).error, /1 to 114/);
   const q = /** @type {any} */ (checkVoiceRequest({ fileName: "duha.m4a", bytes: 5e6, kind: "quran", surah: 93, ayat: "1-11", reciter: "Qari <b>X</b>" }));
   assert.equal(q.ok, true);
   assert.equal(q.value.reciter, "Qari bXb");

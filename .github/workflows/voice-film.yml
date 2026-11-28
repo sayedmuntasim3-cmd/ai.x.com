@@ -40,7 +40,7 @@ on:
         description: "What the film is about (optional)"
         default: ""
       quran:
-        description: 'Quran only: {"surah":93,"ayat":"1-11","reciter":"..."}'
+        description: 'Quran only: {"surah":93,"ayat":"1-11","reciter":"..."}. Leave surah out and the passage is found from the recording (several surahs are fine).'
         default: ""
       resolution:
         description: "Picture size"
@@ -77,6 +77,9 @@ jobs:
       RESOLUTION: ${{ inputs.resolution }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ZUPONA_PYTHON: python
+      # The Quran recognizer (Whisper base fine-tuned on recitation, Apache-2.0), used only when no surah is given.
+      # transcribe.py converts it once to CTranslate2 and keeps it in ~/.cache/zupona-stt.
+      QURAN_STT_MODEL: tarteel-ai/whisper-base-ar-quran
       ZUPONA_STT_BATCH: "8"
       ZUPONA_MEDIA_CONCURRENCY: "6"
       VOICE_SELFTEST: ${{ inputs.selftest == 'yes' && '1' || '' }}
@@ -110,6 +113,7 @@ jobs:
           [ -z "$VOICE_SELFTEST" ] || sudo apt-get install -y -qq espeak-ng > /dev/null
           if [ "$KIND" = quran ]; then
             # The recitation is aligned to the verbatim Tanzil text (local/stt/align.py), and pictures pass the adab guard.
+            # torch and transformers also convert the Quran recognizer (QURAN_STT_MODEL) to CTranslate2 on first use.
             pip install -q "opencv-python-headless==4.10.0.84" pillow
             pip install -q --index-url https://download.pytorch.org/whl/cpu torch
             pip install -q transformers
@@ -117,7 +121,9 @@ jobs:
       - name: Keep the speech-to-text model between runs
         uses: actions/cache@v4
         with:
-          path: ~/.cache/huggingface
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/zupona-stt
           key: whisper-${{ inputs.kind }}-v1
       - name: Fetch the recording (private, with this run's ticket)
         run: |
@@ -141,12 +147,23 @@ jobs:
           # Free modern stock (Pixabay) with the Worker's own key, relayed for this one recording.
           [ -n "$VOICE_SELFTEST" ] || export ZUPONA_STOCK_RELAY="$SITE/api/voice/$VOICE_ID/stock?ticket=$VOICE_TICKET"
           if [ "$KIND" = quran ]; then
-            surah=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!Number.isInteger(q.surah)||q.surah<1||q.surah>114)process.exit(1);console.log(q.surah)') || { echo "::error::Quran needs the surah."; exit 1; }
+            surah=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(Number.isInteger(q.surah)&&q.surah>=1&&q.surah<=114)console.log(q.surah)')
             ayat=$(node -e 'const q=JSON.parse(process.env.QURAN||"{}");console.log(/^\d{1,3}(-\d{1,3})?$/.test(q.ayat||"")?q.ayat:"")')
             # The reviewer's ayah marks (taps on the uploaded recording): confirmed times, so no pause is shortened.
             marks=""
             if node -e 'const q=JSON.parse(process.env.QURAN||"{}");if(!q.marks)process.exit(1);require("fs").writeFileSync("marks.json",JSON.stringify(q.marks))'; then marks="--marks marks.json --tighten off"; fi
-            node local/voice-film.mjs --audio "in.$EXT" --surah "$surah" ${ayat:+--ayat "$ayat"} --master mosque-hall $marks --out run 2>&1 | tee voice-film.log step.log
+            # No surah typed: the recitation is written down by the Quran recognizer and the passage is found from
+            # its words, across surah boundaries, a juz at a time if need be (engine/src/quran-locate.mjs).
+            find=()
+            if [ -n "$surah" ]; then find=(--surah "$surah"); else find=(--stt faster-whisper --model "$QURAN_STT_MODEL" --language ar); fi
+            node local/voice-film.mjs --audio "in.$EXT" --kind quran "${find[@]}" ${ayat:+--ayat "$ayat"} --master mosque-hall $marks --out run 2>&1 | tee voice-film.log step.log
+            rc="${PIPESTATUS[0]}"
+            if [ "$rc" = 3 ] && [ -z "$surah" ]; then
+              # The locator never guesses: it stops with a question. Say what the owner must do, in his languages.
+              node --input-type=module -e 'import { msg } from "./engine/src/messages.mjs"; console.log("::error::" + msg("quran.ask.needSurah").en); console.log("::error::" + msg("quran.ask.needSurah").bn);' | tee -a voice-film.log
+              exit 1
+            fi
+            test "$rc" = 0
           else
             # The Craft Ledger (R2, through the Worker): earlier films' targets for the shot plan and the critic.
             mkdir -p run && { node render/voice-runner.mjs ledger --out run/craft-ledger.json || echo "::warning::The craft ledger could not be read; the house standard sets the targets."; }
