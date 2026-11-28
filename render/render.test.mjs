@@ -562,6 +562,15 @@ test("a chunked render (parts on separate runners, then a join) gives the same f
       assert.equal(r.part, i + 1);
       parts.push(file);
     }
+    // More parts than shots: a part with no shot writes only its report (no crash, no picture), and the join skips it.
+    const many = 8;
+    const emptyIndex = Array.from({ length: many }, (_, i) => i).find((i) => { const r = partRange(make().video, i, many); return r.start >= r.end; });
+    assert.ok(emptyIndex !== undefined, "6 shots in 8 parts leave a part empty");
+    const emptyFile = join(dir, "part-empty.mp4");
+    const empty = /** @type {any} */ (await renderFilm({ ...common, timeline: make(), workDir: join(dir, "w-empty"), outFile: emptyFile, part: { index: /** @type {number} */ (emptyIndex), count: many } }));
+    assert.equal(empty.empty, true);
+    assert.equal(empty.frames, 0);
+    assert.equal(existsSync(emptyFile), false, "an empty part writes no picture");
     const joined = join(dir, "joined.mp4");
     const report = await renderFilm({ ...common, timeline: make(), workDir: join(dir, "w-join"), outFile: joined, joinParts: parts });
     assert.equal(report.stats.segmentsRendered, 0, "the join renders no shot");
