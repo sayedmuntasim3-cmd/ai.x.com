@@ -16,9 +16,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CRITIC_LIMITS, brainPrompt, critiqueScript, parseBrainRead, rewriteNotes } from "../engine/src/story-critic.mjs";
+import { CRITIC_LIMITS, brainPrompt, critiqueScript, parseBrainRead, repairScript, REPAIR_MAX_SHARE, rewriteNotes } from "../engine/src/story-critic.mjs";
 import { msg } from "../engine/src/messages.mjs";
 import { dailyTopic } from "../worker/daily-film.mjs";
+import { GROQ_MODELS } from "../worker/groq.mjs";
 import { parseArgs, send } from "./voice-runner.mjs";
 
 /** The film's length in words (about 40 minutes at the narrator's ~145 words a minute). */
@@ -162,6 +163,98 @@ export function systemPrompt(topic) {
   ].join("\n");
 }
 
+/** Each Groq model has its own 8,000-token minute (worker/groq.mjs); a call is counted at its prompt plus most of its reply. */
+export const LANE_TOKENS_PER_MINUTE = 5500;
+
+/**
+ * Three free models, each with its own minute: a call goes to the model that has room now, so three
+ * calls run at once instead of one every 62 seconds. A model that answers "busy" rests a while;
+ * a model whose day is used up is out until tomorrow.
+ * @param {{ models?: readonly string[], now?: () => number, sleep?: (ms: number) => Promise<void>, perMinute?: number }} [o]
+ */
+export function makeLanes(o = {}) {
+  const models = [...(o.models ?? GROQ_MODELS)];
+  const now = o.now ?? Date.now;
+  const sleep = o.sleep ?? ((/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms)));
+  const perMinute = o.perMinute ?? LANE_TOKENS_PER_MINUTE;
+  /** @type {Map<string, { at: number, tokens: number }[]>} */
+  const used = new Map(models.map((m) => [m, []]));
+  /** @type {Map<string, number>} */
+  const restUntil = new Map();
+  /** @type {Set<string>} */
+  const spent = new Set();
+  const load = (/** @type {string} */ m) => { const t = now(); const list = (used.get(m) ?? []).filter((x) => t - x.at < 60_000); used.set(m, list); return list.reduce((n, x) => n + x.tokens, 0); };
+  return {
+    models,
+    spent,
+    /** @param {number} tokens @returns {Promise<string>} the model to call */
+    async acquire(tokens) {
+      const need = Math.min(tokens, perMinute);
+      for (;;) {
+        const live = models.filter((m) => !spent.has(m));
+        if (!live.length) throw new Error("every free model's day is used up");
+        const t = now();
+        const ready = live.filter((m) => (restUntil.get(m) ?? 0) <= t && load(m) + need <= perMinute);
+        if (ready.length) {
+          // The emptiest minute first, so the three share the work.
+          const m = ready.reduce((a, b) => (load(b) < load(a) ? b : a));
+          /** @type {{ at: number, tokens: number }[]} */ (used.get(m)).push({ at: t, tokens: need });
+          return m;
+        }
+        // Wait until the earliest moment a model has room (a window slides out, or a rest ends).
+        const when = live.map((m) => {
+          const rest = restUntil.get(m) ?? 0;
+          let sum = load(m);
+          let free = t;
+          for (const x of used.get(m) ?? []) { if (sum + need <= perMinute) break; sum -= x.tokens; free = x.at + 60_000; }
+          return Math.max(rest, free);
+        });
+        await sleep(Math.max(500, Math.min(...when) - t + 200));
+      }
+    },
+    /** A model said it is busy: rest it. @param {string} m @param {number} [ms] */
+    rest(m, ms = 20_000) { restUntil.set(m, now() + ms); },
+    /** A model's day is used up. @param {string} m */
+    spend(m) { spent.add(m); },
+  };
+}
+
+/**
+ * One brain call on the lane that has room: the model is named to the Worker, which asks only that model.
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {{ system: string, prompt: string, maxTokens: number }} body
+ * @param {{ calls: { model: string, words: number, seconds: number }[], lanes: ReturnType<typeof makeLanes>, dayHits?: Record<string, number> }} state
+ */
+async function laneCall(c, body, state) {
+  const lanes = state.lanes;
+  const tokens = Math.ceil((body.system.length + body.prompt.length) / 3.8) + Math.ceil(body.maxTokens * 0.8);
+  let last = "";
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
+    let model;
+    try { model = await lanes.acquire(tokens); } catch (e) { throw new Error(`The free brains' daily limit is used up: ${last.slice(0, 300) || (e instanceof Error ? e.message : String(e))}`); }
+    const t0 = Date.now();
+    try {
+      const r = await send(c, "/brain", { ...body, model });
+      const text = String(r.text ?? "");
+      state.calls.push({ model: String(r.model ?? model), words: wordCount(text), seconds: Math.round((Date.now() - t0) / 1000) });
+      if (text.trim()) return { text, model: String(r.model ?? model), stopReason: r.stopReason };
+      last = "empty reply";
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e);
+      // Groq's daily limit is a rolling window of tokens (200,000 a model: "try again in 20m" measured 27 Nov), not a midnight
+      // reset: the model rests and comes back, 10 minutes longer each time it says so, instead of stopping the film.
+      if (/day used up|per day|RPD|TPD|PerDay/i.test(last) && !/busy/i.test(last)) {
+        const hits = (state.dayHits ??= {});
+        hits[model] = (hits[model] ?? 0) + 1;
+        lanes.rest(model, Math.min(40, 10 * hits[model]) * 60_000);
+        continue;
+      }
+      if (/ 4\d\d /.test(last) && !/ 429 /.test(last) && !/ 413 /.test(last)) throw new Error(`The brain refused the request: ${last.slice(0, 400)}`);
+      lanes.rest(model);
+    }
+  }
+  throw new Error(`The free brain did not answer after 40 tries: ${last.slice(0, 400)}`);
+}
+
 /**
  * One brain call through the Worker, paced for Groq's minute limit, retried while the brain is only busy.
  * Stops with the brain's own reason when a daily limit is used up.
@@ -169,6 +262,7 @@ export function systemPrompt(topic) {
  * @param {{ calls: { model: string, words: number, seconds: number }[], last: number, sleep?: (ms: number) => Promise<void>, gapMs?: number }} state
  */
 export async function brainCall(c, body, state) {
+  if (state.lanes) return laneCall(c, body, state);
   const sleep = state.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const gap = state.gapMs ?? CALL_GAP_MS;
   let last = "";
@@ -230,7 +324,7 @@ export async function writeScript(o) {
   log(`source: ${articles.map((a) => a.url).join(", ")} (${sourceChars} characters, ${sections.length} sections)`);
   if (sourceChars < 6000) throw new Error(`The source is too short (${sourceChars} characters) to write a 40-minute film from facts only.`);
   const sources = chapterSources(sections, CHAPTERS);
-  const state = { calls: /** @type {{ model: string, words: number, seconds: number }[]} */ ([]), last: 0, sleep: o.sleep, gapMs: o.gapMs };
+  const state = { calls: /** @type {{ model: string, words: number, seconds: number }[]} */ ([]), last: 0, sleep: o.sleep, gapMs: o.gapMs, lanes: o.gapMs === undefined && !o.sleep ? makeLanes() : null };
   const system = systemPrompt(o.topic);
 
   const headings = sections.map((s) => s.heading).join("; ");
@@ -243,12 +337,13 @@ export async function writeScript(o) {
   let factChanges = 0;
   /** @type {string[]} */
   const unsupported = [];
-  for (let i = 0; i < CHAPTERS; i += 1) {
-    // Each part's length follows what is left, so a long part is balanced by shorter ones after it.
-    const sofar = chapters.reduce((n, ch) => n + ch.words, 0);
-    const want = Math.min(1000, Math.max(450, Math.round((TARGET_WORDS - sofar) / (CHAPTERS - i))));
+  /** @param {number} i */
+  const writePart = async (i) => {
+    // Each part's length follows what is left, so a long part is balanced by shorter ones after it; parts written at once share the target evenly.
+    const sofar = chapters.reduce((n, ch) => n + (ch?.words ?? 0), 0);
+    const want = state.lanes ? Math.round(TARGET_WORDS / CHAPTERS) : Math.min(1000, Math.max(450, Math.round((TARGET_WORDS - sofar) / (CHAPTERS - i))));
     const plan = outline.map((p, k) => `${k + 1}. ${p.title}: ${p.beat}${k === i ? "   <- THIS PART" : ""}`).join("\n");
-    const before = chapters.at(-1)?.text.slice(-700) ?? "";
+    const before = state.lanes ? "" : chapters.at(-1)?.text.slice(-700) ?? "";
     const job = i === 0 ? "Open cold on the most dramatic documented moment, then ask the central question in plain words within the first minute." : i === CHAPTERS - 1 ? "Answer the central question plainly, show what the investigations found and what engineers changed, and end on a quiet, memorable last line." : "Continue the story from where the last part ended; add new facts only, never repeat earlier parts; end with a question or a turn that makes the viewer want the next part.";
     const prompt = `SOURCE:\n${sources[i]}\n\nTHE FILM'S PLAN:\n${plan}\n\n${before ? `The previous part ended with:\n...${before}\n\n` : ""}Write part ${i + 1} of ${CHAPTERS} now: ${want} words (between ${want - 60} and ${want + 60}; never more than ${want + 100}). ${job}`;
     const r = await brainCall(o.c, { system, prompt, maxTokens: Math.round(want * 1.9) + 300 }, state);
@@ -259,14 +354,19 @@ export async function writeScript(o) {
       text = `${text}\n\n${cleanNarration(trimToSentence(more.text, more.stopReason))}`;
     }
     // The fact pass: the brain lists the part's sentences its own source does not support; they are cut.
-    const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 4000, prompt: `SOURCE:\n${sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, state);
+    const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 1500, prompt: `SOURCE:\n${sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, state);
     const cut = cutSentences(text, flagged.text);
     factChanges += cut.removed.length;
     unsupported.push(...cut.removed);
     text = cut.text;
-    chapters.push({ title: outline[i].title, beat: outline[i].beat, text, words: wordCount(text) });
+    chapters[i] = { title: outline[i].title, beat: outline[i].beat, text, words: wordCount(text) };
     log(`part ${i + 1}/${CHAPTERS}: ${wordCount(text)} words (${r.model})`);
-  }
+  };
+  if (state.lanes) {
+    // Three models, three minutes: the parts are written at once (each from the film's plan and its own source).
+    const queue = Array.from({ length: CHAPTERS }, (_, i) => i);
+    await Promise.all(Array.from({ length: Math.min(state.lanes.models.length, CHAPTERS) }, async () => { for (let i = queue.shift(); i !== undefined; i = queue.shift()) await writePart(i); }));
+  } else for (let i = 0; i < CHAPTERS; i += 1) await writePart(i);
   mkdirSync(o.out, { recursive: true });
   const critic = o.critic === false ? null : await storyCritic({ ...o, log, chapters, sources, whole: sections.map((s) => s.text).join("\n\n"), system, state });
   const words = chapters.reduce((n, ch) => n + ch.words, 0);
@@ -275,6 +375,9 @@ export async function writeScript(o) {
   writeFileSync(join(o.out, "script.md"), `# ${script.title}\n\n${chapters.map((ch) => ch.text).join("\n\n")}\n`);
   return script;
 }
+
+/** Findings code can repair itself by dropping a sentence. */
+const FIXABLE = new Set(["critique.inventedNumber", "critique.repetition", "critique.logic", "critique.filler", "critique.unsourcedName", "critique.unsourcedPlace", "critique.noQuestion"]);
 
 /** Findings about the chain of an act, which a brain may rescue by quoting the sentence code missed. */
 const CHAIN = new Set(["critique.noWhy", "critique.noEvent", "critique.noConsequence", "critique.unanswered"]);
@@ -295,13 +398,18 @@ async function storyCritic(o) {
     const acts = o.chapters.map((ch, i) => ({ id: `C${i + 1}`, text: ch.text }));
     const base = { acts, sources: [o.whole], question: o.topic.question, title: o.topic.title };
     let review = critiqueScript(base);
+    /** @type {import("../engine/src/story-critic.mjs").BrainRead | undefined} */
+    let brainRead;
     const weak = [...new Set(review.findings.filter((f) => CHAIN.has(f.code) && f.chapter).map((f) => /** @type {string} */ (f.chapter)))];
     if (weak.length) {
       /** @type {import("../engine/src/story-critic.mjs").BrainRead} */
       const brain = { chapters: [], answer: null };
-      for (const id of weak) {
+      brainRead = brain;
+      const reads = await Promise.all(weak.map(async (id) => {
         const p = brainPrompt(acts.filter((a) => a.id === id), id === acts.at(-1)?.id ? o.topic.question : null);
-        const read = parseBrainRead((await brainCall(o.c, { system: p.system, prompt: p.prompt, maxTokens: 1500 }, o.state)).text);
+        return { id, read: parseBrainRead((await brainCall(o.c, { system: p.system, prompt: p.prompt, maxTokens: 1500 }, o.state)).text) };
+      }));
+      for (const { id, read } of reads) {
         if (!read) continue;
         brain.chapters.push(...read.chapters.map((c) => ({ ...c, chapter: id })));
         if (read.answer) brain.answer = read.answer;
@@ -310,6 +418,26 @@ async function storyCritic(o) {
     }
     rounds.push({ round, ok: review.ok, brainRead: weak, findings: review.findings.map((f) => ({ code: f.code, severity: f.severity, chapter: f.chapter, message: f.message, items: f.items })), stats: review.stats });
     const codes = [...new Set(review.findings.map((f) => f.code.replace("critique.", "")))].join(", ");
+    // Never stop a film for a fixable line: when only an invented number or a repeat is left (or the rewrites
+    // are used up), code drops those sentences itself; it refuses only when more than a tenth of the words would go.
+    if (!review.ok && (round >= max || review.findings.every((f) => FIXABLE.has(f.code)))) {
+      // The film's own central question (the topic's, written from the source) opens the film when the writers left it out.
+      const asked = review.findings.some((f) => f.code === "critique.noQuestion") && acts.length ? o.topic.question : "";
+      const withQuestion = asked ? acts.map((a, i) => (i === 0 ? { ...a, text: ((p) => [p[0], asked, ...p.slice(1)].join("\n\n"))(a.text.split(/\n{2,}/)) } : a)) : acts;
+      const fx = repairScript(withQuestion, { sources: [o.whole], title: o.topic.title, brain: brainRead ?? null });
+      if (asked && fx.ok) fx.removed = fx.removed.filter((r) => r.sentence !== asked);
+      if (fx.ok && (fx.removed.length || asked)) {
+        const again = critiqueScript({ ...base, acts: fx.acts, ...(brainRead ? { brain: brainRead } : {}) });
+        if (again.ok) {
+          fx.acts.forEach((a, i) => { o.chapters[i] = { ...o.chapters[i], text: a.text, words: wordCount(a.text) }; });
+          rounds.push({ round, repaired: true, share: Math.round(fx.share * 1000) / 10, removed: fx.removed.map((r) => ({ act: r.act, why: r.why, sentence: r.sentence.slice(0, 200) })), ok: true });
+          save(true);
+          o.log(`story critic: ${fx.removed.length} sentence(s) dropped by code (${["number", "repeat", "logic", "filler", "name"].map((w) => `${fx.removed.filter((r) => r.why === w).length} ${w}`).join(", ")}), ${(fx.share * 100).toFixed(1)}% of the words; the script passes.`);
+          return { summary: { ok: true, rounds: round + 1, repaired: fx.removed.length } };
+        }
+        o.log(`story critic: dropping ${fx.removed.length} sentence(s) was not enough (${again.findings.map((f) => f.code.replace("critique.", "")).join(", ")} remain).`);
+      } else if (!fx.ok) o.log(`story critic: a repair would take ${(fx.share * 100).toFixed(1)}% of the words (over ${REPAIR_MAX_SHARE * 100}%); it is not a fixable script.`);
+    }
     if (review.ok) {
       save(true);
       o.log(msg("critique.passed", { round }).en);
@@ -322,15 +450,15 @@ async function storyCritic(o) {
     }
     const notes = rewriteNotes(review.findings, acts);
     o.log(msg("critique.rewrite", { count: notes.size, round: round + 1, max, codes }).en);
-    for (const [id, list] of notes) {
+    await Promise.all([...notes].map(async ([id, list]) => {
       const i = Number(id.slice(1)) - 1;
       const ch = o.chapters[i];
       const r = await brainCall(o.c, { system: o.system, maxTokens: Math.round(ch.words * 1.9) + 300, prompt: `SOURCE:\n${o.sources[i]}\n\nTHIS IS PART ${i + 1} OF ${o.chapters.length}:\n${ch.text}\n\nA story editor sent this part back. Fix every point below; keep everything else that was right and keep about ${ch.words} words. Use only facts the SOURCE states.\n- ${list.join("\n- ")}\n\nAnswer with the whole rewritten part only.` }, o.state);
       let text = cleanNarration(trimToSentence(r.text, r.stopReason));
-      const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 4000, prompt: `SOURCE:\n${o.sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, o.state);
+      const flagged = await brainCall(o.c, { system: FACT_SYSTEM, maxTokens: 1500, prompt: `SOURCE:\n${o.sources[i]}\n\nNARRATION:\n${text}\n\nList every sentence of the NARRATION that states something the SOURCE does not support: an event, death, injury, time, number, name or cause the SOURCE does not give, or that contradicts it. Copy each such sentence exactly, one per line. If every sentence is supported, answer NONE.` }, o.state);
       text = cutSentences(text, flagged.text).text;
       o.chapters[i] = { ...ch, text, words: wordCount(text) };
-    }
+    }));
   }
 }
 

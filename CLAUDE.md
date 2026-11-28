@@ -32,6 +32,12 @@ production. Never force-push, reset or delete branches; on a real conflict with 
 3. Quote file and line for claims, or say "my opinion". Never assume a free tier works (Gemini's does not on his account).
 
 ## Save tokens (the owner pays for every token)
+- Owner's order, 27 Nov 2026 (weekly plan ran hot): coding goes to freebuff first (free; task pack:
+  docs/missions/NEXT_TASKS.md and the Boss's copy-ready list). At most ONE Claude worker at a time, on
+  sonnet, reporting once. The Boss reviews and merges; it writes no code a worker or freebuff can write.
+- Every turn re-reads the whole chat: the Boss uses no send_later check-ins (wait for the worker's report),
+  replies in 10 lines or fewer, and asks the owner to type /compact when the chat passes ~200k tokens
+  (same chat, no new session).
 - Do NOT explore the repo or re-audit it. The state is in two files; read only
   the section you need: `docs/ENGINEERING_STATE.md` (state, next work in order),
   `docs/ARCHITECTURE.md` (devices, jobs, Bossism, failure handling).

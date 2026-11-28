@@ -96,7 +96,7 @@ export function relevant(phrase, words) {
  * band) are added to `o.doubts` when given.
  * @param {MediaResult} r @param {{ seconds: number, level: import("./quran-director.mjs").AdabLevel, used: Set<string>, query?: string, doubts?: string[] }} o
  * @param {{ verify?: (c: any) => Promise<boolean> | boolean, inspect?: Inspect }} [checks]
- * @typedef {(r: MediaResult, query?: string) => Promise<string | { warn: string[] } | null> | string | { warn: string[] } | null} Inspect
+ * @typedef {(r: MediaResult, query?: string, seconds?: number) => Promise<string | { warn: string[] } | null> | string | { warn: string[] } | null} Inspect
  *   a refusal reason, doubts (the picture may be right; a person decides), or null (clean)
  */
 export async function rejectWhy(r, o, checks = {}) {
@@ -125,7 +125,7 @@ export async function rejectWhy(r, o, checks = {}) {
   }
   // The second net: a frame check (faces, people), where the machine has a detector.
   if (checks.inspect) {
-    const seen = await checks.inspect(r, o.query);
+    const seen = await checks.inspect(r, o.query, o.seconds);
     if (typeof seen === "string") return seen.includes(":") ? seen : "detector: " + seen;
     if (seen?.warn?.length) o.doubts?.push(...seen.warn);
   }
@@ -178,6 +178,9 @@ export async function findQuranMedia(o) {
     /** @type {{ r: MediaResult, kind: "video" | "image", q: string, rung: any, doubts: string[] } | null} */
     let doubtful = null;
     let looked = 0;
+    // The strongest candidate the pixel test called empty: held, with a WARNING, only if nothing better is found (never a card).
+    /** @type {{ r: MediaResult, kind: "video" | "image", q: string, rung: any, score: number, why: string } | null} */
+    let nearest = null;
     search: for (const { q, rung } of ladder) {
       for (const kind of /** @type {const} */ (["video", "image"])) {
         for (const p of providers.filter((x) => x.kinds.includes(kind))) {
@@ -187,6 +190,8 @@ export async function findQuranMedia(o) {
               /** @type {string[]} */
               const doubts = [];
               const why = await rejectWhy(r, { seconds, level, used, query: q, doubts }, { verify: o.verify, inspect: o.inspect });
+              const miss = /^quality: empty stretch .*brightness ([\d.]+), detail ([\d.]+)/.exec(why ?? "");
+              if (miss && why) { const score = Number(miss[2]) + Number(miss[1]) / 255; if (!nearest || score > nearest.score) nearest = { r, kind, q, rung, score, why }; }
               if (why) { if (sm.rejected.length < 60 && !sm.rejected.some((x) => x.id === r.id)) sm.rejected.push({ id: r.id, why }); continue; }
               if (doubtful) looked += 1;
               if (doubts.length) {
@@ -209,6 +214,11 @@ export async function findQuranMedia(o) {
       used.add(doubtful.r.id);
       Object.assign(sm, { status: "found", kind: doubtful.kind, query: doubtful.q, rung: doubtful.rung, asset: toAsset(doubtful.r), check: "WARNING", doubts: doubtful.doubts });
       o.log?.(`${s.id}: only a doubtful picture (${doubtful.doubts.join("; ")}); marked WARNING for review`);
+    }
+    if (nearest && sm.status === "gap") {
+      used.add(nearest.r.id);
+      Object.assign(sm, { status: "found", kind: nearest.kind, query: nearest.q, rung: nearest.rung, asset: toAsset(nearest.r), check: "WARNING", doubts: [`held: every candidate left measured as an empty stretch; the strongest (${nearest.why})`] });
+      o.log?.(`${s.id}: no candidate passed the pixel test; the strongest is held, marked WARNING for review`);
     }
     out.push(sm);
   }

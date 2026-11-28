@@ -44,17 +44,29 @@ export function planTighten({ spans, totalSeconds, kind }) {
     if (totalSeconds - last.end > rule.edgeMax) cuts.push({ from: r3(last.end + rule.edgeKeep), to: r3(totalSeconds), seconds: r3(totalSeconds - last.end - rule.edgeKeep), gap: r3(totalSeconds - last.end), at: "end" });
   }
   const removed = r3(cuts.reduce((a, c) => a + c.seconds, 0));
-  /** Old time to new time; a time inside a cut lands where the cut closes. @param {number} t */
-  const map = (t) => {
+  return { kind, rule, cuts, removedSeconds: removed, newSeconds: r3(totalSeconds - removed), map: cutMap(cuts) };
+}
+
+/**
+ * Old time to new time for a list of cuts (any cuts, not only tighten's): a
+ * time inside a cut lands where the cut closes. Shared with the retake cuts of
+ * quran-retakes.mjs, so both kinds of cut move word times the same way.
+ * @param {{ from: number, to: number }[]} cuts
+ * @returns {(t: number) => number}
+ */
+export function cutMap(cuts) {
+  const list = [...cuts].sort((a, b) => a.from - b.from);
+  /** @param {number} t */
+  return (t) => {
     let shift = 0;
-    for (const c of cuts) {
-      if (t >= c.to) shift += c.seconds;
+    for (const c of list) {
+      const seconds = c.to - c.from;
+      if (t >= c.to) shift += seconds;
       else if (t > c.from) return r3(c.from - shift);
       else break;
     }
     return r3(t - shift);
   };
-  return { kind, rule, cuts, removedSeconds: removed, newSeconds: r3(totalSeconds - removed), map };
 }
 
 /**

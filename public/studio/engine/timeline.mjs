@@ -204,6 +204,17 @@ export function captionsFromWords(words, maxChars = 42) {
 }
 
 /**
+ * Captions for a recording that is the whole narration (voice films): the voice's own word times, each caption held
+ * through the pause after it (to the next caption, the last to `total`) as script films hold theirs. Without the hold
+ * every pause between sentences read as speech with no caption (13% of a 38 s film).
+ * @param {TimedWord[]} words @param {number} total the film's length in seconds
+ * @returns {Caption[]}
+ */
+export function captionsForVoice(words, total) {
+  return holdCaptions(captionsFromWords(words), total);
+}
+
+/**
  * Split narration into caption lines of at most maxChars, timed by length
  * (each word gets a share of its line by its length).
  * @param {string} text @param {number} start @param {number} end @param {number} [maxChars]

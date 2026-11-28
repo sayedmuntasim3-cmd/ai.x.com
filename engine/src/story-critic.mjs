@@ -143,6 +143,25 @@ export function spokenValue(run) {
 }
 
 /**
+ * A clock time said in words: an hour of one to twelve, then minutes of ten to fifty-nine ("one thirty",
+ * "eleven forty-five"). Eleven and twelve need a sign that it is a clock (a.m., p.m., o'clock, "in the
+ * morning"), because "twelve fifty" could also be a year. Returns null for anything else.
+ * @param {string[]} ws @param {string} after the text right after the run
+ * @returns {{ hour: number, minute: number } | null}
+ */
+export function clockTime(ws, after = "") {
+  if (ws.length < 2 || ws.length > 3 || !(ws[0] in UNITS)) return null;
+  const hour = UNITS[/** @type {keyof typeof UNITS} */ (ws[0])];
+  if (!(hour >= 1 && hour <= 12)) return null;
+  const rest = ws.slice(1);
+  if (rest.some((w) => w === "hundred" || w in SCALES || w === "and" || w === "point")) return null;
+  const minute = rest.reduce((n, w) => n + (w in UNITS ? UNITS[/** @type {keyof typeof UNITS} */ (w)] : w in TENS ? TENS[/** @type {keyof typeof TENS} */ (w)] : NaN), 0);
+  if (!(minute >= 10 && minute <= 59)) return null;
+  if (hour >= 11 && !/^\s*(?:[ap]\.?\s?m\b|o'clock|in the (?:morning|evening|afternoon))/i.test(after)) return null;
+  return { hour, minute };
+}
+
+/**
  * The numbers a text states, with the words before each (to see "about").
  * Digits ("1,940", "4.5", "1940s") and spoken runs; ordinals count as their value.
  * @param {string} text
@@ -162,7 +181,15 @@ export function numbersIn(text) {
     while (run.length && (run.at(-1)?.[0] === "point")) run.pop();
     if (run.length) {
       const first = /** @type {number} */ (run[0].index);
-      out.push({ value: spokenValue(run.map((x) => x[0])), said: run.map((x) => x[0]).join(" "), before: t.slice(Math.max(0, first - 30), first) });
+      const ws = run.map((x) => x[0]);
+      const last = run.at(-1);
+      const after = t.slice((last?.index ?? 0) + String(last?.[0]).length, (last?.index ?? 0) + String(last?.[0]).length + 24);
+      const clock = clockTime(ws, after);
+      if (clock) {
+        // "One thirty a.m." is the clock time 1:30 the source writes as digits: two numbers, never thirty-one.
+        out.push({ value: clock.hour, said: ws[0], before: t.slice(Math.max(0, first - 30), first) });
+        out.push({ value: clock.minute, said: ws.slice(1).join(" "), before: `${ws[0]} ` });
+      } else out.push({ value: spokenValue(ws), said: ws.join(" "), before: t.slice(Math.max(0, first - 30), first) });
     }
     run = [];
   };
@@ -257,19 +284,21 @@ function answered(acts, question) {
  * @param {Act[]} acts
  */
 export function repeatedPassages(acts) {
-  /** @type {{ w: string, act: string }[]} */
+  /** @type {{ w: string, act: string, name: boolean }[]} */
   const seq = [];
   for (const a of acts) for (const s of sentencesOf(a.text)) {
-    if (/\?["”’]?$/.test(s)) { seq.push({ w: "\u0000", act: a.id }); continue; }
-    for (const w of words(s)) seq.push({ w, act: a.id });
+    if (/\?["”’]?$/.test(s)) { seq.push({ w: "\u0000", act: a.id, name: false }); continue; }
+    for (const t of capsOf(s)) seq.push({ w: t.w, act: a.id, name: t.name });
   }
   const n = CRITIC_LIMITS.ngram;
   /** @type {Map<string, number[]>} */
   const at = new Map();
   for (let i = 0; i + n <= seq.length; i += 1) {
-    const g = seq.slice(i, i + n).map((x) => x.w);
-    if (g.includes("\u0000")) continue;
-    const k = g.join(" ");
+    const g = seq.slice(i, i + n);
+    if (g.some((x) => x.w === "\u0000")) continue;
+    // An official name said again ("the Board of Water and Power Commissioners") is a name, not padding.
+    if (isNameSpan(g)) continue;
+    const k = g.map((x) => x.w).join(" ");
     if (!at.has(k)) at.set(k, []);
     /** @type {number[]} */ (at.get(k)).push(i);
   }
@@ -286,6 +315,84 @@ export function repeatedPassages(acts) {
     out.push({ text: seq.slice(begin, begin + len).map((x) => x.w).join(" "), words: len, act: seq[begin].act });
   }
   return out;
+}
+
+/** Small words inside an official name ("Board of Water and Power Commissioners"). */
+const NAME_JOINERS = new Set(["of", "and", "the", "for", "de", "del", "la", "du", "von", "van", "on", "at", "in", "to", "&"]);
+
+/**
+ * A sentence's words, lowercased as `words` makes them, each with whether it was written with a capital
+ * and whether it sits inside a proper name (a run of capitalised words with small joiners, three capitals or more).
+ * Tokens match `words(s)` one for one.
+ * @param {string} s
+ * @returns {{ w: string, cap: boolean, first: boolean, name: boolean }[]}
+ */
+function capsOf(s) {
+  const raw = String(s).replace(/[’‘]/g, "'").replace(/[‐-―-]/g, " ").replace(/[^A-Za-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const low = words(s);
+  const toks = low.map((w, i) => ({ w, cap: /^[A-Z]/.test(raw[i] ?? ""), first: i === 0, name: false }));
+  for (let i = 0; i < toks.length;) {
+    if (!toks[i].cap) { i += 1; continue; }
+    let j = i;
+    let capCount = 0;
+    while (j < toks.length && (toks[j].cap || (NAME_JOINERS.has(toks[j].w) && toks[j + 1]?.cap))) { if (toks[j].cap) capCount += 1; j += 1; }
+    if (capCount >= 3) for (let k = i; k < j; k += 1) toks[k].name = true;
+    i = j;
+  }
+  return toks;
+}
+
+/**
+ * A span dominated by a proper name: four or more of its words sit inside one (the few common words
+ * around it are not a passage worth cutting).
+ * @param {{ name?: boolean }[]} g
+ */
+function isNameSpan(g) {
+  return g.filter((x) => x.name).length >= 4;
+}
+
+/**
+ * Capitalised words inside a sentence that no source has: names, and common places, each with its sentence.
+ * @param {string} text @param {{ nsource: string, title: Set<string> }} ctx
+ * @returns {{ name: string, place: boolean, sentence: string }[]}
+ */
+export function unsourcedNamesIn(text, ctx) {
+  /** @type {{ name: string, place: boolean, sentence: string }[]} */
+  const out = [];
+  for (const s of sentencesOf(text)) {
+    const ws = s.replace(/["“”‘’]/g, " ").split(/\s+/).filter(Boolean);
+    ws.forEach((w, i) => {
+      const bare = w.replace(/^[^A-Za-z]+|[^A-Za-z.]+$/g, "").replace(/\.$/, "").replace(/'s$/, "");
+      if (i === 0 || !/^[A-Z][A-Za-z.'-]+$/.test(bare)) return;
+      const k = bare.toLowerCase();
+      if (COMMON_PROPER.has(k) || ctx.title.has(k) || ctx.nsource.includes(` ${normalize(bare)} `)) return;
+      out.push({ name: bare, place: GEOGRAPHY.has(k), sentence: s });
+    });
+  }
+  return out;
+}
+
+/**
+ * The numbers a text states that no source does, each with its sentence.
+ * @param {string} text @param {{ known: number[], knownSet: Set<number> }} ctx
+ * @returns {{ said: string, sentence: string }[]}
+ */
+export function inventedNumbersIn(text, ctx) {
+  const { known, knownSet } = ctx;
+  /** @type {{ said: string, sentence: string }[]} */
+  const bad = [];
+  for (const s of sentencesOf(text)) for (const n of numbersIn(s)) {
+    if (!checkable(n) || knownSet.has(n.value)) continue;
+    // A lone scale word ("the billion") points back at a number; it states no new one.
+    if (n.said in { thousand: 1, million: 1, billion: 1, trillion: 1 }) continue;
+    // "Nineteen eighty-nine or ninety-one": a year said short, next to a full year.
+    if (n.value < 100 && !/\d/.test(n.said) && numbersIn(s).some((y) => y.value >= 1000 && y.value < 2100) && (knownSet.has(1900 + n.value) || knownSet.has(2000 + n.value))) continue;
+    // "The sixties" is a decade: the sources say 1960s.
+    if (/ies$/.test(n.said) && n.value < 100 && (knownSet.has(1900 + n.value) || knownSet.has(1800 + n.value))) continue;
+    if (HEDGED_NUMBER.test(n.before) && known.some((k) => k && Math.abs(k - n.value) / Math.abs(k) <= CRITIC_LIMITS.approx)) continue;
+    bad.push({ said: n.said, sentence: s });
+  }
+  return bad;
 }
 
 /**
@@ -412,32 +519,12 @@ export function critiqueScript(o) {
       const invented = quotes.filter((q) => !nsource.includes(` ${normalize(q)} `));
       if (invented.length) add("critique.inventedQuote", "block", a.id, invented.map((q) => `"${q.slice(0, 120)}"`), `These quotes in act ${a.id} are not in any source, word for word: ${invented.map((q) => `"${q.slice(0, 100)}"`).join("; ")}. Never put words in anyone's mouth: report only what the SOURCE records, in your own words and without quotation marks.`);
       // Numbers: each one the act states is in the sources (a hedged "about forty" may round a source number).
-      const bad = [];
-      for (const s of sentencesOf(a.text)) for (const n of numbersIn(s)) {
-        if (!checkable(n) || knownSet.has(n.value)) continue;
-        // A lone scale word ("the billion") points back at a number; it states no new one.
-        if (n.said in { thousand: 1, million: 1, billion: 1, trillion: 1 }) continue;
-        // "Nineteen eighty-nine or ninety-one": a year said short, next to a full year.
-        if (n.value < 100 && !/\d/.test(n.said) && numbersIn(s).some((y) => y.value >= 1000 && y.value < 2100) && (knownSet.has(1900 + n.value) || knownSet.has(2000 + n.value))) continue;
-        // "The sixties" is a decade: the sources say 1960s.
-        if (/ies$/.test(n.said) && n.value < 100 && (knownSet.has(1900 + n.value) || knownSet.has(1800 + n.value))) continue;
-        if (HEDGED_NUMBER.test(n.before) && known.some((k) => k && Math.abs(k - n.value) / Math.abs(k) <= CRITIC_LIMITS.approx)) continue;
-        bad.push(`${n.said} ("${s.slice(0, 90)}")`);
-      }
+      const bad = inventedNumbersIn(a.text, { known, knownSet }).map((f) => `${f.said} ("${f.sentence.slice(0, 90)}")`);
       if (bad.length) add("critique.inventedNumber", "block", a.id, bad, `These numbers in act ${a.id} are not in the sources: ${bad.slice(0, 8).join("; ")}. Use only numbers the SOURCE gives, or cut the sentence.`);
       // Names: capitalised words inside a sentence that no source has.
-      const unknown = new Set();
-      const places = new Set();
-      for (const s of sentencesOf(a.text)) {
-        const ws = s.replace(/["“”‘’]/g, " ").split(/\s+/).filter(Boolean);
-        ws.forEach((w, i) => {
-          const bare = w.replace(/^[^A-Za-z]+|[^A-Za-z.]+$/g, "").replace(/\.$/, "").replace(/'s$/, "");
-          if (i === 0 || !/^[A-Z][A-Za-z.'-]+$/.test(bare)) return;
-          const k = bare.toLowerCase();
-          if (COMMON_PROPER.has(k) || title.has(k) || nsource.includes(` ${normalize(bare)} `)) return;
-          (GEOGRAPHY.has(k) ? places : unknown).add(bare);
-        });
-      }
+      const found = unsourcedNamesIn(a.text, { nsource, title });
+      const unknown = new Set(found.filter((f) => !f.place).map((f) => f.name));
+      const places = new Set(found.filter((f) => f.place).map((f) => f.name));
       if (unknown.size) add("critique.unsourcedName", "block", a.id, [...unknown], `These names in act ${a.id} are in no source: ${[...unknown].slice(0, 10).join(", ")}. Name only people, firms, places and things the SOURCE names.`);
       if (places.size) add("critique.unsourcedPlace", "revise", a.id, [...places], `These places in act ${a.id} are common geography but in no source: ${[...places].slice(0, 10).join(", ")}. Keep a place only where the SOURCE supports it.`);
     }
@@ -483,4 +570,57 @@ export function rewriteNotes(findings, acts) {
     /** @type {string[]} */ (out.get(id)).push(f.note);
   }
   return out;
+}
+
+/** The most a deterministic repair may take out of a script before it counts as a failed script. */
+export const REPAIR_MAX_SHARE = 0.1;
+
+/**
+ * Never stop a film for a fixable line. After the rewrite rounds, code does the rest: a sentence that holds a
+ * number no source has is dropped; the second copy of a repeated passage of eight words or more is dropped
+ * (official names are not repeats); a sentence the story editor (the brain read) named as a logic gap is dropped;
+ * a sentence holding a cliche or a hedge is dropped. Questions are never dropped. If more than a tenth of the
+ * words would go, nothing is changed and `ok` is false: that script is bad, not fixable.
+ * @param {Act[]} acts @param {{ sources: string[], title?: string, brain?: BrainRead | null }} o
+ * @returns {{ ok: boolean, acts: Act[], removed: { act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" | "name" }[], share: number }}
+ */
+export function repairScript(acts, o) {
+  const source = o.sources.join("\n\n");
+  const known = numbersIn(source).map((n) => n.value);
+  const ctx = { known, knownSet: new Set(known) };
+  const nsource = ` ${normalize(source)} `;
+  const title = new Set(words(o.title ?? ""));
+  const n = CRITIC_LIMITS.ngram;
+  /** @type {{ act: string, sentence: string, why: "number" | "repeat" | "logic" | "filler" | "name" }[]} */
+  const removed = [];
+  /** @type {Set<string>} */
+  const seen = new Set();
+  const total = acts.reduce((t, a) => t + words(a.text).length, 0);
+  const fixed = acts.map((a) => {
+    // Sentences are kept or dropped one by one; a paragraph break stays where a sentence before it was kept.
+    const paragraphs = String(a.text).split(/\n{2,}/).map((p) => sentencesOf(p).filter((s) => {
+      const isQuestion = /\?["”’]?$/.test(s);
+      if (!isQuestion && inventedNumbersIn(s, ctx).length) { removed.push({ act: a.id, sentence: s, why: "number" }); return false; }
+      if (isQuestion) return true;
+      if (unsourcedNamesIn(s, { nsource, title }).length) { removed.push({ act: a.id, sentence: s, why: "name" }); return false; }
+      const gaps = (o.brain?.chapters ?? []).filter((c) => String(c.chapter) === String(a.id)).flatMap((c) => c.gaps ?? []);
+      if (gaps.some((g) => g?.problem && g?.sentence && normalize(s).includes(normalize(g.sentence)))) { removed.push({ act: a.id, sentence: s, why: "logic" }); return false; }
+      if (phrasesIn(s, CLICHES).length || phrasesIn(s, HEDGES).length) { removed.push({ act: a.id, sentence: s, why: "filler" }); return false; }
+      const toks = capsOf(s);
+      /** @type {string[]} */
+      const grams = [];
+      for (let i = 0; i + n <= toks.length; i += 1) {
+        const g = toks.slice(i, i + n);
+        if (!isNameSpan(g)) grams.push(g.map((x) => x.w).join(" "));
+      }
+      if (grams.some((g) => seen.has(g))) { removed.push({ act: a.id, sentence: s, why: "repeat" }); return false; }
+      for (const g of grams) seen.add(g);
+      return true;
+    }).join(" ")).filter(Boolean);
+    return { ...a, text: paragraphs.join("\n\n") };
+  });
+  const gone = removed.reduce((t, r) => t + words(r.sentence).length, 0);
+  const share = total ? gone / total : 0;
+  if (share > REPAIR_MAX_SHARE) return { ok: false, acts, removed: [], share };
+  return { ok: true, acts: fixed, removed, share };
 }

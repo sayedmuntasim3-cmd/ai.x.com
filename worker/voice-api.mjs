@@ -379,13 +379,13 @@ export async function handleVoice(request, env, url, deps = {}) {
     // Groq only: Gemini's 20 requests a day are gone long before a 40-minute film is planned, and a call sent there
     // after Groq's busy minute came back as "daily limit used up" and stopped the film's brain (film ccd86532).
     if (!env.GROQ_API_KEY || String(env.GROQ ?? "").toLowerCase() === "off") return json({ error: "The free brain (Groq, the GROQ_API_KEY secret) is not set." }, 503);
-    const groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-    // The runner names the model it is pacing (render/voice-runner.mjs workerBrain). This route makes one
-    // attempt on one model and never sleeps: a Worker forgets the previous request, so the minute's budget
-    // and the retries live with the runner, which hands back the wait in Retry-After.
-    const asked = String(/** @type {any} */ (body)?.model ?? "").trim();
-    const pinned = GROQ_MODELS.includes(asked);
-    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(pinned ? { models: [asked] } : groqModels.length ? { models: groqModels } : {}), retries: 1, pace: false, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
+    const allowed = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    // The runner names the model it is pacing (render/voice-runner.mjs workerBrain), so each model keeps its own
+    // minute. This route makes one attempt on one model and never sleeps: a Worker forgets the previous request,
+    // so the minute's budget and the retries live with the runner, which hands the wait back in Retry-After.
+    const named = String(/** @type {any} */ (body)?.model ?? "").trim();
+    const pinned = named && (allowed.length ? allowed : [...GROQ_MODELS]).includes(named) ? [named] : allowed;
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(pinned.length ? { models: pinned } : {}), retries: 1, pace: false, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
     const tokens = promptTokens(groqMessages(req));
     // Too big for Groq's minute: the runner splits its batch and asks again (413, never another brain).
     if (tokens > GROQ_PROMPT_LIMIT) return json({ error: `The prompt is about ${tokens} tokens; the free brain takes ${GROQ_PROMPT_LIMIT}. Split it.`, tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);

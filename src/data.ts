@@ -210,7 +210,7 @@ export function planChapters(totalSeconds: number): Chapter[] {
  * Measured 20 Nov 2026: a 1080p render takes about 0.6 runner minutes per film minute on a
  * 2-core GitHub runner, and the free brains cost $0, so the minute is the honest unit.
  */
-export const CREDIT_NOTE = "1 credit = 1 finished minute · no charge during the private beta";
+export const CREDIT_NOTE = "Free during the private beta";
 
 export function estimateCredits(minutes: number) {
   return Math.max(1, Math.ceil(minutes));

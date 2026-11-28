@@ -4,7 +4,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, pictures, resumeState, runSignature, sliceWords, voiceReport } from "./voice-film.mjs";
+import { AYAH_COUNTS, buildQuranIndex } from "../engine/src/quran.mjs";
+import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, pictures, resumeState, retakeRecording, runSignature, sliceWords, voiceReport } from "./voice-film.mjs";
 
 const ffmpeg = await hasFfmpeg();
 
@@ -123,4 +124,101 @@ test("voice brain: free brains only, Groq first", async () => {
   assert.equal(w.kind, "worker");
   assert.deepEqual(/** @type {any} */ (w.model).capabilities, { vision: false, webSearch: false });
   assert.equal(voiceBrain({ SITE: "https://s", VOICE_ID: "i", VOICE_TICKET: "t", VOICE_SELFTEST: "1" }).model, null);
+});
+
+const quranDir = new URL("../engine/data/quran/", import.meta.url);
+const quranIndex = buildQuranIndex(JSON.parse(readFileSync(new URL("tanzil-quran-simple-1.0.2.json", quranDir), "utf8")));
+
+/** Ad-Duha's words for one ayah, from the shipped Tanzil text. @param {number} ayah */
+function surah93Words(ayah) {
+  let offset = ayah - 1;
+  for (let s = 1; s < 93; s += 1) offset += AYAH_COUNTS[s - 1];
+  const entry = quranIndex.ayat[offset];
+  return quranIndex.words.slice(entry.firstWord, entry.firstWord + entry.wordCount);
+}
+
+test("retakes: a restart in ayah 3 is cut into retakes.wav and listed in retakes.json (ffmpeg)", { skip: !ffmpeg && "ffmpeg not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-retakes-"));
+  const ayat = Array.from({ length: 11 }, (_, k) => surah93Words(k + 1));
+  const r3 = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
+  // He recites ayah 1, ayah 2, then starts ayah 3, stops after three words and starts ayah 3 again.
+  /** @type {{ text: string, start: number, end: number }[]} */
+  const words = [];
+  let at = 0.5;
+  for (const token of [...ayat[0], ...ayat[1], ...ayat[2].slice(0, 3), ...ayat[2], ...ayat.slice(3).flat()]) {
+    words.push({ text: token, start: r3(at), end: r3(at + 0.42) });
+    at += 0.54;
+  }
+  // A tone burst per heard word, so the voice analysis finds the stretches the words claim.
+  const rate = 16000, total = Math.ceil((words[words.length - 1].end + 0.5) * rate);
+  const pcm = new Int16Array(total);
+  words.forEach((w, k) => {
+    const f = 180 + (k % 7) * 35;
+    for (let i = Math.floor(w.start * rate); i < Math.floor(w.end * rate) && i < total; i += 1) {
+      const t = i / rate, fade = Math.min(1, (t - w.start) / 0.02, (w.end - t) / 0.02);
+      pcm[i] = Math.round(0.25 * 32767 * fade * Math.sin(2 * Math.PI * f * t));
+    }
+  });
+  const buf = Buffer.alloc(44 + total * 2);
+  buf.write("RIFF", 0); buf.writeUInt32LE(36 + total * 2, 4); buf.write("WAVE", 8); buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(rate, 24);
+  buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write("data", 36); buf.writeUInt32LE(total * 2, 40);
+  Buffer.from(pcm.buffer).copy(buf, 44);
+  const wav = join(dir, "recitation.wav");
+  writeFileSync(wav, buf);
+
+  const out = join(dir, "out");
+  const step1 = await intake({ audio: wav, out });
+  assert.equal(step1.ok, true);
+  const location = { ok: true, ayat: ayat.map((_, k) => ({ surah: 93, ayah: k + 1 })) };
+  const r = await retakeRecording({ out, analysisWav: /** @type {string} */ (step1.analysisWav), sttWav: /** @type {string} */ (step1.sttWav), words, location, index: quranIndex });
+
+  assert.equal(r.cuts.length, 1);
+  assert.equal(r.cuts[0].reason, "restart");
+  assert.deepEqual(r.cuts[0].words, ayat[2].slice(0, 3));
+  assert.ok(Math.abs(r.removedSeconds - 1.62) < 0.05, String(r.removedSeconds));
+  assert.ok(r.message.en && r.message.bn);
+  const saved = JSON.parse(readFileSync(join(out, "retakes.json"), "utf8"));
+  assert.equal(saved.cuts.length, 1);
+  assert.equal(saved.removedSeconds, r.removedSeconds);
+  assert.equal(saved.confidence, 1);
+  assert.equal(saved.message.code, "quran.retakes");
+  // The cut file is shorter by exactly what the cuts took out, and the original is untouched.
+  const secondsOf = (/** @type {string} */ f) => {
+    const b = readFileSync(f);
+    return b.readUInt32LE(40) / (b.readUInt16LE(22) * (b.readUInt16LE(34) / 8)) / b.readUInt32LE(24);
+  };
+  const file = /** @type {string} */ (r.file);
+  assert.ok(Math.abs(secondsOf(wav) - secondsOf(file) - r.removedSeconds) < 0.01, `${secondsOf(wav)} - ${secondsOf(file)}`);
+});
+
+test("retakes: an unsafe passage is not cut, and the reviewer gets a gap message (ffmpeg)", { skip: !ffmpeg && "ffmpeg not installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-retakes-gap-"));
+  const ayat = Array.from({ length: 11 }, (_, k) => surah93Words(k + 1));
+  // One word of ayah 6 is missing from what was heard: the kept words cannot hold every expected word.
+  const heard = [...ayat.slice(0, 5).flat(), ...ayat[5].slice(1), ...ayat.slice(6).flat()];
+  const r3 = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
+  /** @type {{ text: string, start: number, end: number }[]} */
+  const words = heard.map((text, k) => ({ text, start: r3(0.5 + k * 0.54), end: r3(0.92 + k * 0.54) }));
+  const rate = 16000, total = Math.ceil((words[words.length - 1].end + 0.5) * rate);
+  const pcm = new Int16Array(total);
+  for (const w of words) for (let i = Math.floor(w.start * rate); i < Math.floor(w.end * rate); i += 1) pcm[i] = Math.round(0.25 * 32767 * Math.sin(2 * Math.PI * 200 * (i / rate)));
+  const buf = Buffer.alloc(44 + total * 2);
+  buf.write("RIFF", 0); buf.writeUInt32LE(36 + total * 2, 4); buf.write("WAVE", 8); buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(rate, 24);
+  buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write("data", 36); buf.writeUInt32LE(total * 2, 40);
+  Buffer.from(pcm.buffer).copy(buf, 44);
+  const wav = join(dir, "recitation.wav");
+  writeFileSync(wav, buf);
+
+  const out = join(dir, "out");
+  const step1 = await intake({ audio: wav, out });
+  const location = { ok: true, ayat: ayat.map((_, k) => ({ surah: 93, ayah: k + 1 })) };
+  const r = await retakeRecording({ out, analysisWav: /** @type {string} */ (step1.analysisWav), sttWav: /** @type {string} */ (step1.sttWav), words, location, index: quranIndex });
+  assert.equal(r.file, null);
+  assert.deepEqual(r.cuts, []);
+  assert.equal(r.message.code, "quran.retakesGap");
+  const saved = JSON.parse(readFileSync(join(out, "retakes.json"), "utf8"));
+  assert.deepEqual(saved.cuts, []);
+  assert.equal(saved.message.code, "quran.retakesGap");
 });

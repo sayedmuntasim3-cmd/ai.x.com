@@ -5,6 +5,7 @@
  *        [--surah 93] [--ayat 1-11] [--passage "93, 94:1-8"] [--opening auto|none|basmala|istiadha|both] [--closing auto|none|sadaqa]
  *        [--adab strict|nature|people-distant]
  *        [--script <the words as written, .txt>] [--topic "what the film is about"] [--media] [--tighten on|off]
+ *        [--retakes on|off]
  *        [--marks marks.json]   (Quran: the reviewer's ayah times {start, ends[], by}; they become confirmed ends)
  *        [--eyes]               (with --media: after the plan, every picture shot is searched again from its own sentence,
  *                                OpenCLIP chooses, and the critic's free eyes re-pick any miss; render/asset-rank/rerank.mjs)
@@ -57,7 +58,8 @@ import { workerBrain } from "../render/voice-runner.mjs";
 import { planVoice } from "../engine/src/voice-plan.mjs";
 import { ayahEndsOf } from "../engine/src/voice-master.mjs";
 import { masterFile } from "./voice-master.mjs";
-import { applyTighten, planTighten, remapWords } from "../engine/src/voice-tighten.mjs";
+import { applyTighten, cutMap, planTighten, remapWords } from "../engine/src/voice-tighten.mjs";
+import { planRetakes, snapCuts, wordsOfAyat } from "../engine/src/quran-retakes.mjs";
 import { encodeWav24 } from "../engine/src/wav.mjs";
 import { applyMarks, checkMarks } from "../engine/src/quran-marks.mjs";
 import { checkVoiceChapter } from "../engine/src/voice-scenes.mjs";
@@ -365,6 +367,34 @@ export async function tightenRecording(o) {
 }
 
 /**
+ * Take the failed takes out of a recitation (engine/src/quran-retakes.mjs) into retakes.wav, at the
+ * original rate; the original never changes. A hafiz who stumbles, repeats words to correct himself or
+ * starts an ayah again leaves several attempts: only the last complete take stays. The cuts go through
+ * the same cutter as the long silences (applyTighten), so a join is crossfaded and nobody hears it, and
+ * every edge first snaps to a measured silence so no kept word is opened. Writes retakes.json next to
+ * tighten.json; when the passage cannot be laid out safely, nothing is cut and the reviewer is told.
+ * @param {{ out: string, analysisWav: string, sttWav: string, words: any[], location: any, index: any }} o
+ */
+export async function retakeRecording(o) {
+  const { spans } = await readSpans(o.sttWav);
+  const expected = wordsOfAyat(o.index, o.location?.ayat ?? []);
+  const plan = planRetakes({ words: o.words ?? [], expected });
+  const cuts = snapCuts(plan.cuts, spans);
+  const removed = Math.round(cuts.reduce((n, c) => n + c.seconds, 0) * 1000) / 1000;
+  const message = plan.message.code === "quran.retakes" ? msg("quran.retakes", { count: cuts.length, seconds: removed }) : plan.message;
+  if (!cuts.length) {
+    await writeFile(join(o.out, "retakes.json"), JSON.stringify({ cuts: [], removedSeconds: 0, confidence: plan.confidence, keptOrderOk: plan.keptOrderOk, message }, null, 1));
+    return { file: null, cuts, removedSeconds: removed, confidence: plan.confidence, message };
+  }
+  const bytes = await readFile(o.analysisWav);
+  const wav = decodeWav(/** @type {ArrayBuffer} */ (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)));
+  const file = join(o.out, "retakes.wav");
+  await writeFile(file, Buffer.from(encodeWav24(applyTighten(wav.channels, wav.sampleRate, cuts), wav.sampleRate)));
+  await writeFile(join(o.out, "retakes.json"), JSON.stringify({ cuts, removedSeconds: removed, confidence: plan.confidence, keptOrderOk: plan.keptOrderOk, message }, null, 1));
+  return { file, cuts, removedSeconds: removed, confidence: plan.confidence, message, map: cutMap(cuts) };
+}
+
+/**
  * Run local/stt/transcribe.py on the 16 kHz copy. Python and the engine's
  * package must be installed on this machine (pip install faster-whisper).
  * @param {{ wav: string, out: string, engine: string, model?: string, language?: string, python?: string, clips?: number[] }} o
@@ -659,6 +689,29 @@ async function main() {
     for (const p of step3.problems) console.log("! " + p);
     if (!step3.ok) process.exit(/** @type {any} */ (step3).question ? 3 : 1);
     let understanding = step3;
+    // Retakes: now that the words are timed and the passage is located, the failed takes a hafiz leaves (a
+    // stumble, a restart, a word broken and said again) are cut and only the last complete take stays. The same
+    // cutter joins them; every edge snaps to a measured silence. A recitation only: narration is left alone.
+    if (args.retakes !== "off" && understanding.kind === "quran" && step2.words?.length) {
+      const located = await readFile(join(out, "quran-location.json"), "utf8").then(JSON.parse, () => null);
+      if (located?.ok && located.ayat?.length && step1.analysisWav) {
+        const q = await loadQuran();
+        const r = await retakeRecording({ out, analysisWav: step1.analysisWav, sttWav: /** @type {string} */ (step1.sttWav), words: step2.words, location: located, index: q.index });
+        if (r.cuts.length || r.message.code === "quran.retakesGap") console.log("- " + r.message[lang]);
+        if (r.file && r.map) {
+          voicePath = r.file;
+          // The words of a cut take are gone from the recording, so they leave the word list too (their times are
+          // on the old clock); the rest move onto the cut recording with the tighten clock map.
+          const keptWords = step2.words.filter((/** @type {any} */ w) => !r.cuts.some((/** @type {any} */ c) => w.start >= c.from - 1e-6 && w.start < c.to - 1e-6));
+          step2 = { ...step2, words: remapWords(keptWords, r.map) };
+          await writeFile(join(out, "words.json"), JSON.stringify(step2, null, 1));
+          step1 = await intake({ audio: voicePath, out });
+          if (!step1.ok || !step1.report) process.exit(1);
+          understanding = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (understanding.kind), ...about });
+          if (!understanding.ok) process.exit(/** @type {any} */ (understanding).question ? 3 : 1);
+        }
+      }
+    }
     if (args.master) {
       const kind = step3.kind === "quran" ? "quran" : "narration";
       const m = await master({ audio: voicePath, out, kind, space: typeof args.master === "string" ? args.master : undefined, ayahEnds: kind === "quran" ? ayahEndsOf(/** @type {any} */ (step3).quranPlan) : undefined, lang, log: (line) => console.log(line) });

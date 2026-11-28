@@ -608,7 +608,8 @@ export async function rerankRun(o) {
   const pool = worldQueries(world, topicWords);
   /** @type {Map<any, any[]>} */
   const candidatesOf = new Map();
-  for (const s of shots) {
+  /** @param {any} s */
+  const searchShot = async (s) => {
     const beat = beatAt(beats, s.start, s.end);
     const historic = historicEra(beat?.era || world.era);
     const qs = shotQueries(s, world);
@@ -630,7 +631,10 @@ export async function rerankRun(o) {
     const byId = new Map();
     for (const c of all) if (c?.id && c.previewUrl && !byId.has(c.id)) byId.set(c.id, c);
     candidatesOf.set(s, [...byId.values()]);
-  }
+  };
+  // Shots are searched several at a time (the rate limiter still paces each provider): one after another took an hour on 463 shots.
+  const todoShots = [...shots];
+  await Promise.all(Array.from({ length: Math.max(1, Number(env.ZUPONA_SEARCH_CONCURRENCY) || 8) }, async () => { for (let s = todoShots.shift(); s; s = todoShots.shift()) await searchShot(s); }));
   const searchSeconds = (Date.now() - t0) / 1000;
   const empty = shots.filter((/** @type {any} */ s) => !(candidatesOf.get(s) ?? []).length).length;
   if (empty) log(`Searches: ${empty} shot(s) found no candidate at all (a provider refused or timed out); their plan pick stays.`);
@@ -647,10 +651,17 @@ export async function rerankRun(o) {
 
   const python = o.python ?? env.ZUPONA_RANK_PYTHON ?? env.ZUPONA_PYTHON ?? "python3";
   const dir = await mkdtemp(join(tmpdir(), "asset-rank-"));
-  await writeFile(join(dir, "req.json"), JSON.stringify({ texts, images, cache: env.ZUPONA_RANK_CACHE || undefined }));
+  const budget = Math.max(60, Number(env.ZUPONA_RANK_BUDGET) || 1500);
+  await writeFile(join(dir, "req.json"), JSON.stringify({ texts, images, cache: env.ZUPONA_RANK_CACHE || undefined, budget_seconds: budget }));
   const script = new URL("./rank.py", import.meta.url).pathname;
   const t1 = Date.now();
-  await run(python, [script, "score", join(dir, "req.json"), join(dir, "ans.json")], { maxBuffer: 1 << 26, timeout: 3600_000 });
+  try {
+    await run(python, [script, "score", join(dir, "req.json"), join(dir, "ans.json")], { maxBuffer: 1 << 26, timeout: (budget + 900) * 1000 });
+  } catch (/** @type {any} */ e) {
+    // The first lines of a failed run are only Hugging Face notices; the cause is at the end (film ccd86532 lost it to a 200-character cut).
+    const err = String(e?.stderr ?? "").trim().split("\n").filter((l) => !/unauthenticated|HF_TOKEN|huggingface/i.test(l)).slice(-6).join(" | ");
+    throw new Error(`rank.py ${e?.killed ? `was stopped after ${Math.round((Date.now() - t1) / 1000)} s (${e?.signal ?? "timeout"})` : `exited with code ${e?.code ?? "?"}`}: ${err || "no error text"}`);
+  }
   const ans = await readJson(join(dir, "ans.json"));
   const seeSeconds = (Date.now() - t1) / 1000;
 
@@ -859,6 +870,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const groq = process.env.GROQ_API_KEY && String(process.env.GROQ ?? "").toLowerCase() !== "off" ? String(process.env.GROQ_API_KEY) : "";
   rerankRun({ run: a.run, python: typeof a.python === "string" ? a.python : undefined, sheet: a.sheet === true, brain: groq ? groqModel({ apiKey: groq }) : null, look: groq ? groqLook({ apiKey: groq }) : null, topic: typeof a.topic === "string" ? a.topic : undefined }).catch((e) => {
     // The plan's own picks stay: the film is never stopped by the eyes.
-    console.log(`::warning::The eyes could not rank the pictures (${String(e?.message ?? e).slice(0, 200)}); the plan's picks stay.`);
+    console.log(`::warning::The eyes could not rank the pictures (${String(e?.message ?? e).slice(0, 700)}); the plan's picks stay.`);
   });
 }

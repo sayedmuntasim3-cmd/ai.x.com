@@ -81,6 +81,7 @@ jobs:
     steps:
       - name: Check the inputs
         run: |
+          echo "t0=$(date +%s)" > "$RUNNER_TEMP/film-timing.env"
           echo "::add-mask::$VOICE_TICKET"
           [[ "$VOICE_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::Bad voiceover ID."; exit 1; }
           [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::Bad site."; exit 1; }
@@ -151,6 +152,7 @@ jobs:
           fi
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
+          echo "words=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - name: Keep the picture-ranking model between runs (OpenCLIP, CPU)
         if: inputs.kind == 'narration'
         uses: actions/cache@v4
@@ -174,6 +176,7 @@ jobs:
           else
             echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
           fi
+          echo "pictures=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - name: Quran pictures (adab guard; no living beings, no AI pictures)
         if: inputs.kind == 'quran'
         env:
@@ -197,6 +200,12 @@ jobs:
         run: |
           echo deliver > .stage
           node render/voice-runner.mjs deliver --file out/film.mp4 --seconds "$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 out/film.mp4)" --review --run run
+      - name: Shorts (three vertical cuts of whole ayat; never fails the film)
+        if: inputs.kind == 'quran'
+        continue-on-error: true
+        run: |
+          # 30-55 s each, 9:16, the Arabic ayah and its Pickthall line burned in, the recitation only.
+          node render/shorts.mjs --run run --film out/film.mp4 --kind quran --out shorts 2>&1 | tee shorts.log || echo "::warning::The Shorts could not be made; the film is unaffected."
       - name: Prepare the render (voice, free score); the parts render on 8 runners
         id: prepare
         if: inputs.kind == 'narration'
@@ -210,6 +219,7 @@ jobs:
           mkdir -p music && touch music/.keep
           [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
           echo "args=--run run --one-track $voice --words run/words.json --music music --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
+          echo "prepare=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
       - uses: actions/upload-artifact@v4
         if: inputs.kind == 'narration'
         with:
@@ -221,6 +231,13 @@ jobs:
           retention-days: 1
           include-hidden-files: true
           if-no-files-found: error
+      - name: Minutes per stage (listen and plan, pictures, prepare; the render parts and the join are their own jobs)
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/film-timing.env" ] || exit 0
+          set -a; . "$RUNNER_TEMP/film-timing.env"; set +a
+          mkdir -p run
+          node -e 'const e=process.env,n=(k)=>e[k]?Number(e[k]):null,m=(a,b)=>a!=null&&b!=null?Math.round((b-a)/6)/10:null;const t={listenAndPlan:m(n("t0"),n("words")),pictures:m(n("words"),n("pictures")),prepare:m(n("pictures")??n("words"),n("prepare"))};require("fs").writeFileSync("run/film-timing.json",JSON.stringify(t,null,1));console.log("Minutes per stage: "+JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Tell the studio what stopped it
         if: failure()
         run: |
@@ -238,6 +255,8 @@ jobs:
             voice-film.log
             out/*.json
             out/*.srt
+            shorts/
+            shorts.log
           retention-days: 14
           if-no-files-found: warn
 
@@ -289,6 +308,15 @@ jobs:
         run: |
           echo deliver > .stage
           node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: prep-${{ inputs.voice_id }}
+      - name: Shorts (three vertical cuts of the strongest moments; never fails the film)
+        continue-on-error: true
+        run: |
+          # The picker reads the film's own words (run/words.json) and shot plan (run/shots.json); a Short that fails is
+          # reported in shorts/shorts.json and skipped, and nothing here can stop the film from being delivered.
+          node render/shorts.mjs --run run --film out/film.mp4 --out shorts 2>&1 | tee shorts.log || echo "::warning::The Shorts could not be made; the film is unaffected."
       - name: Teach the craft ledger (this film's critic measures, for the next film)
         run: node render/voice-runner.mjs ledger --report out/film.report.json || echo "::warning::The film is delivered, but the craft ledger could not record it."
       - name: Tell the studio what stopped it
@@ -304,5 +332,7 @@ jobs:
           path: |
             out/*.json
             out/*.srt
+            shorts/
+            shorts.log
           retention-days: 14
           if-no-files-found: warn

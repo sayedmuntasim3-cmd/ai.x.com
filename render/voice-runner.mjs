@@ -99,7 +99,9 @@ export function summarizeRun(dir) {
   const report = read("voice-report.json");
   if (report) out.push({ stage: "intake", params: { minutes: Math.round((report.durationSeconds / 60) * 10) / 10, lufs: Math.round((report.integratedLufs ?? report.lufs ?? 0) * 10) / 10 } });
   const words = read("words.json");
-  if (words) out.push({ stage: "words", params: { count: (words.words ?? []).length } });
+  // A recitation's failed takes (local/voice-film.mjs --retakes) are cut before this: say how many and how long.
+  const retakes = read("retakes.json");
+  if (words) out.push({ stage: "words", params: { count: (words.words ?? []).length, ...(retakes ? { retakes: (retakes.cuts ?? []).length, retakeSeconds: Math.round((retakes.removedSeconds ?? 0) * 10) / 10 } : {}) } });
   const u = read("understanding.json");
   // A recitation's scenes are its ayat (quranPlan.scenes); a narration's are its own scenes.
   if (u) out.push({ stage: "understand", params: { scenes: (u.scenes ?? u.quranPlan?.scenes ?? []).length } });

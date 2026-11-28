@@ -17,6 +17,9 @@ on:
   schedule:
     # 10:23 UTC (5:23 am in New York): the film is ready for the US day.
     - cron: "23 10 * * *"
+    # A second ask, four hours later: GitHub may drop a scheduled run under load (27 Nov: the 10:23 run never started).
+    # The Worker answers 409 while today's film is under way, so a second ask never makes a second film.
+    - cron: "23 14 * * *"
   workflow_dispatch:
     inputs:
       voice_id:
@@ -79,7 +82,7 @@ jobs:
           [[ "$VOICE_ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "::error::Bad film ID."; exit 1; }
           [[ "$SITE" =~ ^https://[A-Za-z0-9.-]+$ ]] || { echo "::error::Bad site."; exit 1; }
           [[ "$TOPIC_ID" =~ ^[a-z0-9-]{3,60}$ ]] || { echo "::error::Bad topic id."; exit 1; }
-          echo "start=$(date +%s)" > timing.env
+          echo "start=$(date +%s)" > "$RUNNER_TEMP/timing.env"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -95,7 +98,7 @@ jobs:
           t=$(date +%s)
           node render/daily-script.mjs --topic "$TOPIC_ID" --out run 2>&1 | tee step.log
           test "${PIPESTATUS[0]}" = 0
-          echo "script=$(( $(date +%s) - t ))" >> timing.env
+          echo "script=$(( $(date +%s) - t ))" >> "$RUNNER_TEMP/timing.env"
       - name: Keep the free narrator's model files between runs
         uses: actions/cache@v4
         with:
@@ -110,7 +113,7 @@ jobs:
           python3 -m venv ~/.venv-narrator && ~/.venv-narrator/bin/pip install -q kokoro-onnx==0.6.1 soundfile
           node render/daily-voice.mjs --run run --topic "$TOPIC_ID" --out narration.mp3 --python ~/.venv-narrator/bin/python 2>&1 | tee step.log
           test "${PIPESTATUS[0]}" = 0
-          echo "narrate=$(( $(date +%s) - t ))" >> timing.env
+          echo "narrate=$(( $(date +%s) - t ))" >> "$RUNNER_TEMP/timing.env"
           minutes=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("run/daily-voice.json","utf8")).minutes)')
           node render/voice-runner.mjs progress --stage narrate --params "{\"minutes\":$minutes}"
       - name: Send the voice; the Worker starts the voiceover film (voice-film.yml)
@@ -119,11 +122,11 @@ jobs:
           t=$(date +%s)
           node render/voice-runner.mjs voice --file narration.mp3 2>&1 | tee step.log
           test "${PIPESTATUS[0]}" = 0
-          echo "upload=$(( $(date +%s) - t ))" >> timing.env
+          echo "upload=$(( $(date +%s) - t ))" >> "$RUNNER_TEMP/timing.env"
       - name: Minutes per stage
         if: always()
         run: |
-          set -a; . ./timing.env; set +a
+          set -a; . "$RUNNER_TEMP/timing.env"; set +a
           node -e 'const e=process.env,m=(s)=>s?Math.round(Number(s)/6)/10:null;const t={script:m(e.script),narrate:m(e.narrate),upload:m(e.upload),total:m(Math.floor(Date.now()/1000)-Number(e.start))};require("fs").mkdirSync("run",{recursive:true});require("fs").writeFileSync("run/daily-timing.json",JSON.stringify(t,null,1));console.log(JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Tell the studio what stopped it
         if: failure()
