@@ -82,12 +82,12 @@ async function main() {
   if (!Array.isArray(listed.watched)) { console.error("The Worker did not list the watched films:", JSON.stringify(listed).slice(0, 200)); process.exit(1); }
   const next = pickCandidates(rows, new Set(listed.watched));
   if (process.argv.includes("--print")) { console.log(next.map((c) => `${c.id}  ${c.channel}  ${c.title}`).join("\n")); return; }
-  let done = 0, stopped = listed.stoppedToday === true;
+  let done = 0, failed = 0, stopped = listed.stoppedToday === true;
   for (const c of stopped ? [] : next) {
     const res = await fetch(`${site}/api/youtube-watch`, { method: "POST", headers, body: JSON.stringify({ videoId: c.id }) });
     const body = await res.json().catch(() => ({}));
     if (res.status === 429) { console.log(`Quota used up after ${done} films; stopped for the day.`); stopped = true; break; }
-    if (res.ok) { done++; console.log(`watched ${c.id} (${c.channel}) wpm=${body.record?.wordsPerMinute}`); } else console.log(`skipped ${c.id}: ${res.status} ${body.error ?? ""}`.slice(0, 240));
+    if (res.ok) { done++; console.log(`watched ${c.id} (${c.channel}) wpm=${body.record?.wordsPerMinute}`); } else { failed++; console.log(`skipped ${c.id}: ${res.status} ${body.error ?? ""}`.slice(0, 240)); if (failed >= 3 && !done) { console.log("Three failures in a row; stopping for today."); break; } }
   }
   const all = await (await fetch(`${site}/api/youtube-watch?all=1`, { headers })).json();
   const records = Array.isArray(all.records) ? all.records : [];

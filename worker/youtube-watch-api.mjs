@@ -44,6 +44,12 @@ export async function handleYoutubeWatch(request, env, url, deps) {
   const stoppedToday = Boolean(stopped && stopped.day === today);
 
   if (request.method === "GET") {
+    if (url.searchParams.get("models") === "1") {
+      // Which models the key can call right now (a list request: no generation quota).
+      const r = await get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": env.GEMINI_API_KEY ?? "" } });
+      const list = r.ok ? ((await r.json()).models ?? []) : [];
+      return json({ models: list.filter((/** @type {any} */ m) => (m.supportedGenerationMethods ?? []).includes("generateContent")).map((/** @type {any} */ m) => String(m.name).replace(/^models\//, "")) });
+    }
     const ids = [];
     let cursor;
     do {
@@ -70,13 +76,17 @@ export async function handleYoutubeWatch(request, env, url, deps) {
 
   const sent = JSON.stringify(buildWatchRequest(videoId));
   let lastError = "";
-  for (const model of WATCH_MODELS) {
+  let notFound = 0;
+  const models = String(env.WATCH_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+  const tryModels = models.length ? models : WATCH_MODELS;
+  for (const model of tryModels) {
     let res;
     try {
       res = await get(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: sent });
     } catch (e) { lastError = `${model}: network error`; continue; }
     const text = await res.text();
     if (isQuotaAnswer(res.status, text)) { lastError = `${model}: quota`; continue; } // next model has its own daily quota
+    if (res.status === 404) { lastError = `${model}: not available`; notFound++; continue; } // retired model: try the next one
     if (!res.ok) return json({ error: `Gemini ${model} answered ${res.status}: ${text.slice(0, 300)}` }, 502);
     let raw;
     try { raw = JSON.parse(JSON.parse(text).candidates?.[0]?.content?.parts?.map((/** @type {any} */ p) => p.text ?? "").join("") ?? ""); } catch { return json({ error: `${model} did not return the JSON.` }, 422); }
@@ -86,6 +96,7 @@ export async function handleYoutubeWatch(request, env, url, deps) {
     await env.FILMS.put(key, JSON.stringify(record));
     return json({ ok: true, record });
   }
+  if (notFound === tryModels.length) return json({ error: `No watch model is available (${lastError}). Set WATCH_MODELS or fix WATCH_MODELS in engine/src/youtube-watch.mjs.` }, 502);
   await env.FILMS.put(STOP_KEY, JSON.stringify({ day: today, at: new Date(now).toISOString(), why: lastError }));
   return json({ error: `Gemini quota is used up (${lastError}). Stopped for the day (Pacific).`, stoppedToday: true }, 429);
 }
