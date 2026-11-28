@@ -60,11 +60,11 @@ export function captionsFor(captions, start, end) {
  * Word-by-word captions in ASS (libass): each line stays up while it is
  * spoken and the word being said lights up, the style viral Shorts use so
  * they work with the sound off. Sizes are in the frame's own pixels.
- * @param {Caption[]} captions @param {{ width: number, height: number, font?: string }} frame
+ * @param {Caption[]} captions @param {{ width: number, height: number, font?: string, size?: number, marginV?: number }} frame
  */
 export function toAss(captions, frame) {
   const { width: W, height: H } = frame;
-  const size = Math.round(H * (H / W >= 1.5 ? 0.036 : 0.045));
+  const size = frame.size ?? Math.round(H * (H / W >= 1.5 ? 0.036 : 0.045));
   const time = (/** @type {number} */ t) => {
     const cs = Math.max(0, Math.round(t * 100));
     return `${Math.floor(cs / 360000)}:${String(Math.floor(cs / 6000) % 60).padStart(2, "0")}:${String(Math.floor(cs / 100) % 60).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
@@ -88,7 +88,7 @@ export function toAss(captions, frame) {
     "[Script Info]", "ScriptType: v4.00+", `PlayResX: ${W}`, `PlayResY: ${H}`, "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Cap,${frame.font ?? "DejaVu Sans"},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${Math.max(2, Math.round(size / 14))},2,2,${Math.round(W * 0.07)},${Math.round(W * 0.07)},${Math.round(H * 0.14)},1`,
+    `Style: Cap,${frame.font ?? "DejaVu Sans"},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${Math.max(2, Math.round(size / 14))},2,2,${Math.round(W * 0.07)},${Math.round(W * 0.07)},${frame.marginV ?? Math.round(H * 0.14)},1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
