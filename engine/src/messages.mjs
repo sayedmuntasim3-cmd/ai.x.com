@@ -199,6 +199,7 @@ export const MESSAGES = Object.freeze({
   "voice.stage.narrate": { en: (p) => `Daily film: the free narrator read the script (${p.minutes} min).`, bn: (p) => `দৈনিক ফিল্ম: ফ্রি ন্যারেটর স্ক্রিপ্টটি পড়েছে (${p.minutes} মিনিট)।` },
   "voice.stage.uploaded": { en: (p) => `Recording received (${p.mb} MB). It stays private.`, bn: (p) => `রেকর্ডিং পাওয়া গেছে (${p.mb} MB)। এটি প্রাইভেট থাকবে।` },
   "voice.stage.marked": { en: (p) => `The reviewer (${p.by}) marked ${p.count} ayah ends; the film is made again with them, and the verbatim text is shown on those times.`, bn: (p) => `রিভিউয়ার (${p.by}) ${p.count}টি আয়াতের শেষ চিহ্নিত করেছেন; সেই সময় ধরে ফিল্ম আবার বানানো হচ্ছে, আর হুবহু আয়াতের লেখা সেই সময়ে দেখানো হবে।` },
+  "voice.stage.swaps": { en: (p) => `Re-making the film with ${p.count} new picture(s): only the ${p.parts} part(s) holding them are rendered again.`, bn: (p) => `${p.count}টি নতুন ছবি দিয়ে ফিল্ম আবার বানানো হচ্ছে: শুধু সেই ${p.parts}টি অংশ আবার রেন্ডার হবে যেখানে ছবিগুলো আছে।` },
   "voice.stage.queued": { en: () => "Waiting for a free film machine.", bn: () => "একটি ফাঁকা ফিল্ম মেশিনের অপেক্ষায়।" },
   "voice.stage.started": { en: () => "A film machine took the recording.", bn: () => "একটি ফিল্ম মেশিন রেকর্ডিংটি নিয়েছে।" },
   "voice.stage.intake": { en: (p) => `Listened to the recording: ${p.minutes} min, ${p.lufs} LUFS.`, bn: (p) => `রেকর্ডিং শোনা হয়েছে: ${p.minutes} মিনিট, ${p.lufs} LUFS।` },
