@@ -434,6 +434,15 @@ export async function runFilm(o) {
     return Math.max(600, Math.min(maxTokens, Math.floor(7600 - fixed)));
   }
   /**
+   * Text cut to fit one part: the cut is never silent, it is written to the run's gaps (the QA desk and the release gate read them).
+   * @param {string} what @param {string} text @param {number} maxChars
+   */
+  function cutNote(what, text, maxChars) {
+    if (text.length <= maxChars) return text;
+    state.gaps.push(`${what}: split mode gave one call only the first ${maxChars} of ${text.length} characters (the whole text is in the stage's file); a late item may be missing.`);
+    return text.slice(0, maxChars);
+  }
+  /**
    * Ask one stage in parts: each part is self-contained, the replies are merged in order by the caller.
    * @param {string} stage @param {string[]} parts @param {number} maxTokens
    */
@@ -765,7 +774,7 @@ export async function runFilm(o) {
         const claims = claimDigest(s2, Math.max(2000, roomFor("s3") - 3000)).join("\n");
         const planText = await ask("s3", [{ text: `${ctx("S2", claims)}\n\nWrite ONLY S3's chapter plan for this film, and nothing else: end with ${chapterJson} Mark every brief with the claim IDs it uses.` }], partTokens("s3", 16000), { system: partSystem("s3") });
         const chaptersPart = safeJson(planText) ?? [];
-        const prose = await ask("s3:2", [{ text: `Write the rest of S3 (section 7): ${architecture}. The chapter plan is already fixed; use it as it stands.\n\n${ctx("CHAPTERS", JSON.stringify(chaptersPart, null, 1).slice(0, Math.max(2000, roomFor("s3") - 1500)))}` + learned }], partTokens("s3", 24000), { system: partSystem("s3") });
+        const prose = await ask("s3:2", [{ text: `Write the rest of S3 (section 7): ${architecture}. The chapter plan is already fixed; use it as it stands.\n\n${ctx("CHAPTERS", cutNote("s3 chapter plan", JSON.stringify(chaptersPart, null, 1), Math.max(2000, roomFor("s3") - 1500)))}` + learned }], partTokens("s3", 24000), { system: partSystem("s3") });
         text = prose + "\n\n```json\n" + JSON.stringify(chaptersPart) + "\n```";
       } else {
         text = await ask("s3", content, 32000);
@@ -809,7 +818,7 @@ export async function runFilm(o) {
           ledger += (ledger ? "\n" : "") + chunk;
         }
         if (ledger.length < chunks.join("\n").length) state.gaps.push("s4: split mode read only the first of the ledger's rows that fit one call (the rest is in s2.md); the bibles may miss a late claim.");
-        const prose = s3.replace(/```json[\s\S]*?```/g, "").trim().slice(0, Math.max(2000, budget - chaptersJson.length - 800));
+        const prose = cutNote("s4 story architecture", s3.replace(/```json[\s\S]*?```/g, "").trim(), Math.max(2000, budget - chaptersJson.length - 800));
         const planText = ctx("CHAPTERS", chaptersJson);
         const groups = [
           { bibles: "the narrator, the characters and the depiction policy, the locations and the objects", material: planText + "\n" + ctx("LEDGER", ledger) },
@@ -849,7 +858,7 @@ export async function runFilm(o) {
           // bibles' writer pack and the ledger rows it needs instead of the whole ledger and all bibles.
           // Every scene is written once, by its own clock, and the merged chapter is checked by code.
           const budget = roomFor(`s5:${ch.id}`);
-          const pack = sectionFrom(await read("s4.md"), /writer pack/i).slice(0, Math.floor(budget * 0.4));
+          const pack = cutNote(`s5:${ch.id} writer pack`, sectionFrom(await read("s4.md"), /writer pack/i), Math.floor(budget * 0.4));
           const rows = claimDigest(await read("s2.md"), Math.max(1500, Math.floor(budget * 0.3)));
           const scenes = spec.lastScene - spec.firstScene + 1;
           const ranges = sceneGroups(spec.firstScene, spec.lastScene, Math.max(1, Math.ceil(scenes / Math.max(rows.length, Math.ceil(scenes / 5)))));
