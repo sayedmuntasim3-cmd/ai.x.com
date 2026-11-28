@@ -342,7 +342,7 @@ test("motion graphics: a bar chart grows from the shot's own numbers, a highligh
   }
 });
 
-test("archive photos as the Edit Director asks: a print in a white border, a focus zoom, a light leak", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
+test("archive photos as the Edit Director asks: a print is asked for but never drawn as a polaroid, a focus zoom, a light leak", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "zupona-photo-"));
   try {
     await run("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0x2050c0:s=600x400", "-frames:v", "1", join(dir, "p.png")]);
@@ -356,7 +356,7 @@ test("archive photos as the Edit Director asks: a print in a white border, a foc
     const frame = (/** @type {number} */ s) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(s), "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout;
     const near = (/** @type {Buffer} */ f, /** @type {(r: number, g: number, b: number) => boolean} */ ok) => { let n = 0; for (let i = 0; i < f.length; i += 3) if (ok(f[i], f[i + 1], f[i + 2])) n += 1; return n; };
     const white = (/** @type {number} */ r, /** @type {number} */ g, /** @type {number} */ b) => r > 200 && g > 200 && b > 190;
-    assert.ok(near(frame(1), white) > 200, `the print has its white border (${near(frame(1), white)} white pixels)`);
+    assert.equal(near(frame(1), white), 0, "an archive picture is full frame: no white print border (owner's note on film e0b87efb)");
     assert.equal(near(frame(3), white), 0, "a plain photo has none");
     const warm = (/** @type {Buffer} */ f) => { let n = 0; for (let i = 0; i < f.length; i += 3) n += f[i] - f[i + 2]; return n / (f.length / 3); };
     assert.ok(warm(frame(4.15)) > warm(frame(5.5)) + 15, `the light leak warms the frame, then passes (${warm(frame(4.15)).toFixed(0)} vs ${warm(frame(5.5)).toFixed(0)})`);
