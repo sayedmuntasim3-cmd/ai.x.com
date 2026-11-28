@@ -245,7 +245,7 @@ export function subtitleFit(narration, captions, seconds) {
  * Read a timeline and the render's report and return every finding.
  * @param {any} timeline
  * @param {any} report
- * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any, voiceFilm?: boolean, taste?: { unfilled?: { id: string, filled: number }[], repeats?: { a: string, b: string, bits: number, consecutive: boolean }[], logos?: { id: string, corner: string }[], cards?: { id: string }[] } | null }} [evidence]
+ * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any, voiceFilm?: boolean, agents?: { results?: { role: string, findings?: any[] }[], plan?: any[] } | null, taste?: { unfilled?: { id: string, filled: number }[], repeats?: { a: string, b: string, bits: number, consecutive: boolean }[], logos?: { id: string, corner: string }[], cards?: { id: string }[] } | null }} [evidence]
  *   voiceFilm: the film is the length of the recording the owner gave (one narration track): a short one is a note, not a block
  *   craft: the Craft Ledger's calibrated targets for this genre (craft-memory.mjs calibratedDoctrine): a note per
  *   measure short of its target and the craft index 0-100 in `craft`. Notes only: the floor above decides blocks.
@@ -479,8 +479,20 @@ export function critique(timeline, report = {}, evidence = {}) {
   if (taste.logos?.length) add({ ...msg("critic.logo", { count: taste.logos.length, ids: taste.logos.slice(0, 5).map((l) => `${l.id} (${l.corner})`).join(", ") }), severity: "block", value: taste.logos.length });
   if (taste.cards?.length) add({ ...msg("critic.textOnBlack", { count: taste.cards.length, ids: taste.cards.slice(0, 5).map((c) => c.id).join(", ") }), severity: "block", value: taste.cards.length });
 
+  // The crew's picture and edit agents (render/film-agents.mjs): every failing shot is named with the reason, one finding per
+  // kind. A block here is about one shot's own picture, so the auto-fix loop can re-pick it before the film is stopped.
+  const crew = [...(evidence.agents?.results ?? []).flatMap((r) => (r.findings ?? []).map((f) => ({ ...f, role: r.role }))), ...(evidence.agents?.plan ?? [])];
+  /** @type {Map<string, any[]>} */
+  const byCode = new Map();
+  for (const f of crew) byCode.set(f.code, [...(byCode.get(f.code) ?? []), f]);
+  for (const [code, list] of byCode) {
+    const ids = [...new Set(list.map((f) => f.shot))];
+    const blocks = list.some((f) => f.severity === "block");
+    add({ ...msg(code, { count: ids.length, ids: ids.slice(0, 6).join(", "), reason: String(list[0].reason).slice(0, 200) }), severity: blocks ? "block" : "warn", value: ids.length });
+  }
+
   const measures = {
-    unfilledShots: (taste.unfilled ?? []).length, samePictures: (taste.repeats ?? []).length, logoShots: (taste.logos ?? []).length, textOnBlackCards: (taste.cards ?? []).length,
+    agentFindings: crew.length, agentBlocks: crew.filter((f) => f.severity === "block").length, unfilledShots: (taste.unfilled ?? []).length, samePictures: (taste.repeats ?? []).length, logoShots: (taste.logos ?? []).length, textOnBlackCards: (taste.cards ?? []).length,
     seconds: round(seconds, 1), shots: lengths.length, avgShot: round(avg), longestShot: round(longest),
     shortShare: round(shortShare, 3), movingShare: round(movingShare, 3), designedMoments: designed.length,
     designedPerMinute: round(perMinute, 2), cueCoverage: round(coverage, 3), firstShot: round(firstShot),

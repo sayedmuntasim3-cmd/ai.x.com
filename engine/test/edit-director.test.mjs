@@ -61,7 +61,7 @@ test("two named transitions never follow each other, counting the script's own",
 test("the timeline merges the edit: transitions, punch-ins and shakes on their shots, the director's sounds", () => {
   const edit = validateEditPlan({ scenes: [
     { scene: "SC0002", transition: "cut", punchIns: ["0:00:16.5"] },
-    { scene: "SC0003", transition: "glitch", shakes: ["0:00:25.0"], hits: [{ at: "0:00:28.0", sound: "riser" }] },
+    { scene: "SC0003", transition: "glitch", shakes: ["0:00:28.5"], hits: [{ at: "0:00:28.0", sound: "riser" }] },
     { scene: "SC0005", hits: [{ at: "0:00:44.0", sound: "whoosh" }] },
   ] }, CHAPTER, "C1");
   const t = buildTimeline({ chapters: [{ id: "C1", markdown: CHAPTER, edit }] });
@@ -69,10 +69,10 @@ test("the timeline merges the edit: transitions, punch-ins and shakes on their s
   assert.equal(seg("SC0002-1")?.transition, undefined, "the director's cut replaces the whip");
   assert.deepEqual(seg("SC0002-2")?.punchIns, [1.5], "seconds from the start of the shot on screen");
   assert.equal(seg("SC0003-1")?.transition, "glitch");
-  assert.deepEqual(seg("SC0003-1")?.shakes, [5]);
+  assert.deepEqual(seg("SC0003-1")?.shakes, [8.5]);
   const at = (/** @type {string} */ token) => t.sfx.filter((e) => e.token === token).map((e) => e.start);
   assert.ok(at("AUTO-GLITCH").some((t) => Math.abs(t - 20) <= 0.3), "a glitch transition brings its sound, laid into the cut, off the first word");
-  assert.ok(at("AUTO-IMPACT").includes(25), "a shake is an impact");
+  assert.ok(at("AUTO-IMPACT").some((x) => Math.abs(x - 28.5) <= 0.3), "a shake is an impact (8 s after the glitch: one hit per 8 s)");
   assert.ok(at("AUTO-RISER").includes(26.4), "a riser ends on its moment");
   assert.ok(at("AUTO-WHOOSH").some((t) => Math.abs(t - 43.8) <= 0.3), "a whoosh leads into its moment, nudged only enough to clear the word it lands on");
   // Without an edit the script's whip stays and nothing is punched.

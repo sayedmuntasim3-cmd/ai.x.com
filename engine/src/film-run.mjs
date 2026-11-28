@@ -17,6 +17,7 @@
 import { packagingBrief, pillarOf } from "./reference-prior.mjs";
 import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
 import { buildTimeline } from "./timeline.mjs";
+import { runScriptAgents } from "./script-agents.mjs";
 import { roleCraft } from "./role-craft.mjs";
 import { chapterMedia, createUseHistory, shotKey, shotSettled } from "./film-media.mjs";
 import { getFormat, lookFor, suggestFormat } from "./formats.mjs";
@@ -1020,6 +1021,12 @@ export async function runFilm(o) {
       const hookLeft = hookFindings(parseSceneLines((await read(`s5-${plan.chapters[0]?.id}.md`)) || chapters[0]?.markdown || ""));
       state.gaps.push(...hookLeft.map((h) => `hook (${h.code}): ${h.detail}`));
       qa.codeCraft = { hook: hook.map((h) => h.code), hookLeft: hookLeft.map((h) => h.code), cardShare: mix };
+      // The crew's script agents (script-agents.mjs, free code, the same ones a voiceover film runs): freshness, geography, named
+      // sources, clarity, on the chapters as they stand after the fixes. Reported in crew.json; never a gap, so no film is held for a style note.
+      /** @type {{ sc: string, start: number, end: number, narration: string }[]} */
+      const crewLines = [];
+      for (const c of plan.chapters) for (const sl of parseSceneLines((await read(`s5-${c.id}.md`)) || chapters.find((x) => x.id === c.id)?.markdown || "")) crewLines.push({ sc: sl.sc, start: sl.start, end: sl.end, narration: sl.narration });
+      await store.put("crew.json", JSON.stringify(runScriptAgents(crewLines), null, 1));
       await store.put("qa.json", JSON.stringify(qa, null, 1));
       await store.put("fix-log.json", JSON.stringify(fixLog, null, 1));
       return { mustFix: (qa.mustFix ?? []).length, applied: fixLog.filter((f) => f.status === "applied").length };

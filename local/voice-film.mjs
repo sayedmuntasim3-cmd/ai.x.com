@@ -53,6 +53,8 @@ import { archiveKeys } from "../engine/src/open-archives.mjs";
 import { brainFromEnv } from "../worker/brain.mjs";
 import { groqLook, groqModel } from "../worker/groq.mjs";
 import { rerankRun } from "../render/asset-rank/rerank.mjs";
+import { storyPlace } from "../render/film-agents.mjs";
+import { crewMarkdown, runVoiceCrew } from "../engine/src/voice-crew.mjs";
 import { workerBrain } from "../render/voice-runner.mjs";
 
 import { planVoice } from "../engine/src/voice-plan.mjs";
@@ -583,7 +585,8 @@ export async function pictures(o) {
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
   // A quiet score under a narration (never under a recitation): s4.md is the cue plan the free score composes.
-  const score = voiceScore(u.scenes, { kind: "narration" });
+  // The music turns where the story turns: each section of the narration (a long pause, or a new part) starts a cue.
+  const score = voiceScore(u.scenes, { kind: "narration", turns: (u.structure?.sections ?? []).map((x) => x.start) });
   if (score) await writeFile(join(o.out, "s4.md"), score.s4);
   const s5 = score ? withMusic(plan.markdown, score.cueOf) : plan.markdown;
   await writeFile(join(o.out, "s5-C1.md"), s5 + "\n");
@@ -599,6 +602,20 @@ export async function pictures(o) {
   const qa = resume?.shots ? { findings: [], called: 0, stopped: "" } : await auditVoiceFilm({ brain, shots: plan.shots, scenes: u.scenes, hook: plan.hook });
   if (!resume?.shots) planMessages.push(msg("voice.qa", { found: qa.findings.length, called: qa.called }));
   if (qa.stopped) planMessages.push(msg("voice.brainStopped", { reason: qa.stopped }));
+  // The crew on this recording's words and plan (engine/src/voice-crew.mjs): freshness, geography, sources, clarity, the picture's
+  // place in the story, title + chapters + description, the viewer panel. Findings are reported; shot findings reach the render
+  // (agents-plan.json), where the critic blocks and the auto-fix loop re-picks them.
+  try {
+    const crew = await runVoiceCrew({ scenes: u.scenes, structure: u.structure, shots: plan.shots, topic: o.topic, brain, storyPlace });
+    await writeFile(join(o.out, "agents.json"), JSON.stringify({ agents: crew.agents, unverifiedPlaces: crew.unverifiedPlaces, panel: crew.panel }, null, 1));
+    await writeFile(join(o.out, "agents.md"), crewMarkdown(crew));
+    await writeFile(join(o.out, "agents-plan.json"), JSON.stringify({ shotFindings: crew.shotFindings }, null, 1));
+    await writeFile(join(o.out, "packaging.json"), JSON.stringify(crew.packaging, null, 1));
+    planMessages.push(msg("voice.crew", { ran: crew.agents.filter((a) => a.ran).length, found: crew.agents.reduce((n, a) => n + (a.found ?? 0), 0), title: crew.packaging.title, chapters: crew.packaging.chapters.length }));
+  } catch (e) {
+    if (/** @type {any} */ (e)?.daily) throw e;
+    planMessages.push(msg("voice.crewFailed", { reason: String(/** @type {any} */ (e)?.message ?? e).slice(0, 120) }));
+  }
   if (r.chapterMedia && !resume?.pictures) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
   return { ok: r.findings.length === 0 && director.findings.length === 0 && plan.findings.length === 0, messages: [...messages, ...(director.messages ?? []), ...r.messages, ...planMessages], problems: [...(director.findings ?? []).map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail), ...qa.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`), ...plan.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`)], gaps: [] };
