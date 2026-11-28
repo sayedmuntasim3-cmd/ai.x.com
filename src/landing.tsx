@@ -91,7 +91,7 @@ type Draft = {
 };
 
 const DEFAULT_DRAFT: Draft = {
-  mode: "idea",
+  mode: "voice",
   idea: "",
   minutes: 8,
   category: "engineering",
@@ -403,9 +403,9 @@ type ComposerProps = {
 
 function Composer(props: ComposerProps) {
   const { draft, update, voiceLocked, totalSeconds, credits, onCreate, flash, setError } = props;
-  const tabs: { id: Mode; label: string; icon: ReactNode }[] = [
-    { id: "idea", label: "Idea", icon: <BulbIcon size={21} /> },
-    { id: "voice", label: "Voiceover", icon: <MicIcon size={21} /> },
+  const tabs: { id: Mode; label: string; hint: string; icon: ReactNode }[] = [
+    { id: "voice", label: "I have a voice recording", hint: "Your voice becomes the film", icon: <MicIcon size={24} /> },
+    { id: "idea", label: "I have an idea", hint: "We write the story for you", icon: <BulbIcon size={24} /> },
   ];
 
   const selectMode = (mode: Mode) => {
@@ -430,11 +430,11 @@ function Composer(props: ComposerProps) {
       }`}
     >
       {/* Mode tabs */}
-      <div role="tablist" aria-label="How do you want to start?" className="relative grid grid-cols-2 rounded-full bg-sunken p-1">
+      <div role="tablist" aria-label="How do you want to start?" className="relative grid grid-cols-2 gap-1 rounded-[22px] bg-sunken p-1">
         <span
           aria-hidden="true"
-          className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-brand-gradient shadow-cta transition-transform duration-300 ease-[cubic-bezier(.3,.7,.2,1)] ${
-            draft.mode === "voice" ? "translate-x-full" : ""
+          className={`absolute inset-y-1 left-1 w-[calc(50%-6px)] rounded-[18px] bg-brand-gradient shadow-cta transition-transform duration-300 ease-[cubic-bezier(.3,.7,.2,1)] ${
+            draft.mode === "idea" ? "translate-x-[calc(100%+4px)]" : ""
           }`}
         />
         {tabs.map((tab) => {
@@ -452,17 +452,18 @@ function Composer(props: ComposerProps) {
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
                   e.preventDefault();
-                  const next = tab.id === "idea" ? "voice" : "idea";
+                  const next = tab.id === "voice" ? "idea" : "voice";
                   selectMode(next);
                   document.getElementById(`tab-${next}`)?.focus();
                 }
               }}
-              className={`relative z-10 flex h-12 items-center justify-center gap-2.5 rounded-full text-[16px] font-medium transition-colors duration-300 ${
+              className={`relative z-10 flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-[18px] px-2 py-3 text-center transition-colors duration-300 ${
                 selected ? "text-white" : "text-muted hover:text-ink"
               }`}
             >
               <span className={selected ? "text-white" : ""}>{tab.icon}</span>
-              {tab.label}
+              <span className="text-[15px] font-semibold leading-tight sm:text-[16px]">{tab.label}</span>
+              <span className={`hidden text-[12px] leading-tight min-[400px]:block ${selected ? "text-white/85" : "text-muted"}`}>{tab.hint}</span>
             </button>
           );
         })}
@@ -470,6 +471,12 @@ function Composer(props: ComposerProps) {
 
       {draft.mode === "idea" ? <IdeaPanel {...props} /> : <VoicePanel {...props} />}
 
+      {draft.mode === "voice" && (
+        <VoiceFilm fileName={props.voice?.name} voiceUrl={props.voice?.url} seconds={props.voice?.seconds} topic={draft.topic.trim()} />
+      )}
+
+      {draft.mode === "idea" && (
+      <>
       {/* Duration: five chips, plus a stepper for anything else */}
       <div className="mt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -623,13 +630,12 @@ function Composer(props: ComposerProps) {
         </span>
         <span className="ml-3 hidden h-8 items-center gap-1.5 whitespace-nowrap rounded-full bg-black/25 px-3 text-[13.5px] font-semibold text-white min-[360px]:flex sm:ml-5">
           <CoinsIcon size={17} />
-          <span>
-            {credits} <span className="sr-only min-[400px]:not-sr-only">{credits === 1 ? "credit" : "credits"}</span>
-          </span>
-          <span className="sr-only">{credits === 1 ? "credit" : "credits"}, one per finished minute</span>
+          <span>Free during beta</span>
         </span>
       </button>
-      <p className="mt-3 text-center text-[13px] text-muted">{CREDIT_NOTE}. Your settings save automatically on this device.</p>
+      <p className="mt-3 text-center text-[13px] text-muted">Free during the private beta. Your settings save automatically on this device.</p>
+      </>
+      )}
     </div>
   );
 }
@@ -887,7 +893,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
   return (
     <div id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" className="mt-6">
       <p className="text-[17px] font-medium text-ink">Add your narration</p>
-      <p className="mt-1 text-[14px] leading-relaxed text-muted">Zupona builds the visuals around your voice, and the film runs as long as you speak.</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-muted">Drop or choose your recording. Zupona builds the pictures around your voice, and the film is exactly as long as you speak.</p>
 
       {voice ? (
         <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line-strong bg-canvas/50 p-3">
@@ -902,7 +908,7 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-medium text-ink">{voice.name}</p>
             <p className="text-[13px] tabular-nums text-muted">
-              {formatRuntime(voice.seconds)} · {formatBytes(voice.size)} · {voice.source === "record" ? "Recorded here" : "Uploaded"}
+              {formatRuntime(voice.seconds)} · {formatBytes(voice.size)} · {voice.source === "record" ? "Recorded here" : "From your device"}
             </p>
           </div>
           <button
@@ -976,6 +982,8 @@ function VoicePanel({ draft, update, voice, setVoice, error, setError }: Compose
           {error}
         </p>
       )}
+
+      {voice && <p className="mt-2 text-[14px] font-medium text-ink">Your film will run {formatRuntime(voice.seconds)}, the length of your voice.</p>}
 
       <label htmlFor="topic" className="mt-5 block text-[15px] font-medium text-ink">
         What is it about? <span className="font-normal text-muted">Optional</span>
@@ -1359,7 +1367,7 @@ function briefText(b: Brief) {
     b.mode === "idea" ? `Idea: ${b.idea}` : `Voiceover: ${b.voiceName ?? "—"}${b.idea ? ` (about: ${b.idea})` : ""}`,
     `Length: ${b.runtime} · Audience: ${b.age}`,
     `Idea system: ${b.category} · Style: ${b.style} · Music: ${b.music}`,
-    `Cost: ${b.credits} credits (${CREDIT_NOTE})`,
+    "Cost: free during the private beta",
     "",
     "Chapters:",
     ...b.chapters.map((c) => `${formatClock(c.start)}  ${c.title}`),
@@ -1403,7 +1411,7 @@ function BriefDialog({ open, onClose, brief }: { open: boolean; onClose: () => v
     ["Starts from", brief.mode === "idea" ? "Your idea" : "Your voiceover"],
     ["Style", brief.style],
     ["Music", brief.music],
-    ["Cost", `${brief.credits} ${brief.credits === 1 ? "credit" : "credits"}`],
+    ["Cost", "Free during beta"],
   ];
 
   return (
@@ -1677,11 +1685,7 @@ function MakeFilm({ brief, open }: { brief: Brief; open: boolean }) {
 
   if (brief.mode !== "idea") {
     // Voiceover mode: the creator's own recording becomes the film (src/voice-film.tsx).
-    return brief.voiceUrl && brief.voiceName ? (
-      <VoiceFilm open={open} fileName={brief.voiceName} voiceUrl={brief.voiceUrl} topic={brief.idea} />
-    ) : (
-      <p className="mt-6 rounded-2xl bg-sunken p-4 text-[14px] leading-relaxed text-ink-2">Add your voiceover first: upload a file or record it.</p>
-    );
+    return null;
   }
 
   // Resume the same film: finished stages are kept and are not paid for again. A new film would throw
