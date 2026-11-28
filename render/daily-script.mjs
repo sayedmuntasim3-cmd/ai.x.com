@@ -248,10 +248,12 @@ async function laneCall(c, body, state) {
         const hits = (state.dayHits ??= {});
         hits[model] = (hits[model] ?? 0) + 1;
         lanes.rest(model, Math.min(40, 10 * hits[model]) * 60_000);
+        console.log(`brain: ${model} day limit hit ${hits[model]}x, rests ${Math.min(40, 10 * hits[model])} min (${last.replace(/\s+/g, " ").slice(0, 200)})`);
         continue;
       }
       if (/ 4\d\d /.test(last) && !/ 429 /.test(last) && !/ 413 /.test(last)) throw new Error(`The brain refused the request: ${last.slice(0, 400)}`);
       lanes.rest(model);
+      console.log(`brain: ${model} busy or failed on try ${attempt}, rests 20 s (${last.replace(/\s+/g, " ").slice(0, 200)})`);
     }
   }
   throw new Error(`The free brain did not answer after 40 tries: ${last.slice(0, 400)}`);
