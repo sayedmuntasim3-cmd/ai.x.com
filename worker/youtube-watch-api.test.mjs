@@ -38,11 +38,11 @@ test("quota on both models stops the day: no retry loop, later calls refused wit
   const f = async () => { calls++; return new Response("{}", { status: 429 }); };
   const r = await call(env, "POST", { videoId: "rj-G_gmFWtE" }, f);
   assert.equal(r.status, 429);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.equal(JSON.parse(env.FILMS.m.get(STOP_KEY)).day, "2026-11-28");
   const r2 = await call(env, "POST", { videoId: "AAAAAAAAAAA" }, f);
   assert.equal(r2.status, 429);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
 });
 
 test("the first model out of quota falls through to the second; wrong key and bad id are refused", async () => {

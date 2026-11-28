@@ -71,12 +71,14 @@ export async function handleYoutubeWatch(request, env, url, deps) {
   const key = `${WATCH_PREFIX}${videoId}.json`;
   const have = await env.FILMS.get(key);
   if (have) return json({ ok: true, cached: true, record: JSON.parse(await have.text()) });
-  if (stoppedToday) return json({ error: "Gemini's daily quota ran out; no more watching today.", stoppedToday: true }, 429);
+  const ignoreStop = owner && url.searchParams.get("retry") === "1"; // owner re-checks after a stop, one film
+  if (stoppedToday && !ignoreStop) return json({ error: "Gemini's daily quota ran out; no more watching today.", stoppedToday: true }, 429);
   if (!env.GEMINI_API_KEY) return json({ error: "Gemini needs the GEMINI_API_KEY secret." }, 503);
 
   const sent = JSON.stringify(buildWatchRequest(videoId));
   let lastError = "";
   let notFound = 0;
+  /** @type {string[]} */ const attempts = [];
   const models = String(env.WATCH_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
   const tryModels = models.length ? models : WATCH_MODELS;
   for (const model of tryModels) {
@@ -85,6 +87,7 @@ export async function handleYoutubeWatch(request, env, url, deps) {
       res = await get(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: sent });
     } catch (e) { lastError = `${model}: network error`; continue; }
     const text = await res.text();
+    attempts.push(`${model}: ${res.status} ${text.replace(/\s+/g, " ").slice(0, 160)}`);
     if (isQuotaAnswer(res.status, text)) { lastError = `${model}: quota`; continue; } // next model has its own daily quota
     if (res.status === 404) { lastError = `${model}: not available`; notFound++; continue; } // retired model: try the next one
     if (!res.ok) return json({ error: `Gemini ${model} answered ${res.status}: ${text.slice(0, 300)}` }, 502);
@@ -96,7 +99,7 @@ export async function handleYoutubeWatch(request, env, url, deps) {
     await env.FILMS.put(key, JSON.stringify(record));
     return json({ ok: true, record });
   }
-  if (notFound === tryModels.length) return json({ error: `No watch model is available (${lastError}). Set WATCH_MODELS or fix WATCH_MODELS in engine/src/youtube-watch.mjs.` }, 502);
+  if (notFound === tryModels.length) return json({ error: `No watch model is available (${lastError}). Set WATCH_MODELS or fix WATCH_MODELS in engine/src/youtube-watch.mjs.`, attempts }, 502);
   await env.FILMS.put(STOP_KEY, JSON.stringify({ day: today, at: new Date(now).toISOString(), why: lastError }));
-  return json({ error: `Gemini quota is used up (${lastError}). Stopped for the day (Pacific).`, stoppedToday: true }, 429);
+  return json({ error: `Gemini quota is used up (${lastError}). Stopped for the day (Pacific).`, stoppedToday: true, attempts }, 429);
 }
