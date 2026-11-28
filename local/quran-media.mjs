@@ -16,6 +16,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { mediaProviders, verifyArchiveItem } from "../engine/src/film-media.mjs";
 import { creditsText, findQuranMedia, mediaTable } from "../engine/src/quran-media.mjs";
+import { videoWindow } from "../render/quran-render.mjs";
+import { auditSource } from "../render/visual-audit.mjs";
 import { parseArgs } from "./voice-film.mjs";
 
 
@@ -102,6 +104,20 @@ export function frameDoubts(item, query = "") {
 }
 
 /**
+ * The visual gate's test (render/visual-audit.mjs) on the first `seconds` of a candidate: a reason when it reads empty.
+ * A file ffmpeg cannot read gives no samples and no opinion (detect.py has already read its frames).
+ * @param {string} source @param {number} seconds the shot's length @param {number | null} videoSeconds the video's length (null: a picture)
+ * @returns {Promise<string | null>}
+ */
+export async function emptyOnScreen(source, seconds, videoSeconds = null) {
+  // The same stretch the renderer will cut: it skips a video's first tenth.
+  const w = videoSeconds ? videoWindow(videoSeconds, seconds) : { start: 0, seconds };
+  const a = await auditSource(source, { seconds: w.seconds, from: w.start });
+  const e = a.empty[0];
+  return e ? `quality: empty stretch ${e.start}-${e.end} s of the ${w.seconds.toFixed(1)} s shown (brightness ${e.brightness}, detail ${e.entropy})` : null;
+}
+
+/**
  * A frame check through local/media/detect.py: faces and people, painting or
  * photograph, orientation, near-duplicates of what the film already uses.
  * @param {string} python @param {{ clip?: boolean }} [o]
@@ -137,14 +153,16 @@ export function detector(python, o = {}) {
     waiting.push((line) => { clearTimeout(timer); if (line === null) fail(new Error("the detector stopped")); else done(JSON.parse(line)); });
     proc.stdin.write(JSON.stringify({ source, query }) + "\n");
   });
-  return async (r, query) => {
+  return async (r, query, seconds) => {
     // The file that will be used (Commons refuses thumbnail sizes it does not list, so not the preview).
     const target = r.mediaUrl ?? r.previewUrl;
     if (!target) return null;
     try {
       const item = await ask(target, o.clip ? query : undefined);
       if (item.error) throw new Error(item.error);
-      const why = frameVerdict(item, used, query ?? "");
+      let why = frameVerdict(item, used, query ?? "");
+      // The film's own pixel test on the stretch the shot will show (not the mean of five frames across the whole file).
+      if (!why && seconds) why = await emptyOnScreen(target, seconds, r.mediaType === "video" ? Number(r.durationSeconds) || null : null);
       // A passed picture's hashes join the film, so a near-copy later is refused.
       if (!why) used.push(...(item.dhash ?? []));
       if (why) return why;
