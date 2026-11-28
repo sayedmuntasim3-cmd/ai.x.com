@@ -876,7 +876,7 @@ export async function rerankRun(o) {
   };
   // A shot no right picture was found for becomes a designed line of its own words (owner's rule: a
   // marked gap or a card, never an unrelated photo). The plan files say so, so the renderer draws a card.
-  const gaps = plan.filter((p, i) => !chosen[i] && p.s.heard).map((p) => ({ scene: p.s.scene, shot: p.s.shot, text: p.s.heard }));
+  const gaps = plan.filter((p, i) => !chosen[i] && p.s.heard && p.s.review !== "held").map((p) => ({ scene: p.s.scene, shot: p.s.shot, text: p.s.heard }));
   if (gaps.length) {
     const s5 = join(o.run, "s5-C1.md");
     if (existsSync(s5)) await writeFile(s5, markGaps(await readFile(s5, "utf8"), gaps));
