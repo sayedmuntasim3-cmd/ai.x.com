@@ -1,0 +1,47 @@
+name: Health digest
+
+# The platform's daily report, free and automatic (docs/AUTOPILOT.md). Once a day, after both daily-film
+# slots (10:23 and 14:23 UTC) and a film's usual two hours, it reads the last 24 hours of film runs
+# (voice-film.yml, daily-film.yml: results, job minutes, gate BLOCK lines, why films stopped, free-brain
+# requests, archive failures), writes the plain report into this run's summary, keeps it as a file, and
+# sends it to the Worker (GET /api/health/report, shown in the studio under "My films"). The Worker checks
+# GitHub's own identity token (no stored secret). The builder is pure and tested: engine/src/health-digest.mjs.
+
+on:
+  schedule:
+    - cron: "41 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: health-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The digest builder (no network)
+        run: node --test engine/test/health-digest.test.mjs local/health-digest.test.mjs
+      - name: Read the last 24 hours, write the report, send it to the Worker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SITE: https://ai-x-com.sayedmuntasim3.workers.dev
+        run: node local/health-digest.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: health-digest
+          path: out/health-digest.*
+          retention-days: 30
+          if-no-files-found: warn

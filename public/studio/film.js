@@ -49,6 +49,10 @@ const T = {
     files: "ফাইল",
     page: "পুরো ফিল্মের পেজ খোলো (স্ক্রিপ্ট, শট, ক্লিপ, সোর্স, খরচ)",
     myFilms: "আমার ফিল্মগুলো",
+    digestTitle: "গত ২৪ ঘণ্টার রিপোর্ট",
+    digestNone: "এখনও দৈনিক রিপোর্ট আসেনি।",
+    digestFilms: "ফিল্ম (ভয়েসওভার / আইডিয়া)",
+    digestFix: "সবার আগে ঠিক করার বিষয়",
     noFilms: "এখনও কোনো ফিল্ম নেই।",
     open: "খোলো",
     render: "ভিডিও রেন্ডার করো (MP4, Shorts, থাম্বনেইল)",
@@ -130,6 +134,10 @@ const T = {
     files: "Files",
     page: "Open the film page (script, shots, clips, sources, cost)",
     myFilms: "My films",
+    digestTitle: "Last 24 hours",
+    digestNone: "No daily report yet.",
+    digestFilms: "Films (voiceover / idea)",
+    digestFix: "Fix first",
     noFilms: "No films yet.",
     open: "Open",
     render: "Render the video (MP4, Shorts, thumbnails)",
@@ -439,6 +447,21 @@ async function findIdeas() {
   }
 }
 
+/** The daily health report (GET /api/health/report) as a few plain lines above the films. @param {string} token @param {(text: string) => void} say */
+async function showDigest(token, say) {
+  const l = L();
+  try {
+    const res = await fetch("/api/health/report", { headers: { authorization: `Bearer ${token}` } });
+    const r = await res.json().catch(() => null);
+    const d = r?.report;
+    if (!res.ok || !d) { say(`${l.digestTitle}: ${l.digestNone}`); return; }
+    const f = d.films ?? {};
+    const n = (/** @type {any} */ p) => `${p?.total ?? 0} (${p?.passed ?? p?.done ?? 0}✓ ${p?.failed ?? 0}✗)`;
+    say(`${l.digestTitle} · ${String(d.generatedAt).slice(0, 16).replace("T", " ")} UTC · ${l.digestFilms}: ${n(f.voiceover)} / ${n(f.idea)}`);
+    for (const t of (d.topFixes ?? []).slice(0, 3)) say(`${l.digestFix}: ${String(t).slice(0, 220)}`);
+  } catch { /* the report is a courtesy: the films list still shows */ }
+}
+
 /** The owner's films, newest first; choosing one shows it below. */
 async function showFilms() {
   const l = L();
@@ -451,6 +474,7 @@ async function showFilms() {
     const res = await fetch("/api/films", { headers: { authorization: `Bearer ${token}` } });
     const r = await res.json().catch(() => ({ error: l.notConnected }));
     if (!res.ok) { say(`${l.remakeFailed} ${r.error ?? res.status}`); return; }
+    await showDigest(token, say);
     if (!r.films.length) { say(l.noFilms); return; }
     for (const f of r.films) {
       const li = document.createElement("li");
