@@ -14,7 +14,7 @@
  * page all read the same functions. Never a second copy of the licence rule:
  * FREE_LICENCES is the film media step's own list.
  */
-import { FREE_LICENCES } from "./film-media.mjs";
+import { FREE_LICENCES, isImageUrl } from "./film-media.mjs";
 
 /** The pack's own format number; a page that reads another number says so instead of guessing. */
 export const EDIT_PACK_VERSION = 1;
@@ -57,7 +57,7 @@ export function candidateOf(raw, fallbackLicence = null) {
     mediaUrl: httpUrl(raw.mediaUrl) ?? httpUrl(raw.url) ?? null,
     sourcePageUrl: httpUrl(raw.sourcePageUrl) ?? null,
     title: text(raw.title ?? raw.description ?? "", 140),
-    kind: text(raw.kind ?? "", 12) || null,
+    kind: text(raw.kind ?? "", 12) || (isImageUrl(httpUrl(raw.mediaUrl) ?? httpUrl(raw.url)) ? "image" : null),
   };
 }
 
@@ -365,7 +365,7 @@ export function mediaFromPack(pack) {
       ? {
           id: s.pick.id,
           source: s.pick.source,
-          kind: s.pick.kind ?? undefined,
+          kind: s.pick.kind ?? (isImageUrl(s.pick.mediaUrl) ? "image" : undefined),
           mediaUrl: s.pick.mediaUrl,
           previewUrl: s.pick.thumbnailUrl,
           sourcePageUrl: s.pick.sourcePageUrl,

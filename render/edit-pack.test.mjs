@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { packFromRun, writeRunFromPack } from "./edit-pack.mjs";
+import { spawnSync } from "node:child_process";
+import { joinRemake, packFromRun, writeRunFromPack } from "./edit-pack.mjs";
 import { changedParts } from "../engine/src/edit-pack.mjs";
 
 const ID = "11111111-2222-3333-4444-555555555555";
@@ -72,4 +73,26 @@ test("a re-make's run folder carries the new picture and only its own part chang
   const plan = changedParts(pack, swaps);
   assert.deepEqual(plan.changed, [2]);
   assert.deepEqual(plan.kept, [1]);
+});
+
+const HAS_FFMPEG = spawnSync("ffmpeg", ["-version"]).status === 0 && spawnSync("ffprobe", ["-version"]).status === 0;
+
+test("the re-make join keeps every frame: parts cut off a keyframe, the changed part replaced, a missing new part stops it", { skip: !HAS_FFMPEG }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "join-"));
+  const ff = (/** @type {string[]} */ args) => { const r = spawnSync("ffmpeg", ["-v", "error", "-y", ...args], { encoding: "utf8" }); assert.equal(r.status, 0, r.stderr); };
+  // A 60-frame film, a keyframe every 25 frames; the parts are cut at frames 20 and 40, off the keyframes.
+  ff(["-f", "lavfi", "-i", "testsrc=s=160x90:r=30:d=2", "-f", "lavfi", "-i", "sine=d=2", "-c:v", "libx264", "-g", "25", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", join(dir, "old.mp4")]);
+  mkdirSync(join(dir, "parts"));
+  ff(["-f", "lavfi", "-i", "color=c=red:s=160x90:r=30:d=0.6667", "-frames:v", "20", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", "-video_track_timescale", "90000", join(dir, "parts", "part-2.mp4")]);
+  const pack = { fps: 30, parts: [{ index: 1, start: 0, end: 20 / 30 }, { index: 2, start: 20 / 30, end: 40 / 30 }, { index: 3, start: 40 / 30, end: 2 }] };
+  const out = join(dir, "film.mp4");
+  const done = joinRemake({ old: join(dir, "old.mp4"), partsDir: join(dir, "parts"), pack, changed: [2], out });
+  assert.deepEqual([done.rendered, done.reused], [1, 2]);
+  const frames = spawnSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", out], { encoding: "utf8" }).stdout.trim();
+  assert.equal(frames, "60", "no frame lost or doubled");
+  const pixel = (/** @type {number} */ t) => spawnSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", out, "-frames:v", "1", "-vf", "scale=4:4,format=rgb24", "-f", "rawvideo", "-"], { encoding: "buffer" }).stdout;
+  const red = pixel(1);
+  assert.ok(red[0] > 200 && red[1] < 80, "the changed part shows the new picture");
+  assert.ok(!(pixel(0.2)[0] > 200 && pixel(0.2)[1] < 80) && !(pixel(1.7)[0] > 200 && pixel(1.7)[1] < 80), "the untouched parts keep the old picture");
+  assert.throws(() => joinRemake({ old: join(dir, "old.mp4"), partsDir: join(dir, "nothing"), pack, changed: [2], out: join(dir, "x.mp4") }), /was not rendered/);
 });

@@ -140,6 +140,7 @@ test("a result as /api/media/search really answers (license.code, fullUrl, pageU
   const c = candidateFromSearch(real);
   assert.equal(c?.licence, "PUBLIC-DOMAIN");
   assert.equal(c?.mediaUrl, "https://thumb.test/p.jpg", "the CDN preview, not the rate-limited original");
+  assert.equal(c?.kind, "image");
   assert.equal(c?.sourcePageUrl, real.pageUrl);
   assert.equal(candidateFromSearch({ ...real, license: { code: "cc0" } })?.licence, "CC0-1.0");
   assert.equal(candidateFromSearch({ ...real, license: { code: "us-government" } })?.licence, "US-GOV-PD");

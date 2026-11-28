@@ -56,6 +56,7 @@ export function candidateFromSearch(r) {
     mediaUrl,
     sourcePageUrl: httpUrl(r.sourcePageUrl) ?? httpUrl(r.pageUrl),
     title: text(r.title ?? "", 140),
+    kind: r.kind === "video" || /\.(mp4|webm|mov|m4v)$/i.test(mediaUrl ?? "") ? "video" : "image",
   };
 }
 
