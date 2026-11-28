@@ -8,11 +8,11 @@ import { tokenizeArabic } from "../engine/src/arabic.mjs";
 import { AYAH_COUNTS, ayahText, buildQuranIndex } from "../engine/src/quran.mjs";
 import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, retakeRecording, sliceWords, voiceReport } from "./voice-film.mjs";
 
-const quranIndex = buildQuranIndex(JSON.parse(readFileSync(new URL("../engine/data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
+const tanzilIndex = buildQuranIndex(JSON.parse(readFileSync(new URL("../engine/data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
 
 /** An ayah's words as recited (the basmala before ayah 1 is not part of it). @param {number} surah @param {number} ayah */
 function recited(surah, ayah) {
-  const text = ayahText(quranIndex, surah, ayah) ?? "";
+  const text = ayahText(tanzilIndex, surah, ayah) ?? "";
   const words = text.split(/\s+/);
   return ayah === 1 && surah !== 1 && surah !== 9 && tokenizeArabic(words.slice(0, 4).join(" ")).join(" ") === "بسم الله الرحمن الرحيم" ? words.slice(4).join(" ") : text;
 }
@@ -95,7 +95,7 @@ test("a recitation with no surah typed: --kind quran --transcript finds every su
   const words = [];
   let at = 0.6;
   for (const u of units) {
-    const tokens = u.ayah === null ? tokenizeArabic(ayahText(quranIndex, 1, 1) ?? "") : tokenizeArabic(recited(u.surah, u.ayah));
+    const tokens = u.ayah === null ? tokenizeArabic(ayahText(tanzilIndex, 1, 1) ?? "") : tokenizeArabic(recited(u.surah, u.ayah));
     tokens.forEach((text, i) => words.push({ text, start: Math.round((at + i * 0.55) * 1000) / 1000, end: Math.round((at + i * 0.55 + 0.5) * 1000) / 1000 }));
     at += tokens.length * 0.55 + 0.8;
   }
