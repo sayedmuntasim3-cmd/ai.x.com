@@ -583,7 +583,8 @@ export async function pictures(o) {
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
   // A quiet score under a narration (never under a recitation): s4.md is the cue plan the free score composes.
-  const score = voiceScore(u.scenes, { kind: "narration" });
+  // The music turns where the story turns: each section of the narration (a long pause, or a new part) starts a cue.
+  const score = voiceScore(u.scenes, { kind: "narration", turns: (u.structure?.sections ?? []).map((x) => x.start) });
   if (score) await writeFile(join(o.out, "s4.md"), score.s4);
   const s5 = score ? withMusic(plan.markdown, score.cueOf) : plan.markdown;
   await writeFile(join(o.out, "s5-C1.md"), s5 + "\n");
