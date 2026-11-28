@@ -185,7 +185,9 @@ export function findCandidates(ws) {
     const words = ws.slice(a, j + 1).map((w) => low(w.text));
     const placey = words.some((w) => PLACE_WORDS.has(w) || THING_WORDS.has(w));
     const named = words.some((w) => NOT_NAME.has(w) || STOP.has(w));
-    if (!placey && !named && free(a, j) && words.length <= 3) {
+    // A capitalised pair right after "in", "at", "near"... is a place ("the bridge at Tacoma Narrows"), not a man: the place pass below takes it.
+    const afterPlacePrep = ["in", "at", "near", "outside", "inside", "across", "around"].includes(low(ws[a - 1]?.text ?? ""));
+    if (!placey && !named && !afterPlacePrep && free(a, j) && words.length <= 3) {
       out.push({ kind: "lowerThird", at: ws[a].start, i: a, j, sentence: sent[a], priority: 60, tier: "A", data: { name: span(a, j) }, key: words.join(" ") });
       claim(a, j);
     }
