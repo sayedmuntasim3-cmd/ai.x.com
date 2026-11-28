@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { msg } from "../engine/src/messages.mjs";
+import { MIN_FILLED } from "./picture-taste.mjs";
 import { placeholderTokens } from "../engine/src/claim-values.mjs";
 import { METRICS, craftReport } from "../engine/src/craft-memory.mjs";
 
@@ -243,7 +244,7 @@ export function subtitleFit(narration, captions, seconds) {
  * Read a timeline and the render's report and return every finding.
  * @param {any} timeline
  * @param {any} report
- * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any, voiceFilm?: boolean }} [evidence]
+ * @param {{ channels?: number | null, relevance?: number[] | null, freezes?: { start: number, end: number }[] | null, blurred?: { id: string, value: number }[] | null, blurredDesigned?: { id: string, value: number }[] | null, flicker?: { at: number }[] | null, dark?: { id: string, value: number }[] | null, voiced?: string[] | null, edits?: any[] | null, craft?: any, voiceFilm?: boolean, taste?: { unfilled?: { id: string, filled: number }[], repeats?: { a: string, b: string, bits: number, consecutive: boolean }[], logos?: { id: string, corner: string }[], cards?: { id: string }[] } | null }} [evidence]
  *   voiceFilm: the film is the length of the recording the owner gave (one narration track): a short one is a note, not a block
  *   craft: the Craft Ledger's calibrated targets for this genre (craft-memory.mjs calibratedDoctrine): a note per
  *   measure short of its target and the craft index 0-100 in `craft`. Notes only: the floor above decides blocks.
@@ -469,7 +470,16 @@ export function critique(timeline, report = {}, evidence = {}) {
   const dark = evidence.dark ?? [];
   if (dark.length) add({ ...msg("critic.dark", { count: dark.length }), severity: "warn", value: dark.length });
 
+  // Picture taste (the Apollo 11 voice film passed the gate with small pictures in black, one mosaic six times, a TV logo and
+  // text on empty black): measured on the master itself. Each is a block; nothing above is loosened.
+  const taste = evidence.taste ?? {};
+  if (taste.unfilled?.length) add({ ...msg("critic.unfilled", { count: taste.unfilled.length, floor: round(MIN_FILLED * 100, 0), worst: round(Math.min(...taste.unfilled.map((u) => u.filled)) * 100, 0), ids: taste.unfilled.slice(0, 5).map((u) => u.id).join(", ") }), severity: "block", value: taste.unfilled.length });
+  if (taste.repeats?.length) add({ ...msg("critic.samePicture", { count: taste.repeats.length, consecutive: taste.repeats.filter((r) => r.consecutive).length, ids: taste.repeats.slice(0, 4).map((r) => `${r.a}=${r.b}`).join(", ") }), severity: "block", value: taste.repeats.length });
+  if (taste.logos?.length) add({ ...msg("critic.logo", { count: taste.logos.length, ids: taste.logos.slice(0, 5).map((l) => `${l.id} (${l.corner})`).join(", ") }), severity: "block", value: taste.logos.length });
+  if (taste.cards?.length) add({ ...msg("critic.textOnBlack", { count: taste.cards.length, ids: taste.cards.slice(0, 5).map((c) => c.id).join(", ") }), severity: "block", value: taste.cards.length });
+
   const measures = {
+    unfilledShots: (taste.unfilled ?? []).length, samePictures: (taste.repeats ?? []).length, logoShots: (taste.logos ?? []).length, textOnBlackCards: (taste.cards ?? []).length,
     seconds: round(seconds, 1), shots: lengths.length, avgShot: round(avg), longestShot: round(longest),
     shortShare: round(shortShare, 3), movingShare: round(movingShare, 3), designedMoments: designed.length,
     designedPerMinute: round(perMinute, 2), cueCoverage: round(coverage, 3), firstShot: round(firstShot),

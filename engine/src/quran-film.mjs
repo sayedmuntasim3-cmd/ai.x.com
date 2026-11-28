@@ -29,11 +29,16 @@ export const RECITATION_VISUALS = Object.freeze({
 const MIN_SCENE_SECONDS = 1.5;
 // A silence longer than this between two ayat is shown to the owner: something may not have been recognised.
 const LONG_GAP_SECONDS = 6;
+// A surah title card: at most this long (a long pause is not all card), and only
+// placed when there is at least this much room between the previous ayah's last
+// word and this surah's first one (the pause, and the basmala if it was recited).
+const TITLE_MAX_SECONDS = 3;
+const TITLE_MIN_SECONDS = 0.3;
 
 /**
  * @typedef {{ id: string, surah: number, ayah: number | null, kind: "title" | "ayah", start: number, end: number, spokenStart: number | null, spokenEnd: number | null, text: string, label: string, complete: boolean, estimated: boolean, needsReview: string[], endSure?: boolean }} QuranScene
  * @typedef {{ start: number, end: number, text: string }} QuranCaption
- * @typedef {{ ok: boolean, timed: boolean, totalSeconds: number, scenes: QuranScene[], captions: QuranCaption[], credit: string, audio: typeof RECITATION_AUDIO, visuals: typeof RECITATION_VISUALS, rules: string[], review: string[], summary: { surah: number | null, fromAyah: number | null, toAyah: number | null, ayat: number, coverage: number }, timing?: "recognized" | "estimated", source?: string }} QuranFilmPlan
+ * @typedef {{ ok: boolean, timed: boolean, totalSeconds: number, scenes: QuranScene[], captions: QuranCaption[], credit: string, audio: typeof RECITATION_AUDIO, visuals: typeof RECITATION_VISUALS, rules: string[], review: string[], summary: { surah: number | null, surahs: number[], fromAyah: number | null, toAyah: number | null, ayat: number, coverage: number }, timing?: "recognized" | "estimated", source?: string }} QuranFilmPlan
  */
 
 /** @param {number} n */
@@ -48,7 +53,7 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
   /** @type {string[]} */
   const review = [];
   const total = Number.isFinite(totalSeconds) && totalSeconds > 0 ? r3(totalSeconds) : 0;
-  const empty = (/** @type {string} */ why) => ({ ok: false, timed: false, totalSeconds: total, scenes: [], captions: [], credit: QURAN_CREDIT, audio: RECITATION_AUDIO, visuals: RECITATION_VISUALS, rules, review: [why], summary: { surah: null, fromAyah: null, toAyah: null, ayat: 0, coverage: match?.coverage ?? 0 } });
+  const empty = (/** @type {string} */ why) => ({ ok: false, timed: false, totalSeconds: total, scenes: [], captions: [], credit: QURAN_CREDIT, audio: RECITATION_AUDIO, visuals: RECITATION_VISUALS, rules, review: [why], summary: { surah: null, surahs: [], fromAyah: null, toAyah: null, ayat: 0, coverage: match?.coverage ?? 0 } });
   if (!match?.isQuran || !match.segments.length) return empty("The recording was not recognised as a Quran recitation, so no film is planned.");
   if (!total) return empty("The length of the recording is needed to plan the film.");
 
@@ -90,13 +95,16 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
   }
 
   // Cut points: the middle of the quiet between two ayat, so no ayah is ever clipped.
+  // At a new surah the cut sits on the previous ayah's last word, so the whole
+  // opening of the next surah (its pause and its basmala) belongs to that surah's
+  // title card, and no other surah's basmala plays over this surah's last ayah.
   const first = ayat[0];
   /** @type {number[]} */
   const cuts = [];
   for (let i = 0; i + 1 < ayat.length; i += 1) {
     const e = /** @type {number} */ (ayat[i].end);
     const s = /** @type {number} */ (ayat[i + 1].start);
-    cuts.push(r3(Math.min(Math.max((e + s) / 2, e), Math.max(s, e))));
+    cuts.push(r3(ayat[i + 1].surah !== ayat[i].surah ? Math.min(e, s) : Math.min(Math.max((e + s) / 2, e), Math.max(s, e))));
   }
 
   /** @type {QuranScene[]} */
@@ -107,7 +115,7 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
   };
   let sceneStart = 0;
   let previousSurah = 0;
-  const basmala = match.markers.find((m) => m.type === "basmala");
+  const basmalas = match.markers.filter((m) => m.type === "basmala");
   ayat.forEach((a, i) => {
     const end = i + 1 < ayat.length ? cuts[i] : total;
     const text = ayahText(index, a.surah, a.ayah) ?? "";
@@ -117,12 +125,22 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
     if (a.ambiguous) flags.push("The passage could also be another place in the Quran.");
     if (end - sceneStart < MIN_SCENE_SECONDS) flags.push("A very short scene.");
     if (a.surah !== previousSurah) {
-      // A surah's opening: a title card runs through the isti'adha and basmala, before the first ayah is spoken.
-      const titleEnd = Math.min(Math.max(a.start ?? 0, MIN_SCENE_SECONDS), end);
-      if (titleEnd > sceneStart + 0.5 && (a.start ?? 0) > sceneStart + 0.5) {
-        const showsBasmala = a.ayah === 1 && a.surah !== 1 && a.surah !== 9 && basmala && i === 0;
-        scenes.push({ id: "", surah: a.surah, ayah: null, kind: "title", start: r3(sceneStart), end: r3(titleEnd), spokenStart: null, spokenEnd: null, text: showsBasmala ? (ayahText(index, 1, 1) ?? "") : "", label: surahTitle(a.surah), complete: true, estimated: !timed, needsReview: [] });
-        sceneStart = titleEnd;
+      // Every surah gets its own title card: it runs through the pause before the
+      // first ayah, over that surah's basmala when the reciter said one. A surah
+      // shown from its first ayah gets the basmala on the card too (the Tanzil
+      // text of 1:1), except Al-Fatiha (it is its first ayah) and At-Tawbah (it
+      // has none). The card only ever takes time in which nothing is recited, so
+      // the ayah's picture still holds its whole recitation.
+      const spoken = a.start ?? sceneStart;
+      const card = Math.min(Math.max(0, spoken - sceneStart), TITLE_MAX_SECONDS);
+      const basmala = a.ayah === 1 && a.surah !== 1 && a.surah !== 9
+        ? basmalas.find((m) => m.start !== null && m.start >= sceneStart - 0.05 && m.start <= spoken + 0.05)
+        : undefined;
+      if (card >= TITLE_MIN_SECONDS) {
+        scenes.push({ id: "", surah: a.surah, ayah: null, kind: "title", start: r3(sceneStart), end: r3(sceneStart + card), spokenStart: null, spokenEnd: null, text: basmala ? (ayahText(index, 1, 1) ?? "") : "", label: surahTitle(a.surah), complete: true, estimated: !timed, needsReview: [] });
+        sceneStart = r3(sceneStart + card);
+      } else {
+        review.push(`Surah ${a.surah} begins with no pause before its first ayah: there is no room for its title card without covering the recitation, so it has none.`);
       }
       previousSurah = a.surah;
     }
@@ -147,7 +165,7 @@ export function planQuranFilm({ match, index, totalSeconds, surahNames = [] }) {
     visuals: RECITATION_VISUALS,
     rules,
     review,
-    summary: { surah: surahs.size === 1 ? first.surah : null, fromAyah: first.ayah, toAyah: ayat[ayat.length - 1].ayah, ayat: ayat.length, coverage: match.coverage },
+    summary: { surah: surahs.size === 1 ? first.surah : null, surahs: [...surahs], fromAyah: first.ayah, toAyah: ayat[ayat.length - 1].ayah, ayat: ayat.length, coverage: match.coverage },
   };
 }
 

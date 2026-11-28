@@ -2,8 +2,8 @@
 // and follow the film. The recording stays private; its words are the script, unchanged.
 const $ = (s) => document.querySelector(s);
 const T = {
-  en: { make: "Make the film on the studio's machines", key: "Studio key", up: (p) => `Uploading… ${p}%`, start: "Starting…", noFile: "Choose a recording first.", noKey: "Enter your studio key.", badKey: "That studio key is not right.", surah: "Say which surah is recited (a number, 1-114).", dl: "Download the film", review: "A Quran film is never published before a qualified scholar has reviewed it.", stopped: "Stopped", net: "No connection. Try again." },
-  bn: { make: "স্টুডিওর মেশিনে ফিল্ম বানান", key: "স্টুডিও কী", up: (p) => `আপলোড হচ্ছে… ${p}%`, start: "শুরু হচ্ছে…", noFile: "আগে একটি রেকর্ডিং বেছে নিন।", noKey: "স্টুডিও কী দিন।", badKey: "স্টুডিও কী ঠিক নয়।", surah: "কোন সূরা তিলাওয়াত হয়েছে লিখুন (সংখ্যা, ১-১১৪)।", dl: "ফিল্ম ডাউনলোড করুন", review: "কুরআনের ফিল্ম একজন যোগ্য আলেমের রিভিউ ছাড়া কখনো প্রকাশ হয় না।", stopped: "থেমে গেছে", net: "সংযোগ নেই। আবার চেষ্টা করুন।" },
+  en: { make: "Make the film on the studio's machines", key: "Studio key", up: (p) => `Uploading… ${p}%`, start: "Starting…", noFile: "Choose a recording first.", noKey: "Enter your studio key.", badKey: "That studio key is not right.", surah: "The surah is a number from 1 to 114, or leave it empty and the recording is read for you.", dl: "Download the film", review: "A Quran film is never published before a qualified scholar has reviewed it.", stopped: "Stopped", net: "No connection. Try again." },
+  bn: { make: "স্টুডিওর মেশিনে ফিল্ম বানান", key: "স্টুডিও কী", up: (p) => `আপলোড হচ্ছে… ${p}%`, start: "শুরু হচ্ছে…", noFile: "আগে একটি রেকর্ডিং বেছে নিন।", noKey: "স্টুডিও কী দিন।", badKey: "স্টুডিও কী ঠিক নয়।", surah: "সূরা ১ থেকে ১১৪-এর মধ্যে একটি সংখ্যা, অথবা খালি রাখুন—রেকর্ডিং পড়ে সূরাগুলো খুঁজে নেওয়া হবে।", dl: "ফিল্ম ডাউনলোড করুন", review: "কুরআনের ফিল্ম একজন যোগ্য আলেমের রিভিউ ছাড়া কখনো প্রকাশ হয় না।", stopped: "থেমে গেছে", net: "সংযোগ নেই। আবার চেষ্টা করুন।" },
 };
 const lang = () => (document.documentElement.lang === "bn" ? "bn" : "en");
 const t = (k, ...a) => { const v = T[lang()][k]; return typeof v === "function" ? v(...a) : v; };
@@ -45,12 +45,15 @@ function init() {
     const studioKey = key.value.trim();
     if (!studioKey) return say(t("noKey"), true);
     const quran = $("#ctype").value === "quran_recitation";
-    const surah = Number(($("#q-surah").value.match(/^\s*(\d{1,3})\s*$/) || [])[1]);
-    if (quran && !(surah >= 1 && surah <= 114)) return say(t("surah"), true);
+    // A surah may be left empty: the film machine then reads the recording and finds
+    // every surah and ayah itself, across surah boundaries, asking rather than guessing.
+    const asked = $("#q-surah").value.trim();
+    const surah = Number((asked.match(/^\s*(\d{1,3})\s*$/) || [])[1]);
+    if (quran && asked && !(surah >= 1 && surah <= 114)) return say(t("surah"), true);
     go.disabled = true; go.textContent = t("start");
     try {
       const auth = { authorization: `Bearer ${studioKey}` };
-      const res = await fetch("/api/voice", { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ fileName: file.name, bytes: file.size, kind: quran ? "quran" : "narration", ...(quran ? { surah, ayat: $("#q-ayat").value.trim(), reciter: $("#q-reciter").value.trim() } : {}) }) });
+      const res = await fetch("/api/voice", { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ fileName: file.name, bytes: file.size, kind: quran ? "quran" : "narration", ...(quran ? { ...(asked ? { surah } : {}), ayat: $("#q-ayat").value.trim(), reciter: $("#q-reciter").value.trim() } : {}) }) });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) return say(t("badKey"), true);
       if (!res.ok) return say(data.error || res.status, true);

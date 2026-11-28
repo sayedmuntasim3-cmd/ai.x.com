@@ -77,3 +77,10 @@ test("a moment never lands on a designed card, and never runs past its shot", ()
   assert.equal(r.placed.length, 0);
   assert.equal(r.dropped.length, 2);
 });
+
+test("a capitalised pair after 'at' or 'in' is a place, not a man's name card", () => {
+  const ws = timed("The bridge at Tacoma Narrows collapsed in November of that year, while Leon Moisseiff watched the deck twist in the wind.");
+  const c = findCandidates(ws);
+  assert.deepEqual(c.filter((x) => x.kind === "lowerThird").map((x) => x.data.name), ["Leon Moisseiff"]);
+  assert.ok(c.some((x) => x.kind === "place" && x.data.text === "Tacoma Narrows"));
+});

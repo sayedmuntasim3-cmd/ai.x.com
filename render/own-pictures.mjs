@@ -47,12 +47,15 @@ export function ownPictureFolder(dir) {
  * named after. The shot keeps its time, transition, fades, chip, chapter title
  * and the Edit Director's moves; its card text, map or split is replaced.
  * @param {import("../engine/src/timeline.mjs").Timeline} timeline
- * @param {ReturnType<typeof ownPictureFolder>} folder
+ * @param {ReturnType<typeof ownPictureFolder>} folder  each shot may name its own licence (a creator's own
+ *   media says so; a picture the owner committed keeps "provided by the owner")
  * @returns {{ applied: string[], unknown: string[], ignored: string[] }}
  */
 export function applyOwnPictures(timeline, folder) {
   /** @type {string[]} */
   const applied = [];
+  /** @type {string[]} */
+  const ownMediaShots = [];
   const ids = new Set(timeline.video.map((v) => v.id));
   timeline.video = timeline.video.map((v) => {
     const own = folder.shots[v.id];
@@ -65,18 +68,21 @@ export function applyOwnPictures(timeline, folder) {
       return v;
     }
     applied.push(v.id);
+    if (own.licence === OWN_MEDIA_LICENCE) ownMediaShots.push(v.id);
     const { split: _split, counter: _counter, map: _map, speed: _speed, chart: _chart, highlight: _highlight, ...rest } = v;
     // The file's content is part of the shot, so a replaced picture under the same name is rendered again.
-    return { ...rest, type: "clip", url: own.file, sourcePageUrl: null, licence: OWNER_LICENCE, motion: own.kind === "image" ? "push" : "none", text: "", sourceIn: 0, still: own.kind === "image", fileHash };
+    return { ...rest, type: "clip", url: own.file, sourcePageUrl: null, licence: own.licence ?? OWNER_LICENCE, motion: own.kind === "image" ? "push" : "none", text: "", sourceIn: 0, still: own.kind === "image", fileHash };
   });
   const unknown = Object.keys(folder.shots).filter((id) => !ids.has(id));
   if (applied.length) timeline.notes.push(`${applied.length} shot${applied.length > 1 ? "s use pictures" : " uses a picture"} provided by the owner (${applied.join(", ")}); their rights are the owner's responsibility.`);
+  // The creator's own media is named in the report as what it is: theirs, with the rights they confirmed.
+  if (ownMediaShots.length) timeline.notes.push(`${OWN_MEDIA_LICENCE} (${ownMediaShots.join(", ")}).`);
   for (const id of unknown) timeline.notes.push(`pictures: ${id} is not a shot of this film; ${folder.shots[id].file} was not used.`);
   for (const f of folder.ignored) timeline.notes.push(`pictures: ${f} is not named after a shot (SC0012-1.jpg) or is a second file for one shot; not used.`);
   timeline.stats.clips = timeline.video.filter((v) => v.type === "clip").length;
   timeline.stats.cards = timeline.video.filter((v) => v.type === "card").length;
   timeline.stats.black = timeline.video.filter((v) => v.type === "black").length;
-  return { applied, unknown, ignored: folder.ignored };
+  return { applied, unknown, ignored: folder.ignored, ownMedia: ownMediaShots };
 }
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/x-m4v": "m4v" };
@@ -140,12 +146,20 @@ export async function downloadPictureLinks(links, dir, o = {}) {
   return out;
 }
 
-/** The licence line for media the creator adds themselves. */
-export const OWN_MEDIA_LICENCE = "Your own media";
-/** Fixed preference bonus given to the creator's own media when it is scored against a sentence. */
-export const OWN_MEDIA_PREFERENCE_BONUS = 0.25;
-/** A match below this (after the bonus) is not used. */
-export const OWN_MEDIA_MATCH_FLOOR = 0.2;
+/**
+ * The licence line for media the creator adds themselves. The creator ticked the
+ * promise ("Only add pictures you own or may use") when choosing the files, so the
+ * rights report records their confirmation, not a stock licence.
+ */
+export const OWN_MEDIA_LICENCE = "Your own media, creator confirmed rights";
+/**
+ * The preference given to the creator's own media when it is scored against a sentence. Small on purpose:
+ * OpenCLIP text-to-image similarities sit near 0.15-0.35 (render/asset-rank/rerank.mjs), so a bonus of a few
+ * hundredths wins a tie against stock and still lets an unrelated picture lose.
+ */
+export const OWN_MEDIA_PREFERENCE_BONUS = 0.03;
+/** A match below this (after the bonus) is not used: the shot keeps its searched picture. */
+export const OWN_MEDIA_MATCH_FLOOR = 0.22;
 export const OWN_MEDIA_BONUS = OWN_MEDIA_PREFERENCE_BONUS;
 export const OWN_MEDIA_FLOOR = OWN_MEDIA_MATCH_FLOOR;
 
