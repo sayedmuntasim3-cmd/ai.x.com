@@ -96,9 +96,9 @@ const ID = /^[0-9a-f-]{36}$/;
 /** The stages the runner reports, in order (each has a message voice.stage.<stage>). */
 export const VOICE_STAGES = /** @type {const} */ (["script", "narrate", "uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
 
-/** @param {unknown} body @param {number} [status] */
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+/** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
+function json(body, status = 200, headers = {}) {
+  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 }
 
 /** @param {string} a @param {string} b */
@@ -386,11 +386,13 @@ export async function handleVoice(request, env, url, deps = {}) {
     // Groq only: Gemini's 20 requests a day are gone long before a 40-minute film is planned, and a call sent there
     // after Groq's busy minute came back as "daily limit used up" and stopped the film's brain (film ccd86532).
     if (!env.GROQ_API_KEY || String(env.GROQ ?? "").toLowerCase() === "off") return json({ error: "The free brain (Groq, the GROQ_API_KEY secret) is not set." }, 503);
-    let groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-    // The runner may name one model (each has its own minute, so it spreads its calls over all three): only that model is asked.
-    const named = String(body?.model ?? "");
-    if (named && (groqModels.length ? groqModels : [...GROQ_MODELS]).includes(named)) groqModels = [named];
-    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(groqModels.length ? { models: groqModels } : {}), ...(deps.fetch ? { fetch: deps.fetch } : {}) });
+    const allowed = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    // The runner names the model it is pacing (render/voice-runner.mjs workerBrain), so each model keeps its own
+    // minute. This route makes one attempt on one model and never sleeps: a Worker forgets the previous request,
+    // so the minute's budget and the retries live with the runner, which hands the wait back in Retry-After.
+    const named = String(/** @type {any} */ (body)?.model ?? "").trim();
+    const pinned = named && (allowed.length ? allowed : [...GROQ_MODELS]).includes(named) ? [named] : allowed;
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(pinned.length ? { models: pinned } : {}), retries: 1, pace: false, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
     const tokens = promptTokens(groqMessages(req));
     // Too big for Groq's minute: the runner splits its batch and asks again (413, never another brain).
     if (tokens > GROQ_PROMPT_LIMIT) return json({ error: `The prompt is about ${tokens} tokens; the free brain takes ${GROQ_PROMPT_LIMIT}. Split it.`, tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
@@ -401,7 +403,13 @@ export async function handleVoice(request, env, url, deps = {}) {
       const e = /** @type {any} */ (error);
       if (e?.tooLarge) return json({ error: String(e.message).slice(0, 600), tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
       // A busy minute or a used-up day, in Groq's own words, as 429 so the runner itself decides to wait or stop.
-      return json({ error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens }, 429);
+      // The wait Groq named travels back in Retry-After, and a used-up day says so, so the runner can pace.
+      const waitMs = Number(e?.retryAfterMs) || 0;
+      return json(
+        { error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens, daily: Boolean(e?.daily), retryAfterMs: waitMs || null, spentModels: e?.spentModels ?? [] },
+        429,
+        waitMs ? { "retry-after": String(Math.max(1, Math.ceil(waitMs / 1000))) } : {},
+      );
     }
   }
 
