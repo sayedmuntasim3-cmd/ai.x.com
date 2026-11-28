@@ -43,7 +43,8 @@ export function groqModel(o) {
   const spent = new Set();
   return {
     name: models[0],
-    capabilities: { vision: false, webSearch: false },
+    // promptLimitTokens: the film run splits any stage larger than one Groq request (engine/src/film-split.mjs).
+    capabilities: { vision: false, webSearch: false, promptLimitTokens: GROQ_PROMPT_LIMIT },
     /** Whether a request fits Groq at all (no web search, prompt under the per-minute limit). @param {any} req */
     fits(req) {
       return !req.webSearch && !req.system.some((/** @type {any} */ b) => b.image) && promptTokens(groqMessages(req)) <= GROQ_PROMPT_LIMIT;
@@ -128,6 +129,9 @@ export function groqLook(o) {
 export function withGroq(main, groq, o = {}) {
   return {
     ...main,
+    // The chain is a Groq-sized brain: the film run keeps every call under Groq's limit, so Groq takes the
+    // stage and Gemini is asked only when Groq cannot (engine/src/film-split.mjs).
+    capabilities: { ...main.capabilities, promptLimitTokens: /** @type {any} */ (groq.capabilities)?.promptLimitTokens },
     /** @param {any} req */
     async call(req) {
       if (groq.fits(req)) {
