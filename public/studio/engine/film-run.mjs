@@ -24,6 +24,8 @@ import { MOTION_LEVELS } from "./motion.mjs";
 import { checkOriginality, fingerprintFilm } from "./originality.mjs";
 import { FICTION_LABELS, lintNarration, STORY_RULES } from "./story-mode.mjs";
 import { applyFixes, checkChapter, checkFilm, hookFindings, parseSceneLines, toClock, toSeconds } from "./scene-lines.mjs";
+import { CHARS_PER_TOKEN, chunkLines, claimDigest, factGroups, mergeJson, mergeParts, sceneClock, sceneGroups, sectionFrom, textTokens } from "./film-split.mjs";
+import { splitManual } from "./lean-manual.mjs";
 import { bindToCorpus, corpusBudget, corpusText, gatherCorpus, queryInstruction, writeInstruction } from "./research-desk.mjs";
 import { checkSources, sourceGaps } from "./source-check.mjs";
 import { getVersion } from "./versions.mjs";
@@ -66,7 +68,7 @@ export const WEB_SEARCH_USD = 0.01;
  * @typedef {{ stage: string, system: Block[], messages: { role: "user" | "assistant", content: Block[] }[], maxTokens: number, effort: string, webSearch?: { maxUses: number } }} ModelRequest
  * @typedef {{ input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number, cache_creation_input_tokens?: number, web_search_requests?: number, batch?: number }} Usage
  * @typedef {{ text: string, stopReason: string, usage: Usage, model?: string, responseId?: string, modelVersion?: string }} ModelReply
- * @typedef {{ vision?: boolean, webSearch?: boolean, contextTokens?: number, maxOutputTokens?: number }} Capabilities  what the brain can do; a missing field means yes (the Claude API can do all of it)
+ * @typedef {{ vision?: boolean, webSearch?: boolean, contextTokens?: number, maxOutputTokens?: number, promptLimitTokens?: number }} Capabilities  what the brain can do; a missing field means yes (the Claude API can do all of it); promptLimitTokens: the most prompt tokens one request may carry (a split-capable run keeps every call under it, film-split.mjs)
  * @typedef {{ input: number, output: number, cacheRead: number, cacheWrite: number }} Price  US dollars per million tokens
  * @typedef {{ name: string, call: (r: ModelRequest) => Promise<ModelReply>, capabilities?: Capabilities, price?: Price }} Model  price: the brain's own price (a local brain is free); without it PRICES is used
  * @typedef {{ get: (key: string) => Promise<string | null>, put: (key: string, text: string) => Promise<void> }} Store
@@ -233,6 +235,19 @@ export function chapterSpec(c, versionId, o = {}) {
   };
 }
 
+/**
+ * The short brief a split part gets instead of the whole production brief: the stage's own instruction
+ * and role craft carry the production rules, and every part must fit the brain's whole prompt limit.
+ * Nothing here contradicts filmBrief: same film, same version lock, same facts-only rule.
+ * @param {Film} film
+ */
+export function splitBrief(film) {
+  return filmBrief(film)
+    .split("\n")
+    .filter((l) => /^FILM:|^PIPELINE MODE|^VERSION LOCK|^1\. /.test(l))
+    .join("\n");
+}
+
 /** The tagging rule S5 is given for a true-story film (scene-lines.mjs linkFindings checks it). */
 export const CLAIM_TAG_RULE = "CLAIM TAGS (true-story films; code checks every sentence): end every sentence in NARR with a tag in curly braces: {C01} or {C01, C02} for a sentence that states anything from the S2 ledger (a fact, a number, a date, a name, an event, an estimate, a contested or an unknown point), or {N} for a sentence that states nothing factual (a question, a transition, commentary). Example: NARR: The mill opened in seventeen ninety. {C01} Nobody wrote down why. {C02} So who paid for it? {N} Tags are never spoken; code removes them before the voice and the captions. A sentence tagged {N} may hold no number and no date.";
 
@@ -365,7 +380,7 @@ export const PER_CHAPTER_STAGES = 3;
  * budgetUsd is a hard cap: before every model call the worst case of that call
  * (its whole input at the full input price plus its whole output allowance)
  * is reserved, and a call that could cross the cap is never made.
- * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", researchStrict?: boolean, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, referencePrior?: object, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
+ * @param {{ film: Film, signal?: AbortSignal, halt?: () => Promise<string | null>, promptLimit?: number, research?: { providers: import("./research-desk.mjs").ResearchProvider[], fetch: import("./research-desk.mjs").FetchLike }, manual: string, model: Model, store: Store, step?: Step, researchMode?: "knowledge", researchStrict?: boolean, log?: (line: string) => void, maxRepairs?: number, budgetUsd?: number, edit?: boolean, viewers?: boolean, lessons?: { load(): Promise<string> }, referencePrior?: object, market?: { find(topic: string): Promise<{ title: string, channelTitle: string, views: number, outlier: number, durationSeconds: number }[]> }, sources?: { fetch: (url: string, init?: RequestInit) => Promise<Response> }, channel?: { load(): Promise<import("./originality.mjs").Fingerprint[]>, save(list: import("./originality.mjs").Fingerprint[]): Promise<void> }, media?: { providers: import("./film-media.mjs").MediaProvider[], review?: boolean, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void> } }} o
  */
 export async function runFilm(o) {
   const { film, manual, model, store } = o;
@@ -376,6 +391,69 @@ export async function runFilm(o) {
   const maxRepairs = o.maxRepairs ?? 2;
   const brief = filmBrief(film);
   const system = [{ text: manual, cache: true }, { text: brief, cache: true }];
+  /**
+   * A brain that limits one request's prompt (Groq's free tier: 7,200 tokens by the engine's estimate)
+   * gets every stage in parts, each part under the limit, instead of the stage going to another brain
+   * (film-split.mjs). A part gets only the manual sections it acts on, the short brief and the role craft,
+   * so the limit holds for the whole request, not just its material.
+   */
+  const limit = o.promptLimit ?? model.capabilities?.promptLimitTokens;
+  /** @param {string} stage */
+  const partSystem = (stage) => [{ text: splitManual(manual, stage), cache: true }, { text: splitBrief(film), cache: true }];
+  /**
+   * How much stage material (characters) one part may carry: the part's manual, brief and role craft are
+   * counted first and a reserve is left for its own instruction.
+   * @param {string} stage @param {number} [reserveChars]
+   */
+  function roomFor(stage, reserveChars = 1500) {
+    if (!limit) return Infinity;
+    const craftKey = /** @type {Record<string, import("./role-craft.mjs").CraftStage>} */ (ROLE_CRAFT_STAGES)[stage.split(":")[0]];
+    const fixed = textTokens(partSystem(stage)[0].text) + textTokens(splitBrief(film)) + (craftKey ? textTokens(roleCraft(craftKey)) : 0);
+    return Math.max(0, Math.floor((limit - fixed) * CHARS_PER_TOKEN) - reserveChars);
+  }
+  /**
+   * Whether the stage's whole call (its full manual sections, the brief, the role craft and this material)
+   * is over the limit, so the stage is split.
+   * @param {string} stage @param {number} chars
+   */
+  const overLimit = (stage, chars) => {
+    if (!limit) return false;
+    const craftKey = /** @type {Record<string, import("./role-craft.mjs").CraftStage>} */ (ROLE_CRAFT_STAGES)[stage.split(":")[0]];
+    // The whole call as this run sends it: the production manual, the brief, the role craft and the material
+    // (a brain that cuts the manual to the stage's sections is served even smaller parts, never larger ones).
+    const whole = textTokens(manual) + textTokens(brief) + (craftKey ? textTokens(roleCraft(craftKey)) : 0) + Math.ceil(chars / CHARS_PER_TOKEN);
+    return whole > limit;
+  };
+  /**
+   * The output allowance of one part: Groq counts the reply in the same per-minute budget as the prompt.
+   * @param {string} stage @param {number} maxTokens
+   */
+  function partTokens(stage, maxTokens) {
+    if (!limit) return maxTokens;
+    const fixed = limit - roomFor(stage, 0) / CHARS_PER_TOKEN;
+    return Math.max(600, Math.min(maxTokens, Math.floor(7600 - fixed)));
+  }
+  /**
+   * Text cut to fit one part: the cut is never silent, it is written to the run's gaps (the QA desk and the release gate read them).
+   * @param {string} what @param {string} text @param {number} maxChars
+   */
+  function cutNote(what, text, maxChars) {
+    if (text.length <= maxChars) return text;
+    state.gaps.push(`${what}: split mode gave one call only the first ${maxChars} of ${text.length} characters (the whole text is in the stage's file); a late item may be missing.`);
+    return text.slice(0, maxChars);
+  }
+  /**
+   * Ask one stage in parts: each part is self-contained, the replies are merged in order by the caller.
+   * @param {string} stage @param {string[]} parts @param {number} maxTokens
+   */
+  async function askParts(stage, parts, maxTokens) {
+    const out = [];
+    for (let i = 0; i < parts.length; i += 1) {
+      if (i > 0 && i % 24 === 0) log(`${stage}: part ${i + 1} of ${parts.length}`);
+      out.push(await ask(i === 0 ? stage : `${stage}:${i + 1}`, [{ text: parts[i] }], partTokens(stage, maxTokens), { system: partSystem(stage) }));
+    }
+    return out;
+  }
 
   /** @type {any} */
   const state = JSON.parse((await store.get("run.json")) ?? "null") ?? { film, model: model.name, stages: {}, usage: {}, costUsd: 0, gaps: [], status: "running" };
@@ -555,7 +633,15 @@ export async function runFilm(o) {
     const priorBrief = o.referencePrior ? packagingBrief(o.referencePrior, pillarOf({ title: film.topic })) : "";
     await stage("s01", async () => {
       const demand = proven();
-      const text = await ask("s01", [...(demand ? [{ text: demand }] : []), ...(priorBrief ? [{ text: priorBrief }] : []), { text: "Write S0 (section 4: intake, media math, risk scan) and S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it."  + (demand ? " PROVEN_DEMAND lists real videos on this topic that beat their own channels: study why they won (the promise, the stake, the specific detail) and beat them with a better angle; never reuse their wording or structure." : "") }], 24000);
+      const pack = [...(demand ? [{ text: demand }] : []), ...(priorBrief ? [{ text: priorBrief }] : [])];
+      const beat = demand ? " PROVEN_DEMAND lists real videos on this topic that beat their own channels: study why they won (the promise, the stake, the specific detail) and beat them with a better angle; never reuse their wording or structure." : "";
+      const s0 = "Write S0 (section 4: intake, media math, risk scan) for this film.";
+      const s1 = "Write S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it." + beat;
+      const instruction = "Write S0 (section 4: intake, media math, risk scan) and S1 (section 5: beat-the-best, angle, 10 titles scored, 3 thumbnail briefs, title contract) for this film. Mark every title number PROVISIONAL until S2 confirms it." + beat;
+      const withPack = (/** @type {string} */ part) => [...pack.map((b) => b.text), part].join("\n\n");
+      const text = overLimit("s01", pack.reduce((n, b) => n + b.text.length, 0) + instruction.length)
+        ? mergeParts(await askParts("s01", [withPack(s0), withPack(s1)], 24000))
+        : await ask("s01", [...pack, { text: instruction }], 24000);
       await store.put("s01.md", text);
       return { chars: text.length };
     });
@@ -648,22 +734,51 @@ export async function runFilm(o) {
     }
 
     await stage("s2", async () => {
-      const text = await ask("s2", [
-        { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("RESEARCH", await read("research.json")) },
-        { text: isStoryFilm(film)
+      const s01 = await read("s01.md");
+      const researchText = await read("research.json");
+      const storyInstruction = isStoryFilm(film)
           ? "Write S2 for an invented story: (a) the realism ledger, one row per real-world detail the story uses, with ID (C01...), detail, exact value, sources and chapter use, from the research file only; (b) the story bible: each invented character's name (no famous real person's name), age, want, wound, fear and the price they pay; (c) if money is involved, the money path: every jump in wealth with its cause and the exact figures, adding up." + CHECKED_FACTS
-          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources (first the research fact IDs, F01 ..., the claim rests on, then their URLs), confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." + CHECKED_FACTS },
-      ], 32000);
+          : "Write S2, the claim ledger (section 6), from the research file only: one row per claim with ID (C01...), claim, status (FACT, CONTESTED, QUOTE -> paraphrase, ESTIMATE, UNKNOWN), value, sources (first the research fact IDs, F01 ..., the claim rests on, then their URLs), confidence, conflicts, wording rule for narration, on-screen chip and chapter use. Currency conversions use that year's rate and today's money; values you cannot compute from the research are PENDING with the exact method." + CHECKED_FACTS;
+      // A brain with a small prompt limit gets the ledger in fact groups; the parts are merged in order
+      // into the one ledger, which is the stage's output format either way.
+      let text;
+      if (overLimit("s2", s01.length + researchText.length + storyInstruction.length)) {
+        const groups = factGroups(researchText, roomFor("s2"));
+        const parts = groups.map((g, i) => [
+          ctx("S0_S1", s01),
+          ctx("RESEARCH", g.text),
+          storyInstruction + ` These are research facts in ${groups.length} group${groups.length > 1 ? "s" : ""}; write the S2 rows that rest on THESE facts only, in the stage's format, with no preamble. Another call writes the rows for the other facts; never write a row for a fact you were not given, and never change a fact's wording.`,
+        ].join("\n\n"));
+        text = mergeParts(await askParts("s2", parts, 24000));
+      } else {
+        text = await ask("s2", [{ text: ctx("S0_S1", s01) + "\n" + ctx("RESEARCH", researchText) }, { text: storyInstruction }], 32000);
+      }
       await store.put("s2.md", text);
       return { claims: (text.match(/\bC\d{2,3}\b/g) ?? []).length };
     });
 
     const plan = await stage("s3", async () => {
+      const s01 = await read("s01.md");
+      const s2 = await read("s2.md");
+      const chapterJson = `ONE fenced \`\`\`json block: an array of chapters, each {"id": "C1", "title", "start": "0:00:00", "end": "h:mm:ss", "firstScene": "SC0001", "lastScene": "SC00nn", "brief": "a self-contained brief for that chapter's writer: scene count, word budget, beats with exact times and claim IDs, loops opened and paid, what it must hand to the next chapter"}. Chapters tile 0:00:00 to ${toClock(film.durationSeconds)} with no gap; scene IDs run from SC0001 with no gap. Chapters of 5 to 9 minutes; a film under 10 minutes has 1 to 3 chapters.`;
+      const architecture = "arc, chapter plan, scene allocation and clock, retention map, interrupt plan, progress motif, title-contract binding, open-loop ledger, emotion curve, music arc, Shorts candidates";
       const content = [
-        { text: ctx("S0_S1", await read("s01.md")) + "\n" + ctx("S2", await read("s2.md")) },
-        { text: `Write S3, the story architecture (section 7): arc, chapter plan, scene allocation and clock, retention map, interrupt plan, progress motif, title-contract binding, open-loop ledger, emotion curve, music arc, Shorts candidates. Then end with ONE fenced \`\`\`json block: an array of chapters, each {"id": "C1", "title", "start": "0:00:00", "end": "h:mm:ss", "firstScene": "SC0001", "lastScene": "SC00nn", "brief": "a self-contained brief for that chapter's writer: scene count, word budget, beats with exact times and claim IDs, loops opened and paid, what it must hand to the next chapter"}. Chapters tile 0:00:00 to ${toClock(film.durationSeconds)} with no gap; scene IDs run from SC0001 with no gap. Chapters of 5 to 9 minutes; a film under 10 minutes has 1 to 3 chapters.` + learned },
+        { text: ctx("S0_S1", s01) + "\n" + ctx("S2", s2) },
+        { text: `Write S3, the story architecture (section 7): ${architecture}. Then end with ${chapterJson}` + learned },
       ];
-      let text = await ask("s3", content, 32000);
+      let text;
+      if (overLimit("s3", content[0].text.length + content[1].text.length)) {
+        // A brain with a small prompt limit cannot read the ledger and the whole plan in one call: the
+        // chapter plan is written first (the clock and the scene tiling come from code), then the
+        // architecture is written around that plan. The merged S3 is the stage's own format.
+        const claims = claimDigest(s2, Math.max(2000, roomFor("s3") - 3000)).join("\n");
+        const planText = await ask("s3", [{ text: `${ctx("S2", claims)}\n\nWrite ONLY S3's chapter plan for this film, and nothing else: end with ${chapterJson} Mark every brief with the claim IDs it uses.` }], partTokens("s3", 16000), { system: partSystem("s3") });
+        const chaptersPart = safeJson(planText) ?? [];
+        const prose = await ask("s3:2", [{ text: `Write the rest of S3 (section 7): ${architecture}. The chapter plan is already fixed; use it as it stands.\n\n${ctx("CHAPTERS", cutNote("s3 chapter plan", JSON.stringify(chaptersPart, null, 1), Math.max(2000, roomFor("s3") - 1500)))}` + learned }], partTokens("s3", 24000), { system: partSystem("s3") });
+        text = prose + "\n\n```json\n" + JSON.stringify(chaptersPart) + "\n```";
+      } else {
+        text = await ask("s3", content, 32000);
+      }
       let chapters = safeJson(text);
       let check = validateChapterPlan(chapters, film.durationSeconds);
       for (let i = 0; !check.ok && i < maxRepairs; i += 1) {
@@ -683,10 +798,37 @@ export async function runFilm(o) {
     await save();
 
     await stage("s4", async () => {
-      const text = await ask("s4", [
-        { text: ctx("S2", await read("s2.md")) + "\n" + ctx("S3", await read("s3.md")) },
-        { text: "Write S4, the production bibles (section 8): narrator, characters and depiction policy, locations, objects, the master look and chapter trims, motion-graphics style, sound bible with tokens and search phrases, music plan per cue, pronunciation lexicon (a table | Term | Narrator says | Note |, listing only names and words an American narrator would get wrong, each respelled in full, like 'ruh-MAYSH BAH-boo'; the voice reads every listed term as respelled), continuity rules, and the bible summary block (8.8)." + (film.allowAi && isStoryFilm(film) ? " For every invented character add one line, on its own: `CHR-01 LOOK: <age, build, skin tone, face, hair, clothes, era and place>`. Every AI prompt repeats it word for word, so the character looks the same in every scene; mark each invented character's type as Invented." : "") },
-      ], 32000);
+      const s2 = await read("s2.md");
+      const s3 = await read("s3.md");
+      const instruction = "Write S4, the production bibles (section 8): narrator, characters and depiction policy, locations, objects, the master look and chapter trims, motion-graphics style, sound bible with tokens and search phrases, music plan per cue, pronunciation lexicon (a table | Term | Narrator says | Note |, listing only names and words an American narrator would get wrong, each respelled in full, like 'ruh-MAYSH BAH-boo'; the voice reads every listed term as respelled), continuity rules, and the bible summary block (8.8)." + (film.allowAi && isStoryFilm(film) ? " For every invented character add one line, on its own: `CHR-01 LOOK: <age, build, skin tone, face, hair, clothes, era and place>`. Every AI prompt repeats it word for word, so the character looks the same in every scene; mark each invented character's type as Invented." : "");
+      const material = ctx("S2", s2) + "\n" + ctx("S3", s3);
+      let text;
+      if (!overLimit("s4", material.length + instruction.length)) {
+        text = await ask("s4", [{ text: material }, { text: instruction }], 32000);
+      } else {
+        // The bibles are written in groups, each from the ledger rows and the chapter plan it acts on, so
+        // every call fits the limit. The last group also writes the writer pack the chapter writers get.
+        const budget = roomFor("s4");
+        const chaptersJson = JSON.stringify(plan.chapters, null, 1);
+        const ledgerBudget = Math.max(2000, budget - chaptersJson.length - 1200);
+        const chunks = claimDigest(s2, ledgerBudget);
+        let ledger = "";
+        for (const chunk of chunks) {
+          if (ledger.length + chunk.length > ledgerBudget) break;
+          ledger += (ledger ? "\n" : "") + chunk;
+        }
+        if (ledger.length < chunks.join("\n").length) state.gaps.push("s4: split mode read only the first of the ledger's rows that fit one call (the rest is in s2.md); the bibles may miss a late claim.");
+        const prose = cutNote("s4 story architecture", s3.replace(/```json[\s\S]*?```/g, "").trim(), Math.max(2000, budget - chaptersJson.length - 800));
+        const planText = ctx("CHAPTERS", chaptersJson);
+        const groups = [
+          { bibles: "the narrator, the characters and the depiction policy, the locations and the objects", material: planText + "\n" + ctx("LEDGER", ledger) },
+          { bibles: "the master look and chapter trims, and the motion-graphics style", material: planText + "\n" + ctx("S3_ARCHITECTURE", prose) },
+          { bibles: "the sound bible with tokens and search phrases, the music plan per cue, the pronunciation lexicon, the continuity rules and the bible summary block (8.8)", material: planText + "\n" + ctx("LEDGER", ledger) },
+        ];
+        const parts = groups.map((g) => [g.material, instruction + `\n\nThis call writes ONLY these bibles: ${g.bibles}. Write them in full, in the stage's own format; another call writes the other bibles, so never write those.`].join("\n\n"));
+        parts[parts.length - 1] += "\n\nAlso end, under a heading `## WRITER PACK`, with at most 450 words the chapter writer works from: the narrator's voice, the master look, the allowed footage sources (R2 archive, R3 stock, R1 graphics, R9 AI only where allowed), the sound tokens, the music cues, the pronunciation list and the continuity rules.";
+        text = mergeParts(await askParts("s4", parts, 20000));
+      }
       await store.put("s4.md", text);
       return { chars: text.length };
     });
@@ -708,7 +850,38 @@ export async function runFilm(o) {
           ctx("CHAPTER_BRIEF", JSON.stringify(ch, null, 1)),
           previousTail ? ctx("PREVIOUS_CHAPTER_END", previousTail) : "",
         ].filter(Boolean).join("\n\n");
-        let text = await ask(`s5:${ch.id}`, [{ text: shared, cache: true }, { text: instruction }], 64000);
+        let text;
+        if (!overLimit(`s5:${ch.id}`, shared.length + instruction.length)) {
+          text = await ask(`s5:${ch.id}`, [{ text: shared, cache: true }, { text: instruction }], 64000);
+        } else {
+          // A brain with a small prompt limit writes the chapter in scene groups, each part given the
+          // bibles' writer pack and the ledger rows it needs instead of the whole ledger and all bibles.
+          // Every scene is written once, by its own clock, and the merged chapter is checked by code.
+          const budget = roomFor(`s5:${ch.id}`);
+          const pack = cutNote(`s5:${ch.id} writer pack`, sectionFrom(await read("s4.md"), /writer pack/i), Math.floor(budget * 0.4));
+          const rows = claimDigest(await read("s2.md"), Math.max(1500, Math.floor(budget * 0.3)));
+          const scenes = spec.lastScene - spec.firstScene + 1;
+          const ranges = sceneGroups(spec.firstScene, spec.lastScene, Math.max(1, Math.ceil(scenes / Math.max(rows.length, Math.ceil(scenes / 5)))));
+          // The part owns one stretch of the chapter's clock: its first scene's start to its last scene's end.
+          const starts = (/** @type {number} */ n) => sceneClock(spec.startSeconds, spec.endSeconds, spec.firstScene, spec.lastScene, n).split("-");
+          const parts = ranges.map((r, i) => {
+            const names = r.first === r.last ? `SC${String(r.first).padStart(4, "0")}` : `SC${String(r.first).padStart(4, "0")}-SC${String(r.last).padStart(4, "0")}`;
+            return [
+              pack ? ctx("WRITER_PACK", pack) : "",
+              rows.length ? ctx("S2_ROWS", rows[i % rows.length]) : "",
+              `Write stage S5 for chapter ${ch.id} "${ch.title}", scenes ${names} ONLY, ${starts(r.first)[0]} to ${starts(r.last)[1]}: one compact scene line per scene, exactly in this shape:`,
+              SCENE_LINE_EXAMPLE,
+              `Rules the code will check: these scenes start at ${starts(r.first)[0]} and end at ${starts(r.last)[1]}, each one starting where the previous one ends; scene IDs run with no gap; every narrated scene has (seconds × ${(getVersion(film.versionId)?.narrationWpm.target ?? 150) / 60}) words ±10% (wordless scenes say NARR: (wordless)); the W field states written/target; every line has NARR, ANCHOR, SHOTS and LOOK; no banned phrase (section 16); footage only from the allowed sites.`,
+              i === 0 ? "Start with a header line and the chapter's word budget." : "Continue the same chapter: write no earlier scene again, and no scene after these.",
+              i === ranges.length - 1 ? "End with one QA line." : "",
+              factual ? CLAIM_TAG_RULE : "",
+              learned,
+              ctx("CHAPTER_BRIEF", JSON.stringify(ch, null, 1)),
+              previousTail && i === 0 ? ctx("PREVIOUS_CHAPTER_END", previousTail) : "",
+            ].filter(Boolean).join("\n\n");
+          });
+          text = mergeParts(await askParts(`s5:${ch.id}`, parts, 16000));
+        }
         let check = checkChapter(text, spec);
         for (let i = 0; !check.ok && i < maxRepairs; i += 1) {
           log(`s5:${ch.id}: ${check.errors.length} failures, repair ${i + 1}`);
@@ -734,6 +907,29 @@ export async function runFilm(o) {
      */
     async function repairChapter(text, errors, ch) {
       const structural = errors.some((e) => ["no-scenes", "scene-count", "first-scene", "last-scene", "unfinished"].includes(e.code));
+      // A chapter larger than the brain's prompt limit is repaired in scene groups (or, when only some
+      // scenes failed, with only those scenes sent): the fixes are the same find/replace format, applied in code.
+      if (limit && text.length > roomFor(`repair:${ch.id}`, 2500)) {
+        const spec = chapterSpec(ch, film.versionId, { linkClaims: factual });
+        const failing = new Set(errors.flatMap((e) => (e.scene ? [e.scene] : [])));
+        if (structural) {
+          const ranges = sceneGroups(spec.firstScene, spec.lastScene, Math.max(1, Math.ceil((spec.lastScene - spec.firstScene + 1) / 6)));
+          const lines = text.split("\n");
+          const parts = ranges.map((r) => {
+            const picked = lines.filter((l) => { const m = /SC(\d{4})/.exec(l); const n = m ? Number(m[1]) : NaN; return n >= r.first && n <= r.last; });
+            return [
+              `Rewrite scenes SC${String(r.first).padStart(4, "0")}-SC${String(r.last).padStart(4, "0")} of chapter ${ch.id} so they pass the checks below, keeping every line that was right. Each scene starts where the previous one ends and the group runs from ${sceneClock(spec.startSeconds, spec.endSeconds, spec.firstScene, spec.lastScene, r.first).split("-")[0]} to ${sceneClock(spec.startSeconds, spec.endSeconds, spec.firstScene, spec.lastScene, r.last).split("-")[1]}, one compact scene line each, the same shape as below.`,
+              ctx("SCENES_NOW", picked.join("\n")),
+              `Failing checks:\n- ${errors.map((e) => `${e.scene ?? ""} ${e.detail}`).join("\n- ")}`,
+            ].join("\n\n");
+          });
+          return mergeParts(await askParts(`repair:${ch.id}`, parts, 16000));
+        }
+        const picked = text.split("\n").filter((l) => [...failing].some((sc) => l.includes(`**${sc}**`)));
+        const reply = await ask(`repair:${ch.id}`, [{ text: ctx("FAILING_SCENES", picked.join("\n")) }, { text: `These checks failed:\n- ${errors.map((e) => `${e.scene ?? ""} ${e.detail}`).join("\n- ")}\n\nFix only these. Return ONE fenced \`\`\`json array of {"find": exact text copied from the scene line, "replace": new text}. Keep each find short but unique. Word fixes change the narration and its W field together; facts must stay as they are.` }], 16000, { system: partSystem(`repair:${ch.id}`) });
+        const fixes = safeJson(reply);
+        return Array.isArray(fixes) ? applyFixes(text, fixes).text : text;
+      }
       if (structural) {
         // Missing or extra scenes cannot be patched line by line: rewrite the chapter.
         return ask(`repair:${ch.id}`, [{ text: shared, cache: true }, { text: `Your chapter ${ch.id} failed these checks:\n- ${errors.map((e) => `${e.scene ?? ""} ${e.detail}`).join("\n- ")}\n\nRewrite the whole chapter so it passes, keeping every line that was right.\n\n` + ctx("CHAPTER_BRIEF", JSON.stringify(ch, null, 1)) + "\n" + ctx("YOUR_CHAPTER", text) }], 64000);
@@ -761,21 +957,33 @@ export async function runFilm(o) {
        * One QA request over some chapters, with the code findings that concern them.
        * @param {string} name @param {typeof chapters} part
        */
-      const qaAsk = (name, part) => {
+      /** @param {string} name @param {typeof chapters} part @returns {Promise<any>} */
+      const qaAsk = async (name, part) => {
         const whole = part.length === chapters.length;
         const scenes = new Set(part.flatMap((c) => parseSceneLines(c.markdown).map((x) => x.sc)));
         const errors = whole ? machine.errors : machine.errors.filter((e) => !e.scene || scenes.has(e.scene));
         const partCraft = whole ? craft : craft.filter((x) => (x.code === "card-heavy" ? part.some((c) => x.detail.startsWith(`${c.id}:`)) : part[0]?.id === chapters[0]?.id));
-        return ask(name, [
-          { text: ctx("S2", s2) + "\n" + part.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n") },
-          { text: "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(errors.slice(0, 60)) + (partCraft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(partCraft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). " + (factual ? "Keep every claim tag ({C01}, {N}) in NARR and give each new sentence its own tag; a fix that drops or breaks a tag is reverted. " : "") + "Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field." },
-        ], 32000);
+        const material = ctx("S2", s2) + "\n" + part.map((c) => ctx(`S5_${c.id}`, c.markdown)).join("\n");
+        const instruction = "You are the QA desk. Code already checked clock, IDs, word counts, fields, banned phrases, language and sources; its findings:\n" + JSON.stringify(errors.slice(0, 60)) + (partCraft.length ? "\nCode also measured these craft problems; fix each in pass C:\n" + JSON.stringify(partCraft) : "") + "\n\nMake three passes for what code cannot check: A FACTS (every statement against the S2 ledger: invented facts, silently resolved conflicts, quotes presented as verbatim, unattributed superlatives), B LANGUAGE AND RIGHTS (version lock, speakable narration, no stock face as a real person, licences), C CRAFT (hook, resets, interrupts, midpoint, cliffhanger, loops paid, hand-offs). " + (factual ? "Keep every claim tag ({C01}, {N}) in NARR and give each new sentence its own tag; a fix that drops or breaks a tag is reverted. " : "") + " Output ONE fenced ```json block: {\"mustFix\": [{\"lens\": \"facts|language|craft\", \"chapter\": \"C1\", \"scene\": \"SC0001\", \"issue\": string, \"find\": exact text from that chapter, \"replace\": exact replacement}], \"passed\": [string], \"notChecked\": [string]}. Each find must occur exactly once in its chapter. A word-count change must keep the scene within ±10% and update its W field.";
+        if (!overLimit(name, material.length + instruction.length)) return ask(name, [{ text: material }, { text: instruction }], 32000);
+        // Too large for one prompt: the ledger's rows and the chapter's scenes go in chunks, the verdicts merge.
+        const room = roomFor(name, instruction.length + 600);
+        const rows = claimDigest(s2, Math.max(1200, Math.floor(room * 0.3))).join("\n");
+        const chunks = chunkLines(part.map((c) => c.markdown).join("\n"), Math.max(1200, room - rows.length));
+        /** @type {any[]} */
+        const answers = [];
+        for (let i = 0; i < chunks.length; i += 1) {
+          const chunk = chunks[i];
+          const said = await ask(i === 0 ? name : `${name}:${i + 1}`, [{ text: ctx("S2", rows) + "\n" + ctx("S5_PART", chunk) }, { text: instruction + ` This is part ${i + 1} of ${chunks.length} of the film's scenes; check these only, and give each find exactly as it appears here.` }], partTokens(name, 12000), { system: partSystem(name) });
+          answers.push(safeJson(said));
+        }
+        return mergeJson(answers, "object");
       };
       // A brain whose window cannot hold the whole film reads it chapter by chapter, and the run says so.
       const window = model.capabilities?.contextTokens;
       const reserve = Math.min(32000, model.capabilities?.maxOutputTokens ?? 8192);
       const tokensFor = (/** @type {typeof chapters} */ part) => Math.ceil((manual.length + brief.length + s2.length + part.reduce((n, c) => n + c.markdown.length, 0) + 6000) / 3.2) + reserve;
-      const perChapter = Boolean(window) && chapters.length > 1 && tokensFor(chapters) > /** @type {number} */ (window);
+      const perChapter = (Boolean(window) && chapters.length > 1 && tokensFor(chapters) > /** @type {number} */ (window)) || (chapters.length > 1 && overLimit("qa", tokensFor(chapters) * 3.2));
       /** @type {any} */
       let qa;
       if (!perChapter) qa = safeJson(await qaAsk("qa", chapters)) ?? { mustFix: [], passed: [], notChecked: ["The QA reply was not valid JSON."] };
@@ -864,8 +1072,23 @@ export async function runFilm(o) {
           // Code measures where one picture holds too long; the director is told, and what it leaves uncovered is a gap.
           const laid = buildTimeline({ chapters: [{ id: c.id, markdown }], autoSound: false });
           const holds = longHolds(laid.video, new Set(laid.narration.map((n) => n.scene)));
-          const reply = await ask(`edit:${c.id}`, [{ text: editInstruction(c.id, editSheet(markdown), style, holds) + learned }], 16000);
-          const parsed = safeJson(reply);
+          const instruction = editInstruction(c.id, editSheet(markdown), style, holds) + learned;
+          /** @type {any} */
+          let parsed;
+          if (!overLimit(`edit:${c.id}`, instruction.length)) parsed = safeJson(await ask(`edit:${c.id}`, [{ text: instruction }], 16000));
+          else {
+            // Too large for one prompt: the scene sheet goes in scene groups, the edit plans merge.
+            const lines = markdown.split("\n").filter((l) => /^\s*(\*\*)?SC\d{4}/.test(l));
+            const chunks = chunkLines(lines.join("\n"), Math.max(2000, roomFor(`edit:${c.id}`, 2500)));
+            /** @type {any[]} */
+            const answers = [];
+            for (let i = 0; i < chunks.length; i += 1) {
+              const chunk = chunks[i];
+              const groupHolds = holds.filter((h) => chunk.includes(h.id));
+              answers.push(safeJson(await ask(i === 0 ? `edit:${c.id}` : `edit:${c.id}:${i + 1}`, [{ text: editInstruction(c.id, editSheet(chunk), style, groupHolds) + learned }], partTokens(`edit:${c.id}`, 12000), { system: partSystem(`edit:${c.id}`) })));
+            }
+            parsed = mergeJson(answers, "object");
+          }
           const edit = validateEditPlan(parsed, markdown, c.id);
           if (parsed === null) state.gaps.push(`${c.id} edit: the Edit Director's reply was not valid JSON; this chapter's edit follows the script alone.`);
           const left = uncoveredHolds(holds, edit);
@@ -910,10 +1133,15 @@ export async function runFilm(o) {
       const chapters = await Promise.all(plan.chapters.map(async (c) => ({ id: c.id, markdown: await read(`s5-${c.id}.md`), spec: chapterSpec(c, film.versionId, { linkClaims: factual }) })));
       const machine = checkFilm(chapters, { durationSeconds: film.durationSeconds });
       await store.put("film-check.json", JSON.stringify({ ok: machine.ok, errors: machine.errors, warnings: machine.warnings.length, stats: machine.stats }, null, 1));
-      const text = await ask("s6", [
-        { text: ctx("FILM_CHECK_BY_CODE", JSON.stringify({ ok: machine.ok, errors: machine.errors, stats: machine.stats }, null, 1)) + "\n" + ctx("QA", await read("qa.json")) + "\n" + ctx("FIX_LOG", await read("fix-log.json")) + "\n" + ctx("GAPS", JSON.stringify(state.gaps)) },
-        { text: "Write S6, the whole-film QA report (section 13): one table of gates G1-G17 with PASS, FIXED or GAP and evidence, using the counts code produced (never estimate a number code gave you), the QA fixes applied by type with the total, and every remaining GAP with its action. Do not claim a check that was not run." },
-      ], 16000);
+      const instruction = "Write S6, the whole-film QA report (section 13): one table of gates G1-G17 with PASS, FIXED or GAP and evidence, using the counts code produced (never estimate a number code gave you), the QA fixes applied by type with the total, and every remaining GAP with its action. Do not claim a check that was not run.";
+      const material = ctx("FILM_CHECK_BY_CODE", JSON.stringify({ ok: machine.ok, errors: machine.errors, stats: machine.stats }, null, 1)) + "\n" + ctx("QA", await read("qa.json")) + "\n" + ctx("FIX_LOG", await read("fix-log.json")) + "\n" + ctx("GAPS", JSON.stringify(state.gaps));
+      let text;
+      if (!overLimit("s6", material.length + instruction.length)) {
+        text = await ask("s6", [{ text: material }, { text: instruction }], 16000);
+      } else {
+        const chunks = chunkLines(material, Math.max(2000, roomFor("s6")));
+        text = mergeParts(await askParts("s6", chunks.map((chunk, i) => [chunk, instruction + ` This is part ${i + 1} of ${chunks.length} of the findings: write the gates and fixes these support, in the stage's format.`].join("\n\n")), 12000));
+      }
       await store.put("s6.md", text);
       return { ok: machine.ok, gaps: state.gaps.length };
     });
@@ -922,11 +1150,17 @@ export async function runFilm(o) {
       const chapterTimes = plan.chapters.map((c) => `${c.start} ${c.title}`).join("\n");
       // Credits for the archive pictures the film uses, built from their licence records, never from memory.
       const credits = pictureCredits((await Promise.all(plan.chapters.map((c) => read(`media-${c.id}.json`)))).filter(Boolean).map((t) => JSON.parse(t)));
-      let text = await ask("s7", [
-        ...(priorBrief ? [{ text: priorBrief }] : []),
-        { text: (proven() ? proven() + "\nPROVEN_DEMAND shows titles that won on this topic: learn their promise, never their wording.\n" : "") + ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) + (credits ? "\n" + ctx("PICTURE_CREDITS", credits) + "\nThe description's credits block includes every PICTURE_CREDITS line exactly as written (the CC BY licences require it)." : "") },
-        { text: "Write S7, the publishing pack (section 14): final title matching the delivered film, written on one line as **Final title: ...**, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") + "\n\n" + PACKAGING_RULES },
-      ], 16000);
+      const material = (proven() ? proven() + "\nPROVEN_DEMAND shows titles that won on this topic: learn their promise, never their wording.\n" : "") + ctx("S0_S1", await read("s01.md")) + "\n" + ctx("CHAPTERS", chapterTimes) + "\n" + ctx("S6", await read("s6.md")) + (credits ? "\n" + ctx("PICTURE_CREDITS", credits) + "\nThe description's credits block includes every PICTURE_CREDITS line exactly as written (the CC BY licences require it)." : "");
+      const pack = priorBrief ? [{ text: priorBrief }] : [];
+      const s7instruction = "Write S7, the publishing pack (section 14): final title matching the delivered film, written on one line as **Final title: ...**, 3 thumbnail briefs (free stock and typography, no real faces, no logos), description with chapters (first at 00:00, from the chapter times given), a credits block with \"© OpenStreetMap contributors\", tags, pinned comment, 3 Shorts and 1 Facebook cut with their own hooks and exact source timestamps, upload settings (" + (film.allowAi ? "altered or synthetic content: Yes when the film has realistic AI scenes" : "no synthetic content") + ", not made for kids, category, language) and a posting plan for this audience." + (isStoryFilm(film) ? ` This is an invented story: the title and thumbnails never say true, real or "based on a true story", and the description ends with this exact line: "${storyNote(film)}".` : "") + "\n\n" + PACKAGING_RULES;
+      /** @type {string} */
+      let text;
+      if (!overLimit("s7", material.length + s7instruction.length + (priorBrief?.length ?? 0))) {
+        text = await ask("s7", [...pack, { text: material }, { text: s7instruction }], 16000);
+      } else {
+        const chunks = chunkLines(material, Math.max(2000, roomFor("s7")));
+        text = mergeParts(await askParts("s7", chunks.map((chunk, i) => [...pack.map((b) => b.text), chunk, s7instruction + ` This is part ${i + 1} of ${chunks.length} of the material: write the parts of the pack these lines support, in the stage's format, with no preamble.`].join("\n\n")), 12000));
+      }
       if (credits && !credits.split("\n").every((line) => text.includes(line))) text += `\n\n### Picture credits (required by the licences)\n\n${credits}\n`;
       const title = (/\*\*Final title[^:]*:\s*([^*\n]+)\*\*/i.exec(text)?.[1] ?? "").trim();
       state.gaps.push(...titleProblems(title).map((p) => `S7: ${p}`));

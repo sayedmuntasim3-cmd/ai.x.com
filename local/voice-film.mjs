@@ -241,7 +241,9 @@ export function voiceBrain(env, o = {}) {
   const groqOn = env.GROQ_API_KEY && String(env.GROQ ?? "").toLowerCase() !== "off";
   if (env.GEMINI_API_KEY || (env.BRAIN_URL && env.BRAIN_MODEL)) {
     const b = brainFromEnv({ ...env, ANTHROPIC_API_KEY: undefined }, o);
-    if (b.ok) return { model: b.model, kind: b.kind === "gemini" && groqOn ? "groq+gemini" : b.kind };
+    // The brain plug names the chain "groq" when Groq runs first (worker/brain.mjs); with a Gemini key set,
+    // the Gemini pool is the fallback behind it, which is what this label says.
+    if (b.ok) return { model: b.model, kind: b.kind === "groq" || (b.kind === "gemini" && groqOn) ? "groq+gemini" : b.kind };
   }
   if (groqOn) return { model: /** @type {any} */ (groqModel({ apiKey: String(env.GROQ_API_KEY), ...(o.fetch ? { fetch: o.fetch } : {}) })), kind: "groq" };
   // On the GitHub runner the keys stay in the Worker: the free brain is asked through it, with this film's ticket.

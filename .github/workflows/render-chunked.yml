@@ -116,7 +116,7 @@ jobs:
       - name: Join the parts and mix the sound once
         run: |
           [[ "$ARGS" =~ ^[A-Za-z0-9_./=:,\ -]+$ ]] || { echo "::error::Bad render arguments."; exit 1; }
-          list=$(for i in $(seq 1 "$PARTS"); do printf 'parts/part-%s.mp4,' "$i"; done)
+          list=$(for i in $(seq 1 "$PARTS"); do if [ -f "parts/part-$i.mp4" ]; then printf 'parts/part-%s.mp4,' "$i"; fi; done)
           for f in ${list//,/ }; do [ -s "$f" ] || { echo "::error::$f is missing."; exit 1; }; done
           mkdir -p out
           read -r -a argv <<< "$ARGS"

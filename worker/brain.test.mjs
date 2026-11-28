@@ -19,7 +19,8 @@ test("a brain that is asked for but not set up says what is missing", () => {
   assert.match(String(/** @type {any} */ (chooseBrain({})).error), /No brain is connected.*BRAIN_URL and BRAIN_MODEL/);
   assert.match(String(/** @type {any} */ (chooseBrain({ BRAIN: "local", BRAIN_URL: "http://h" })).error), /BRAIN_MODEL/);
   assert.match(String(/** @type {any} */ (chooseBrain({ BRAIN: "claude", GEMINI_API_KEY: "g" })).error), /ANTHROPIC_API_KEY/);
-  assert.match(String(/** @type {any} */ (chooseBrain({ BRAIN: "gpt" })).error), /must be local, claude or gemini/);
+  assert.match(String(/** @type {any} */ (chooseBrain({ BRAIN: "gpt" })).error), /must be local, groq, claude or gemini/);
+  assert.match(String(/** @type {any} */ (chooseBrain({ BRAIN: "groq" })).error), /GROQ_API_KEY/);
   assert.deepEqual(chooseBrain({ BRAIN_URL: "http://h" }).ok, false, "a URL without a model is not a brain");
 });
 
@@ -50,6 +51,39 @@ test("health shows the brain without its address or any key", () => {
   assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk", BRAIN: "claude" }).seesPictures, true);
   assert.equal(brainHealth({ ANTHROPIC_API_KEY: "sk" }).connected, false, "a paid key alone connects nothing");
   assert.equal(brainHealth({}).connected, false);
+});
+
+test("free Groq alone is a whole brain: a film finishes on it without Gemini or a paid key", async () => {
+  // Groq's key is the only one set: before this, no brain was chosen and no film could run without Gemini's
+  // 20-a-day key. The brain also says how large one request's prompt may be, so the run splits its stages.
+  assert.deepEqual(chooseBrain({ GROQ_API_KEY: "q" }), { ok: true, kind: "groq" });
+  assert.deepEqual(chooseBrain({ GROQ_API_KEY: "q", GEMINI_API_KEY: "g" }), { ok: true, kind: "groq" }, "with both keys, the free Groq brain is chosen");
+  assert.equal(chooseBrain({ GROQ_API_KEY: "q", GROQ: "off" }).ok, false, "GROQ=off is not a brain on its own");
+  const b = brainFromEnv({ GROQ_API_KEY: "q" });
+  assert.ok(b.ok);
+  assert.equal(b.kind, "groq");
+  assert.deepEqual(b.model.capabilities, { vision: false, webSearch: false, promptLimitTokens: 7200 });
+  assert.equal(brainHealth({ GROQ_API_KEY: "q" }).pricing, "free tier (daily limits apply)");
+  assert.equal(brainHealth({ GROQ_API_KEY: "q" }).kind, "groq");
+});
+
+test("with Groq and Gemini both set, Groq takes every call that fits and Gemini is only the fallback", async () => {
+  /** @type {string[]} */
+  const urls = [];
+  const fetch = /** @type {typeof globalThis.fetch} */ (async (url) => {
+    urls.push(String(url));
+    return Response.json({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: {} });
+  });
+  const b = brainFromEnv({ GROQ_API_KEY: "q", GEMINI_API_KEY: "g" }, { fetch });
+  assert.ok(b.ok);
+  assert.equal(b.kind, "groq");
+  assert.equal(b.model.capabilities?.promptLimitTokens, 7200, "the chain is Groq-sized, so the run keeps every call under its limit");
+  const r = await b.model.call({ stage: "s5:C1", system: [{ text: "M" }], messages: [{ role: "user", content: [{ text: "go" }] }], maxTokens: 1000, effort: "high" });
+  assert.equal(r.text, "ok");
+  assert.ok(urls[0].startsWith("https://api.groq.com/"), urls[0]);
+  // GROQ_FALLBACK=off keeps Gemini out of the chain completely: Groq alone.
+  const alone = brainFromEnv({ GROQ_API_KEY: "q", GEMINI_API_KEY: "g", GROQ_FALLBACK: "off" });
+  assert.ok(alone.ok && alone.kind === "groq" && alone.model.capabilities?.promptLimitTokens === 7200);
 });
 
 test("GEMINI_SEARCH=off turns Google Search off for Gemini only; unset keeps it on (the studio's setting)", () => {
