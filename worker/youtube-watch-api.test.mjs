@@ -59,3 +59,13 @@ test("pacificDay and isQuotaAnswer", () => {
   assert.equal(isQuotaAnswer(200, "ok"), false);
   assert.equal(isQuotaAnswer(400, "Quota exceeded"), true);
 });
+
+test("a retired model (404) falls through to the next; all retired is a clear 502, not a quota stop", async () => {
+  const env = mkEnv(); let n = 0;
+  const ok = await call(env, "POST", { videoId: "rj-G_gmFWtE" }, async () => (n++ === 0 ? new Response("{}", { status: 404 }) : gem(answer)));
+  assert.equal(ok.status, 200);
+  const env2 = mkEnv();
+  const bad = await call(env2, "POST", { videoId: "rj-G_gmFWtE" }, async () => new Response("{}", { status: 404 }));
+  assert.equal(bad.status, 502);
+  assert.equal(env2.FILMS.m.has(STOP_KEY), false);
+});

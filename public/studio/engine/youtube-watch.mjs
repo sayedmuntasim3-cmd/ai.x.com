@@ -6,7 +6,7 @@
  */
 
 /** Models that accept a YouTube URL as video input, tried in this order (free tier, one request each). */
-export const WATCH_MODELS = Object.freeze(["gemini-2.5-flash", "gemini-2.5-flash-lite"]);
+export const WATCH_MODELS = Object.freeze(["gemini-3.8-flash", "gemini-3.8-flash-lite"]);
 /** The medians replace the estimates only from this many measured films on. */
 export const MIN_FILMS_FOR_TARGETS = 20;
 /** @param {unknown} id */
