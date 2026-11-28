@@ -18,6 +18,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CRITIC_LIMITS, brainPrompt, critiqueScript, parseBrainRead, repairScript, REPAIR_MAX_SHARE, rewriteNotes } from "../engine/src/story-critic.mjs";
 import { msg } from "../engine/src/messages.mjs";
+import { barBrief } from "../engine/src/reference-bar.mjs";
 import { dailyTopic } from "../worker/daily-film.mjs";
 import { GROQ_MODELS } from "../worker/groq.mjs";
 import { parseArgs, send } from "./voice-runner.mjs";
@@ -160,6 +161,7 @@ export function systemPrompt(topic) {
     "- Write numbers and years as they are spoken (nineteen forty, forty-two miles an hour, two thousand eight hundred feet).",
     "- No headings, lists, markdown, scene directions, music cues or the word chapter. Only the words the narrator says, in paragraphs.",
     "- Keep the central question alive: each part raises the stakes; give the viewer a reason to keep watching, without hype and without promising anything the film does not deliver.",
+    barBrief(),
   ].join("\n");
 }
 
