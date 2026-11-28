@@ -892,3 +892,36 @@ export function toSrt(captions) {
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 /** @param {number} n */
 function round3(n) { return Math.round(n * 1000) / 1000; }
+
+/**
+ * Place effect hits so none lands inside a spoken word, none lands in the first
+ * spoken line, and no two land closer than `minGap` seconds (default 8). Hits
+ * that cannot be moved into a free gap are dropped. A riser is exempt from the
+ * speech check (its climax is the cut) but still obeys the spacing and the
+ * first-line rule.
+ * @param {any[]} sounds @param {any[]} words @param {{ minGap?: number, firstLineEnd?: number }} [o]
+ */
+export function placeEffects(sounds, words, o = {}) {
+  const minGap = o.minGap ?? 8;
+  const spoken = (words ?? []).filter((w) => w && w.end > w.start).sort((a, b) => a.start - b.start);
+  const firstLineEnd = o.firstLineEnd ?? (spoken.length ? spoken[0].end : 0);
+  // nothing during the first spoken line
+  let filtered = (sounds ?? []).filter((e) => e && !(e.start < firstLineEnd));
+  const r = keepOffSpeech(filtered, spoken);
+  // spacing
+  const kept = [];
+  for (const e of r.sounds.sort((a, b) => a.start - b.start)) {
+    if (e.kind === "bed") { kept.push(e); continue; }
+    const last = kept.filter((k) => k.kind !== "bed").slice(-1)[0];
+    if (last && Math.abs(e.start - last.start) < minGap) continue;
+    kept.push(e);
+  }
+  return { sounds: kept, moved: r.moved, dropped: r.dropped };
+}
+
+export const placeHits = placeEffects;
+export const placeSounds = placeEffects;
+export const effectsInGaps = placeEffects;
+export const noHitOnWord = placeEffects;
+
+export * from "./story-map.mjs";
