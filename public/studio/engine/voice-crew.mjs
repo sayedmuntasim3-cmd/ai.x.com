@@ -47,7 +47,8 @@ export function packagingPack(o) {
   const total = o.durationSeconds ?? (o.scenes.length ? o.scenes[o.scenes.length - 1].end : 0);
   if (chapters.length && total - chapters[chapters.length - 1].at < 10) chapters.pop();
   const usable = chapters.length >= 3;
-  const tags = [...new Set([...entities.slice(0, 8), ...(o.structure?.topicWords ?? []).slice(0, 6).map((/** @type {any} */ w) => String(w.word))].map((t) => t.toLowerCase()))].slice(0, 12);
+  // Tags are the names the film says (people, places, projects) and its topic; never loose words like "before" or "began".
+  const tags = [...new Set([...(o.topic ? [o.topic] : []), ...entities.slice(0, 10)].map((t) => String(t).toLowerCase().trim()).filter((t) => t.length >= 3))].slice(0, 12);
   const description = [
     clip(sentencesOf(o.scenes.slice(0, 2).map((s) => s.narration).join(" ")).slice(0, 2).join(" "), 280),
     ...(usable ? ["", "Chapters", ...chapters.map((c) => `${c.stamp} ${c.title}`)] : []),
@@ -95,11 +96,13 @@ export async function runVoiceCrew(o) {
   const place = o.storyPlace ? o.storyPlace(o.shots, o.scenes) : null;
   const pack = packagingPack({ topic: o.topic, scenes: o.scenes, structure: o.structure, durationSeconds: o.durationSeconds });
   const panel = await voicePanel({ brain: o.brain, scenes: o.scenes, shots: o.shots, topic: o.topic });
+  const total = o.durationSeconds ?? (o.scenes.length ? o.scenes[o.scenes.length - 1].end : 0);
+  const short = total < 180;
   const agents = [
     ...script.results.map((r) => ({ role: r.role, ran: true, file: r.file, pass: r.pass, found: r.findings.length, ...(r.note ? { note: r.note } : {}), findings: r.findings })),
     ...(place ? [{ role: place.role, ran: true, file: place.file, pass: place.pass, found: place.findings.length, checked: place.checked, findings: place.findings }] : []),
     { role: "audience-title", ran: true, file: "engine/src/voice-crew.mjs", pass: pack.checks.every((c) => c.ok || c.code === "chapters-youtube-rules"), found: 0, note: `title: ${pack.title}`, findings: [] },
-    { role: "audience-metadata", ran: true, file: "engine/src/voice-crew.mjs", pass: pack.chapters.length >= 3, found: pack.chapters.length >= 3 ? 0 : 1, note: `${pack.chapters.length} chapters, ${pack.tags.length} tags`, findings: pack.chapters.length >= 3 ? [] : [{ role: "audience-metadata", scene: "-", code: "few-chapters", severity: "warn", detail: pack.checks[2].detail, fix: "Add a pause between parts so each gets a chapter." }] },
+    { role: "audience-metadata", ran: true, file: "engine/src/voice-crew.mjs", pass: pack.chapters.length >= 3 || short, found: pack.chapters.length >= 3 || short ? 0 : 1, note: `${pack.chapters.length} chapters, ${pack.tags.length} tags${short ? " (a film under 3 minutes needs no chapters)" : ""}`, findings: pack.chapters.length >= 3 || short ? [] : [{ role: "audience-metadata", scene: "-", code: "few-chapters", severity: "warn", detail: pack.checks[2].detail, fix: "Add a pause between parts so each gets a chapter." }] },
     { role: "audience-panel-review", ran: panel.ran, file: "engine/src/voice-crew.mjs", pass: panel.ran ? (panel.stayScore ?? 10) >= 6 : null, found: panel.ran ? (panel.leaves?.length ?? 0) : 0, note: panel.ran ? `stay score ${panel.stayScore}/10: ${panel.why}` : panel.why, findings: [] },
   ];
   return { agents, shotFindings: place?.findings ?? [], packaging: pack, panel, unverifiedPlaces: script.unverifiedPlaces };
