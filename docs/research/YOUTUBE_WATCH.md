@@ -14,6 +14,24 @@ Tags: **[M]** measured by code from public metadata in this repo (chapter timest
 - What I could measure honestly: chapter timestamps and lengths that the 2,734-video reference file already carries (section 1).
 - To finish the watch job someone needs a route YouTube allows: the owner's own computer or browser (he can export captions and storyboards from there), or the official YouTube Data API `captions` route with his key (owner choice; it costs quota, not money).
 
+## 0b. Update 28 Nov 2026 (evening): Gemini watched 12 films [measured, with caveats]
+
+Route `POST /api/youtube-watch` (PR #130, #132, #133) sends each public YouTube URL to Gemini as video input. **12 films were watched today** (full table with video ids: `docs/research/YOUTUBE_WATCH_MEASURED.md`). Medians over the 12 [M], model: gemini-3.5-flash-lite for 11, gemini-3.8-flash for 1:
+
+| Measure [M] | Number |
+|---|---|
+| Length, median | 28.7 min (these are long Plainly Difficult / Real Engineering / Practical Engineering films) |
+| Seconds per shot (25th / median / 75th) | 4.4 / 6.7 / 7.9 |
+| First number spoken at, median | 13 s |
+| First stake clear at, median | 33 s |
+| Maps, diagrams, animation share (25th / median / 75th) | 34% / 49% / 58% |
+| Archive / talking heads / stock (medians) | 5% / 5% / 14% |
+| Gap between chapter turns, median | 284 s |
+| Gap between reveals, median | 411 s |
+| First / last reveal at (share of length) | 29% / 72% |
+
+**Do not trust yet:** words per minute came back 140-147 for 11 of 12 films (median 142): the model repeats a default instead of counting, so wpm stays an **[E] estimate**, and `targetsFromSummary` skips any range narrower than 10% of its middle. Shot length and graphics share are the model's visual estimate, not frame counts. 4 answers failed the code check (reveal or chapter seconds outside the film) and were not stored. The targets in `PRACTICE_TARGETS` change only from 20 films on (`engine/src/watch-measured.mjs`, rewritten daily by `.github/workflows/youtube-watch.yml`).
+
 ## 1. Measured from public metadata [M]
 
 Source: `data/engineering-reference-videos.json`, English-looking titles with 1M+ views; chapter numbers use the 172 of them that list 3+ chapters.
