@@ -43,7 +43,9 @@ export function candidateFromSearch(r) {
   const code = typeof licenceRaw === "string" ? licenceRaw : licenceRaw?.licenseId ?? licenceRaw?.code ?? licenceRaw?.name ?? "";
   const licence = text(ARCHIVE_LICENCES[String(code).toLowerCase()] ?? code, 60) || null;
   if (!licence || !FREE_LICENCES.includes(licence)) return null;
-  const mediaUrl = httpUrl(r.mediaUrl) ?? httpUrl(r.fullUrl);
+  // A picture from an archive: its 1280 px preview is what the CDN serves reliably (the original is rate-limited
+  // and can be tens of megabytes); the film uses it the way it uses its own picks.
+  const mediaUrl = httpUrl(r.mediaUrl) ?? httpUrl(r.previewUrl) ?? httpUrl(r.fullUrl);
   const thumbnailUrl = httpUrl(r.previewUrl) ?? httpUrl(r.thumbnailUrl) ?? mediaUrl;
   if (!mediaUrl && !thumbnailUrl) return null;
   return {

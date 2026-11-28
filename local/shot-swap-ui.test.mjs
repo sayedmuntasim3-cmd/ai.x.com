@@ -139,7 +139,7 @@ test("a result as /api/media/search really answers (license.code, fullUrl, pageU
   const real = { id: "wikipedia:Saturn V|File:Apollo 11 Launch.jpg", source: "wikipedia", title: "Saturn V", pageUrl: "https://commons.wikimedia.org/wiki/File:Apollo_11_Launch.jpg", thumbnailUrl: "https://thumb.test/t.jpg", previewUrl: "https://thumb.test/p.jpg", fullUrl: "https://upload.test/full.jpg", license: { code: "public-domain", label: "Public domain" } };
   const c = candidateFromSearch(real);
   assert.equal(c?.licence, "PUBLIC-DOMAIN");
-  assert.equal(c?.mediaUrl, "https://upload.test/full.jpg");
+  assert.equal(c?.mediaUrl, "https://thumb.test/p.jpg", "the CDN preview, not the rate-limited original");
   assert.equal(c?.sourcePageUrl, real.pageUrl);
   assert.equal(candidateFromSearch({ ...real, license: { code: "cc0" } })?.licence, "CC0-1.0");
   assert.equal(candidateFromSearch({ ...real, license: { code: "us-government" } })?.licence, "US-GOV-PD");
