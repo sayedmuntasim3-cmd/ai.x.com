@@ -986,6 +986,18 @@ export async function rerankRun(o) {
   }
   const lookSeconds = (Date.now() - t2) / 1000;
 
+  // The other candidates, kept (render/autofix.mjs): a film blocked on a shot's own picture is re-picked from
+  // these in the same rank order, without searching again and without a lower relevance floor.
+  const candidateShots = plan.map((p) => ({
+    id: p.s.id,
+    ranked: p.ranked.slice(0, 8).map((x) => {
+      const c = /** @type {any} */ (x.c);
+      const pick = c.licence ? { ...c, kind: c.mediaType } : toPick(c);
+      delete pick.rights; delete pick.mediaType; delete pick.layer;
+      return { id: String(c.id), title: String(c.title ?? "").slice(0, 120), total: Math.round(x.total * 1000) / 1000, relevance: Number.isFinite(Number(x.score?.relevance)) ? Number(x.score.relevance) : null, pick };
+    }),
+  }));
+  await writeFile(join(o.run, "candidates-C1.json"), JSON.stringify({ chapter: media.chapter ?? "C1", at: new Date().toISOString(), shots: candidateShots }, null, 1));
   await copyFile(mediaPath, join(o.run, "media-C1.before.json"));
   const report = [];
   plan.forEach((p, i) => {
