@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { blurAndFlicker, chapterMusic, critique, cutsPerMinute, designedMoments, designedStill, hookReport, measurePicture, parsePicture, STANDARD, subtitleFit, verdictOf } from "./critic.mjs";
+import { blurAndFlicker, chapterMusic, critique, cutsPerMinute, designedAt, designedMoments, designedStill, hookReport, measurePicture, parsePicture, STANDARD, subtitleFit, verdictOf } from "./critic.mjs";
 
 /** A timeline of equal shots, as the renderer builds one (only the fields the critic reads). */
 function timeline(shots, extra = {}) {
@@ -179,6 +179,17 @@ test("what counts as a designed moment: a number, a kinetic line, a chart, a map
     { start: 15, end: 18, type: "black" },
   ]);
   assert.equal(got.length, 4);
+});
+
+test("a graphic laid over a picture counts as a designed moment, from its own time, unless it failed to draw", () => {
+  const video = [
+    { start: 0, end: 6, type: "clip", moment: { kind: "title", at: 0.5, seconds: 3.6 } },
+    { start: 6, end: 12, type: "clip", moment: { kind: "counter", at: 8, seconds: 3.4 } },
+    { start: 12, end: 18, type: "clip", moment: { kind: "lowerThird", at: 13, seconds: 3.6, failed: true } },
+  ];
+  assert.equal(designedMoments(video).length, 2);
+  assert.equal(designedAt(video[1]), 8);
+  assert.equal(hookReport({ video, narration: [] }).titleAt, 0.5);
 });
 
 /** The codes a nearly-good film earns, so a new check can be read on its own. */

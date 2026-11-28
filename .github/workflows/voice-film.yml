@@ -285,6 +285,8 @@ jobs:
       artifact: prep-${{ inputs.voice_id }}
       args: ${{ needs.film.outputs.args }}
       parts: 8
+      # Before the film is blocked: fix the failing shots twice, then hand over a draft with reasons.
+      autofix: 2
       out_artifact: film-${{ inputs.voice_id }}
 
   finish:
@@ -315,16 +317,28 @@ jobs:
         with:
           name: film-${{ inputs.voice_id }}
           path: out
+      # The film is never taken away from the creator: a film the gate still blocks after the auto-fix rounds
+      # is delivered as a DRAFT, marked, with the plain reasons — not as a released film, and no threshold moves.
       - name: Check the finished film
+        id: gate
         run: |
           echo check > .stage
           node render/release-gate.mjs --report out/film.report.json --file out/film.mp4 2>&1 | tee step.log
-          test "${PIPESTATUS[0]}" = 0
-          node render/voice-runner.mjs progress --stage check
+          if [ "${PIPESTATUS[0]}" = 0 ]; then
+            echo "passed=yes" >> "$GITHUB_OUTPUT"
+            node render/voice-runner.mjs progress --stage check
+          else
+            echo "passed=no" >> "$GITHUB_OUTPUT"
+            echo "::warning::The film did not pass its quality check after the auto-fix rounds; it is delivered as a marked draft, never as a released film."
+          fi
       - name: Send the film to the studio (private)
         run: |
           echo deliver > .stage
-          node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json
+          if [ "${{ steps.gate.outputs.passed }}" = yes ]; then
+            node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json
+          else
+            node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json --draft
+          fi
       - uses: actions/download-artifact@v4
         with:
           name: prep-${{ inputs.voice_id }}

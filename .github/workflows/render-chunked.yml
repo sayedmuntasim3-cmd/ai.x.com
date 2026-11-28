@@ -27,6 +27,10 @@ on:
         description: "How many runners render the picture (1-16)"
         type: number
         default: 8
+      autofix:
+        description: "Rounds of re-picking the shots the release gate blocks on (0 = off, at most 2)"
+        type: number
+        default: 0
       out_artifact:
         description: "Name of the artifact the finished film is uploaded as"
         type: string
@@ -105,6 +109,10 @@ jobs:
           node-version: 22
       - name: Install ffmpeg and fonts
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
+      # A part drawn again needs the same browsers the parts were drawn with (the designed graphics).
+      - name: Install the graphics engine (only when a part may be drawn again)
+        if: inputs.autofix > 0
+        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
       - uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -116,11 +124,44 @@ jobs:
       - name: Join the parts and mix the sound once
         run: |
           [[ "$ARGS" =~ ^[A-Za-z0-9_./=:,\ -]+$ ]] || { echo "::error::Bad render arguments."; exit 1; }
-          list=$(for i in $(seq 1 "$PARTS"); do printf 'parts/part-%s.mp4,' "$i"; done)
+          list=$(for i in $(seq 1 "$PARTS"); do if [ -f "parts/part-$i.mp4" ]; then printf 'parts/part-%s.mp4,' "$i"; fi; done)
           for f in ${list//,/ }; do [ -s "$f" ] || { echo "::error::$f is missing."; exit 1; }; done
           mkdir -p out
           read -r -a argv <<< "$ARGS"
           node render/render-film.mjs "${argv[@]}" --join "${list%,}" --work .render --out out/film.mp4
+      # Before the film is blocked: re-pick only the shots the gate points at from the candidates the eyes
+      # already found, draw only the parts holding them, and check again. At most two rounds (render/autofix.mjs).
+      - name: Fix the failing shots, then check the film again
+        if: inputs.autofix > 0
+        run: |
+          set -o pipefail
+          AUTOFIX=${{ inputs.autofix }}
+          [[ "$AUTOFIX" =~ ^[0-9]+$ ]] && (( AUTOFIX >= 1 && AUTOFIX <= 2 )) || AUTOFIX=2
+          [[ "$ARGS" =~ ^[A-Za-z0-9_./=:,\ -]+$ ]] || { echo "::error::Bad render arguments."; exit 1; }
+          read -r -a argv <<< "$ARGS"
+          gate() { node render/release-gate.mjs --report out/film.report.json --file out/film.mp4 2>&1 | tee gate.log; }
+          passed=0
+          gate && passed=1
+          for round in $(seq 1 "$AUTOFIX"); do
+            [ "$passed" = 1 ] && break
+            node render/autofix.mjs --run run --report out/film.report.json --parts "$PARTS" --round "$round" --out out/autofix.json 2>&1 | tee autofix.log
+            [ "${PIPESTATUS[0]}" = 0 ] || { echo "Round $round: nothing this loop can fix."; break; }
+            parts=$(node -e 'const j=require("./out/autofix.json");const r=(j.rounds||[]).find((x)=>x.round===Number(process.argv[1]));console.log(((r&&r.parts)||[]).join(" "))' "$round")
+            [ -n "$parts" ] || break
+            for p in $parts; do
+              node render/render-film.mjs "${argv[@]}" --part "$p/$PARTS" --work .render --out "parts/part-$p.mp4" || { echo "::error::Part $p could not be drawn again."; exit 1; }
+            done
+            list=$(for i in $(seq 1 "$PARTS"); do if [ -f "parts/part-$i.mp4" ]; then printf 'parts/part-%s.mp4,' "$i"; fi; done)
+            node render/render-film.mjs "${argv[@]}" --join "${list%,}" --work .render --out out/film.mp4 || { echo "::error::The film could not be joined again."; exit 1; }
+            gate && passed=1
+          done
+          # The rounds travel with the report, so the draft says what was tried and what changed.
+          node render/autofix.mjs --report out/film.report.json --merge out/autofix.json || true
+          if [ "$passed" = 1 ]; then
+            echo "The film passed its quality check after $(node -e 'console.log(((require("./out/autofix.json")||{}).rounds||[]).length)' 2>/dev/null || echo 0) auto-fix round(s)." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::The film is still blocked after the auto-fix rounds; it is handed over as a marked draft, not as a released film."
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.out_artifact }}

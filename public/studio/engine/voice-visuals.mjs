@@ -376,6 +376,8 @@ export async function planVoiceVisuals(o) {
         });
       } catch (e) {
         // A used-up day (429) stops the brain for the rest of the film; those scenes are planned from their own words.
+        // The day being spent everywhere is different: it stops the whole film, so the saved stages resume tomorrow.
+        if (/** @type {any} */ (e)?.daily) throw e;
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
       }
     }
@@ -413,7 +415,7 @@ export async function planVoiceVisuals(o) {
   if (o.providers?.length) {
     const judge = o.brain && canSee(o.brain) ? o.judge : undefined;
     // Voiceover films: a picture must name what was searched (the archives match "car" to "Carina Nebula").
-    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency, topic: o.topic, subject: o.topic ? undefined : found.subject, holdWeak: true });
+    media = await chapterMedia({ chapter, markdown, providers: o.providers, judge, wholeWord: true, reachable: o.reachable, concurrency: o.concurrency, topic: o.topic, subject: o.topic ? undefined : found.subject, holdWeak: true, heard: Object.fromEntries(scenes.map((x) => [x.sc, x.narration])) });
     for (const shot of media.shots) {
       const p = plan.find((x) => x.sc === shot.scene);
       if (!p) continue;

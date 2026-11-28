@@ -11,7 +11,7 @@
  *   GET  /api/voice/:id                  state and progress (+ a short-lived download link when the film is ready)   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/audio            the uploaded recording   (Bearer STUDIO_TOKEN, or ?ticket= for the GitHub runner)
  *   POST /api/voice/:id/progress         { stage, ok?, params?, error? } from the GitHub runner   (ticket)
- *   POST /api/voice/:id/film             { bytes } -> start the upload of the finished MP4 from the runner   (ticket)
+ *   POST /api/voice/:id/film             { bytes, draft?, blocks? } -> start the upload of the finished MP4 from the runner   (ticket)
  *   PUT  /api/voice/:id/film/parts/:n    one piece of the MP4   (ticket)
  *   POST /api/voice/:id/film/complete    { parts }   (ticket)
  *   POST /api/voice/:id/marks            { start, ends[], by } the reviewer's ayah times (Quran): the film is made again with them   (Bearer STUDIO_TOKEN)
@@ -96,9 +96,9 @@ const ID = /^[0-9a-f-]{36}$/;
 /** The stages the runner reports, in order (each has a message voice.stage.<stage>). */
 export const VOICE_STAGES = /** @type {const} */ (["script", "narrate", "uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
 
-/** @param {unknown} body @param {number} [status] */
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+/** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
+function json(body, status = 200, headers = {}) {
+  return new Response(JSON.stringify(body, null, 1), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 }
 
 /** @param {string} a @param {string} b */
@@ -200,12 +200,18 @@ async function runEnded(rec, env, f = fetch) {
   return run.status === "completed";
 }
 
+/** The plain reasons a draft carries: a code and both languages, nothing long, no stack traces. @param {unknown} list */
+function cleanBlocks(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 3).map((/** @type {any} */ b) => ({ code: String(b?.code ?? "").slice(0, 60), en: String(b?.en ?? "").slice(0, 300), bn: String(b?.bn ?? "").slice(0, 300) })).filter((b) => b.code && (b.en || b.bn));
+}
+
 /** The status the creator sees, from the last progress entry. @param {any} rec */
 function statusOf(rec) {
   const last = rec.progress?.at(-1);
   if (!last) return "uploading";
   if (!last.ok) return "failed";
-  if (last.stage === "done") return rec.kind === "quran" ? "awaiting-review" : "done";
+  // A draft is its own state: the film is here, but it did not pass the quality check (never shown as released).
+  if (last.stage === "done") return rec.film?.draft ? "draft" : rec.kind === "quran" ? "awaiting-review" : "done";
   if (last.stage === "uploaded") return "uploaded";
   if (last.stage === "queued") return "queued";
   return "running";
@@ -227,7 +233,8 @@ async function save(bucket, rec) {
 
 /** A record as the creator sees it (no upload ids, no keys). @param {any} rec */
 function publicView(rec) {
-  return { id: rec.id, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, release: rec.release ?? null, report: rec.report ?? null };
+  const draft = rec.film?.draft === true;
+  return { id: rec.id, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, draft, blocks: draft ? cleanBlocks(rec.film?.blocks) : [], release: rec.release ?? null, report: rec.report ?? null };
 }
 
 /**
@@ -382,11 +389,13 @@ export async function handleVoice(request, env, url, deps = {}) {
     // Groq only: Gemini's 20 requests a day are gone long before a 40-minute film is planned, and a call sent there
     // after Groq's busy minute came back as "daily limit used up" and stopped the film's brain (film ccd86532).
     if (!env.GROQ_API_KEY || String(env.GROQ ?? "").toLowerCase() === "off") return json({ error: "The free brain (Groq, the GROQ_API_KEY secret) is not set." }, 503);
-    let groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-    // The runner may name one model (each has its own minute, so it spreads its calls over all three): only that model is asked.
-    const named = String(body?.model ?? "");
-    if (named && (groqModels.length ? groqModels : [...GROQ_MODELS]).includes(named)) groqModels = [named];
-    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(groqModels.length ? { models: groqModels } : {}), ...(deps.fetch ? { fetch: deps.fetch } : {}) });
+    const allowed = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    // The runner names the model it is pacing (render/voice-runner.mjs workerBrain), so each model keeps its own
+    // minute. This route makes one attempt on one model and never sleeps: a Worker forgets the previous request,
+    // so the minute's budget and the retries live with the runner, which hands the wait back in Retry-After.
+    const named = String(/** @type {any} */ (body)?.model ?? "").trim();
+    const pinned = named && (allowed.length ? allowed : [...GROQ_MODELS]).includes(named) ? [named] : allowed;
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(pinned.length ? { models: pinned } : {}), retries: 1, pace: false, ...(deps.fetch ? { fetch: deps.fetch } : {}) });
     const tokens = promptTokens(groqMessages(req));
     // Too big for Groq's minute: the runner splits its batch and asks again (413, never another brain).
     if (tokens > GROQ_PROMPT_LIMIT) return json({ error: `The prompt is about ${tokens} tokens; the free brain takes ${GROQ_PROMPT_LIMIT}. Split it.`, tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
@@ -397,7 +406,13 @@ export async function handleVoice(request, env, url, deps = {}) {
       const e = /** @type {any} */ (error);
       if (e?.tooLarge) return json({ error: String(e.message).slice(0, 600), tooLarge: true, tokens, limit: GROQ_PROMPT_LIMIT }, 413);
       // A busy minute or a used-up day, in Groq's own words, as 429 so the runner itself decides to wait or stop.
-      return json({ error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens }, 429);
+      // The wait Groq named travels back in Retry-After, and a used-up day says so, so the runner can pace.
+      const waitMs = Number(e?.retryAfterMs) || 0;
+      return json(
+        { error: e instanceof Error ? e.message.slice(0, 600) : String(e), tokens, daily: Boolean(e?.daily), retryAfterMs: waitMs || null, spentModels: e?.spentModels ?? [] },
+        429,
+        waitMs ? { "retry-after": String(Math.max(1, Math.ceil(waitMs / 1000))) } : {},
+      );
     }
   }
 
@@ -443,7 +458,8 @@ export async function handleVoice(request, env, url, deps = {}) {
     if (list.length !== count || list.some((/** @type {any} */ p, /** @type {number} */ i) => p.partNumber !== i + 1 || !p.etag)) return json({ error: `Send all ${count} pieces, numbered 1-${count}, each with its etag.` }, 400);
     const done = await bucket.resumeMultipartUpload(target.key, target.uploadId).complete(list);
     if (forFilm) {
-      rec.film = { key: target.key, bytes: done.size ?? target.bytes, seconds: Number(body?.seconds) || null };
+      const wasDraft = "draft" in /** @type {any} */ (target) && /** @type {any} */ (target).draft === true;
+      rec.film = { key: target.key, bytes: done.size ?? target.bytes, seconds: Number(body?.seconds) || null, ...(wasDraft ? { draft: true, blocks: cleanBlocks(/** @type {any} */ (target).blocks) } : {}) };
       delete rec.filmUpload;
       await save(bucket, rec);
       return json({ ok: true });
@@ -496,7 +512,9 @@ export async function handleVoice(request, env, url, deps = {}) {
     if (statusOf(rec) === "running" && (await runEnded(rec, env, deps.fetch))) {
       rec.progress.push(progressEntry(rec.progress.at(-1)?.stage ?? "started", {}, "the film machine stopped without reporting (its runner was shut down)."));
     }
-    if (statusOf(rec) !== "failed") return json({ error: "Only a stopped film can be started again." }, 409);
+    // A draft can be started again too (its pictures were fixed as far as they could be; a new run may do better).
+    const st = statusOf(rec);
+    if (st !== "failed" && st !== "draft") return json({ error: "Only a stopped film or a draft can be started again." }, 409);
     rec.retries = (rec.retries ?? 0) + 1;
     delete rec.film;
     delete rec.report;
@@ -566,12 +584,15 @@ export async function handleVoice(request, env, url, deps = {}) {
 
   if (sub === "film" && method === "POST") {
     if (!runner) return json({ error: "Wrong ticket." }, 401);
-    const bytes = Number((/** @type {any} */ (await request.json().catch(() => null)))?.bytes);
+    const body = /** @type {any} */ (await request.json().catch(() => null));
+    const bytes = Number(body?.bytes);
     if (!Number.isInteger(bytes) || bytes < 1024 || bytes > MAX_FILM_BYTES) return json({ error: "Bad film size." }, 400);
     if (rec.filmUpload) await bucket.resumeMultipartUpload(rec.filmUpload.key, rec.filmUpload.uploadId).abort().catch(() => {});
     const key = `voice/${id}/film.mp4`;
     const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType: "video/mp4" } });
-    rec.filmUpload = { key, uploadId: upload.uploadId, bytes };
+    // A film that still fails after the auto-fix rounds is uploaded as a DRAFT with its plain reasons (en + bn).
+    const draft = body?.draft === true;
+    rec.filmUpload = { key, uploadId: upload.uploadId, bytes, ...(draft ? { draft: true, blocks: cleanBlocks(body?.blocks) } : {}) };
     await save(bucket, rec);
     return json({ partSize: PART_SIZE, parts: partsFor(bytes) }, 201);
   }

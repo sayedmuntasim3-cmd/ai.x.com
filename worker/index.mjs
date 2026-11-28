@@ -64,6 +64,7 @@ import { anthropicBatchModel, permanentError, savingModel } from "./anthropic.mj
 import { brainFromEnv, brainHealth } from "./brain.mjs";
 import { dispatchRender } from "./github.mjs";
 import { listFilms } from "./films.mjs";
+import { handleHealthReport } from "./health-api.mjs";
 import { radarSearch, videoDetails } from "./youtube.mjs";
 import { authUrl, exchangeCode, learnFromVideo, signState, verifyState } from "./youtube-analytics.mjs";
 import { lessonsText } from "../engine/src/retention.mjs";
@@ -266,6 +267,8 @@ export default {
       if (jobs) return jobs;
       const voice = await handleVoice(request, env, url);
       if (voice) return voice;
+      const healthReport = await handleHealthReport(request, env, url, { sameToken, json });
+      if (healthReport) return healthReport;
       if (url.pathname === "/api/health") {
         const brain = brainHealth(env);
         // The media step's real provider list: the archives that need no key, plus each stock provider whose

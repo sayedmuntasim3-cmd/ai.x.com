@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { tokenizeArabic } from "../engine/src/arabic.mjs";
 import { AYAH_COUNTS, ayahText, buildQuranIndex } from "../engine/src/quran.mjs";
-import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, retakeRecording, sliceWords, voiceReport } from "./voice-film.mjs";
+import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, pictures, resumeState, retakeRecording, runSignature, sliceWords, voiceReport } from "./voice-film.mjs";
 
 const tanzilIndex = buildQuranIndex(JSON.parse(readFileSync(new URL("../engine/data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
 
@@ -18,6 +18,46 @@ function recited(surah, ayah) {
 }
 
 const ffmpeg = await hasFfmpeg();
+
+test("a re-run reads the stages the earlier run finished, and never asks the brain for them again", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-resume-"));
+  const about = { audio: "a.mp3", bytes: 1000, topic: "The bridge", kind: "narration", slice: null, media: false };
+  assert.equal(runSignature(about), runSignature({ ...about, somethingElse: 1 }), "only the fingerprint fields count");
+  assert.equal((await resumeState(dir, about)).matches, false, "a folder with no run.json reuses nothing");
+  writeFileSync(join(dir, "run.json"), JSON.stringify({ version: 1, signature: runSignature({ ...about, bytes: 2000 }), about: { ...about, bytes: 2000 } }));
+  assert.equal((await resumeState(dir, about)).matches, false, "another recording's folder is not reused");
+
+  const { syntheticScenes } = await import("../engine/src/brain-budget.mjs");
+  const { voiceStructure } = await import("../engine/src/voice-understand.mjs");
+  const { planVoiceVisuals } = await import("../engine/src/voice-visuals.mjs");
+  const { planBeats, planShots } = await import("../engine/src/shot-plan.mjs");
+  const scenes = syntheticScenes(1, 4);
+  const structure = voiceStructure(scenes);
+  const director = await planBeats({ scenes, structure, topic: about.topic });
+  const r = await planVoiceVisuals({ scenes, structure, topic: about.topic, brain: null });
+  const plan = planShots({ markdown: r.markdown, scenes, beats: director.beats, world: director.world, genre: director.genre, topic: about.topic, structure });
+  writeFileSync(join(dir, "run.json"), JSON.stringify({ version: 1, signature: runSignature(about), about }));
+  writeFileSync(join(dir, "understanding.json"), JSON.stringify({ ok: true, kind: "narration", language: "en", scenes, structure }));
+  writeFileSync(join(dir, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: [] }));
+  writeFileSync(join(dir, "pictures.md"), r.markdown + "\n");
+  writeFileSync(join(dir, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: [], media: null, changedByBrain: [] }));
+  writeFileSync(join(dir, "shots.json"), JSON.stringify({ genre: director.genre, world: director.world, hook: plan.hook, shots: plan.shots, findings: [] }));
+  writeFileSync(join(dir, "edit-C1.json"), JSON.stringify({ scenes: plan.edit }));
+
+  const state = await resumeState(dir, about);
+  assert.equal(state.matches, true);
+  assert.deepEqual(state.stages, ["understanding", "beats", "pictures", "shots", "edit"]);
+
+  // The brain throws if it is asked at all: a resumed run must not make one call.
+  const brain = { name: "must-not-be-asked", capabilities: { vision: false, webSearch: false }, call: async () => { throw new Error("the brain must not be asked again"); } };
+  const again = await pictures({ out: dir, understanding: state.understanding, brain, resume: state, topic: about.topic });
+  assert.equal(again.ok, true);
+  assert.ok(again.messages.some((m) => m.code === "voice.resumed"));
+
+  // A plan with an unfinished line (TODO) is not trusted: it is planned again.
+  writeFileSync(join(dir, "pictures.md"), r.markdown.replace("ANCHOR:", "ANCHOR: TODO") + "\n");
+  assert.equal((await resumeState(dir, about)).pictures, null);
+});
 
 test("arguments: kind is checked", () => {
   assert.deepEqual(parseArgs(["--audio", "a.mp3"]), { audio: "a.mp3", kind: "auto" });
