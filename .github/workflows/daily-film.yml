@@ -128,8 +128,10 @@ jobs:
         run: |
           set -a; . "$RUNNER_TEMP/timing.env"; set +a
           node -e 'const e=process.env,m=(s)=>s?Math.round(Number(s)/6)/10:null;const t={script:m(e.script),narrate:m(e.narrate),upload:m(e.upload),total:m(Math.floor(Date.now()/1000)-Number(e.start))};require("fs").mkdirSync("run",{recursive:true});require("fs").writeFileSync("run/daily-timing.json",JSON.stringify(t,null,1));console.log(JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
+      # A cancelled run (a timeout, a person pressing Cancel) must say so too: otherwise the Worker keeps the film
+      # "under way" for 12 hours and every new ask answers 409 (27 Nov: st-francis-dam, cancelled at 90 minutes).
       - name: Tell the studio what stopped it
-        if: failure()
+        if: failure() || cancelled()
         run: |
           stage=$(cat .stage 2>/dev/null || echo started)
           why=$( (grep -h '^BLOCK:' step.log 2>/dev/null || tail -n 3 step.log 2>/dev/null) | head -n 3 | tr '\n' ' ' | cut -c1-300)

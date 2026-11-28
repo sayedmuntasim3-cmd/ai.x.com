@@ -3,8 +3,10 @@
  * settings (Cloudflare vars and secrets, or the environment of the local
  * runner). Kept apart from worker/index.mjs so it runs and is tested in Node.
  *
- *   BRAIN           "local" | "claude" | "gemini"; unset: the first free one configured (local, then
- *                   gemini). The paid brain (claude) is never chosen unless BRAIN names it.
+ *   BRAIN           "local" | "groq" | "claude" | "gemini"; unset: the first free one configured (local,
+ *                   then groq, then gemini). The paid brain (claude) is never chosen unless BRAIN names
+ *                   it. A groq brain needs only GROQ_API_KEY: a film finishes on free Groq alone, and
+ *                   Gemini is an optional fallback taken only when Groq cannot (GROQ_FALLBACK=off: never).
  *   local           BRAIN_URL (the owner's Ollama, llama.cpp, vLLM or LM Studio, reachable from
  *                   where the run happens), BRAIN_MODEL, optional BRAIN_KEY (secret),
  *                   BRAIN_API ("ollama" | "openai"; guessed from the URL), BRAIN_CONTEXT (tokens,
@@ -27,11 +29,14 @@ import { groqModel, withGroq } from "./groq.mjs";
 import { localBrain } from "./local-brain.mjs";
 
 /** @typedef {import("../engine/src/film-run.mjs").Model} Model */
-/** @typedef {"local" | "claude" | "gemini"} BrainKind */
+/** @typedef {"local" | "groq" | "claude" | "gemini"} BrainKind */
 
-const KINDS = /** @type {const} */ (["local", "claude", "gemini"]);
+const KINDS = /** @type {const} */ (["local", "groq", "claude", "gemini"]);
 /** The brains chosen without BRAIN, in this order: never a paid one. */
-const FREE_KINDS = /** @type {const} */ (["local", "gemini"]);
+const FREE_KINDS = /** @type {const} */ (["local", "groq", "gemini"]);
+
+/** @param {Record<string, any>} env */
+const groqReady = (env) => Boolean(env.GROQ_API_KEY) && String(env.GROQ ?? "").toLowerCase() !== "off";
 
 /** @param {unknown} v */
 const num = (v) => {
@@ -46,9 +51,10 @@ const num = (v) => {
  */
 export function chooseBrain(env) {
   const asked = String(env.BRAIN ?? "").trim().toLowerCase();
-  if (asked && !KINDS.includes(/** @type {BrainKind} */ (asked))) return { ok: false, error: `BRAIN is "${asked}"; it must be local, claude or gemini.` };
+  if (asked && !KINDS.includes(/** @type {BrainKind} */ (asked))) return { ok: false, error: `BRAIN is "${asked}"; it must be local, groq, claude or gemini.` };
   const ready = {
     local: env.BRAIN_URL && env.BRAIN_MODEL ? null : !env.BRAIN_URL ? "the local brain needs BRAIN_URL (its server address)" : "the local brain needs BRAIN_MODEL (for example qwen3:32b)",
+    groq: groqReady(env) ? null : "Groq needs the GROQ_API_KEY secret (free)",
     claude: env.ANTHROPIC_API_KEY ? null : "Claude needs the ANTHROPIC_API_KEY secret",
     gemini: env.GEMINI_API_KEY ? null : "Gemini needs the GEMINI_API_KEY secret",
   };
@@ -59,7 +65,7 @@ export function chooseBrain(env) {
   // Without BRAIN only a free brain is chosen; the paid one (Claude) runs only when BRAIN=claude names it.
   for (const kind of FREE_KINDS) if (!ready[kind]) return { ok: true, kind };
   if (!ready.claude) return { ok: false, error: "Only the paid brain (Claude) is set up. It is never chosen automatically: set BRAIN=claude to use it, or set up a free brain (BRAIN_URL and BRAIN_MODEL, or GEMINI_API_KEY)." };
-  return { ok: false, error: "No brain is connected. Set up the free local brain (BRAIN_URL and BRAIN_MODEL, docs/BRAIN.md), or a GEMINI_API_KEY or ANTHROPIC_API_KEY secret." };
+  return { ok: false, error: "No brain is connected. Set up the free local brain (BRAIN_URL and BRAIN_MODEL, docs/BRAIN.md), a free GROQ_API_KEY or GEMINI_API_KEY secret, or an ANTHROPIC_API_KEY." };
 }
 
 /**
@@ -72,6 +78,16 @@ export function brainFromEnv(env, o = {}) {
   const chosen = chooseBrain(env);
   if (!chosen.ok) return chosen;
   if (chosen.kind === "claude") return { ok: true, kind: "claude", model: anthropicModel({ apiKey: env.ANTHROPIC_API_KEY, model: env.MODEL || "claude-opus-5-5", baseURL: env.ANTHROPIC_BASE_URL || undefined, ...(o.fetch ? { fetch: o.fetch } : {}) }) };
+  if (chosen.kind === "groq") {
+    const groqModels = String(env.GROQ_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    const groq = groqModel({ apiKey: env.GROQ_API_KEY, ...(groqModels.length ? { models: groqModels } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) });
+    // Gemini is a fallback only: it is asked when Groq's day is used up or a call needs its web search.
+    if (!env.GEMINI_API_KEY || String(env.GROQ_FALLBACK ?? "").toLowerCase() === "off") return { ok: true, kind: "groq", model: groq };
+    const g = { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(String(env.GEMINI_SEARCH ?? "").toLowerCase() === "off" ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) };
+    const models = String(env.GEMINI_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    const gemini = String(env.GEMINI_POOL ?? "").toLowerCase() === "off" ? geminiModel(g) : geminiPool({ ...g, ...(models.length ? { models } : {}) });
+    return { ok: true, kind: "groq", model: withGroq(gemini, groq, { log: (line) => console.log(line) }) };
+  }
   if (chosen.kind === "gemini") {
     const g = { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || undefined, ...(String(env.GEMINI_SEARCH ?? "").toLowerCase() === "off" ? { webSearch: false } : {}), ...(o.fetch ? { fetch: o.fetch } : {}) };
     // Several Gemini models on the same key take turns when one model's free day is used up (gemini-pool.mjs);
@@ -123,6 +139,6 @@ export function brainHealth(env) {
     searchesWeb: caps.webSearch !== false,
     ...(caps.contextTokens ? { contextTokens: caps.contextTokens } : {}),
     ...(caps.maxOutputTokens ? { maxOutputTokens: caps.maxOutputTokens } : {}),
-    pricing: b.kind === "local" ? (free ? "free (runs on your own machine)" : "metered at BRAIN_PRICE_INPUT / BRAIN_PRICE_OUTPUT") : b.kind === "gemini" ? "free tier (daily limits apply)" : "paid per token (Claude API)",
+    pricing: b.kind === "local" ? (free ? "free (runs on your own machine)" : "metered at BRAIN_PRICE_INPUT / BRAIN_PRICE_OUTPUT") : b.kind === "gemini" || b.kind === "groq" ? "free tier (daily limits apply)" : "paid per token (Claude API)",
   };
 }
