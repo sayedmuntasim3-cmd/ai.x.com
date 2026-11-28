@@ -108,15 +108,19 @@ export function summarizeRun(dir) {
 
 /**
  * Upload the finished film in pieces, then say it is done.
- * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} file @param {{ seconds: number | null, review: boolean, report?: any }} o
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} file @param {{ seconds: number | null, review: boolean, report?: any, draft?: boolean, blocks?: { code: string, en: string, bn: string }[] }} o
  */
 export async function deliver(c, file, o) {
   const bytes = statSync(file).size;
   await send(c, "/progress", { stage: "deliver" });
-  const parts = await uploadParts(c, file, await send(c, "/film", { bytes }), "/film/parts");
+  // A draft is uploaded like a film, but the record says so and carries the reasons: released and draft are
+  // two different states, and a draft is never shown as a film that passed (render/autofix.mjs).
+  const draft = o.draft === true;
+  const opened = await send(c, "/film", { bytes, ...(draft ? { draft: true, blocks: (o.blocks ?? []).slice(0, 3) } : {}) });
+  const parts = await uploadParts(c, file, opened, "/film/parts");
   await send(c, "/film/complete", { parts, seconds: o.seconds });
   const minutes = o.seconds ? Math.max(1, Math.round(o.seconds / 60)) : 0;
-  await send(c, "/progress", { stage: "done", params: { minutes, ...(o.review ? { review: 1 } : {}) }, ...(o.report ? { report: o.report } : {}) });
+  await send(c, "/progress", { stage: "done", params: { minutes, ...(o.review ? { review: 1 } : {}), ...(draft ? { draft: 1 } : {}) }, ...(o.report ? { report: o.report } : {}) });
 }
 
 /**
@@ -240,7 +244,10 @@ async function main() {
       return;
     }
     const small = report ? { durationSeconds: report.durationSeconds ?? null, width: report.width ?? null, height: report.height ?? null, stats: report.stats ?? null, warnings: (report.warnings ?? []).slice(0, 20) } : undefined;
-    await deliver(c, String(a.file), { seconds: report?.durationSeconds ?? (Number(a.seconds) || null), review: a.review === true, report: small });
+    // --draft: the film did not pass the quality check after the auto-fix rounds; it is delivered anyway, marked,
+    // with the plain reasons the critic gave (never relabelled as released, never a lowered threshold).
+    const blocks = a.draft === true ? (report?.critic?.findings ?? []).filter((/** @type {any} */ f) => f.severity === "block").map((/** @type {any} */ f) => ({ code: String(f.code), en: String(f.en ?? f.code), bn: String(f.bn ?? f.code) })).slice(0, 3) : [];
+    await deliver(c, String(a.file), { seconds: report?.durationSeconds ?? (Number(a.seconds) || null), review: a.review === true, report: small, ...(a.draft === true ? { draft: true, blocks } : {}) });
     console.log("delivered");
   } else throw new Error("Use fetch, progress, summary or deliver.");
 }

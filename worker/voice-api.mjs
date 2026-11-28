@@ -11,7 +11,7 @@
  *   GET  /api/voice/:id                  state and progress (+ a short-lived download link when the film is ready)   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/audio            the uploaded recording   (Bearer STUDIO_TOKEN, or ?ticket= for the GitHub runner)
  *   POST /api/voice/:id/progress         { stage, ok?, params?, error? } from the GitHub runner   (ticket)
- *   POST /api/voice/:id/film             { bytes } -> start the upload of the finished MP4 from the runner   (ticket)
+ *   POST /api/voice/:id/film             { bytes, draft?, blocks? } -> start the upload of the finished MP4 from the runner   (ticket)
  *   PUT  /api/voice/:id/film/parts/:n    one piece of the MP4   (ticket)
  *   POST /api/voice/:id/film/complete    { parts }   (ticket)
  *   POST /api/voice/:id/marks            { start, ends[], by } the reviewer's ayah times (Quran): the film is made again with them   (Bearer STUDIO_TOKEN)
@@ -197,12 +197,18 @@ async function runEnded(rec, env, f = fetch) {
   return run.status === "completed";
 }
 
+/** The plain reasons a draft carries: a code and both languages, nothing long, no stack traces. @param {unknown} list */
+function cleanBlocks(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 3).map((/** @type {any} */ b) => ({ code: String(b?.code ?? "").slice(0, 60), en: String(b?.en ?? "").slice(0, 300), bn: String(b?.bn ?? "").slice(0, 300) })).filter((b) => b.code && (b.en || b.bn));
+}
+
 /** The status the creator sees, from the last progress entry. @param {any} rec */
 function statusOf(rec) {
   const last = rec.progress?.at(-1);
   if (!last) return "uploading";
   if (!last.ok) return "failed";
-  if (last.stage === "done") return rec.kind === "quran" ? "awaiting-review" : "done";
+  // A draft is its own state: the film is here, but it did not pass the quality check (never shown as released).
+  if (last.stage === "done") return rec.film?.draft ? "draft" : rec.kind === "quran" ? "awaiting-review" : "done";
   if (last.stage === "uploaded") return "uploaded";
   if (last.stage === "queued") return "queued";
   return "running";
@@ -224,7 +230,8 @@ async function save(bucket, rec) {
 
 /** A record as the creator sees it (no upload ids, no keys). @param {any} rec */
 function publicView(rec) {
-  return { id: rec.id, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, release: rec.release ?? null, report: rec.report ?? null };
+  const draft = rec.film?.draft === true;
+  return { id: rec.id, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, draft, blocks: draft ? cleanBlocks(rec.film?.blocks) : [], release: rec.release ?? null, report: rec.report ?? null };
 }
 
 /**
@@ -440,7 +447,8 @@ export async function handleVoice(request, env, url, deps = {}) {
     if (list.length !== count || list.some((/** @type {any} */ p, /** @type {number} */ i) => p.partNumber !== i + 1 || !p.etag)) return json({ error: `Send all ${count} pieces, numbered 1-${count}, each with its etag.` }, 400);
     const done = await bucket.resumeMultipartUpload(target.key, target.uploadId).complete(list);
     if (forFilm) {
-      rec.film = { key: target.key, bytes: done.size ?? target.bytes, seconds: Number(body?.seconds) || null };
+      const wasDraft = "draft" in /** @type {any} */ (target) && /** @type {any} */ (target).draft === true;
+      rec.film = { key: target.key, bytes: done.size ?? target.bytes, seconds: Number(body?.seconds) || null, ...(wasDraft ? { draft: true, blocks: cleanBlocks(/** @type {any} */ (target).blocks) } : {}) };
       delete rec.filmUpload;
       await save(bucket, rec);
       return json({ ok: true });
@@ -493,7 +501,9 @@ export async function handleVoice(request, env, url, deps = {}) {
     if (statusOf(rec) === "running" && (await runEnded(rec, env, deps.fetch))) {
       rec.progress.push(progressEntry(rec.progress.at(-1)?.stage ?? "started", {}, "the film machine stopped without reporting (its runner was shut down)."));
     }
-    if (statusOf(rec) !== "failed") return json({ error: "Only a stopped film can be started again." }, 409);
+    // A draft can be started again too (its pictures were fixed as far as they could be; a new run may do better).
+    const st = statusOf(rec);
+    if (st !== "failed" && st !== "draft") return json({ error: "Only a stopped film or a draft can be started again." }, 409);
     rec.retries = (rec.retries ?? 0) + 1;
     delete rec.film;
     delete rec.report;
@@ -563,12 +573,15 @@ export async function handleVoice(request, env, url, deps = {}) {
 
   if (sub === "film" && method === "POST") {
     if (!runner) return json({ error: "Wrong ticket." }, 401);
-    const bytes = Number((/** @type {any} */ (await request.json().catch(() => null)))?.bytes);
+    const body = /** @type {any} */ (await request.json().catch(() => null));
+    const bytes = Number(body?.bytes);
     if (!Number.isInteger(bytes) || bytes < 1024 || bytes > MAX_FILM_BYTES) return json({ error: "Bad film size." }, 400);
     if (rec.filmUpload) await bucket.resumeMultipartUpload(rec.filmUpload.key, rec.filmUpload.uploadId).abort().catch(() => {});
     const key = `voice/${id}/film.mp4`;
     const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType: "video/mp4" } });
-    rec.filmUpload = { key, uploadId: upload.uploadId, bytes };
+    // A film that still fails after the auto-fix rounds is uploaded as a DRAFT with its plain reasons (en + bn).
+    const draft = body?.draft === true;
+    rec.filmUpload = { key, uploadId: upload.uploadId, bytes, ...(draft ? { draft: true, blocks: cleanBlocks(body?.blocks) } : {}) };
     await save(bucket, rec);
     return json({ partSize: PART_SIZE, parts: partsFor(bytes) }, 201);
   }
