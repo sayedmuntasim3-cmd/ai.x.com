@@ -17,6 +17,8 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { msg } from "../engine/src/messages.mjs";
+import { GROQ_MODELS } from "../worker/groq.mjs";
+import { GROQ_RETRIES_PER_MODEL, GROQ_RETRY_WAIT_MS, promptTokensOf, retryAfterMs, tokenBucket, waitText } from "../worker/groq-pacing.mjs";
 
 /** Must match PART_SIZE in worker/voice-api.mjs (the Worker says it again when an upload opens). */
 const PART_SIZE = 16 * 1024 * 1024;
@@ -49,9 +51,16 @@ export async function send(c, path, body, method = "POST") {
       const res = await get(endpoint(c, path), { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const text = await res.text();
       if (res.ok) return JSON.parse(text || "{}");
+      if (res.status < 500) {
+        // A 4xx is the answer, not a transport fault: the caller decides (a 429 waits, or the next model takes it).
+        // The status and the wait Groq named travel with the error.
+        throw Object.assign(new Error(`${method} ${path} failed: ${res.status} ${text.slice(0, 300)}`), { status: res.status, headers: res.headers, body: text, retryAfterMs: retryAfterMs(res.headers) });
+      }
       last = `${res.status} ${text.slice(0, 300)}`;
-      if (res.status < 500) break;
-    } catch (e) { last = e instanceof Error ? e.message : String(e); }
+    } catch (e) {
+      if (Number(/** @type {any} */ (e)?.status) && Number(/** @type {any} */ (e).status) < 500) throw e;
+      last = e instanceof Error ? e.message : String(e);
+    }
     await new Promise((r) => setTimeout(r, 2000 * attempt));
   }
   throw new Error(`${method} ${path} failed: ${last}`);
@@ -160,12 +169,27 @@ export async function sendVoice(c, file) {
  * The free brain through the Worker (POST /api/voice/:id/brain: Groq only, the Worker's own key), as a model for
  * local/voice-film.mjs and render/asset-rank/rerank.mjs. A prompt too big for Groq comes back as an error with
  * tooLarge (the caller splits its batch); every call's prompt tokens are logged. Text only and no web search, said in its capabilities, so every stage
- * takes its own path (canSee/canSearch). A busy minute is waited out; a used-up day stops with the brains' words.
+ * takes its own path (canSee/canSearch).
+ *
+ * The pacing is here, on the runner, because the Worker cannot keep it: each request forgets the last one, so
+ * a minute's budget and a retry's history have nowhere to live in it. A busy minute is waited out for the
+ * time Groq names (Retry-After, else x-ratelimit-reset-*), three times on the same model; after that the next
+ * model in GROQ_MODELS takes the call. A token bucket keeps each model under 8,000 prompt tokens a minute, so a
+ * 40-minute film's bursts never trip the limit. A used-up day throws with daily and the reset time, and the
+ * run stops with a message instead of a half-planned film.
  * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c
- * @param {{ sleep?: (ms: number) => Promise<void>, waitMs?: number, log?: (line: string) => void }} [o]
+ * @param {{ sleep?: (ms: number) => Promise<void>, waitMs?: number, log?: (line: string) => void, now?: () => number, bucket?: ReturnType<typeof tokenBucket>, models?: string[], retries?: number }} [o]
  */
 export function workerBrain(c, o = {}) {
   const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const now = o.now ?? (() => Date.now());
+  const models = o.models?.length ? o.models : [...GROQ_MODELS];
+  const retries = Math.max(1, o.retries ?? GROQ_RETRIES_PER_MODEL);
+  /** The wait when Groq's answer names none (a test passes 0 to keep its clock fake). */
+  const waitWhenUnnamed = o.waitMs === undefined ? GROQ_RETRY_WAIT_MS : Number(o.waitMs);
+  const bucket = o.bucket ?? tokenBucket({ now });
+  /** Models whose day the runner saw used up: never asked again in this run. */
+  const spent = new Set();
   const calls = /** @type {{ stage: string, model: string, seconds: number, tokens?: number }[]} */ ([]);
   return {
     name: "zupona-free-brain (Groq, through the Worker)",
@@ -174,23 +198,46 @@ export function workerBrain(c, o = {}) {
     /** @param {any} req */
     async call(req) {
       const body = { req: { stage: req.stage, system: req.system, messages: req.messages, maxTokens: req.maxTokens } };
-      let last = "";
-      for (let attempt = 1; attempt <= 4; attempt += 1) {
-        const t0 = Date.now();
-        try {
-          const r = await send(c, "/brain", body);
-          calls.push({ stage: String(req.stage ?? ""), model: String(r.model ?? "?"), seconds: Math.round((Date.now() - t0) / 1000), tokens: Number(r.tokens) || 0 });
-          o.log?.(`free brain ${req.stage}: ${r.tokens ?? "?"} prompt tokens, ${r.model}`);
-          return { text: String(r.text ?? ""), stopReason: r.stopReason ?? "end_turn", model: r.model, usage: r.usage ?? { input_tokens: 0, output_tokens: 0 } };
-        } catch (e) {
-          last = e instanceof Error ? e.message : String(e);
-          if (/ 413 /.test(last)) throw Object.assign(new Error(`The prompt is too big for the free brain: ${last.slice(0, 300)}`), { status: 413, tooLarge: true });
-          if (/day used up|per day|PerDay|RESOURCE_EXHAUSTED|daily/i.test(last) && !/busy/i.test(last)) throw Object.assign(new Error(`The free brains' daily limit is used up: ${last.slice(0, 300)}`), { status: 429, daily: true });
-          if (!/ 429 /.test(last)) throw Object.assign(new Error(last.slice(0, 300)), { status: 400 });
-          o.log?.(`free brain busy (${req.stage}); waiting a minute`);
-          await sleep(o.waitMs ?? 61_000);
+      const tokens = promptTokensOf(req);
+      let last = "", status = 0, daily = false, resetMs = 0;
+      for (const model of models) {
+        if (spent.has(model)) continue;
+        // The minute's tokens first: wait until this prompt fits, so a burst never crosses 8,000 in a minute.
+        const waitForMinute = bucket.waitMs(model, tokens);
+        if (waitForMinute > 0) {
+          o.log?.(`free brain pacing: ${model} waits ${waitText(waitForMinute)} for its minute`);
+          await sleep(waitForMinute + 250);
+        }
+        for (let attempt = 1; attempt <= retries; attempt += 1) {
+          const t0 = Date.now();
+          try {
+            const r = await send(c, "/brain", { ...body, model });
+            bucket.spend(model, Number(r.tokens) || tokens);
+            calls.push({ stage: String(req.stage ?? ""), model: String(r.model ?? model), seconds: Math.round((Date.now() - t0) / 1000), tokens: Number(r.tokens) || 0 });
+            o.log?.(`free brain ${req.stage}: ${r.tokens ?? "?"} prompt tokens, ${r.model}`);
+            return { text: String(r.text ?? ""), stopReason: r.stopReason ?? "end_turn", model: r.model, usage: r.usage ?? { input_tokens: 0, output_tokens: 0 } };
+          } catch (e) {
+            const err = /** @type {any} */ (e);
+            last = e instanceof Error ? e.message : String(e);
+            status = Number(err?.status) || 0;
+            if (/ 413 /.test(last)) throw Object.assign(new Error(`The prompt is too big for the free brain: ${last.slice(0, 300)}`), { status: 413, tooLarge: true });
+            if (err?.daily || (/day used up|per day|PerDay|RESOURCE_EXHAUSTED|daily/i.test(last) && !/busy/i.test(last))) {
+              spent.add(model);
+              daily = true;
+              resetMs = Number(err?.resetMs) || Number(err?.retryAfterMs) || 0;
+              o.log?.(`free brain: ${model}'s free day is used up${models.some((m) => !spent.has(m)) ? "; the next model takes the call" : ""}`);
+              break;
+            }
+            if (status !== 429) throw Object.assign(new Error(last.slice(0, 300)), { status: 400 });
+            const wait = Number(err?.retryAfterMs) || waitWhenUnnamed;
+            if (attempt < retries) {
+              o.log?.(`free brain busy (${req.stage}) on ${model}; waiting ${waitText(wait) || "a minute"}`);
+              await sleep(Math.min(wait, 65_000) + 500);
+            }
+          }
         }
       }
+      if (daily) throw Object.assign(new Error(`The free brains' daily limit is used up: ${last.slice(0, 300)}`), { status: 429, daily: true, resetMs, wait: waitText(resetMs) });
       throw Object.assign(new Error(`The free brain stayed busy: ${last.slice(0, 300)}`), { status: 503 });
     },
   };

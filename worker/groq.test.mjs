@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { groqMessages, groqModel, promptTokens, withGroq, GROQ_PROMPT_LIMIT } from "./groq.mjs";
+import { dailyResetMs, durationMs, retryAfterMs, tokenBucket, GROQ_TOKENS_PER_MINUTE } from "./groq-pacing.mjs";
 import { brainFromEnv } from "./brain.mjs";
 
 const MANUAL = readFileSync(new URL("../prompts/1-zupona-master-engine-full.txt", import.meta.url), "utf8");
@@ -58,6 +59,67 @@ test("the brain plug adds Groq to Gemini when GROQ_API_KEY is set, and not with 
   assert.ok(urls[0].startsWith("https://api.groq.com/"));
   const off = brainFromEnv({ GEMINI_API_KEY: "g", GROQ_API_KEY: "q", GROQ: "off" });
   assert.ok(off.ok && !("fits" in off.model));
+});
+
+test("the pacing reads every wait Groq writes: Retry-After, an HTTP date, and the per-minute reset headers", () => {
+  assert.equal(durationMs("2"), 2000, "a bare Retry-After is seconds");
+  assert.equal(durationMs("2.5s"), 2500);
+  assert.equal(durationMs("1m30s"), 90_000);
+  assert.equal(durationMs("150ms"), 150);
+  assert.equal(durationMs("1h2m3s"), 3_723_000);
+  assert.equal(durationMs("not a time"), 0);
+  const now = Date.parse("2026-11-27T10:00:00Z");
+  assert.equal(retryAfterMs(new Headers({ "retry-after": "5" }), now), 5000);
+  assert.equal(retryAfterMs(new Headers({ "retry-after": new Date(now + 30_000).toUTCString() }), now), 30_000);
+  assert.equal(retryAfterMs(new Headers({ "x-ratelimit-reset-tokens": "7.66s" }), now), 7660);
+  assert.equal(retryAfterMs(new Headers({ "x-ratelimit-reset-requests": "1m" }), now), 60_000);
+  assert.equal(retryAfterMs(new Headers(), now), 0);
+  assert.equal(dailyResetMs("Rate limit reached ... Please try again in 2h5m.", new Headers(), now), 7_500_000);
+  assert.equal(dailyResetMs("{} the day is used up", new Headers()), 24 * 3_600_000, "no time named: about a day");
+});
+
+test("the token bucket holds a minute's 8,000 tokens per model on a fake clock", () => {
+  let clock = 0;
+  const bucket = tokenBucket({ now: () => clock });
+  assert.equal(bucket.waitMs("a", 4000), 0);
+  bucket.spend("a", 4000);
+  assert.equal(bucket.waitMs("a", 4000), 0, "two batches fit the minute");
+  bucket.spend("a", 4000);
+  const wait = bucket.waitMs("a", 4000);
+  assert.ok(wait > 0 && wait <= 60_000, `waits ${wait}`);
+  assert.equal(bucket.used("a"), GROQ_TOKENS_PER_MINUTE);
+  clock += wait;
+  assert.equal(bucket.waitMs("a", 4000), 0, "the first batch left the window");
+  assert.equal(bucket.waitMs("b", 4000), 0, "each model has its own minute");
+});
+
+test("three busy minutes on one Groq model, then the next model; a spent day on every model throws daily", async () => {
+  const seen = /** @type {string[]} */ ([]);
+  const slept = /** @type {number[]} */ ([]);
+  let clock = 0;
+  const fetch = async (/** @type {string} */ _u, /** @type {any} */ init) => {
+    const model = JSON.parse(init.body).model;
+    seen.push(model);
+    if (model === "openai/gpt-oss-120b") return new Response("{}", { status: 429, headers: { "retry-after": "4" } });
+    return reply("ok");
+  };
+  const groq = groqModel({ apiKey: "k", fetch: /** @type {any} */ (fetch), now: () => clock, sleep: async (/** @type {number} */ ms) => { slept.push(ms); clock += ms; } });
+  const r = await groq.call(req("qa"));
+  assert.equal(r.model, "qwen/qwen3.8-27b");
+  assert.deepEqual(seen, ["openai/gpt-oss-120b", "openai/gpt-oss-120b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]);
+  assert.deepEqual(slept, [4500, 4500]);
+  const everyDay = groqModel({
+    apiKey: "k",
+    fetch: /** @type {any} */ (async () => new Response(JSON.stringify({ error: { message: "Rate limit reached on requests per day (RPD). Please try again in 3h." } }), { status: 429 })),
+    sleep: async () => {},
+  });
+  await assert.rejects(everyDay.call(req("qa")), (e) => {
+    const err = /** @type {any} */ (e);
+    assert.equal(err.daily, true);
+    assert.equal(err.status, 429);
+    assert.equal(err.resetMs, 3 * 3_600_000);
+    return true;
+  });
 });
 
 test("groqLook: one picture question to the free eyes model; the minute window is waited out", async () => {

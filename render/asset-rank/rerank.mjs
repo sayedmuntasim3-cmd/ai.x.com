@@ -891,8 +891,9 @@ export async function rerankRun(o) {
       const decided = textPicks.get(s) ?? null;
       const byText = !sim && Boolean(decided?.shortlist.some((x) => x.id === c.id));
       // A text-decided shot's shortlist is scored by its tags: no thumbnail was looked at, so watermark and
-      // off-world are unknown (never failed), and the critic's eyes still see the pick itself.
-      const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : byText ? { total: 0, relevance: 0, place: 0.5, quality: 0.5, era: 0.5, watermark: 0, offBy: -1, offWhy: "", by: "text" } : null;
+      // off-world are unknown (never failed), and the critic's eyes still see the pick itself. No relevance
+      // number is written: 0 would read as a weak picture to the critic and the contact sheet; absent is unknown.
+      const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : byText ? { total: 0, place: 0.5, quality: 0.5, era: 0.5, watermark: 0, offBy: -1, offWhy: "", by: "text" } : null;
       const stock = STOCK_SOURCES.includes(String(c.source));
       const aboutIt = !s.named || aboutNames(c, s.names ?? []);
       const why = (s.named && !aboutIt && stock ? "off-subject" : "") || refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
