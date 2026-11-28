@@ -25,6 +25,8 @@ import { promisify } from "node:util";
 import { FREE_LICENCES, REPEAT_WINDOW_SECONDS, internetArchiveProvider, nasaProvider, pixabayProvider, pexelsProvider, toPick, verifyArchiveItem, wikimediaProvider } from "../../engine/src/film-media.mjs";
 import { createRateLimiter, fetchShotMedia } from "../../engine/src/documentary-media-fetch.mjs";
 import { chooseByWords, judgePicture } from "../critic.mjs";
+import { namedQueries, subjectOf } from "../../engine/src/picture-ladder.mjs";
+import { mainTerms } from "../../engine/src/archive-guard.mjs";
 import { groqLook, groqModel } from "../../worker/groq.mjs";
 
 const run = promisify(execFile);
@@ -298,6 +300,23 @@ export function tagHits(title, queries) {
   return Math.min(3, n);
 }
 export const TAG_BONUS = 0.4;
+/** A shot about a named thing: a relevant archive picture gains, generic stock loses (CLIP similarities sit near 0.15-0.35, so 10·relevance moves about 1.5). */
+export const ARCHIVE_NAMED_EDGE = 2;
+export const STOCK_NAMED_COST = 3;
+/** The sources that are real archives, not stock. */
+export const STOCK_SOURCES = Object.freeze(["pixabay", "pexels"]);
+
+/**
+ * For a shot that names something: is this candidate about it? An archive record must hold the name in its title;
+ * a stock clip must carry one of the name words in its tags (a mining truck is not Apollo 11).
+ * @param {{ source?: string, title?: string | null }} c @param {string[]} names
+ */
+export function aboutNames(c, names) {
+  const words = [...new Set(names.flatMap((n) => mainTerms(n)))];
+  if (!words.length) return true;
+  const title = String(c.title ?? "").toLowerCase();
+  return words.some((w) => new RegExp(`(^|[^\\p{L}\\p{N}])${w}(s|es)?($|[^\\p{L}\\p{N}])`, "u").test(title));
+}
 
 /**
  * What kind of record a pick is (owner's rule, 26 Nov 2026): A authentic historical, B authentic present-day,
@@ -575,6 +594,7 @@ export async function rerankRun(o) {
   // The final shot plan: the picks land on the shots the renderer draws, each searched from its own sentence.
   const shotPlan = await readJsonOr(join(o.run, "shots.json"), null);
   const wordsFile = await readJsonOr(join(o.run, "words.json"), null);
+  const words = wordsFile?.words ?? [];
   /** @type {{ calls: number, answered: number, by: Record<string, number> } | null} */
   let written = null;
   if (shotPlan?.shots?.length && wordsFile?.words?.length) {
@@ -582,6 +602,13 @@ export async function rerankRun(o) {
     const w = await writeQueries({ brain: o.brain ?? null, shots: media.shots, world, topic: o.topic ?? beatsFile.topic, log });
     for (const m of media.shots) { const q = /** @type {any} */ (w.queries.get(m.id)); m.queries = q.queries; m.query = q.queries[0] ?? null; m.queriesBy = q.by; }
     written = { calls: w.calls, answered: w.answered, by: { brain: media.shots.filter((/** @type {any} */ m) => m.queriesBy === "brain").length, words: media.shots.filter((/** @type {any} */ m) => m.queriesBy === "words").length } };
+    // Named things first, in code, after the brain: the film's subject plus the names of the shot's own sentence; the brain's moods follow.
+    const subject = subjectOf(o.topic ?? beatsFile.topic ?? "", words.map((x) => x.text).join(" "));
+    for (const m of media.shots) {
+      const n = namedQueries({ sentence: m.sentence || m.heard, subject, queries: m.queries });
+      if (n.queries.length) { m.queries = n.queries; m.query = n.queries[0]; }
+      m.named = n.named; m.names = n.names; m.nameCount = n.nameCount;
+    }
     log(`Searches: ${media.shots.length} picture shots, each from its own sentence; ${written.by.brain} written by the free brain, ${written.by.words} from the words.`);
   }
 
@@ -612,8 +639,19 @@ export async function rerankRun(o) {
   const searchShot = async (s) => {
     const beat = beatAt(beats, s.start, s.end);
     const historic = historicEra(beat?.era || world.era);
-    const qs = shotQueries(s, world);
+    const qs = s.named ? s.queries.slice(0, 10) : shotQueries(s, world);
     const lists = [];
+    if (s.named) {
+      // A named shot: the real archives first (video, then stills) on the names; stock only for the brain's mood queries,
+      // and for the names too when the archives hold fewer than three relevant records.
+      const names = qs.slice(0, Math.min(5, s.nameCount || 5));
+      const arch = (await Promise.all(names.flatMap((q) => [search(q, "video", archives), search(q, "image", archives)]))).flat();
+      const relevant = arch.filter((c) => c && aboutNames(c, s.names ?? []));
+      lists.push(Promise.resolve(arch));
+      const mood = qs.slice(s.nameCount || 5);
+      for (const q of relevant.length >= 3 ? mood : qs) lists.push(search(q, "video", stock));
+      if (relevant.length < 3 && qs[0]) lists.push(search(qs[0], "image", stock));
+    } else {
     // Video first: every search on stock video; stills only from the best search; archives only for real history.
     for (const q of qs) {
       lists.push(search(q, "video", stock));
@@ -623,10 +661,12 @@ export async function rerankRun(o) {
       }
     }
     if (qs[0]) lists.push(search(qs[0], "image", stock));
+    }
     let all = (await Promise.all(lists)).flat();
     // The film's place pool only when the shot's own searches found little: a generic street must not outbid the sentence.
-    if (new Set(all.map((c) => c?.id)).size < 40) all = all.concat((await Promise.all(pool.map((q) => search(q, "video", stock)))).flat());
-    if (s.pick) all.push({ ...s.pick, mediaType: s.pick.kind, rights: { allowed: true, licenseId: s.pick.licence?.licenseId } });
+    if (!s.named && new Set(all.map((c) => c?.id)).size < 40) all = all.concat((await Promise.all(pool.map((q) => search(q, "video", stock)))).flat());
+    // A named shot keeps its plan pick only when that pick is about the name.
+    if (s.pick && (!s.named || aboutNames({ source: s.pick.source, title: s.pick.title }, s.names ?? []))) all.push({ ...s.pick, mediaType: s.pick.kind, rights: { allowed: true, licenseId: s.pick.licence?.licenseId } });
     /** @type {Map<string, any>} */
     const byId = new Map();
     for (const c of all) if (c?.id && c.previewUrl && !byId.has(c.id)) byId.set(c.id, c);
@@ -675,9 +715,11 @@ export async function rerankRun(o) {
     for (const c of candidatesOf.get(s) ?? []) {
       const sim = ans.sim[c.id];
       const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : null;
-      const why = refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
+      const stock = STOCK_SOURCES.includes(String(c.source));
+      const aboutIt = !s.named || aboutNames(c, s.names ?? []);
+      const why = (s.named && !aboutIt && stock ? "off-subject" : "") || refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
       const tags = tagHits(c.title, s.queries ?? [s.query ?? ""]);
-      const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags, score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
+      const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags + (s.named ? (stock ? -STOCK_NAMED_COST : aboutIt ? ARCHIVE_NAMED_EDGE : 0) : 0), score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
       if (why) { refused[why] = (refused[why] ?? 0) + 1; if (why === "off-world" && score) lastResort.push(row); continue; }
       ranked.push(row);
     }
@@ -784,6 +826,17 @@ export async function rerankRun(o) {
     }
     report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
   });
+  // No off-topic fallback: a named shot with no relevant pick of its own holds the nearest strong pick of the film, never a random picture.
+  const strong = plan.map((p, i) => ({ s: p.s, pick: chosen[i] })).filter((x) => x.pick && (!x.s.named || aboutNames(/** @type {any} */ (x.pick).c, x.s.names ?? [])));
+  for (let i = 0; i < plan.length; i += 1) {
+    const s = plan[i].s;
+    if (!s.named || chosen[i] || !strong.length) continue;
+    const near = [...strong].sort((a, b) => Math.abs(a.s.start - s.start) - Math.abs(b.s.start - s.start))[0];
+    s.pick = { .../** @type {any} */ (near.s.pick) };
+    s.status = "found"; s.review = "held"; s.reused = near.s.pick?.id;
+    s.why = { by: "held: no relevant picture found for this named shot, the nearest strong pick is held", provider: near.s.pick?.source ?? null };
+    log(`Held: ${s.id} found nothing relevant for ${(s.names ?? []).slice(0, 2).join(" / ")}; it holds ${near.s.id}.`);
+  }
   const picks = report.filter((r) => r.after);
   // Continuity across the chosen picks (M3 item 5), measured on the same pass: no extra requests or passes.
   /** @type {any[]} */
