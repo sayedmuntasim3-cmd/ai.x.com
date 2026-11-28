@@ -1196,7 +1196,7 @@ export async function renderFilm(o) {
   // The eyes' per-shot relevance (M3) reaches the gate too, not only the `why` field of a media file.
   // The critic also reads which scenes really carry a voice (a single recording voices them all) and the edit plans,
   // so a scene that lost its narration or a transition the editor asked for cannot pass unnoticed.
-  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(o.oneTrack ? { voiceFilm: true } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
   if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
@@ -1302,8 +1302,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (timeline.timing) console.log(`timing: ${timeline.timing.plannedSeconds} s planned, ${timeline.timing.fittedSeconds} s fitted to the voice (${timeline.timing.stretched} scenes longer, ${timeline.timing.shortened} shorter)`);
   console.log(`look: ${look}`);
   if (oneTrack && typeof args.words === "string") {
-    const { captionsFromWords } = await import("../engine/src/timeline.mjs");
-    timeline.captions = captionsFromWords(JSON.parse(readFileSync(args.words, "utf8")).words);
+    const { captionsForVoice } = await import("../engine/src/timeline.mjs");
+    timeline.captions = captionsForVoice(JSON.parse(readFileSync(args.words, "utf8")).words, timeline.durationSeconds);
   }
   // AI scenes made by ai-scenes.mjs replace their cards (stories with one cast).
   let aiShots = 0;
