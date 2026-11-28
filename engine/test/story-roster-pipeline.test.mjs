@@ -133,6 +133,13 @@ test("every agent's real status is recorded: code, a Claude stage, or not built 
   assert.ok(quranUnwired.every((id) => ROLE_STATUS[id][0] === "planned"), "a Quran role no run reaches is still planned");
   assert.equal(ROLE_STATUS["intake-transcriber"][0], "code", "the voice run transcribes its own audio");
   assert.equal(ROLE_STATUS["voice-repair-engineer"][0], "planned", "no noise repair exists yet");
+  // 28 Nov 2026: the picture, edit and research agents the Apollo film showed missing are code checks; each names its file.
+  const crew = { "research-freshness": "script-agents.mjs", "research-geography": "script-agents.mjs", "research-peer-review": "script-agents.mjs", "story-exposition": "script-agents.mjs", "cinematography-composition": "film-agents.mjs", "color-exposure": "film-agents.mjs", "color-white-balance": "film-agents.mjs", "color-artifact-check": "film-agents.mjs", "quality-artifact-qc": "film-agents.mjs", "editing-continuity-match": "film-agents.mjs", "editing-intro-outro": "film-agents.mjs", "animation-diagram-builder": "film-agents.mjs", "cinematography-visual-metaphor": "film-agents.mjs" };
+  for (const [id, file] of Object.entries(crew)) {
+    assert.equal(ROLE_STATUS[id][0], "code", `${id} is a code check now`);
+    assert.ok(ROLE_STATUS[id][1].includes(file), `${id} names ${file}`);
+  }
+  assert.ok(all.planned <= 21, `planned roles fell from 34 to ${all.planned}`);
   assert.equal(ROLE_STATUS["story-transcript-integrity"][0], "code", "every voiceover film restores and checks the transcript's words");
   assert.ok(["arabic", "bangla"].every((l) => ROLE_STATUS[`versions-${l}-writer`][0] === "planned"), "only English runs today");
   const { planRun } = await import("../src/pipeline.mjs");
