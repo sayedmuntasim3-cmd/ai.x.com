@@ -168,6 +168,78 @@ test("without GitHub the recording is kept and the reason is said; Quran waits f
   assert.match(view.data.progress.at(-1).message.en, /scholar/);
 });
 
+test("a film that still fails is stored, served and shown as a marked draft with its reasons", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  const audio = new Uint8Array(5000).fill(9);
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "draft.mp3", bytes: audio.byteLength } });
+  const p = await call(env, "PUT", `/api/voice/${ID}/parts/1`, { headers: OWNER, body: audio });
+  const gh = async () => new Response(null, { status: 204 });
+  const started = await call(env, "POST", `/api/voice/${ID}/complete`, { headers: OWNER, body: { parts: [p.data] }, fetch: gh });
+  const ticket = started.data.progress && (await makeTicket("owner-token", ID, "runner", 3600));
+  const blocks = [
+    { code: "critic.relevance", en: "42% of the shots are relevant to the words; 80% is the floor.", bn: "শটের ৪২% কথার সঙ্গে প্রাসঙ্গিক; ন্যূনতম ৮০% দরকার।" },
+    { code: "critic.designed", en: "The film has 0.4 designed moments a minute; 1.2 is the floor.", bn: "প্রতি মিনিটে ডিজাইন করা মুহূর্ত ০.৪টি; ন্যূনতম ১.২ দরকার।" },
+  ];
+  const film = new Uint8Array(4096).fill(5);
+  const opened = await call(env, "POST", `/api/voice/${ID}/film?ticket=${ticket}`, { body: { bytes: film.byteLength, draft: true, blocks } });
+  assert.equal(opened.status, 201);
+  const fp = await call(env, "PUT", `/api/voice/${ID}/film/parts/1?ticket=${ticket}`, { body: film });
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/film/complete?ticket=${ticket}`, { body: { parts: [fp.data], seconds: 2400 } })).status, 200);
+  await call(env, "POST", `/api/voice/${ID}/progress?ticket=${ticket}`, { body: { stage: "done", params: { minutes: 40, draft: 1 } } });
+
+  // The creator sees a draft, never a released film, with the reasons in both languages.
+  const view = await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER });
+  assert.equal(view.data.status, "draft");
+  assert.equal(view.data.draft, true);
+  assert.deepEqual(view.data.blocks, blocks);
+  assert.equal(view.data.film.seconds, 2400);
+  assert.match(view.data.progress.at(-1).message.en, /Draft ready/);
+  assert.match(view.data.progress.at(-1).message.bn, /খসড়া তৈরি/);
+  // The draft download works like a film's download.
+  const dl = await call(env, "GET", view.data.download);
+  assert.equal(dl.status, 200);
+  assert.deepEqual(dl.data, film);
+  // The list says the same thing.
+  const list = await call(env, "GET", "/api/voice", { headers: OWNER });
+  assert.equal(list.data.films[0].status, "draft");
+  assert.equal(list.data.films[0].blocks.length, 2);
+
+  // A draft can be started again: the draft marker and its reasons go with it.
+  const again = await call(env, "POST", `/api/voice/${ID}/retry`, { headers: OWNER, fetch: gh });
+  assert.equal(again.status, 202);
+  assert.equal(again.data.draft, false);
+  assert.deepEqual(again.data.blocks, []);
+  assert.equal(again.data.status, "queued");
+});
+
+test("a released film is not a draft, and a draft's reasons are cleaned", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  const audio = new Uint8Array(5000).fill(2);
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "ok.mp3", bytes: audio.byteLength } });
+  const p = await call(env, "PUT", `/api/voice/${ID}/parts/1`, { headers: OWNER, body: audio });
+  const started = await call(env, "POST", `/api/voice/${ID}/complete`, { headers: OWNER, body: { parts: [p.data] }, fetch: async () => new Response(null, { status: 204 }) });
+  assert.ok(started.status === 202);
+  const ticket = await makeTicket("owner-token", ID, "runner", 3600);
+  const film = new Uint8Array(2048).fill(3);
+  await call(env, "POST", `/api/voice/${ID}/film?ticket=${ticket}`, { body: { bytes: film.byteLength } });
+  const fp = await call(env, "PUT", `/api/voice/${ID}/film/parts/1?ticket=${ticket}`, { body: film });
+  await call(env, "POST", `/api/voice/${ID}/film/complete?ticket=${ticket}`, { body: { parts: [fp.data], seconds: 600 } });
+  await call(env, "POST", `/api/voice/${ID}/progress?ticket=${ticket}`, { body: { stage: "done", params: { minutes: 10 } } });
+  const view = await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER });
+  assert.equal(view.data.status, "done");
+  assert.equal(view.data.draft, false);
+  assert.deepEqual(view.data.blocks, []);
+  assert.equal(view.data.progress.at(-1).message.en, "Film ready: 10 min. Download it below.");
+
+  // Blocks are kept short: a code, one line per language, at most three.
+  const second = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  await call(second, "POST", "/api/voice", { headers: OWNER, body: { fileName: "d.mp3", bytes: 5000 } });
+  await call(second, "POST", `/api/voice/${ID}/film?ticket=${await makeTicket("owner-token", ID, "runner", 600)}`, { body: { bytes: 2048, draft: true, blocks: [{ code: "critic.dark", en: "x".repeat(900), bn: "y" }, { code: "", en: "no code", bn: "" }, { code: "b", en: "three", bn: "তিন" }] } });
+  const rec = JSON.parse(new TextDecoder().decode(second.FILMS.files.get(`voice/${ID}/voice.json`)));
+  assert.equal(rec.filmUpload.blocks.length, 2, "a block with no code is dropped");
+  assert.equal(rec.filmUpload.blocks[0].en.length, 300);
+});
+
 test("other paths are not handled here", async () => {
   const url = new URL("https://x/api/films");
   assert.equal(await handleVoice(new Request(url), { FILMS: fakeBucket(), STUDIO_TOKEN: "t" }, url), null);

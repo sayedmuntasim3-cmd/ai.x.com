@@ -1235,13 +1235,20 @@ export async function renderFilm(o) {
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
   // What the Edit Director's plan put on screen (punch-ins and shakes drawn, glitches into scenes).
   const edit = { punchIns: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).punchIns), 0), shakes: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).shakes), 0), glitches: t.video.filter((v) => v.transition === "glitch" && !v.fadeIn).length };
-  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, // One recording (the voice system) voices every scene: it is laid from 0:00 under the whole film.
+  // The film's own shots: id, where it sits, how many frames, and the eyes' relevance. A film that is blocked can
+  // then name the shots that failed and the parts that hold them (render/autofix.mjs), instead of being sent back whole.
+  const shots = t.video.map((v) => ({
+    id: String(v.id), scene: v.scene, shot: v.shot, start: v.start, end: v.end, frames: v.frames, type: v.type, url: v.url ?? null,
+    ...(Number.isFinite(v.relevance) ? { relevance: v.relevance } : {}), ...(v.shotType ? { shotType: v.shotType } : {}),
+    ...(v.still ? { still: true } : {}), ...(v.chapterTitle ? { chapterTitle: v.chapterTitle } : {}),
+  }));
+  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, shots, // One recording (the voice system) voices every scene: it is laid from 0:00 under the whole film.
     score,
     voicedScenes: o.oneTrack ? t.narration.length : pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, ...(o.oneTrack ? { oneTrack: basename(o.oneTrack.file) } : {}), musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, mix: { stereo: true, channels, duckDb, curtains: duckPlan.filter((w) => w.gain === 0).length, music: musicFile !== null, effects: sfxFile !== null }, master: mixed, critic, licences, ...(t.timing ? { timing: t.timing } : {}), ...(t.motion ? { motion: t.motion } : {}), warnings };
   // Where the picture flickers or is blurred, by shot: a count alone cannot be fixed (film ccd86532 reported 13 and no place).
   if (picture) {
     const at = (/** @type {{ id: string }} */ f) => { const v = t.video.find((/** @type {any} */ x) => String(x.id) === String(f.id)); return v ? { shotType: v.shotType, type: v.type, still: Boolean(v.still), url: v.url, chapterTitle: v.chapterTitle } : {}; };
-    /** @type {any} */ (report).picture = { samples: picture.samples, flicker: picture.flicker.slice(0, 60).map((f) => ({ ...f, ...at(f) })), blurred: picture.blurred.slice(0, 40).map((b) => ({ ...b, ...at(b) })) };
+    /** @type {any} */ (report).picture = { samples: picture.samples, flicker: picture.flicker.slice(0, 60).map((f) => ({ ...f, ...at(f) })), blurred: picture.blurred.slice(0, 40).map((b) => ({ ...b, ...at(b) })), dark: (picture.dark ?? []).slice(0, 40).map((d) => ({ ...d, ...at(d) })) };
   }
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
