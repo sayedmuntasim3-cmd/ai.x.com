@@ -23,6 +23,7 @@ import { msg } from "../engine/src/messages.mjs";
 import { MIN_FILLED } from "./picture-taste.mjs";
 import { placeholderTokens } from "../engine/src/claim-values.mjs";
 import { METRICS, craftReport } from "../engine/src/craft-memory.mjs";
+import { practiceCheck, practiceMeasures } from "../engine/src/reference-bar.mjs";
 
 /**
  * The house standard. Numbers, not taste: each one is a failure the owner's
@@ -248,7 +249,7 @@ export function subtitleFit(narration, captions, seconds) {
  *   voiceFilm: the film is the length of the recording the owner gave (one narration track): a short one is a note, not a block
  *   craft: the Craft Ledger's calibrated targets for this genre (craft-memory.mjs calibratedDoctrine): a note per
  *   measure short of its target and the craft index 0-100 in `craft`. Notes only: the floor above decides blocks.
- * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any>, craft?: ReturnType<typeof craftReport> }}
+ * @returns {{ verdict: "pass" | "block", findings: Finding[], measures: Record<string, any>, craft?: ReturnType<typeof craftReport>, advisory: Finding[] }}
  */
 export function critique(timeline, report = {}, evidence = {}) {
   /** @type {Finding[]} */
@@ -495,7 +496,12 @@ export function critique(timeline, report = {}, evidence = {}) {
     subtitles: { coverage: round(subs.coverage, 3), maxGap: round(subs.maxGap, 1), overlap: subs.overlap, beyond: subs.beyond },
     repeatsInWindow: within, missingMedia: holes.length, transitionsRequired: required.length, transitionsMissing: lost.length,
   };
-  if (!evidence.craft?.targets) return { verdict: verdictOf(findings), findings, measures };
+  // The reference bar's practice targets (engine/src/reference-bar.mjs): advisory notes only, never a block or a warning.
+  const practice = practiceCheck(practiceMeasures(timeline));
+  // They stay out of `findings` (the gate and the verdict never see them): their own list, printed by reportCritic.
+  const advisory = practice.filter((x) => x.result === "fail").map((r) => ({ ...msg("critic.practiceBelow", { label: r.label, value: r.value, lo: r.lo, hi: r.hi }), code: "critic.practiceBelow", severity: /** @type {const} */ ("note"), value: r.value }));
+  /** @type {any} */ (measures).practice = practice;
+  if (!evidence.craft?.targets) return { verdict: verdictOf(findings), findings, measures, advisory };
   const craft = craftReport(measures, evidence.craft);
   /** @param {any} v */
   const shown = (v) => (Array.isArray(v) ? `${v[0]}-${v[1]}` : String(v));
@@ -503,7 +509,7 @@ export function critique(timeline, report = {}, evidence = {}) {
     const spec = METRICS[/** @type {keyof typeof METRICS} */ (b.metric)];
     add({ ...msg("craft.below", { metricEn: spec.en, metricBn: spec.bn, value: b.value, target: shown(b.target), source: b.source }), code: "craft.below", severity: "note", value: b.value });
   }
-  return { verdict: verdictOf(findings), findings, measures, craft };
+  return { verdict: verdictOf(findings), findings, measures, craft, advisory };
 }
 
 /**
@@ -737,7 +743,7 @@ export async function measureFilm(file, o = {}) {
 
 /** One line per finding, both languages; also the decision line. */
 export function reportCritic(result) {
-  const lines = result.findings.map((f) => `${f.severity.toUpperCase()} ${f.code}: ${f.en}\n${f.bn}`);
+  const lines = [...result.findings, ...(result.advisory ?? [])].map((f) => `${f.severity.toUpperCase()} ${f.code}: ${f.en}\n${f.bn}`);
   const m = result.measures;
   lines.push(`Critic: ${result.verdict.toUpperCase()} — ${m.shots} shots, average ${m.avgShot} s, ${Math.round(m.movingShare * 100)}% moving, ${m.designedPerMinute} designed moments a minute, ${m.lufs} LUFS, LRA ${m.lra} LU, ${m.channels} channel(s).`);
   lines.push(`ক্রিটিক: ${result.verdict === "pass" ? "পাস" : "ব্লক"} — ${m.shots}টি শট, গড় ${m.avgShot} সেকেন্ড, ${Math.round(m.movingShare * 100)}% নড়ছে, মিনিটে ${m.designedPerMinute}টি ডিজাইন করা মুহূর্ত, ${m.lufs} LUFS, LRA ${m.lra} LU, ${m.channels} চ্যানেল।`);
