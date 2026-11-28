@@ -62,6 +62,8 @@ import { applyTighten, cutMap, planTighten, remapWords } from "../engine/src/voi
 import { planRetakes, snapCuts, wordsOfAyat } from "../engine/src/quran-retakes.mjs";
 import { encodeWav24 } from "../engine/src/wav.mjs";
 import { applyMarks, checkMarks } from "../engine/src/quran-marks.mjs";
+import { checkVoiceChapter } from "../engine/src/voice-scenes.mjs";
+import { parseSceneLines } from "../engine/src/scene-lines.mjs";
 
 const run = promisify(execFile);
 
@@ -140,6 +142,80 @@ export function parseSlice(v) {
 export function sliceWords(words, slice) {
   const r3 = (/** @type {number} */ n) => Math.round(n * 1000) / 1000;
   return words.filter((w) => w.start >= slice.start && w.end <= slice.end).map((w) => ({ ...w, start: r3(w.start - slice.start), end: r3(w.end - slice.start) }));
+}
+
+/** A JSON file of the run folder, or null when it is missing or unreadable. @param {string} file */
+async function readJson(file) {
+  try { return JSON.parse(await readFile(file, "utf8")); } catch { return null; }
+}
+
+/** The fields that tie a run folder to one recording and one brief; a different one must not be reused. */
+const SIGNATURE_FIELDS = /** @type {const} */ (["audio", "bytes", "topic", "kind", "slice", "media", "tighten", "transcript", "script", "stt", "model"]);
+
+/**
+ * The run folder's fingerprint: the same recording, the same brief. Files saved under another signature are not
+ * reused, so a re-run with a new topic or another file can never plan on the wrong words.
+ * @param {Record<string, unknown>} [about]
+ */
+export function runSignature(about = {}) {
+  /** @type {Record<string, unknown>} */
+  const picked = {};
+  for (const k of SIGNATURE_FIELDS) picked[k] = about[k] ?? null;
+  return JSON.stringify(picked);
+}
+
+/**
+ * What a re-run may keep: every stage's own output file, checked by the same rule the stage enforces, so a film
+ * that stopped on the free brain's quota continues instead of planning the finished part again (a 40-minute film's
+ * words alone take hours of speech-to-text). A missing, unreadable or invalid file is simply not offered.
+ * @param {string} out
+ * @param {Record<string, unknown>} [about]
+ * @returns {Promise<{ matches: boolean, stages: string[], words: any, understanding: any, beats: any, pictures: any, shots: any, edit: any }>}
+ */
+export async function resumeState(out, about = {}) {
+  /** @type {{ matches: boolean, stages: string[], words: any, understanding: any, beats: any, pictures: any, shots: any, edit: any }} */
+  const none = { matches: false, stages: [], words: null, understanding: null, beats: null, pictures: null, shots: null, edit: null };
+  const saved = await readJson(join(out, "run.json"));
+  if (!saved || saved.version !== 1 || saved.signature !== runSignature(about)) return none;
+
+  const words = await readJson(join(out, "words.json"));
+  const okWords = words && Array.isArray(words.words) && words.words.length > 0 && words.check?.ok !== false ? words : null;
+  const understanding = await readJson(join(out, "understanding.json"));
+  const okUnderstanding = understanding && understanding.ok === true && Array.isArray(understanding.scenes) && understanding.scenes.length ? understanding : null;
+  const scenes = okUnderstanding?.scenes ?? [];
+
+  const beats = await readJson(join(out, "beats.json"));
+  const okBeats = okUnderstanding && beats && Array.isArray(beats.beats) && beats.beats.length > 0
+    && Number(beats.beats[0].start) <= 0.01
+    && Number(beats.beats[beats.beats.length - 1].end) >= Number(scenes[scenes.length - 1].end) - 0.5
+    && beats.beats.every((/** @type {any} */ b) => b && b.goal && b.emotion && b.visual)
+    ? beats : null;
+
+  // The picture plan: one complete line per scene, the voice's words and times intact, and the media when it was asked for.
+  let okPictures = null;
+  const markdown = await readFile(join(out, "pictures.md"), "utf8").catch(() => null);
+  if (okUnderstanding && markdown) {
+    const lines = parseSceneLines(markdown);
+    const complete = lines.length === scenes.length && lines.every((l) => l.fields.SHOTS && l.fields.SRC && !/TODO/.test(l.raw));
+    const intact = complete && !checkVoiceChapter(markdown, scenes).some((f) => f.code === "words-changed" || f.code === "time-changed");
+    const chapterMedia = about.media === true ? await readJson(join(out, "media-C1.json")) : null;
+    if (intact && (about.media !== true || chapterMedia)) okPictures = { markdown, saved: await readJson(join(out, "pictures.json")), chapterMedia };
+  }
+
+  const shots = await readJson(join(out, "shots.json"));
+  const okShots = okPictures && shots && Array.isArray(shots.shots) && shots.shots.length > 0 && (shots.findings ?? []).length === 0 ? shots : null;
+  const edit = await readJson(join(out, "edit-C1.json"));
+  const okEdit = okShots && edit && Array.isArray(edit.scenes) ? edit : null;
+
+  /** @type {string[]} */
+  const stages = [];
+  if (okWords) stages.push("words");
+  if (okUnderstanding) stages.push("understanding");
+  if (okBeats) stages.push("beats");
+  if (okPictures) stages.push("pictures");
+  if (okShots) stages.push("shots");
+  if (okEdit) stages.push("edit");
+  return { matches: true, stages, words: okWords, understanding: okUnderstanding, beats: okBeats, pictures: okPictures, shots: okShots, edit: okEdit };
 }
 
 /**
@@ -443,7 +519,9 @@ export async function understand(o) {
 /**
  * Step 4. With a free brain (voiceBrain: Groq, then the Gemini pool) the plan is written in batches of
  * whole sections; without one, or for scenes past its quota, it comes from each scene's own words.
- * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null, ledger?: import("../engine/src/craft-memory.mjs").Ledger | null, ledgerFile?: string, filmId?: string }} o
+ * A re-run reads the stages a previous run finished from their own files (resumeState), so a film stopped on the
+ * free brain's quota continues where it stopped instead of planning (and transcribing) everything again.
+ * @param {{ out: string, understanding: any, media?: boolean, topic?: string, quranIndex?: any, adab?: "strict" | "nature" | "people-distant", brain?: import("../engine/src/film-run.mjs").Model | null, ledger?: import("../engine/src/craft-memory.mjs").Ledger | null, ledgerFile?: string, filmId?: string, resume?: Awaited<ReturnType<typeof resumeState>> | null }} o
  */
 export async function pictures(o) {
   const u = o.understanding;
@@ -465,18 +543,27 @@ export async function pictures(o) {
     return { ok: guard.ok && direction.ok, messages: [...guard.messages, ...direction.messages], problems: [...guard.problems, ...direction.problems], gaps: guard.gaps };
   }
   const brain = o.brain ?? null;
+  const resume = o.resume ?? null;
+  const kept = /** @type {string[]} */ (resume?.stages ?? []);
+  /** @type {any[]} */
+  const messages = kept.length ? [msg("voice.resumed", { stages: kept.join(", ") })] : [];
   // The Director pass first (beats.json): the world, the genre and a beat sheet; the picture plan is told the world.
-  const director = await planBeats({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic });
-  await writeFile(join(o.out, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: director.brainFindings }, null, 1));
-  const r = await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, archiveEnv: archiveKeys(process.env), fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
-  await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
+  // A finished pass is read from its own file instead of being asked again (a re-run after the free day's quota).
+  const director = resume?.beats ?? await planBeats({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic });
+  if (!resume?.beats) await writeFile(join(o.out, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: director.brainFindings }, null, 1));
+  const r = resume?.pictures
+    ? { markdown: resume.pictures.markdown, plan: resume.pictures.saved?.plan ?? [], findings: resume.pictures.saved?.findings ?? [], messages: [], brainUsed: true, changedByBrain: resume.pictures.saved?.changedByBrain ?? [], media: resume.pictures.saved?.media ?? null, chapterMedia: resume.pictures.chapterMedia ?? null }
+    : await planVoiceVisuals({ brain, scenes: u.scenes, structure: u.structure, topic: o.topic, worldNote: worldBrief(director.world), providers: o.media ? mediaProviders({ pexelsKey: process.env.PEXELS_API_KEY || undefined, pixabayKey: process.env.PIXABAY_API_KEY || (process.env.ZUPONA_STOCK_RELAY ? "relay" : undefined), smithsonianKey: process.env.SMITHSONIAN_API_KEY || undefined, archiveEnv: archiveKeys(process.env), fetch: stockRelayFetch(process.env.ZUPONA_STOCK_RELAY) }) : [], reachable: o.media ? fileReachable : undefined, concurrency: Number(process.env.ZUPONA_MEDIA_CONCURRENCY) || 1 });
+  if (!resume?.pictures) await writeFile(join(o.out, "pictures.md"), r.markdown + "\n");
   // The shot plan (shots.json): every shot typed, re-cut to the genre's rhythm, designed moments on the voice's own lines.
   // The Craft Ledger: the targets earlier films taught for this genre (never looser than the house), read by the
   // shot plan here and by the renderer's critic through craft-targets.json.
   const doctrine = calibratedDoctrine(o.ledger ?? emptyLedger(), ledgerGenre(director.genre));
   const rhythm = rhythmFrom(doctrine, GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (director.genre)] ?? GENRE_RHYTHM.documentary);
   await writeFile(join(o.out, "craft-targets.json"), JSON.stringify({ ...doctrine, rhythm, filmId: o.filmId ?? basename(o.out), ...(o.ledgerFile ? { ledgerFile: o.ledgerFile } : {}) }, null, 1));
-  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure, rhythm });
+  const plan = resume?.shots
+    ? { markdown: r.markdown, genre: resume.shots.genre ?? director.genre, world: resume.shots.world ?? director.world, hook: resume.shots.hook, shots: resume.shots.shots, findings: resume.shots.findings ?? [], edit: [] }
+    : planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure, rhythm });
   const lens = plan.shots.map((x) => x.seconds).sort((a, b) => a - b);
   const designed = plan.shots.filter((x) => DESIGNED_TYPES.includes(x.type));
   const planMessages = [
@@ -484,7 +571,7 @@ export async function pictures(o) {
     msg("voice.shotPlan", { shots: plan.shots.length, designed: designed.length, kinds: [...new Set(designed.map((x) => x.type))].join(", ") || "—", median: lens[Math.floor(lens.length / 2)] ?? 0, problems: plan.findings.length }),
     msg("voice.hook", { score: plan.hook.score, beats: plan.hook.beats, titleAt: plan.hook.titleAt === null ? null : Math.round(plan.hook.titleAt), designed: plan.hook.designed }),
   ];
-  await writeFile(join(o.out, "shots.json"), JSON.stringify({ genre: director.genre, world: director.world, hook: plan.hook, shots: plan.shots, findings: plan.findings }, null, 1));
+  if (!resume?.shots) await writeFile(join(o.out, "shots.json"), JSON.stringify({ genre: director.genre, world: director.world, hook: plan.hook, shots: plan.shots, findings: plan.findings }, null, 1));
   // The run folder the renderer reads (render/render-film.mjs --run <out> --one-track <recording> --words words.json).
   await writeFile(join(o.out, "s3-chapters.json"), JSON.stringify([{ id: "C1", title: o.topic ?? "" }]));
   // A quiet score under a narration (never under a recitation): s4.md is the cue plan the free score composes.
@@ -493,17 +580,20 @@ export async function pictures(o) {
   const s5 = score ? withMusic(plan.markdown, score.cueOf) : plan.markdown;
   await writeFile(join(o.out, "s5-C1.md"), s5 + "\n");
   // The Edit Director stage on the voiceover chapter (edit-C1.json, the file the renderer reads).
-  const cut = await directEdit({ markdown: s5, chapter: "C1", genre: director.genre, brain, code: plan.edit });
-  await writeFile(join(o.out, "edit-C1.json"), JSON.stringify(cut.edit, null, 1));
-  planMessages.push(msg("voice.edit", { answered: cut.answered, calls: cut.calls, transitions: cut.stats.transitions, punchIns: cut.stats.punchIns, hits: cut.stats.hits, dropped: cut.stats.dropped }));
+  const cut = resume?.edit
+    ? { edit: resume.edit, stats: null, answered: 0, calls: 0, stopped: "", fromBrain: 0 }
+    : await directEdit({ markdown: s5, chapter: "C1", genre: director.genre, brain, code: plan.edit });
+  if (!resume?.edit) await writeFile(join(o.out, "edit-C1.json"), JSON.stringify(cut.edit, null, 1));
+  if (!resume?.edit && cut.stats) planMessages.push(msg("voice.edit", { answered: cut.answered, calls: cut.calls, transitions: cut.stats.transitions, punchIns: cut.stats.punchIns, hits: cut.stats.hits, dropped: cut.stats.dropped }));
   if (cut.stopped) planMessages.push(msg("voice.brainStopped", { reason: cut.stopped }));
   // The QA squad's pass (prompts/4 squad 8) over the finished plan: its findings join the same problems list, no loop of its own.
-  const qa = await auditVoiceFilm({ brain, shots: plan.shots, scenes: u.scenes, hook: plan.hook });
-  planMessages.push(msg("voice.qa", { found: qa.findings.length, called: qa.called }));
+  // A plan read from its saved file was already audited (its findings are empty, or the file would not be reused).
+  const qa = resume?.shots ? { findings: [], called: 0, stopped: "" } : await auditVoiceFilm({ brain, shots: plan.shots, scenes: u.scenes, hook: plan.hook });
+  if (!resume?.shots) planMessages.push(msg("voice.qa", { found: qa.findings.length, called: qa.called }));
   if (qa.stopped) planMessages.push(msg("voice.brainStopped", { reason: qa.stopped }));
-  if (r.chapterMedia) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
+  if (r.chapterMedia && !resume?.pictures) await writeFile(join(o.out, "media-C1.json"), JSON.stringify(r.chapterMedia, null, 1));
   await writeFile(join(o.out, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: r.findings, media: r.media, changedByBrain: r.changedByBrain }, null, 1));
-  return { ok: r.findings.length === 0 && director.findings.length === 0 && plan.findings.length === 0, messages: [...director.messages, ...r.messages, ...planMessages], problems: [...director.findings.map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail), ...qa.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`), ...plan.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`)], gaps: [] };
+  return { ok: r.findings.length === 0 && director.findings.length === 0 && plan.findings.length === 0, messages: [...messages, ...(director.messages ?? []), ...r.messages, ...planMessages], problems: [...(director.findings ?? []).map((f) => `${f.beat}: ${f.code} (${f.detail})`), ...r.findings.map((f) => f.detail), ...qa.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`), ...plan.findings.map((f) => `${f.shot}: ${f.code} (${f.detail})`)], gaps: [] };
 }
 
 /**
@@ -540,6 +630,23 @@ async function main() {
   let step1 = await intake({ audio: source, out });
   for (const m of step1.messages) console.log("- " + m[lang]);
   if (!step1.ok || !step1.report) process.exit(1);
+  // The run folder's fingerprint and what an earlier run already finished. A re-run of the same recording and
+  // brief continues from there (a 40-minute film's speech-to-text alone takes hours); another brief starts fresh.
+  const fingerprint = {
+    audio: basename(source),
+    bytes: (await stat(source)).size,
+    topic: typeof args.topic === "string" ? args.topic : null,
+    kind: args.kind,
+    slice: slice ? `${slice.start}-${slice.end}` : null,
+    media: args.media === true,
+    tighten: args.tighten === "off" ? "off" : "on",
+    transcript: typeof args.transcript === "string" ? basename(args.transcript) : null,
+    script: typeof args.script === "string" ? basename(args.script) : null,
+    stt: typeof args.stt === "string" ? args.stt : null,
+    model: typeof args.model === "string" ? args.model : null,
+  };
+  await writeFile(join(out, "run.json"), JSON.stringify({ version: 1, signature: runSignature(fingerprint), about: fingerprint }, null, 1));
+  const resume = await resumeState(out, fingerprint);
   // Long silences out, so the film never holds on dead air (--tighten off keeps the recording as it is).
   let voicePath = source;
   /** @type {((t: number) => number) | undefined} */
@@ -563,8 +670,9 @@ async function main() {
   const hasGiven = typeof args.surah === "string" || typeof args.passage === "string";
   if (args.transcript || args.stt || hasGiven) {
     /** @type {any} */
-    let step2 = { words: [], language: null };
-    if (args.transcript || args.stt) {
+    let step2 = resume.words ?? { words: [], language: null };
+    if (resume.words) console.log(`- ${msg("voice.resumed", { stages: "words" })[lang]}`);
+    else if (args.transcript || args.stt) {
       step2 = await words({ out, totalSeconds: step1.report.durationSeconds, sttWav: step1.sttWav, transcript: str(args.transcript), remap, slice, stt: typeof args.stt === "string" ? args.stt : undefined, model: typeof args.model === "string" ? args.model : undefined, language: typeof args.language === "string" ? args.language : hasGiven || args.kind === "quran" ? "ar" : undefined, script: str(args.script) });
       for (const m of step2.messages) console.log("- " + m[lang]);
       if (!step2.check.ok) process.exit(1);
@@ -578,7 +686,7 @@ async function main() {
     const python = typeof args.python === "string" ? args.python : process.env.ZUPONA_PYTHON;
     const marks = typeof args.marks === "string" ? JSON.parse(await readFile(resolve(args.marks), "utf8")) : null;
     const about = { sttWav: step1.sttWav, given: hasGiven ? given : null, opening: args.opening, closing: args.closing, python, marks };
-    const step3 = await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
+    const step3 = resume.understanding ?? await understand({ out, transcript: step2, totalSeconds: step1.report.durationSeconds, kind: /** @type {any} */ (hasGiven ? "quran" : args.kind), ...about });
     for (const m of step3.messages) console.log("- " + m[lang]);
     for (const p of step3.problems) console.log("! " + p);
     if (!step3.ok) process.exit(/** @type {any} */ (step3).question ? 3 : 1);
@@ -624,7 +732,17 @@ async function main() {
     const ledgerPath = resolve(typeof args.ledger === "string" ? args.ledger : join("out", "craft-ledger.json"));
     const read = await readFile(ledgerPath, "utf8").then(parseLedger, () => null);
     for (const n of read?.notes ?? []) console.log("- " + msg(n.code, n.params ?? {})[lang]);
-    const step4 = await pictures({ out, understanding, brain: vb.model, ledger: read?.ledger ?? null, ledgerFile: args["ledger-record"] === "off" ? undefined : ledgerPath, filmId: typeof args["film-id"] === "string" ? args["film-id"] : undefined, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab });
+    // A used-up day stops here: what is finished is saved, and the next run continues from it (voice.brainDaySpent).
+    let step4;
+    try {
+      step4 = await pictures({ out, understanding, brain: vb.model, ledger: read?.ledger ?? null, ledgerFile: args["ledger-record"] === "off" ? undefined : ledgerPath, filmId: typeof args["film-id"] === "string" ? args["film-id"] : undefined, media: args.media === true, topic: typeof args.topic === "string" ? args.topic : undefined, adab, resume });
+    } catch (e) {
+      if (!(/** @type {any} */ (e)?.daily)) throw e;
+      const spent = msg("voice.brainDaySpent", { resets: /** @type {any} */ (e).wait ?? "" });
+      console.error("- " + spent[lang]);
+      console.error(`- ${spent.en}`);
+      process.exit(4);
+    }
     for (const m of step4.messages) console.log("- " + m[lang]);
     for (const p of [...step4.problems, ...step4.gaps]) console.log("! " + p);
     // What the free brain cost this film (measured, so a 40-minute film's need is known against the daily limits).

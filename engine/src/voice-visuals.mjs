@@ -376,6 +376,8 @@ export async function planVoiceVisuals(o) {
         });
       } catch (e) {
         // A used-up day (429) stops the brain for the rest of the film; those scenes are planned from their own words.
+        // The day being spent everywhere is different: it stops the whole film, so the saved stages resume tomorrow.
+        if (/** @type {any} */ (e)?.daily) throw e;
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
       }
     }
