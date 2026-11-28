@@ -8,6 +8,8 @@
 /** @typedef {{ id: string, source: string | null, licence: string | null, thumbnailUrl: string | null, mediaUrl: string | null, sourcePageUrl: string | null, title: string }} Candidate */
 
 /** The licences a swap may bring in (the film media step's own list, engine/src/film-media.mjs). */
+/** The archives' licence codes as the pack names them. */
+const ARCHIVE_LICENCES = /** @type {Record<string, string>} */ ({ cc0: "CC0-1.0", "public-domain": "PUBLIC-DOMAIN", pdm: "PDM-1.0", "us-gov": "US-GOV-PD", "us-government": "US-GOV-PD", pixabay: "PIXABAY", pexels: "PEXELS", "us-gov-pd": "US-GOV-PD", "cc-by": "CC-BY" });
 export const FREE_LICENCES = Object.freeze(["PEXELS", "PIXABAY", "CC0-1.0", "PDM-1.0", "PUBLIC-DOMAIN", "US-GOV-PD", "CC-BY"]);
 
 /** Only https pictures and clips are shown or sent (a javascript: URL must never reach the page). @param {unknown} v */
@@ -36,9 +38,14 @@ export function candidateFromSearch(r) {
   const id = text(r.id, 200);
   if (!id) return null;
   const licenceRaw = r.licence ?? r.license ?? null;
-  const licence = text(typeof licenceRaw === "string" ? licenceRaw : licenceRaw?.licenseId ?? licenceRaw?.name ?? "", 60) || null;
+  // The archives' own answer carries `license: { code: "cc0" | "public-domain" | ... }` (open-archives-lib); the
+  // pack and the film use the upper-case names.
+  const code = typeof licenceRaw === "string" ? licenceRaw : licenceRaw?.licenseId ?? licenceRaw?.code ?? licenceRaw?.name ?? "";
+  const licence = text(ARCHIVE_LICENCES[String(code).toLowerCase()] ?? code, 60) || null;
   if (!licence || !FREE_LICENCES.includes(licence)) return null;
-  const mediaUrl = httpUrl(r.mediaUrl);
+  // A picture from an archive: its 1280 px preview is what the CDN serves reliably (the original is rate-limited
+  // and can be tens of megabytes); the film uses it the way it uses its own picks.
+  const mediaUrl = httpUrl(r.mediaUrl) ?? httpUrl(r.previewUrl) ?? httpUrl(r.fullUrl);
   const thumbnailUrl = httpUrl(r.previewUrl) ?? httpUrl(r.thumbnailUrl) ?? mediaUrl;
   if (!mediaUrl && !thumbnailUrl) return null;
   return {
@@ -47,8 +54,9 @@ export function candidateFromSearch(r) {
     licence,
     thumbnailUrl,
     mediaUrl,
-    sourcePageUrl: httpUrl(r.sourcePageUrl),
+    sourcePageUrl: httpUrl(r.sourcePageUrl) ?? httpUrl(r.pageUrl),
     title: text(r.title ?? "", 140),
+    kind: r.kind === "video" || /\.(mp4|webm|mov|m4v)$/i.test(mediaUrl ?? "") ? "video" : "image",
   };
 }
 

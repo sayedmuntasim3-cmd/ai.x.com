@@ -113,14 +113,21 @@ export function joinRemake(o) {
   for (const part of all) {
     const n = Number(part.index) || 0;
     const fresh = join(o.partsDir, `part-${n}.mp4`);
-    if (o.changed.includes(n) && existsSync(fresh)) {
+    if (o.changed.includes(n)) {
+      // A changed part that was not drawn must stop the re-make: quietly cutting the old picture in
+      // would hand back a film that looks swapped and is not.
+      if (!existsSync(fresh)) throw new Error(`Part ${n} was swapped but its new picture was not rendered (${fresh} is missing).`);
       files.push(fresh);
       continue;
     }
     const seg = join(dir, `part-${n}.mp4`);
-    const start = Number(part.start) || 0;
-    const end = Number(part.end) || start;
-    run("ffmpeg", ["-v", "error", "-y", "-i", o.old, "-ss", start.toFixed(3), "-to", end.toFixed(3), "-an", "-c", "copy", seg]);
+    // The old film's own frames of this part, cut by frame number and drawn again (cheap: no filters, no
+    // pictures): a stream copy can only start on a keyframe, and the real film's keyframes sit on shot
+    // starts a frame or two away from the plan's times, which loses or doubles frames and shifts every part after it.
+    const fps = Number(o.pack?.fps) || 30;
+    const first = Math.round((Number(part.start) || 0) * fps);
+    const last = Math.max(first + 1, Math.round((Number(part.end) || 0) * fps));
+    run("ffmpeg", ["-v", "error", "-y", "-ss", (first / fps).toFixed(6), "-i", o.old, "-frames:v", String(last - first), "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", String(fps), "-video_track_timescale", "90000", seg]);
     files.push(seg);
   }
   const list = join(dir, "parts.txt");

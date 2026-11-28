@@ -978,3 +978,12 @@ export function mediaProviders(keys) {
   if (keys.pixabayKey) out.push(pixabayProvider({ apiKey: keys.pixabayKey, fetch: keys.fetch }));
   return out;
 }
+
+/**
+ * Whether an address is a picture file (a still), by its path. A picture with no kind written must not be
+ * treated as footage: the renderer loops footage, and a looped photograph never ends.
+ * @param {string | null | undefined} url
+ */
+export function isImageUrl(url) {
+  try { return /\.(jpe?g|png|webp|gif|tiff?|bmp)$/i.test(new URL(String(url)).pathname); } catch { return false; }
+}

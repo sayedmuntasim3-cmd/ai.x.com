@@ -225,3 +225,18 @@ test("a pack built from the shot plan alone still lists its shots", () => {
   assert.equal(pack.seconds, 4);
   assert.deepEqual(shotRows({ media: null, rank: null }), []);
 });
+
+test("a picture with no kind written is a still, never footage (a looped photograph never ends)", async () => {
+  const { isImageUrl } = await import("../src/film-media.mjs");
+  const { candidateOf, mediaFromPack } = await import("../src/edit-pack.mjs");
+  const { buildTimeline } = await import("../src/timeline.mjs");
+  assert.equal(isImageUrl("https://thumb.wikimedia.org/a/1280px-Apollo.jpg?utm_source=x"), true);
+  assert.equal(isImageUrl("https://videos.pexels.com/5.mp4"), false);
+  assert.equal(candidateOf({ id: "w:1", licence: "CC0-1.0", mediaUrl: "https://x.test/a.jpg" })?.kind, "image");
+  assert.equal(candidateOf({ id: "p:1", licence: "PEXELS", mediaUrl: "https://x.test/a.mp4" })?.kind, null);
+  const pack = { shots: [{ id: "SC0001-1", scene: "SC0001", index: 1, start: 0, end: 4, pick: { id: "w:1", source: "w", licence: "CC0-1.0", thumbnailUrl: "https://x.test/t.jpg", mediaUrl: "https://x.test/a.jpg", sourcePageUrl: null, title: "" } }] };
+  assert.equal(mediaFromPack(pack).shots[0].pick.kind, "image");
+  const md = `**SC0001** | 0:00:00-0:00:04 | C1 | b | E | C01 | NARR: One. | W 1/1 | ANCHOR: x | SHOTS: (1) R3 a photo | LOOK: L`;
+  const t = buildTimeline({ chapters: [{ id: "C1", markdown: md, media: { chapter: "C1", providers: [], repeatWindowSeconds: 600, stats: {}, shots: [{ scene: "SC0001", shot: 1, start: 0, end: 4, status: "found", pick: { id: "w:1", source: "w", mediaUrl: "https://x.test/a.jpg", previewUrl: "https://x.test/t.jpg", sourcePageUrl: null, licence: { licenseId: "CC0-1.0" } } }] } }] });
+  assert.equal(t.video.find((v) => v.type === "clip")?.still, true, "no kind, a .jpg address: a still");
+});

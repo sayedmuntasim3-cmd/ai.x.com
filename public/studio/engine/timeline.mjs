@@ -8,7 +8,7 @@
  * 45-minute film never drifts by a frame however many cuts it has.
  */
 import { EDIT_SOUNDS } from "./edit-director.mjs";
-import { shotParts } from "./film-media.mjs";
+import { isImageUrl, shotParts } from "./film-media.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 import { sentencesOfWords, storyMap } from "./story-map.mjs";
 import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionReport, sceneIntent, writtenMove } from "./motion.mjs";
@@ -754,7 +754,7 @@ export function buildTimeline(o) {
           const shotSeconds = frames / fps;
           const sourceIn = clipSeconds > shotSeconds ? Math.round(Math.min(3, (clipSeconds - shotSeconds) / 2) * 100) / 100 : 0;
           // A still photograph (an archive picture) always moves: the renderer gives it a slow push, pull or pan.
-          const still = row.pick.kind === "image";
+          const still = row.pick.kind === "image" || (!row.pick.kind && isImageUrl(row.pick.mediaUrl));
           // A still's move is decided from the scene (motion.mjs); footage keeps its own movement.
           const move = still ? decideMove({ intent: sceneIntent(s, { shotText: shot.text, chapterOpen: lead && opening, chapterClose: closing }), seconds: frames / fps, written: writtenMove(s.fields.MOTION ?? ""), profile, level, previous: moves, index: moves.length }) : null;
           if (move) moves.push(move);
