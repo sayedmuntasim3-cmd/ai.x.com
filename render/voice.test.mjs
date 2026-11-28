@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { recordVoice, voiceLines } from "./voice.mjs";
+import { summarizeRun } from "./voice-runner.mjs";
 import { pricedClaims } from "../engine/src/claim-values.mjs";
 
 const md = [
@@ -136,3 +137,20 @@ test("a scene whose number was never priced is reported, never dropped silently;
   assert.equal(filled.lines[1].text, "It cost about one dollar and fifteen cents dollars.");
 });
 
+test("the run summary says how many retakes were cut and how long they were", () => {
+  const dir = mkdtempSync(join(tmpdir(), "zupona-run-summary-"));
+  try {
+    writeFileSync(join(dir, "words.json"), JSON.stringify({ words: new Array(40).fill({ text: "x", start: 0, end: 1 }) }));
+    writeFileSync(join(dir, "retakes.json"), JSON.stringify({ cuts: [{ from: 1, to: 2.5, seconds: 1.5, reason: "restart", words: [] }, { from: 5, to: 6.24, seconds: 1.24, reason: "garbled", words: [] }], removedSeconds: 2.74, confidence: 1, message: null }));
+    const words = summarizeRun(dir).find((s) => s.stage === "words");
+    assert.equal(words?.params.count, 40);
+    assert.equal(words?.params.retakes, 2);
+    assert.equal(words?.params.retakeSeconds, 2.7);
+    // A narration (no retakes.json) reports only its word count.
+    rmSync(join(dir, "retakes.json"));
+    const plain = summarizeRun(dir).find((s) => s.stage === "words");
+    assert.equal(plain?.params.retakes, undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
