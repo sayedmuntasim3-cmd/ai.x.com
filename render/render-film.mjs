@@ -1304,8 +1304,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (timeline.timing) console.log(`timing: ${timeline.timing.plannedSeconds} s planned, ${timeline.timing.fittedSeconds} s fitted to the voice (${timeline.timing.stretched} scenes longer, ${timeline.timing.shortened} shorter)`);
   console.log(`look: ${look}`);
   if (oneTrack && typeof args.words === "string") {
-    const { captionsForVoice } = await import("../engine/src/timeline.mjs");
+    const { captionsForVoice, resettleSound } = await import("../engine/src/timeline.mjs");
     timeline.captions = captionsForVoice(JSON.parse(readFileSync(args.words, "utf8")).words, timeline.durationSeconds);
+    // The captions now hold the recording's own word times: the hits and the breaths are placed against those.
+    resettleSound(timeline);
   }
   // AI scenes made by ai-scenes.mjs replace their cards (stories with one cast).
   let aiShots = 0;
