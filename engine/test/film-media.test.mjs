@@ -402,3 +402,24 @@ test("a clip too short to show is refused; a clip at least as long as the shot c
   const none = await chapterMedia({ chapter: "C1", markdown: md, providers: [flicker] });
   assert.equal(none.stats.found, 0, "no fake footage is made from a one-frame clip");
 });
+
+test("NASA: a year in the words is a filter, and a frame-number title is judged by its description; Commons also asks the category", async () => {
+  const { nasaProvider, wikimediaProvider } = await import("../src/film-media.mjs");
+  /** @type {string[]} */
+  const urls = [];
+  const nasaFetch = /** @type {any} */ (async (/** @type {string} */ url) => {
+    urls.push(url);
+    return { ok: true, status: 200, json: async () => ({ collection: { items: [{ data: [{ nasa_id: "AS11-40-5903", title: "AS11-40-5903", description: "Apollo 11 Saturn V liftoff at Kennedy Space Center", media_type: "image", keywords: ["Apollo 11"] }], links: [{ rel: "preview", href: "https://images-assets.nasa.gov/p.jpg" }] }] } }) };
+  });
+  const found = await nasaProvider({ fetch: nasaFetch }).search("Apollo 11 liftoff 1969", "image");
+  assert.equal(found.length, 1, "kept by its description, not its frame-number title");
+  const q = new URL(urls[0]).searchParams;
+  assert.equal(q.get("year_start"), "1969");
+  assert.equal(q.get("q"), "Apollo 11 liftoff");
+  /** @type {string[]} */
+  const asked = [];
+  const commons = /** @type {any} */ (async (/** @type {string} */ url) => { asked.push(new URL(url).searchParams.get("gsrsearch") ?? ""); return { ok: true, status: 200, json: async () => ({ query: { pages: [] } }) }; });
+  await wikimediaProvider({ fetch: commons }).search("Apollo 11 1969", "image");
+  assert.equal(asked.length, 2);
+  assert.match(asked[1], /^incategory:"Apollo 11" filetype:bitmap$/);
+});
