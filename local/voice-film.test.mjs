@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { tokenizeArabic } from "../engine/src/arabic.mjs";
+import { ayahText, buildQuranIndex } from "../engine/src/quran.mjs";
 import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, sliceWords, voiceReport } from "./voice-film.mjs";
+
+const quranIndex = buildQuranIndex(JSON.parse(readFileSync(new URL("../engine/data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
+
+/** An ayah's words as recited (the basmala before ayah 1 is not part of it). @param {number} surah @param {number} ayah */
+function recited(surah, ayah) {
+  const text = ayahText(quranIndex, surah, ayah) ?? "";
+  const words = text.split(/\s+/);
+  return ayah === 1 && surah !== 1 && surah !== 9 && tokenizeArabic(words.slice(0, 4).join(" ")).join(" ") === "بسم الله الرحمن الرحيم" ? words.slice(4).join(" ") : text;
+}
 
 const ffmpeg = await hasFfmpeg();
 
@@ -68,6 +79,38 @@ test("slice: the recording is cut to the slice (ffmpeg)", { skip: !ffmpeg && "ff
   const r = await intake({ audio: file, out: join(dir, "out") });
   assert.ok(r.report && Math.abs(r.report.durationSeconds - 2.5) < 0.05, String(r.report?.durationSeconds));
   assert.deepEqual(JSON.parse(readFileSync(join(dir, "out", "slice.json"), "utf8")), { source: "tone.wav", start: 1, end: 3.5, seconds: 2.5 });
+});
+
+test("a recitation with no surah typed: --kind quran --transcript finds every surah and ayah from the words alone", () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-transcript-only-"));
+  // Ad-Duha 93:8-11, the basmala, Ash-Sharh 94:1-8, the basmala, At-Tin 95:1-3: what a recognizer hears, with times.
+  /** @type {{ surah: number, ayah: number | null }[]} */
+  const units = [];
+  for (let a = 8; a <= 11; a += 1) units.push({ surah: 93, ayah: a });
+  units.push({ surah: 94, ayah: null });
+  for (let a = 1; a <= 8; a += 1) units.push({ surah: 94, ayah: a });
+  units.push({ surah: 95, ayah: null });
+  for (let a = 1; a <= 3; a += 1) units.push({ surah: 95, ayah: a });
+  /** @type {{ text: string, start: number, end: number }[]} */
+  const words = [];
+  let at = 0.6;
+  for (const u of units) {
+    const tokens = u.ayah === null ? tokenizeArabic(ayahText(quranIndex, 1, 1) ?? "") : tokenizeArabic(recited(u.surah, u.ayah));
+    tokens.forEach((text, i) => words.push({ text, start: Math.round((at + i * 0.55) * 1000) / 1000, end: Math.round((at + i * 0.55 + 0.5) * 1000) / 1000 }));
+    at += tokens.length * 0.55 + 0.8;
+  }
+  const fixture = join(dir, "quran-words.json");
+  writeFileSync(fixture, JSON.stringify({ language: "ar", words }));
+  const out = join(dir, "run");
+  execFileSync(process.execPath, ["local/voice-film.mjs", "--kind", "quran", "--transcript", fixture, "--out", out], { stdio: "pipe" });
+  const location = JSON.parse(readFileSync(join(out, "quran-location.json"), "utf8"));
+  assert.equal(location.ok, true);
+  assert.equal(location.source, "recognized");
+  assert.deepEqual(location.passages, [{ surah: 93, fromAyah: 8, toAyah: 11 }, { surah: 94, fromAyah: 1, toAyah: 8 }, { surah: 95, fromAyah: 1, toAyah: 3 }]);
+  assert.equal(location.ayat.length, 15);
+  const understanding = JSON.parse(readFileSync(join(out, "understanding.json"), "utf8"));
+  assert.equal(understanding.kind, "quran");
+  assert.deepEqual(understanding.quranPlan.summary.surahs, [93, 94, 95]);
 });
 
 test("voice brain: free brains only, Groq first", async () => {
