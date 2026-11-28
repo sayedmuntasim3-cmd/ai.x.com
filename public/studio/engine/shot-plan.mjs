@@ -236,6 +236,8 @@ export async function planBeats(o) {
           for (const line of String(reply.text ?? "").split("\n")) { const b = parseBeatLine(line); if (b && !written.has(b.from)) written.set(b.from, b); }
         });
       } catch (e) {
+        // A used-up day stops the whole film (voice.brainDaySpent): the run resumes from its saved stages.
+        if (/** @type {any} */ (e)?.daily) throw e;
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
       }
     }
@@ -736,6 +738,8 @@ export async function directEdit(o) {
           for (const x of list) if (x && ps.has(x.scene)) brainScenes.push(sceneClock(x, bounds.get(x.scene)));
         });
       } catch (e) {
+        // A used-up day stops the whole film (voice.brainDaySpent): the run resumes from its saved stages.
+        if (/** @type {any} */ (e)?.daily) throw e;
         if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
       }
     }
@@ -799,7 +803,9 @@ export async function auditVoiceFilm(o) {
       findings.push({ shot: scene, code: `qa-${m[1]}`, detail: m[4] ? `${m[3]} Fix: ${m[4]}` : m[3] });
     }
   } catch (e) {
-    if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
+    // A used-up day stops the whole film (voice.brainDaySpent): the run resumes from its saved stages.
+        if (/** @type {any} */ (e)?.daily) throw e;
+        if (/** @type {any} */ (e)?.status === 429 || /** @type {any} */ (e)?.permanent) stopped = String(/** @type {any} */ (e)?.message ?? e).slice(0, 160);
   }
   return { findings, called: 1, stopped };
 }
