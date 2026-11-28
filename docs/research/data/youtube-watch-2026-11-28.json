@@ -1,0 +1,310 @@
+{
+ "date": "2026-11-28",
+ "status": "BLOCKED: no film was watched inside. See docs/research/YOUTUBE_WATCH.md section 0.",
+ "attempts": [
+  {
+   "source": "youtube.com/watch page",
+   "result": "HTTP 429, redirect to google.com/sorry CAPTCHA (automated access refused)"
+  },
+  {
+   "source": "youtube.com/api/timedtext (captions)",
+   "result": "HTTP 200 with an empty body"
+  },
+  {
+   "source": "i.ytimg.com/sb/<id>/storyboard3_L0/M0.jpg (storyboard sprites)",
+   "result": "HTTP 403; the URL needs a signature that only the blocked watch page / player response carries"
+  },
+  {
+   "source": "youtube.com/oembed",
+   "result": "HTTP 200 but only title and channel"
+  },
+  {
+   "source": "third-party mirrors and the app player API",
+   "result": "not tried: they would work around YouTube's refusal; auto-mode refused the attempt"
+  }
+ ],
+ "candidates": [
+  {
+   "id": "DT6KJIARP9U",
+   "title": "Abandoned Concrete and Steel Tower Full of Squatters Collapses In City Centre | Plainly Difficult",
+   "channel": "Plainly Difficult",
+   "views": 1570958,
+   "minutes": 12.2,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "4Tq6jSwGzHk",
+   "title": "Blaming The Victims: The USS Iowa Turret Disaster 1989 | Plainly Difficult Documentary",
+   "channel": "Plainly Difficult",
+   "views": 1495041,
+   "minutes": 24.9,
+   "chapterStarts": [
+    0,
+    61,
+    501,
+    660,
+    900
+   ],
+   "inside": null
+  },
+  {
+   "id": "XcMy2QIYR34",
+   "title": "The Grenfell Tower Disaster 2017 | Plainly Difficult Documentary",
+   "channel": "Plainly Difficult",
+   "views": 1388715,
+   "minutes": 25.1,
+   "chapterStarts": [
+    0,
+    100,
+    388,
+    775,
+    1090
+   ],
+   "inside": null
+  },
+  {
+   "id": "ZOGf4LTB118",
+   "title": "Concrete and Steel Tower Falls Over Without Any Warning | Plainly Difficult",
+   "channel": "Plainly Difficult",
+   "views": 1130045,
+   "minutes": 9.8,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "20BEJouWBgY",
+   "title": "The FTX Disaster is Deeper Than you Think",
+   "channel": "ColdFusion",
+   "views": 8824679,
+   "minutes": 29.7,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "88fWUZhYb04",
+   "title": "How to Lie Your Way to $34 Billion [Nikola Motors Fraud]",
+   "channel": "ColdFusion",
+   "views": 6397779,
+   "minutes": 25.8,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "3KZY41SqaTI",
+   "title": "How This Man Just Caused a $45 BILLION Crash [Terra Luna]",
+   "channel": "ColdFusion",
+   "views": 3852710,
+   "minutes": 19.7,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "lmnVP35uZFY",
+   "title": "Japan's Lost Decade - An Economic Disaster [Documentary]",
+   "channel": "ColdFusion",
+   "views": 2828896,
+   "minutes": 27.4,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "OU72wcPyUfM",
+   "title": "US Banking Crisis: The Truth Behind The Disaster",
+   "channel": "ColdFusion",
+   "views": 2818260,
+   "minutes": 24.1,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "GR3rUlDiMxY",
+   "title": "Married Couple Steals $4.5 Billion in Bitcoin Heist [Bitfinex]",
+   "channel": "ColdFusion",
+   "views": 2615376,
+   "minutes": 12.4,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "wk6Qr6OO5Xo",
+   "title": "The Insane Engineering of the A-10 Warthog",
+   "channel": "Real Engineering",
+   "views": 19169489,
+   "minutes": 16.5,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "1lCOgFPtaZ4",
+   "title": "The Insane Engineering of the F-35B",
+   "channel": "Real Engineering",
+   "views": 10931771,
+   "minutes": 25.1,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "3hYSnyVLmGE",
+   "title": "The Insane Engineering of the SR-71 Blackbird",
+   "channel": "Real Engineering",
+   "views": 10323625,
+   "minutes": 18.9,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "7zR26e504uI",
+   "title": "The Insane Engineering of the X-15",
+   "channel": "Real Engineering",
+   "views": 8852567,
+   "minutes": 31.5,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "aICaAEXDJQQ",
+   "title": "The Insane Engineering of James Webb Telescope",
+   "channel": "Real Engineering",
+   "views": 8838701,
+   "minutes": 31.2,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "_bDXXWQxK38",
+   "title": "A New Way to Achieve Nuclear Fusion: Helion",
+   "channel": "Real Engineering",
+   "views": 8367512,
+   "minutes": 30.8,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "7OpM_zKGE4o",
+   "title": "The Problem with Solar Energy in Africa",
+   "channel": "Real Engineering",
+   "views": 8153634,
+   "minutes": 18.3,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "NR5pWBy-6Fk",
+   "title": "The Insane Engineering of the M1 Abrams",
+   "channel": "Real Engineering",
+   "views": 7669313,
+   "minutes": 26,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "EhhOin2p5Qs",
+   "title": "The Insane Engineering of the F-16",
+   "channel": "Real Engineering",
+   "views": 7653408,
+   "minutes": 40.9,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "lapFQl6RezA",
+   "title": "The Insane Engineering of the 787",
+   "channel": "Real Engineering",
+   "views": 6659817,
+   "minutes": 31.8,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "bY1E2IkvQ3k",
+   "title": "The Bizarre Paths of Groundwater Around Structures",
+   "channel": "Practical Engineering",
+   "views": 14289287,
+   "minutes": 14,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "HRx_dZawN44",
+   "title": "The Hidden Engineering of Landfills",
+   "channel": "Practical Engineering",
+   "views": 11985228,
+   "minutes": 17.1,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "cZINeaDjisY",
+   "title": "Why Concrete Needs Reinforcement",
+   "channel": "Practical Engineering",
+   "views": 11531728,
+   "minutes": 8.2,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "zRM2AnwNY20",
+   "title": "The Wild Story of the Taum Sauk Dam Failure",
+   "channel": "Practical Engineering",
+   "views": 11510443,
+   "minutes": 20.2,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "tmbZVmXyOXM",
+   "title": "Why Are Cooling Towers Shaped Like That?",
+   "channel": "Practical Engineering",
+   "views": 9517540,
+   "minutes": 19.8,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "3oBCtTv6yOw",
+   "title": "What Really Happened at the Arecibo Telescope?",
+   "channel": "Practical Engineering",
+   "views": 9438074,
+   "minutes": 18,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "YkR79oDAgOg",
+   "title": "What is a Weir?",
+   "channel": "Practical Engineering",
+   "views": 8196847,
+   "minutes": 8.4,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "jduDyF2Zwd8",
+   "title": "Where Does Grounded Electricity Actually Go?",
+   "channel": "Practical Engineering",
+   "views": 7964314,
+   "minutes": 19.6,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "yZwfcMSDBHs",
+   "title": "How Water Towers Work",
+   "channel": "Practical Engineering",
+   "views": 7423154,
+   "minutes": 11,
+   "chapterStarts": [],
+   "inside": null
+  },
+  {
+   "id": "zFdyqTGx32A",
+   "title": "How Does a Hydraulic Ram Pump Work?",
+   "channel": "Practical Engineering",
+   "views": 7329176,
+   "minutes": 8.9,
+   "chapterStarts": [],
+   "inside": null
+  }
+ ]
+}

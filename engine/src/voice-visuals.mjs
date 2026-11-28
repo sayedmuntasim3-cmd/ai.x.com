@@ -13,6 +13,7 @@ import { canSee } from "./film-run.mjs";
 import { roleCraft } from "./role-craft.mjs";
 import { chapterMedia, FREE_LICENCES } from "./film-media.mjs";
 import { msg } from "./messages.mjs";
+import { barBrief } from "./reference-bar.mjs";
 import { parseSceneLines } from "./scene-lines.mjs";
 import { checkQuranFilm, RECITATION_AUDIO } from "./quran-film.mjs";
 import { checkVoiceChapter, restoreVoiceFields, voiceSkeleton } from "./voice-scenes.mjs";
@@ -36,6 +37,7 @@ export const VOICE_VISUALS_SYSTEM = [
   "- LOOK: colour and movement in a few words.",
   "Never invent facts the voice does not say. Never show a person's face as if it were someone named unless the archive item is that person.",
   "Answer with the scene lines only, one per line, nothing else.",
+  barBrief(),
 ].join("\n");
 
 /** Words a stock archive cannot picture: reporting, hedging, counting, filler. Searching them returns random pictures. */

@@ -10,6 +10,7 @@
  * never a generic stock picture (Boss, 21 Nov 2026: abstract film strips, random foreigners, the Amazon for India).
  */
 import { msg } from "./messages.mjs";
+import { barBrief } from "./reference-bar.mjs";
 import { roleCraft } from "./role-craft.mjs";
 import { brainBatches, nounsAfterDeterminers, runFitting, wordsPlan } from "./voice-visuals.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
@@ -111,6 +112,7 @@ export const DIRECTOR_SYSTEM = [
   "BEAT | SC0001-SC0002 | GOAL: understand or feel | EMOTION: one of " + BEAT_EMOTIONS.join(", ") + " | REVEAL: the fact, number or name the viewer learns here, or none | RUNG: R2 (real evidence: a named person, place, document or date) or R3 (illustration) | VISUAL: what the viewer sees, concrete | PLACE: city, country | ERA: decade or years | PEOPLE: who is on screen",
   "The world is fixed: show its country and city, its money, its people and its era. Never another country, another currency, a generic abstract background, a film strip, or random people.",
   "Never invent facts the voice does not say.",
+  barBrief(),
 ].join("\n");
 
 /** One beat line of the brain. @param {string} line */

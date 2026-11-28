@@ -336,3 +336,11 @@ test("picture taste: no evidence (an older render) adds nothing, so the gate is 
   const a = critique(t, {}, {});
   assert.ok(!a.findings.some((f) => /^critic\.(unfilled|samePicture|logo|textOnBlack)$/.test(f.code)));
 });
+
+test("the reference bar's practice targets are advisory: listed in the report, never in the findings or the verdict", async () => {
+  const { critique, reportCritic } = await import("./critic.mjs");
+  const r = critique({ durationSeconds: 180, video: [{ type: "clip", start: 0, end: 90 }, { type: "clip", start: 90, end: 180 }], narration: [{ start: 0, end: 170, text: "The wall held for years and nobody looked at it again." }] });
+  assert.ok(r.advisory.some((f) => f.code === "critic.practiceBelow"));
+  assert.ok(!r.findings.some((f) => f.code === "critic.practiceBelow"));
+  assert.match(reportCritic(r), /Reference bar \(advisory\)/);
+});
