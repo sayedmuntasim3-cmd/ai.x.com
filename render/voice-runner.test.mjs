@@ -115,6 +115,7 @@ test("the token bucket keeps a synthetic 40-minute run under 8,000 prompt tokens
   }
   // The pacing costs wall time, not correctness: the film's calls fit inside the film's own length.
   assert.ok(clock.t < 40 * 60_000, `${models} calls took ${Math.round(clock.t / 1000)} s of paced time`);
+});
 
 
 const ID = "11111111-2222-3333-4444-555555555555";
@@ -171,3 +172,4 @@ test("a released film is delivered exactly as before: no draft, no reasons", asy
   assert.deepEqual(opened?.body, { bytes: 2048 });
   const finished = w.calls.filter((c) => c.path.endsWith("/progress") && c.body?.stage === "done");
   assert.equal("draft" in (finished[0].body.params ?? {}), false);
+});
