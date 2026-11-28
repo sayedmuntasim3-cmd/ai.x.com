@@ -217,6 +217,12 @@ jobs:
         run: |
           echo deliver > .stage
           node render/voice-runner.mjs deliver --file out/film.mp4 --seconds "$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 out/film.mp4)" --review --run run
+      - name: Shorts (three vertical cuts of whole ayat; never fails the film)
+        if: inputs.kind == 'quran'
+        continue-on-error: true
+        run: |
+          # 30-55 s each, 9:16, the Arabic ayah and its Pickthall line burned in, the recitation only.
+          node render/shorts.mjs --run run --film out/film.mp4 --kind quran --out shorts 2>&1 | tee shorts.log || echo "::warning::The Shorts could not be made; the film is unaffected."
       - name: Prepare the render (voice, free score); the parts render on 8 runners
         id: prepare
         if: inputs.kind == 'narration'
@@ -266,6 +272,8 @@ jobs:
             voice-film.log
             out/*.json
             out/*.srt
+            shorts/
+            shorts.log
           retention-days: 14
           if-no-files-found: warn
 
@@ -317,6 +325,15 @@ jobs:
         run: |
           echo deliver > .stage
           node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: prep-${{ inputs.voice_id }}
+      - name: Shorts (three vertical cuts of the strongest moments; never fails the film)
+        continue-on-error: true
+        run: |
+          # The picker reads the film's own words (run/words.json) and shot plan (run/shots.json); a Short that fails is
+          # reported in shorts/shorts.json and skipped, and nothing here can stop the film from being delivered.
+          node render/shorts.mjs --run run --film out/film.mp4 --out shorts 2>&1 | tee shorts.log || echo "::warning::The Shorts could not be made; the film is unaffected."
       - name: Teach the craft ledger (this film's critic measures, for the next film)
         run: node render/voice-runner.mjs ledger --report out/film.report.json || echo "::warning::The film is delivered, but the craft ledger could not record it."
       - name: Tell the studio what stopped it
@@ -332,5 +349,7 @@ jobs:
           path: |
             out/*.json
             out/*.srt
+            shorts/
+            shorts.log
           retention-days: 14
           if-no-files-found: warn

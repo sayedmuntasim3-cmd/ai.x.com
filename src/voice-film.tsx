@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckIcon } from "./icons";
 
 /**
@@ -13,7 +13,7 @@ const VOICE_STORE = "zupona:voice-films";
 const eyebrow = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brand-ink";
 
 type Progress = { at: string; stage: string; ok: boolean; message: { en: string; bn: string } };
-type VoiceView = { id: string; status: string; progress: Progress[]; download?: string; listen?: string; run?: { runUrl?: string } | null; kind?: string; report?: { ayat?: { ref: string }[] } | null };
+type VoiceView = { id: string; status: string; progress: Progress[]; createdAt?: string; topic?: string; fileName?: string; film?: { bytes: number; seconds: number | null } | null; download?: string; listen?: string; run?: { runUrl?: string } | null; kind?: string; report?: { ayat?: { ref: string }[] } | null };
 
 function readStore(key: string) {
   try {
@@ -75,9 +75,165 @@ async function putPart(url: string, key: string, body: Blob) {
   throw new Error(last);
 }
 
-export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; fileName: string; voiceUrl: string; topic: string }) {
-  const [key, setKey] = useState("");
-  const [askKey, setAskKey] = useState(false);
+/** The five plain steps the viewer sees; each stage the film machine reports belongs to one of them. */
+const STEPS = ["Listening", "Finding pictures", "Editing", "Quality check", "Ready"];
+const STEP_OF: Record<string, number> = { script: 0, narrate: 0, uploaded: 0, marked: 0, queued: 0, started: 0, intake: 0, words: 0, understand: 0, master: 0, pictures: 1, render: 2, check: 3, deliver: 4, done: 4 };
+const FINISHED = ["done", "awaiting-review"];
+
+function stepOf(film: VoiceView) {
+  if (FINISHED.includes(film.status)) return STEPS.length;
+  const stage = film.progress.at(-1)?.stage ?? "";
+  return STEP_OF[stage] ?? 0;
+}
+
+/** "12 min" or "1 h 05 min". */
+function span(ms: number) {
+  const m = Math.max(0, Math.round(ms / 60000));
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}
+
+/**
+ * An honest range. Measured: a 40-minute voice takes 2-3 hours; shorter voices are scaled from that
+ * (3 to 4.5 minutes of work per minute of voice, never under 10 minutes: the short end is not measured).
+ */
+export function estimateRange(seconds: number) {
+  const m = seconds / 60;
+  const lo = Math.max(10, Math.round(m * 3));
+  const hi = Math.max(20, Math.round(m * 4.5));
+  if (hi < 90) return `${lo}–${hi} minutes`;
+  const h = (x: number) => String(Math.round((x / 60) * 2) / 2);
+  return `${h(lo)}–${h(hi)} hours`;
+}
+
+const META_STORE = "zupona:voice-meta";
+function rememberSeconds(id: string, seconds: number) {
+  try {
+    const all = JSON.parse(readStore(META_STORE) || "{}") as Record<string, number>;
+    all[id] = Math.round(seconds);
+    writeStore(META_STORE, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
+}
+function secondsOf(id: string, view?: VoiceView) {
+  try {
+    return view?.film?.seconds || (JSON.parse(readStore(META_STORE) || "{}") as Record<string, number>)[id] || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** The plain reason a film stopped: the last step that failed. */
+function whyStopped(film: VoiceView) {
+  const bad = [...film.progress].reverse().find((p) => !p.ok);
+  return (bad ?? film.progress.at(-1))?.message.en ?? "The film machine stopped without saying why.";
+}
+
+const KEY_WRONG = "That studio key is not right. Check it and try again.";
+
+/** What the studio key is, asked once, in plain words. */
+export function KeyDialog({ open, error, onSubmit, onCancel }: { open: boolean; error: string; onSubmit: (key: string) => void; onCancel: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) {
+      setValue("");
+      d.showModal();
+    } else if (!open && d.open) d.close();
+  }, [open]);
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby="key-title"
+      onClose={onCancel}
+      className="m-auto w-[calc(100%-32px)] max-w-md rounded-[28px] border border-line bg-surface p-0 text-ink shadow-pop backdrop:bg-[#141413]/50 backdrop:backdrop-blur-[2px]"
+    >
+      <form
+        method="dialog"
+        className="p-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (value.trim()) onSubmit(value.trim());
+        }}
+      >
+        <p className={eyebrow}>One quick thing</p>
+        <h2 id="key-title" className="mt-2 font-serif text-[26px] font-normal leading-tight text-ink">
+          Enter your studio key
+        </h2>
+        <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
+          The studio key is the private password you were given for the beta. It keeps your recordings and films yours. You type it once; this device remembers it.
+        </p>
+        <input
+          type="password"
+          autoComplete="current-password"
+          autoCapitalize="off"
+          spellCheck={false}
+          aria-label="Studio key"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="mt-4 h-12 w-full rounded-2xl border border-line-strong bg-canvas/50 px-4 text-[16px] text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15"
+        />
+        {error && (
+          <p role="alert" className="mt-2 text-[14px] text-[#c2410c]">
+            {error}
+          </p>
+        )}
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" onClick={onCancel} className="h-12 rounded-full border border-line-strong text-[15px] font-medium text-ink transition hover:border-ink/40">
+            Not now
+          </button>
+          <button type="submit" disabled={!value.trim()} className="h-12 rounded-full bg-brand-gradient text-[15px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60">
+            Continue
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+function Stepper({ film, seconds }: { film: VoiceView; seconds: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(t);
+  }, []);
+  const at = stepOf(film);
+  const stopped = film.status === "failed";
+  const started = Date.parse(film.createdAt ?? "");
+  return (
+    <div>
+      <ol className="mt-3 space-y-2 text-[15px]">
+        {STEPS.map((name, i) => {
+          const done = i < at;
+          const current = i === at && !stopped;
+          return (
+            <li key={name} className={`flex items-center gap-2.5 ${done || current ? "text-ink" : "text-muted"}`} aria-current={current ? "step" : undefined}>
+              {done ? (
+                <CheckIcon size={16} className="shrink-0 text-brand-ink" />
+              ) : current ? (
+                <span className="mx-[5px] inline-block size-2.5 shrink-0 animate-pulse rounded-full bg-brand" />
+              ) : (
+                <span className="mx-[5px] inline-block size-2.5 shrink-0 rounded-full border border-line-strong" />
+              )}
+              <span className={current ? "font-medium" : ""}>{name}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {!FINISHED.includes(film.status) && !stopped && (
+        <p className="mt-3 text-[14px] leading-relaxed text-ink-2">
+          {Number.isFinite(started) && <>Working for {span(now - started)}. </>}
+          {seconds > 0 ? `A voice this long usually takes about ${estimateRange(seconds)}. ` : "A 40-minute voice takes about 2–3 hours. "}
+          You can close this page: your film stays under “My films”.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: string; voiceUrl?: string; seconds?: number; topic: string }) {
   const [quran, setQuran] = useState(false);
   const [surah, setSurah] = useState("");
   const [reciter, setReciter] = useState("");
@@ -87,31 +243,96 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
   const [film, setFilm] = useState<VoiceView | null>(null);
   // Bumped when a stopped film is started again, so following it resumes.
   const [round, setRound] = useState(0);
+  const [dialog, setDialog] = useState({ open: false, error: "" });
+  const resolver = useRef<((k: string) => void) | null>(null);
+  const [list, setList] = useState<VoiceView[] | null>(null);
+  const [hasKey, setHasKey] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
+  const askKey = (err = "") =>
+    new Promise<string>((resolve) => {
+      resolver.current = resolve;
+      setDialog({ open: true, error: err });
+    });
+  const answer = (k: string) => {
+    setDialog({ open: false, error: "" });
+    resolver.current?.(k);
+    resolver.current = null;
+  };
+
+  /** Runs a request with the saved key; asks for it in the dialog when missing or wrong (401). */
+  const withKey = async (run: (key: string) => Promise<Response>) => {
+    let k = readStore(KEY_STORE);
+    let err = "";
+    for (let i = 0; i < 3; i += 1) {
+      if (!k) {
+        k = await askKey(err);
+        if (!k) return null;
+      }
+      const res = await run(k);
+      if (res.status !== 401) {
+        writeStore(KEY_STORE, k);
+        setHasKey(true);
+        return res;
+      }
+      writeStore(KEY_STORE, "");
+      setHasKey(false);
+      k = "";
+      err = KEY_WRONG;
+    }
+    return null;
+  };
+
+  const loadList = async (ask: boolean) => {
     const saved = readStore(KEY_STORE);
-    setKey(saved);
-    setAskKey(!saved);
-    setError("");
-    const last = rememberedFor(fileName);
-    setFilm(last ? { id: last, status: "queued", progress: [] } : null);
-  }, [open, fileName]);
+    if (!saved && !ask) return;
+    try {
+      const res = ask ? await withKey((k) => fetch("/api/voice", { cache: "no-store", headers: { authorization: `Bearer ${k}` } })) : await fetch("/api/voice", { cache: "no-store", headers: { authorization: `Bearer ${saved}` } });
+      if (!res) return;
+      if (res.status === 401) {
+        writeStore(KEY_STORE, "");
+        setHasKey(false);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.films)) setList(data.films as VoiceView[]);
+    } catch {
+      /* offline: the list stays as it was */
+    }
+  };
 
-  // Follow the film while the sheet is open.
   useEffect(() => {
-    if (!open || !film?.id) return;
-    const studioKey = readStore(KEY_STORE);
-    if (!studioKey) return;
+    setHasKey(!!readStore(KEY_STORE));
+    loadList(false);
+  }, []);
+
+  useEffect(() => {
+    setError("");
+    const last = fileName ? rememberedFor(fileName) : "";
+    setFilm(last ? { id: last, status: "queued", progress: [] } : null);
+  }, [fileName]);
+
+  // Follow the film while it is shown.
+  useEffect(() => {
+    if (!film?.id) return;
     let stop = false;
     let timer = 0;
     const poll = async () => {
+      const studioKey = readStore(KEY_STORE);
+      if (!studioKey) return;
       try {
         const res = await fetch(`/api/voice/${film.id}`, { cache: "no-store", headers: { authorization: `Bearer ${studioKey}` } });
         if (res.ok) {
           const data = (await res.json()) as VoiceView;
           if (!stop) setFilm(data);
-          if (["done", "awaiting-review", "failed"].includes(data.status)) return;
+          if (["done", "awaiting-review", "failed"].includes(data.status)) {
+            loadList(false);
+            return;
+          }
+        } else if (res.status === 401) {
+          writeStore(KEY_STORE, "");
+          setHasKey(false);
+          if (!stop) setError("Your studio key stopped working. Open “My films” below to enter it again.");
+          return;
         } else if (res.status === 404) {
           if (!stop) setFilm(null);
           return;
@@ -126,15 +347,10 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
       stop = true;
       window.clearTimeout(timer);
     };
-  }, [open, film?.id, round]);
+  }, [film?.id, round]);
 
   const start = async () => {
-    const studioKey = key.trim();
-    if (!studioKey) {
-      setAskKey(true);
-      setError("Enter your studio key to start.");
-      return;
-    }
+    if (!fileName || !voiceUrl) return;
     if (quran && !(Number(surah) >= 1 && Number(surah) <= 114)) {
       setError("Say which surah is recited (1-114). A recitation is never guessed.");
       return;
@@ -144,24 +360,20 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
     setSent(0);
     try {
       const blob = await (await fetch(voiceUrl)).blob();
-      const res = await fetch("/api/voice", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
-        body: JSON.stringify({ fileName, bytes: blob.size, kind: quran ? "quran" : "narration", topic, ...(quran ? { surah: Number(surah), reciter } : {}) }),
-      });
+      const res = await withKey((k) =>
+        fetch("/api/voice", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${k}` },
+          body: JSON.stringify({ fileName, bytes: blob.size, kind: quran ? "quran" : "narration", topic, ...(quran ? { surah: Number(surah), reciter } : {}) }),
+        }),
+      );
+      if (!res) return; // the visitor chose "Not now" or gave a wrong key three times
       const data = await res.json().catch(() => ({}));
-      if (res.status === 401) {
-        writeStore(KEY_STORE, "");
-        setAskKey(true);
-        setError("That studio key is not right. Check it and try again.");
-        return;
-      }
       if (!res.ok || !data.id) {
         setError(String(data.error ?? "The studio could not take the recording. Try again in a minute."));
         return;
       }
-      writeStore(KEY_STORE, studioKey);
-      setAskKey(false);
+      const studioKey = readStore(KEY_STORE);
       const parts: { partNumber: number; etag: string }[] = [];
       for (let n = 1; n <= data.parts; n += 1) {
         const piece = blob.slice((n - 1) * data.partSize, n * data.partSize);
@@ -175,8 +387,10 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
       });
       const view = (await done.json().catch(() => ({}))) as VoiceView & { error?: string };
       remember(fileName, data.id);
+      if (seconds) rememberSeconds(data.id, seconds);
       setFilm(view.id ? view : { id: data.id, status: "uploaded", progress: [] });
       if (!done.ok && view.error) setError(view.error);
+      loadList(false);
     } catch (e) {
       setError(e instanceof Error && e.message ? `The upload stopped: ${e.message}` : "No connection. Check your internet and try again.");
     } finally {
@@ -184,158 +398,244 @@ export function VoiceFilm({ open, fileName, voiceUrl, topic }: { open: boolean; 
     }
   };
 
-  if (film) {
-    const finished = film.status === "done" || film.status === "awaiting-review";
-    const stopped = film.status === "failed";
-    const last = film.progress.at(-1);
+  /** A stopped film starts again from the recording already saved: nothing is uploaded twice. */
+  const retry = async (id: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await withKey((k) => fetch(`/api/voice/${id}/retry`, { method: "POST", headers: { authorization: `Bearer ${k}` } }));
+      if (!res) return;
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.id) {
+        setFilm(data as VoiceView);
+        setRound((r) => r + 1);
+        loadList(false);
+      } else setError(String(data.error ?? "The film could not be started again. Try again in a minute."));
+    } catch {
+      setError("No connection. Check your internet and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const download = async (id: string) => {
+    const res = await withKey((k) => fetch(`/api/voice/${id}`, { cache: "no-store", headers: { authorization: `Bearer ${k}` } }));
+    const data = (await res?.json().catch(() => ({}))) as VoiceView | undefined;
+    if (data?.download) window.location.href = data.download;
+    else setError("The film is not ready to download yet.");
+  };
+
+  const dialogEl = <KeyDialog open={dialog.open} error={dialog.error} onSubmit={answer} onCancel={() => answer("")} />;
+
+  const shown = film;
+  const myFilms = (
+    <MyFilms
+      list={list}
+      hasKey={hasKey}
+      busy={busy}
+      activeId={film?.id}
+      onLoad={() => loadList(true)}
+      onOpen={(v) => {
+        setError("");
+        setFilm(v);
+        setRound((r) => r + 1);
+      }}
+      onRetry={retry}
+      onDownload={download}
+    />
+  );
+
+  if (shown) {
+    const finished = FINISHED.includes(shown.status);
+    const stopped = shown.status === "failed";
     return (
-      <div className="mt-6 rounded-2xl border border-line bg-canvas/50 p-4" aria-live="polite">
-        <p className={`${eyebrow} flex items-center gap-1.5`}>
-          {finished ? <CheckIcon size={16} /> : <span className="inline-block size-2 animate-pulse rounded-full bg-brand" />}
-          {STATUS[film.status] ?? film.status}
-        </p>
-        {!finished && !stopped && (
-          <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
-            You can close this and come back: the film keeps being made. A 40-minute voiceover takes a few hours on the free machines.
+      <div>
+        <div className="mt-6 rounded-2xl border border-line bg-canvas/50 p-4" aria-live="polite">
+          <p className={`${eyebrow} flex items-center gap-1.5`}>
+            {finished ? <CheckIcon size={16} /> : stopped ? null : <span className="inline-block size-2 animate-pulse rounded-full bg-brand" />}
+            {STATUS[shown.status] ?? shown.status}
           </p>
-        )}
-        {film.progress.filter((p) => p.ok).length > 0 && (
-          <ol className="mt-3 space-y-1.5 text-[14px] text-ink">
-            {film.progress
-              .filter((p) => p.ok)
-              .slice(-6)
-              .map((p) => (
-                <li key={p.at + p.stage} className="flex items-start gap-2">
-                  <CheckIcon size={15} className="mt-[3px] shrink-0 text-brand-ink" /> {p.message.en}
-                </li>
-              ))}
-          </ol>
-        )}
-        {stopped && last && <p className="mt-3 text-[14px] text-[#c2410c]">{last.message.en}</p>}
-        {film.status === "awaiting-review" && (
-          <p className="mt-3 text-[13px] text-muted">A Quran film is never published before a qualified scholar has reviewed the text, the timing and every picture.</p>
-        )}
-        {film.status === "awaiting-review" && film.listen && film.report?.ayat?.length ? (
-          <AyahMarker
-            listen={film.listen}
-            refs={film.report.ayat.map((a) => a.ref)}
-            onSend={async (marks) => {
-              const res = await fetch(`/api/voice/${film.id}/marks`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${readStore(KEY_STORE)}` }, body: JSON.stringify(marks) });
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok || !data.id) return String(data.error ?? "The marks could not be saved. Try again.");
-              setFilm(data as VoiceView);
-              setRound((r) => r + 1);
-              return "";
-            }}
-          />
-        ) : null}
-        {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {film.download ? (
-            <a href={film.download} className="inline-flex h-11 items-center justify-center rounded-full bg-ink text-[14px] font-medium text-canvas transition hover:opacity-90">
-              Download the film
-            </a>
-          ) : (
-            <span className="inline-flex h-11 items-center justify-center rounded-full bg-sunken text-[14px] font-medium text-muted">Film not ready yet</span>
+          <Stepper film={shown} seconds={secondsOf(shown.id, shown)} />
+          {stopped && (
+            <p className="mt-3 text-[14px] text-[#c2410c]">
+              Why it stopped: {whyStopped(shown)}
+            </p>
           )}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={async () => {
-              if (!stopped) {
-                remember(fileName, "");
-                setFilm(null);
-                return;
-              }
-              // A stopped film starts again from the recording already saved: nothing is uploaded twice.
-              setBusy(true);
-              setError("");
-              try {
-                const res = await fetch(`/api/voice/${film.id}/retry`, { method: "POST", headers: { authorization: `Bearer ${readStore(KEY_STORE)}` } });
-                const data = await res.json().catch(() => ({}));
-                if (res.ok && data.id) {
-                  setFilm(data as VoiceView);
-                  setRound((r) => r + 1);
-                }
-                else setError(String(data.error ?? "The film could not be started again. Try again in a minute."));
-              } catch {
-                setError("No connection. Check your internet and try again.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
-          >
-            {stopped ? (busy ? "Starting…" : "Try again") : "Make another"}
-          </button>
+          {shown.status === "awaiting-review" && (
+            <p className="mt-3 text-[13px] text-muted">A Quran film is never published before a qualified scholar has reviewed the text, the timing and every picture.</p>
+          )}
+          {shown.status === "awaiting-review" && shown.listen && shown.report?.ayat?.length ? (
+            <AyahMarker
+              listen={shown.listen}
+              refs={shown.report.ayat.map((a) => a.ref)}
+              onSend={async (marks) => {
+                const res = await withKey((k) => fetch(`/api/voice/${shown.id}/marks`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${k}` }, body: JSON.stringify(marks) }));
+                const data = await res?.json().catch(() => ({}));
+                if (!res?.ok || !data?.id) return String(data?.error ?? "The marks could not be saved. Try again.");
+                setFilm(data as VoiceView);
+                setRound((r) => r + 1);
+                return "";
+              }}
+            />
+          ) : null}
+          {error && <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">{error}</p>}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {shown.download ? (
+              <a href={shown.download} className="inline-flex h-11 items-center justify-center rounded-full bg-ink text-[14px] font-medium text-canvas transition hover:opacity-90">
+                Download the film
+              </a>
+            ) : (
+              <span className="inline-flex h-11 items-center justify-center rounded-full bg-sunken text-[14px] font-medium text-muted">Film not ready yet</span>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (!stopped) {
+                  if (fileName) remember(fileName, "");
+                  setFilm(null);
+                } else void retry(shown.id);
+              }}
+              className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+            >
+              {stopped ? (busy ? "Starting…" : "Try again") : "Make another"}
+            </button>
+          </div>
         </div>
+        {myFilms}
+        {dialogEl}
       </div>
     );
   }
 
   return (
-    <div className="mt-6">
-      {askKey && (
-        <label className="block">
-          <span className="text-[14px] font-medium text-ink">Studio key</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            autoCapitalize="off"
-            spellCheck={false}
-            value={key}
-            onChange={(e) => {
-              setKey(e.target.value);
-              setError("");
-            }}
-            className="mt-2 h-12 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15"
-          />
-          <span className="mt-1.5 block text-[12.5px] text-muted">Asked once, then saved on this device.</span>
-        </label>
-      )}
-      <label className="mt-4 flex items-center gap-3 text-[14px] text-ink">
-        <input type="checkbox" checked={quran} onChange={(e) => setQuran(e.target.checked)} className="size-4 accent-brand" />
-        This is a Quran recitation
-      </label>
-      {quran && (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-[13px] font-medium text-ink">Surah (1-114)</span>
-            <input
-              inputMode="numeric"
-              value={surah}
-              onChange={(e) => setSurah(e.target.value.replace(/\D/g, "").slice(0, 3))}
-              className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none focus:border-brand"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[13px] font-medium text-ink">Reciter</span>
-            <input
-              value={reciter}
-              onChange={(e) => setReciter(e.target.value.slice(0, 80))}
-              className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none focus:border-brand"
-            />
-          </label>
-          <p className="col-span-2 text-[12.5px] leading-relaxed text-muted">
-            The reciter's own voice only, the exact Uthmani text, no music, and a scholar's review before anything is published.
+    <div>
+      {voiceUrl && fileName && (
+        <>
+          <details className="mt-5 rounded-2xl border border-line">
+            <summary className="flex min-h-12 cursor-pointer items-center px-4 text-[15px] font-medium text-ink-2">More options</summary>
+            <div className="px-4 pb-4">
+              <label className="flex items-center gap-3 text-[14px] text-ink">
+                <input type="checkbox" checked={quran} onChange={(e) => setQuran(e.target.checked)} className="size-4 accent-brand" />
+                This is a Quran recitation
+              </label>
+              {quran && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-[13px] font-medium text-ink">Surah (1-114)</span>
+                    <input
+                      inputMode="numeric"
+                      value={surah}
+                      onChange={(e) => setSurah(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                      className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none focus:border-brand"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[13px] font-medium text-ink">Reciter</span>
+                    <input
+                      value={reciter}
+                      onChange={(e) => setReciter(e.target.value.slice(0, 80))}
+                      className="mt-1.5 h-11 w-full rounded-2xl border border-line bg-canvas/50 px-4 text-[16px] text-ink outline-none focus:border-brand"
+                    />
+                  </label>
+                  <p className="col-span-2 text-[12.5px] leading-relaxed text-muted">
+                    The reciter's own voice only, the exact Uthmani text, no music, and a scholar's review before anything is published.
+                  </p>
+                </div>
+              )}
+            </div>
+          </details>
+          <button
+            type="button"
+            onClick={start}
+            disabled={busy}
+            className="mt-5 flex h-[60px] w-full items-center justify-center rounded-2xl bg-brand-gradient px-4 text-[17px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60"
+          >
+            {busy ? (sent > 0 ? `Uploading… ${sent}%` : "Starting…") : "Make my film"}
+          </button>
+          <p className="mt-3 text-center text-[13px] text-muted">
+            Free during beta · Your recording stays private and its words are never changed.
+            {seconds ? ` Expect about ${estimateRange(seconds)}.` : ""}
           </p>
-        </div>
+        </>
       )}
-      <button
-        type="button"
-        onClick={start}
-        disabled={busy}
-        className="mt-4 flex h-[56px] w-full items-center justify-center rounded-2xl bg-brand-gradient px-4 text-[16px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60"
-      >
-        {busy ? (sent > 0 ? `Uploading… ${sent}%` : "Starting…") : "Make my film"}
-      </button>
-      <p className="mt-2 text-[12.5px] text-muted">Your recording stays private. Its words are the script: nothing in them is changed.</p>
       {error && (
         <p role="alert" className="mt-3 text-[14px] text-[#c2410c]">
           {error}
         </p>
       )}
+      {myFilms}
+      {dialogEl}
     </div>
+  );
+}
+
+/** "My films": every voiceover film of this studio, so the page can be closed and opened later. */
+function MyFilms({
+  list,
+  hasKey,
+  busy,
+  activeId,
+  onLoad,
+  onOpen,
+  onRetry,
+  onDownload,
+}: {
+  list: VoiceView[] | null;
+  hasKey: boolean;
+  busy: boolean;
+  activeId?: string;
+  onLoad: () => void;
+  onOpen: (v: VoiceView) => void;
+  onRetry: (id: string) => void;
+  onDownload: (id: string) => void;
+}) {
+  if (!list) {
+    if (hasKey) return null;
+    return (
+      <button type="button" onClick={onLoad} className="mt-5 w-full text-center text-[14px] font-medium text-brand-ink underline-offset-4 hover:underline">
+        Already made a film? See My films
+      </button>
+    );
+  }
+  return (
+    <section className="mt-6" aria-label="My films">
+      <h3 className="text-[15px] font-medium text-ink">My films</h3>
+      {list.length === 0 && <p className="mt-2 text-[14px] text-muted">Nothing yet. Your films will wait for you here.</p>}
+      <ul className="mt-2 divide-y divide-line rounded-2xl border border-line">
+        {list.filter((f) => f.id !== activeId).slice(0, 12).map((f) => {
+          const finished = FINISHED.includes(f.status);
+          const stopped = f.status === "failed";
+          return (
+            <li key={f.id} className="p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[14.5px] font-medium text-ink">{f.topic || f.fileName || "Voiceover film"}</p>
+                  <p className="text-[12.5px] text-muted">
+                    {STATUS[f.status] ?? f.status}
+                    {f.createdAt ? ` · ${new Date(f.createdAt).toLocaleDateString()}` : ""}
+                  </p>
+                </div>
+                {finished && f.film ? (
+                  <button type="button" onClick={() => onDownload(f.id)} className="h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas transition hover:opacity-90">
+                    Download
+                  </button>
+                ) : stopped ? (
+                  <button type="button" disabled={busy} onClick={() => onRetry(f.id)} className="h-9 shrink-0 rounded-full border border-line-strong px-4 text-[13px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60">
+                    Try again
+                  </button>
+                ) : f.id !== activeId ? (
+                  <button type="button" onClick={() => onOpen(f)} className="h-9 shrink-0 rounded-full border border-line-strong px-4 text-[13px] font-medium text-ink transition hover:border-ink/40">
+                    See progress
+                  </button>
+                ) : null}
+              </div>
+              {stopped && <p className="mt-1.5 text-[13px] text-[#c2410c]">Why it stopped: {whyStopped(f)}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

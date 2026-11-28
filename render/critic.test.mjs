@@ -282,3 +282,25 @@ test("the Craft Ledger's targets add notes and a craft index, never a block", as
   assert.ok(notes.length >= 1 && notes.every((f) => f.severity === "note" && f.en.length > 10 && f.bn.length > 10));
   assert.ok(notes.some((f) => /cuts in the first 30 s/.test(f.en)), "5 cuts against the history target of 6");
 });
+
+test("a short film is a note for a voice film (the owner's recording sets its length) and a block for an idea or script film", () => {
+  const shots = Array.from({ length: 6 }, (_, i) => ({ start: i * 6, end: (i + 1) * 6 }));
+  const master = { master: { integratedLufs: -14.2, truePeakDbtp: -1.4, loudnessRangeLu: 8, black: [] } };
+  const severity = (/** @type {any} */ evidence) => critique(timeline(shots, {}), master, { channels: 2, ...evidence }).findings.find((f) => f.code === "critic.short")?.severity;
+  assert.equal(severity({}), "block", "a script film of 36 s is still too short");
+  assert.equal(severity({ voiceFilm: true }), "note", "a voice film of 36 s is the owner's choice");
+});
+
+test("voice-film captions are held through the pauses, so the speech between sentences is not left without a caption", async () => {
+  const { captionsForVoice, captionsFromWords } = await import("../engine/src/timeline.mjs");
+  // Three sentences of a 38 s recording, a 2 s pause after each (the shape of film e0b87efb: 13% of the speech had no caption).
+  const words = [];
+  for (const [from, to] of [[0.4, 9], [11, 21], [23, 36.6]]) for (let t = from, n = 0; t < to; t += (to - from) / 10, n += 1) words.push({ text: n === 9 ? "end." : "word", start: t, end: t + (to - from) / 10 - 0.05 });
+  const narration = [{ scene: "SC1", start: 0, end: 10, text: "a" }, { scene: "SC2", start: 10, end: 22, text: "b" }, { scene: "SC3", start: 22, end: 38, text: "c" }];
+  const bare = subtitleFit(narration, captionsFromWords(words), 38);
+  const held = subtitleFit(narration, captionsForVoice(words, 38), 38);
+  assert.ok(held.coverage > 0.97, `held coverage ${held.coverage}`);
+  assert.ok(held.coverage > bare.coverage, "holding the captions adds coverage");
+  assert.ok(held.maxGap < 1, `longest hole ${held.maxGap} s`);
+  assert.equal(held.overlap, 0);
+});

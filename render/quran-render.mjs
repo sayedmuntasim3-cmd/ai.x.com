@@ -1,7 +1,8 @@
 /**
  * The recitation film, rendered:
  *   node render/quran-render.mjs --run <voice-film folder> --audio <mastered or original voice>
- *        [--format 1080p|4k|9:16] [--reciter "name"] [--no-text] [--out film.mp4]
+ *        [--format 1080p|4k|9:16] [--reciter "name"] [--no-text] [--translation pickthall|none]
+ *        [--highlight word|none] [--out film.mp4]
  * Reads shots.json (the director), media.json (the assets; a shot without
  * one becomes a slow dark card), understanding.json (the plan: ayah times)
  * and the verified texts. Every shot is rendered as its own clip (the asset
@@ -18,6 +19,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { measureMaster, mediaDuration, run } from "./render-film.mjs";
+import { ayahOffset } from "../engine/src/quran-meaning.mjs";
 
 const FONTS = new URL("./assets/fonts/", import.meta.url).pathname;
 
@@ -36,7 +38,7 @@ export const FORMATS = Object.freeze({
 });
 
 /** Width of one letter or space of Amiri Quran, as a share of the font size (measured: 430 px for 42 letters at 70). */
-const LETTER_WIDTH = 0.15;
+const LETTER_WIDTH = 0.145;
 
 /**
  * The size an ayah is written at: the largest from maxFontSize down to
@@ -97,6 +99,18 @@ export function moveFilter(move, seconds, f) {
 }
 
 /**
+ * The stretch of a video a shot shows: it skips the first tenth (titles, a shaky start) but keeps enough to cover the
+ * shot; a video a little shorter than its shot is slowed (at most to two thirds of its speed), never held on a frame.
+ * @param {number | null} assetSeconds @param {number} length @returns {{ start: number, slow: number, seconds: number }}
+ */
+export function videoWindow(assetSeconds, length) {
+  const start = assetSeconds && assetSeconds > length + 2 ? Math.min(assetSeconds * 0.1, assetSeconds - length - 1) : 0;
+  const available = assetSeconds ? assetSeconds - start : length;
+  const slow = available < length ? Math.min(1.5, (length + 0.1) / available) : 1;
+  return { start: r3(start), slow, seconds: Math.min(available, length / slow + 1) };
+}
+
+/**
  * ffmpeg arguments for one clip.
  * @param {{ length: number }} seg @param {{ move: string }} shot @param {{ kind: "video" | "image", url: string, seconds: number | null } | null} asset
  * @param {Format} f @param {string} out
@@ -111,10 +125,9 @@ export function clipArgs(seg, shot, asset, f, out) {
   else if (asset.kind === "image") input = ["-loop", "1", "-framerate", String(f.fps), "-t", String(seg.length + 1), "-i", asset.url];
   else {
     // Skip a video's first tenth (titles, a shaky start), but keep enough to cover the shot.
-    const start = asset.seconds && asset.seconds > seg.length + 2 ? Math.min(asset.seconds * 0.1, asset.seconds - seg.length - 1) : 0;
-    const available = asset.seconds ? asset.seconds - start : seg.length;
-    // A video a little shorter than its shot is slowed (at most to two thirds of its speed), never held on a frame.
-    slow = available < seg.length ? Math.min(1.5, (seg.length + 0.1) / available) : 1;
+    const w = videoWindow(asset.seconds, seg.length);
+    const start = w.start;
+    slow = w.slow;
     input = ["-ss", String(r3(start)), "-t", String(r3(seg.length / slow + 1)), "-i", asset.url];
   }
   // Under the title the picture is a little darker, so the name reads clearly.
@@ -127,7 +140,7 @@ export function clipArgs(seg, shot, asset, f, out) {
 export function ayahOnScreen(text, surah, ayah) {
   if (ayah !== 1 || surah === 1 || surah === 9) return text;
   const words = text.split(/\s+/);
-  const bare = words.slice(0, 4).join(" ").replace(/[ً-ٰٟۖ-ۭ]/g, "").replace(/ٱ/g, "ا");
+  const bare = words.slice(0, 4).map(w => w.replace(/[ً-ٰٟۖ-ۭ]/g, "").replace(/ٱ/g, "ا")).join(" ");
   return bare === "بسم الله الرحمن الرحيم" ? words.slice(4).join(" ") : text;
 }
 
@@ -137,20 +150,58 @@ const assTime = (t) => { const cs = Math.max(0, Math.round(t * 100)); const h = 
 const assText = (s) => s.replace(/[{}]/g, "").replace(/\n/g, "\\N");
 
 /**
+ * The English meaning of an ayah from the shipped Pickthall 1930 text.
+ * Public domain (the translator died in 1936); credited on the end card.
+ * @param {{ uthmani: string[], simple: string[], pickthall: string[] }} texts
+ * @param {number} surah @param {number} ayah
+ * @returns {string | null}
+ */
+function pickthallMeaning(texts, surah, ayah) {
+  if (!texts || !Array.isArray(texts.pickthall)) return null;
+  const k = ayahOffset(surah, ayah);
+  if (k < 0) return null;
+  return texts.pickthall[k] ?? null;
+}
+
+/**
+ * Whether a scene carries per-word times confident enough to highlight.
+ * Missing or uncertain word times → the ayah is shown whole, no highlight.
+ * @param {{ words?: { text: string, start: number, end: number, score: number }[] | null | undefined }} scene
+ * @returns {boolean}
+ */
+export function wordTimesConfident(scene) {
+  const words = scene?.words;
+  if (!Array.isArray(words) || words.length === 0) return false;
+  for (const w of words) {
+    if (w.start == null || w.end == null || !Number.isFinite(w.start) || !Number.isFinite(w.end)) return false;
+    if (typeof w.score !== "number" || w.score < 0.5) return false;
+  }
+  return true;
+}
+
+/**
  * The text of the film as an ASS file: the Arabic of each ayah while it is
  * recited (Tanzil Uthmani, verbatim), the title card (surah name in Arabic
- * and Latin letters, the reciter), and the closing credit line.
- * @param {{ scenes: { kind: string, surah: number, ayah: number | null, start: number, end: number, spokenStart: number | null, spokenEnd: number | null, endSure?: boolean }[] }} plan
+ * and Latin letters, the reciter), the Pickthall meaning line under each
+ * ayah, the ayah number in an Arabic ornament ﴿n﴾, and the closing credit
+ * line with the Tanzil credit and, when translation is shown, the Pickthall
+ * credit. Word-by-word highlight is emitted only when the scene carries
+ * confident per-word times; otherwise the whole ayah is shown soft white.
+ * @param {{ scenes: { kind: string, surah: number, ayah: number | null, start: number, end: number, spokenStart: number | null, spokenEnd: number | null, endSure?: boolean, words?: { text: string, start: number, end: number, score: number }[] | null | undefined }[] }} plan
  * @param {string[]} uthmani @param {{ number?: number, arabic?: string, transliteration?: string }[]} surahNames
- * @param {{ format: Format, total: number, reciter?: string, showAyat?: boolean }} o
+ * @param {{ format: Format, total: number, reciter?: string, showAyat?: boolean, translation?: "pickthall" | "none", highlight?: "word" | "none" }} o
+ * @param {{ uthmani: string[], simple: string[], pickthall: string[] }} texts
  */
-export function filmText(plan, uthmani, surahNames, o) {
+export function filmText(plan, uthmani, surahNames, o, texts) {
   const f = o.format;
+  const translationOn = o.translation !== "none";
+  const highlightOn = o.highlight === "word";
   const lines = ["[Script Info]", "ScriptType: v4.00+", `PlayResX: ${f.width}`, `PlayResY: ${f.height}`, "WrapStyle: 0", "ScaledBorderAndShadow: yes", "", "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Ayah,Amiri Quran,${f.fontSize},&H00F0ECE4,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.08)},${Math.round(f.width * 0.08)},${f.margin},-1`,
-    `Style: Title,Amiri Quran,${f.titleSize},&H00F0ECE4,&H00F0ECE4,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,2,3,5,40,40,0,-1`,
-    `Style: Small,Amiri Quran,${Math.round(f.fontSize * 0.5)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,40,40,${Math.round(f.margin * 0.6)},1`,
+    `Style: Ayah,Amiri Quran,${f.fontSize},&H0060C8F0,&H00F0ECE4,&H20000000,&H60000000,0,0,0,0,100,100,0,0,1,${(f.fontSize / 28).toFixed(1)},${(f.fontSize / 22).toFixed(1)},2,${Math.round(f.width * 0.09)},${Math.round(f.width * 0.09)},${f.margin},-1`,
+    `Style: Title,Amiri Quran,${f.titleSize},&H00F0ECE4,&H00F0ECE4,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,2,3,5,50,50,0,-1`,
+    `Style: Small,Amiri Quran,${Math.round(f.fontSize * 0.55)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,${Math.round(f.margin * 0.6)},1`,
+    `Style: Meaning,Amiri Quran,${Math.round(f.fontSize * 0.46)},&H00D8D2C8,&H00D8D2C8,&H50000000,&H00000000,0,0,0,0,100,100,0,0,1,1,2,2,50,50,${Math.round(f.margin * 0.6)},1`,
     "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"];
   const offsetOf = (/** @type {number} */ surah) => { let k = 0; for (let s = 1; s < surah; s += 1) k += AYAT[s - 1]; return k; };
   // A recording that starts at once has no title scene: the surah's name is shown over the first seconds.
@@ -172,12 +223,39 @@ export function filmText(plan, uthmani, surahNames, o) {
     if (s.endSure === false || before?.endSure === false) { hidden += 1; continue; }
     const text = ayahOnScreen(uthmani[offsetOf(s.surah) + s.ayah - 1] ?? "", s.surah, s.ayah);
     // A long ayah is shown whole: libass wraps it on word boundaries, at a size that keeps it within three lines.
-    const shown = `${text} \uFD3F${arabicNumber(s.ayah)}\uFD3E`;
+    const shown = `${text} ﴿${arabicNumber(s.ayah)}﴾`;
     const { size } = ayahFontSize(shown, f);
-    lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
+    // The English meaning line, same timing as the ayah, smaller, below the Arabic.
+    if (translationOn) {
+      const meaning = pickthallMeaning(texts, s.surah, s.ayah);
+      if (meaning) {
+        const meaningShown = assText(meaning);
+        lines.push(`Dialogue: 0,${assTime(s.spokenStart)},${assTime(s.spokenEnd + 0.4)},Meaning,,0,0,${Math.round(f.margin * 0.6)},,{\\fad(600,600)\\fnDejaVu Sans}${meaningShown}`);
+      }
+    }
+    const ayahStart = assTime(s.spokenStart), ayahEnd = assTime(s.spokenEnd + 0.4);
+    const tail = ` ﴿${arabicNumber(s.ayah)}﴾`;
+    const tokens = text.split(/\s+/).filter(Boolean);
+    const ws = highlightOn && wordTimesConfident(s) ? /** @type {{ start: number, end: number }[]} */ (s.words) : [];
+    if (ws.length === tokens.length && tokens.length > 0) {
+      // One event per ayah; each word carries a \kf sweep (centiseconds) from SecondaryColour (soft white) to PrimaryColour (gold).
+      let cursor = s.spokenStart;
+      const karaoke = tokens.map((tok, i) => {
+        const from = Math.max(cursor, ws[i].start), to = Math.max(from, ws[i].end);
+        const lead = Math.round((from - cursor) * 100), dur = Math.round((to - from) * 100);
+        cursor = to;
+        return (lead > 0 ? `{\\k${lead}}` : "") + `{\\kf${dur}}${assText(tok)} `;
+      }).join("").trimEnd();
+      lines.push(`Dialogue: 0,${ayahStart},${ayahEnd},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${karaoke}${assText(tail)}`);
+    } else {
+      lines.push(`Dialogue: 0,${ayahStart},${ayahEnd},Ayah,,0,0,0,,{\\fad(500,500)\\blur0.6\\fs${size}}${assText(shown)}`);
+    }
   }
   if (hidden) lines.push(`; ${hidden} ayah text(s) not shown: their timing is not confirmed by two methods`);
-  lines.push(`Dialogue: 0,${assTime(Math.max(0, o.total - 6))},${assTime(o.total - 0.5)},Small,,0,0,0,,{\\fad(800,1200)\\fnDejaVu Sans}Quran text: Tanzil.net`);
+  // Closing credit line: Tanzil credit always; Pickthall credit when translation is shown.
+  const creditParts = ["Quran text: Tanzil.net"];
+  if (translationOn) creditParts.push("Translation: M. M. Pickthall (1930)");
+  lines.push(`Dialogue: 0,${assTime(Math.max(0, o.total - 6))},${assTime(o.total - 0.5)},Small,,0,0,0,,{\\fad(800,1200)\\fnDejaVu Sans}${assText(creditParts.join("  ·  "))}`);
   return lines.join("\n") + "\n";
 }
 
@@ -269,7 +347,9 @@ export async function renderQuranFilm(o) {
   try { for (const s of JSON.parse(await readFile(join(dir, "media.json"), "utf8")).shots) if (s.asset) assets.set(s.shot, s.asset); } catch { /* no media: every shot is a card */ }
   const data = new URL("../engine/data/quran/", import.meta.url);
   const { parseTanzilText } = await import("../engine/src/quran-meaning.mjs");
-  const uthmani = parseTanzilText(await readFile(new URL("tanzil-quran-uthmani-1.1.txt", data), "utf8")).ayat;
+  const uthmaniTexts = parseTanzilText(await readFile(new URL("tanzil-quran-uthmani-1.1.txt", data), "utf8"));
+  const uthmani = uthmaniTexts.ayat;
+  const pickthall = JSON.parse(await readFile(new URL("pickthall-1930.json", data), "utf8")).ayat;
   const surahNames = JSON.parse(await readFile(new URL("surah-names.json", data), "utf8"));
   const total = await mediaDuration(o.audio);
   const segs = joinPlan(direction.shots, total);
@@ -301,7 +381,7 @@ export async function renderQuranFilm(o) {
     log(`${shot.id} ${seg.length.toFixed(2)} s ${asset ? asset.kind : "card"}`);
   }
   const assFile = join(work, "text.ass");
-  await writeFile(assFile, filmText(understanding.quranPlan, uthmani, surahNames, { format: f, total, reciter: o.reciter, showAyat: o.showAyat }));
+  await writeFile(assFile, filmText(understanding.quranPlan, uthmani, surahNames, { format: f, total, reciter: o.reciter, showAyat: o.showAyat, translation: o.translation ?? "pickthall", highlight: o.highlight ?? "word" }, { uthmani, simple: uthmaniTexts.simple ?? [], pickthall }));
   const out = resolve(o.out ?? join(dir, `film-${(o.format ?? "1080p").replace(":", "x")}.mp4`));
   await mkdir(dirname(out), { recursive: true });
   await run("ffmpeg", finalArgs(segs, clips, { audio: o.audio, ass: assFile, total, out, format: f }));
@@ -341,9 +421,9 @@ export async function renderQuranFilm(o) {
 async function main() {
   const { parseArgs } = await import("../local/voice-film.mjs");
   const args = /** @type {Record<string, any>} */ (parseArgs(process.argv.slice(2)));
-  if (typeof args.run !== "string" || typeof args.audio !== "string") { console.error("Usage: node render/quran-render.mjs --run <folder> --audio <voice> [--format 1080p|4k|9:16] [--reciter name]"); process.exit(2); }
+  if (typeof args.run !== "string" || typeof args.audio !== "string") { console.error("Usage: node render/quran-render.mjs --run <folder> --audio <voice> [--format 1080p|4k|9:16] [--reciter name] [--no-text] [--translation pickthall|none] [--highlight word|none]"); process.exit(2); }
   const format = ["1080p", "4k", "9:16"].includes(String(args.format)) ? args.format : "1080p";
-  const r = await renderQuranFilm({ run: args.run, audio: resolve(args.audio), format, reciter: typeof args.reciter === "string" ? args.reciter : undefined, showAyat: args["no-text"] !== true, out: typeof args.out === "string" ? args.out : undefined, log: (l) => console.error("  " + l) });
+  const r = await renderQuranFilm({ run: args.run, audio: resolve(args.audio), format, reciter: typeof args.reciter === "string" ? args.reciter : undefined, showAyat: args["no-text"] !== true, translation: args.translation === "none" ? "none" : "pickthall", highlight: args.highlight === "none" ? "none" : "word", out: typeof args.out === "string" ? args.out : undefined, log: (l) => console.error("  " + l) });
   console.log("QURAN-RENDER " + JSON.stringify(r));
   // A film with a placeholder card or an empty stretch is never passed: it is a preview at most (--preview).
   const ok = r.lengthMatches && !r.black.length && !r.frozen.length && r.cutsInsideTheVoice === 0 && r.voiceChecked && r.visual.ok && r.audio.ok && (r.cards.length === 0 || args.preview === true);
