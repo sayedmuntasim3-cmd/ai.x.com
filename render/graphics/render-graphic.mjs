@@ -5,6 +5,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, renameSync, rmSync } from "node:fs";
+import { extname } from "node:path";
 import { createRequire } from "node:module";
 import { TEMPLATES } from "./templates.mjs";
 
@@ -105,7 +106,7 @@ export function renderGraphicFile(o, deps = {}) {
   const running = inFlight.get(o.file);
   if (running) return running;
   const job = (async () => {
-    const tmp = `${o.file}.${process.pid}-${randomBytes(4).toString("hex")}.part.mp4`;
+    const tmp = `${o.file}.${process.pid}-${randomBytes(4).toString("hex")}.part${extname(o.file) || ".mp4"}`; // the container follows the file name: a ProRes alpha graphic is a .mov
     try {
       await (deps.render ?? renderGraphic)({ ...o, out: tmp });
       if (!(await (deps.probe ?? ((f) => playable(f, o.ffprobe)))(tmp))) throw new Error(`graphic ${o.template}: the encoded file is not a playable video`);

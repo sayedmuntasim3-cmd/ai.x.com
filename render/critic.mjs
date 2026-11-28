@@ -130,7 +130,16 @@ const round = (n, digits = 2) => Math.round(n * 10 ** digits) / 10 ** digits;
  * @param {any[]} video
  */
 export function designedMoments(video) {
-  return video.filter((v) => v.type !== "black" && (v.counter || v.kinetic || v.chart || v.map || v.chapterTitle));
+  return video.filter((v) => v.type !== "black" && (v.counter || v.kinetic || v.chart || v.map || v.chapterTitle || (v.moment && !v.moment.failed)));
+}
+
+/**
+ * When a designed moment begins: a graphic laid over a picture (video[].moment, engine/src/voice-moments.mjs)
+ * begins at its own time, not at the cut of the shot it sits on.
+ * @param {any} v
+ */
+export function designedAt(v) {
+  return Number(v?.moment?.at ?? v?.start);
 }
 
 /**
@@ -163,9 +172,9 @@ export function hookReport(timeline) {
   const video = (timeline?.video ?? []).filter((/** @type {any} */ v) => v.type !== "black");
   const hook = video.filter((/** @type {any} */ v) => Number(v.start) < 30);
   const beats = hook.length;
-  const titled = video.find((/** @type {any} */ v) => String(v.title ?? "").trim());
-  const titleAt = titled ? round(Number(titled.start), 1) : null;
-  const designed = designedMoments(video).filter((/** @type {any} */ v) => Number(v.start) < 60).length;
+  const titled = video.find((/** @type {any} */ v) => String(v.title ?? "").trim() || (v.moment?.kind === "title" && !v.moment.failed));
+  const titleAt = titled ? round(designedAt(titled.moment?.kind === "title" ? titled : { start: titled.start }), 1) : null;
+  const designed = designedMoments(video).filter((/** @type {any} */ v) => designedAt(v) < 60).length;
   const first = (timeline?.narration ?? []).find((/** @type {any} */ n) => String(n.text ?? "").replace(/\[[^\]]*\]/g, "").trim());
   const sentence = first ? String(first.text).replace(/\[[^\]]*\]/g, "").trim().split(/(?<=[.!?])\s+/)[0] : "";
   const firstSentenceWords = sentence ? sentence.split(/\s+/).filter(Boolean).length : 0;
@@ -286,7 +295,7 @@ export function critique(timeline, report = {}, evidence = {}) {
     add({ ...msg("critic.designed", { value: round(perMinute, 1), need: STANDARD.designedPerMinute }), severity: "block", value: round(perMinute, 1) });
   }
   const sounds = (timeline?.sfx ?? []).filter((/** @type {any} */ s) => s.kind !== "bed");
-  const covered = designed.filter((/** @type {any} */ v) => sounds.some((/** @type {any} */ s) => Math.abs(Number(s.start) - Number(v.start)) <= 1.5 || (Number(s.start) <= Number(v.start) + 0.2 && Number(s.end) >= Number(v.start))));
+  const covered = designed.filter((/** @type {any} */ v) => sounds.some((/** @type {any} */ s) => Math.abs(Number(s.start) - designedAt(v)) <= 1.5 || (Number(s.start) <= designedAt(v) + 0.2 && Number(s.end) >= designedAt(v))));
   const coverage = designed.length ? covered.length / designed.length : 1;
   if (designed.length && coverage < STANDARD.cueCoverage) {
     add({ ...msg("critic.cues", { value: round(coverage * 100, 0), target: round(STANDARD.cueCoverage * 100, 0) }), severity: "block", value: round(coverage * 100, 0) });
@@ -329,7 +338,7 @@ export function critique(timeline, report = {}, evidence = {}) {
     add({ ...msg("critic.firstShot", { value: round(firstShot), max: STANDARD.firstShotMax }), severity: "block", value: round(firstShot) });
   }
   const cuts30 = video.filter((/** @type {any} */ v) => Number(v.end) > 0 && Number(v.end) <= 30).length;
-  const moments30 = designed.filter((/** @type {any} */ v) => Number(v.start) < 30).length;
+  const moments30 = designed.filter((/** @type {any} */ v) => designedAt(v) < 30).length;
   if (seconds > 30 && (cuts30 < STANDARD.first30Cuts || moments30 < 1)) {
     add({ ...msg("critic.opening", { cuts: cuts30, moments: moments30, need: STANDARD.first30Cuts }), severity: "block", value: { cuts: cuts30, moments: moments30 } });
   }
