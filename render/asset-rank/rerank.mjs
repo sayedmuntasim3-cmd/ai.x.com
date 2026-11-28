@@ -391,6 +391,140 @@ export const STILL_FIT_COST = 1;
 export const OFFER = 10;
 
 /**
+ * The most candidates one shot may offer the eyes. Measured on the 38 s Apollo film (run 46093217850):
+ * 2193 candidates over 12 shots (199-253 per shot) and 270 s of looking. A shot needs the few dozen that
+ * pass the gates, not every result a search returned; the rest are refused anyway (licence, size, frame,
+ * another country's tags, a green screen). 40 keeps the same top pick as looking at all of them on the
+ * 40-shot fixture (40/40 at 40, 30 and 25; 39/40 at 20: render/asset-rank/rerank.test.mjs), and takes
+ * the download and embedding from 225 candidates a shot to 40.
+ */
+export const CANDIDATE_CAP = 40;
+/** Even a thin search keeps this many, so the critic still has somewhere to send a pick back to. */
+export const CANDIDATE_FLOOR = 12;
+
+/**
+ * A candidate as the shot's own words see it, before any picture: the tags that name the search, then
+ * footage before stills, then the bigger frame. Pure; used to order and to cap the pool.
+ * @param {{ title?: string | null, mediaType?: string, width?: number | null, height?: number | null }} c @param {string[]} queries
+ */
+export function textRank(c, queries) {
+  return [tagHits(c.title, queries), c.mediaType === "video" ? 1 : 0, Number(c.width) || 0, Number(c.height) || 0];
+}
+
+/** @param {number[]} a @param {number[]} b */
+function descending(a, b) {
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return b[i] - a[i];
+  return 0;
+}
+
+/**
+ * The candidates worth a thumbnail, chosen without one: what a download could never fix is dropped first
+ * (licence, unknown or small size, portrait frame, another country's tags, green screen, wedding, a stranger
+ * as the subject of a line about the film's own man, off-subject stock for a named shot), then the rest are
+ * ordered by the shot's own words in their tags, video before stills, bigger before smaller, and only `cap`
+ * are kept. A cap of 0 or less turns capping off (the old behaviour: look at everything).
+ * @param {any[]} list @param {any} shot @param {World} world @param {number} [cap]
+ */
+export function capCandidates(list, shot, world = {}, cap = CANDIDATE_CAP) {
+  const queries = shot?.queries ?? (shot?.query ? [shot.query] : []);
+  const heard = `${shot?.heard ?? ""} ${shot?.sentence ?? ""}`;
+  const named = Boolean(shot?.named);
+  /** @type {{ c: any, key: number[] }[]} */
+  const kept = [];
+  const seen = new Set();
+  for (const c of Array.isArray(list) ? list : []) {
+    if (!c?.id || !c.previewUrl || seen.has(c.id)) continue;
+    // Nothing a thumbnail could fix: the same gates the pick passes later, before the download.
+    if (refusal(c, null, world) !== "thumbnail not seen") continue;
+    if (notFootage(c.title, queries) || strangerAsSubject(heard, c.title)) continue;
+    if (named && STOCK_SOURCES.includes(String(c.source)) && !aboutNames(c, shot?.names ?? [])) continue;
+    seen.add(c.id);
+    kept.push({ c, key: textRank(c, queries) });
+  }
+  kept.sort((a, b) => descending(a.key, b.key));
+  const keep = Number.isFinite(cap) && cap > 0 ? Math.max(CANDIDATE_FLOOR, cap) : kept.length;
+  return kept.slice(0, keep).map((x) => x.c);
+}
+
+/** Three of the shot's own search words in a clip's tags is a clear statement of what it shows. */
+export const TEXT_DECISIVE_TAGS = 3;
+
+/**
+ * When one clip carries all three of the shot's words and no other candidate comes close, the eyes have
+ * nothing to add: the pick is the text match, and it is not downloaded or embedded. Deliberately narrow:
+ * it must be the only candidate at that tag count, it must be footage at full HD, and a named shot's pick
+ * must still be about the name. Returns the shortlist (best first, at most three) or null.
+ * @param {any[]} capped @param {any} shot @param {World} world
+ * @returns {{ pick: any, tags: number, shortlist: any[] } | null}
+ */
+export function decisiveByText(capped, shot, world = {}) {
+  if (!Array.isArray(capped) || capped.length < 2) return null;
+  const queries = shot?.queries ?? (shot?.query ? [shot.query] : []);
+  const ranked = capped.map((c) => ({ c, key: textRank(c, queries) })).sort((a, b) => descending(a.key, b.key));
+  const best = ranked[0];
+  const tags = best.key[0];
+  if (tags < TEXT_DECISIVE_TAGS) return null;
+  if (ranked[1].key[0] >= tags) return null; // a second clip names the words as well: let the eyes decide
+  if (best.c.mediaType !== "video" || (Number(best.c.width) || 0) < MIN_VIDEO_WIDTH) return null;
+  if (shot?.named && !aboutNames(best.c, shot?.names ?? [])) return null;
+  if (namesOtherCountry(best.c.title, world)) return null;
+  return { pick: best.c, tags, shortlist: ranked.slice(0, 3).map((x) => x.c) };
+}
+
+/**
+ * Every search one chapter needs, each query once: the shots of a chapter that ask the same thing share
+ * one answer, and nothing is asked twice. Pure (no network), so a test can hold the whole plan.
+ * @param {any[]} shots @param {World} world @param {Map<any, boolean> | ((s: any) => boolean)} historicOf
+ * @returns {{ query: string, kind: "video" | "image", group: "stock" | "archives" }[]}
+ */
+export function planChapterSearches(shots, world, historicOf) {
+  const historic = typeof historicOf === "function" ? historicOf : (/** @type {any} */ s) => Boolean(historicOf?.get?.(s));
+  /** @type {Map<string, { query: string, kind: "video" | "image", group: "stock" | "archives" }>} */
+  const out = new Map();
+  const add = (query, kind, group) => {
+    const q = String(query ?? "").trim();
+    if (q.length < 2) return;
+    const k = `${kind}|${group}|${q}`;
+    if (!out.has(k)) out.set(k, { query: q, kind, group });
+  };
+  for (const s of shots) {
+    for (const x of shotSearches(s, world, historic(s))) add(x.query, x.kind, x.group);
+  }
+  return [...out.values()];
+}
+
+/**
+ * The searches one shot asks for, in order and without the results: the shot's own words on stock video
+ * (and on the archives when the scene is historical), stills from its best search, and for a named shot the
+ * names on the archives first. The pool fallback needs the results, so it stays with the caller.
+ * @param {any} s @param {World} world @param {boolean} historic
+ * @returns {{ query: string, kind: "video" | "image", group: "stock" | "archives" }[]}
+ */
+export function shotSearches(s, world, historic) {
+  const qs = s.named ? (s.queries ?? []).slice(0, 10) : shotQueries(s, world);
+  /** @type {{ query: string, kind: "video" | "image", group: "stock" | "archives" }[]} */
+  const out = [];
+  if (s.named) {
+    for (const q of qs.slice(0, Math.min(5, s.nameCount || 5))) {
+      out.push({ query: q, kind: "video", group: "archives" });
+      out.push({ query: q, kind: "image", group: "archives" });
+    }
+    for (const q of qs.slice(s.nameCount || 5)) out.push({ query: q, kind: "video", group: "stock" });
+    if (qs[0]) out.push({ query: qs[0], kind: "image", group: "stock" });
+  } else {
+    for (const q of qs) {
+      out.push({ query: q, kind: "video", group: "stock" });
+      if (historic) {
+        out.push({ query: q, kind: "video", group: "archives" });
+        out.push({ query: q, kind: "image", group: "archives" });
+      }
+    }
+    if (qs[0]) out.push({ query: qs[0], kind: "image", group: "stock" });
+  }
+  return out;
+}
+
+/**
  * A small copy of a picture for the critic's eyes (320 px wide JPEG, as a data URL): a tenth of the
  * image tokens of the stock preview. Without ffmpeg or the file, the URL itself.
  * @param {string} url @returns {Promise<string>}
@@ -633,12 +767,14 @@ export async function rerankRun(o) {
 
   const shots = media.shots.filter((/** @type {any} */ s) => s.status !== "no-query" || s.queries?.length);
   const pool = worldQueries(world, topicWords);
+  /** @type {Map<any, boolean>} */
+  const historicOf = new Map(shots.map((/** @type {any} */ s) => [s, historicEra(beatAt(beats, s.start, s.end)?.era || world.era)]));
   /** @type {Map<any, any[]>} */
   const candidatesOf = new Map();
   /** @param {any} s */
   const searchShot = async (s) => {
     const beat = beatAt(beats, s.start, s.end);
-    const historic = historicEra(beat?.era || world.era);
+    const historic = Boolean(historicOf.get(s));
     const qs = s.named ? s.queries.slice(0, 10) : shotQueries(s, world);
     const lists = [];
     if (s.named) {
@@ -672,12 +808,33 @@ export async function rerankRun(o) {
     for (const c of all) if (c?.id && c.previewUrl && !byId.has(c.id)) byId.set(c.id, c);
     candidatesOf.set(s, [...byId.values()]);
   };
-  // Shots are searched several at a time (the rate limiter still paces each provider): one after another took an hour on 463 shots.
+  // One chapter's searches are planned once and asked in parallel: a query two shots share is searched
+  // once (the memo below is keyed by query and providers), and the rate limiter stays the only brake.
+  const searchConcurrency = Math.max(1, Number(env.ZUPONA_SEARCH_CONCURRENCY) || 12);
+  const planned = planChapterSearches(shots, world, historicOf);
+  const queue = [...planned];
+  await Promise.all(Array.from({ length: Math.min(searchConcurrency, Math.max(1, planned.length)) }, async () => {
+    for (let p = queue.shift(); p; p = queue.shift()) await search(p.query, p.kind, p.group === "archives" ? archives : stock);
+  }));
+  const preSearchSeconds = (Date.now() - t0) / 1000;
+  // Shots are gathered several at a time (their searches are already in hand): one after another took an hour on 463 shots.
   const todoShots = [...shots];
   await Promise.all(Array.from({ length: Math.max(1, Number(env.ZUPONA_SEARCH_CONCURRENCY) || 8) }, async () => { for (let s = todoShots.shift(); s; s = todoShots.shift()) await searchShot(s); }));
   const searchSeconds = (Date.now() - t0) / 1000;
   const empty = shots.filter((/** @type {any} */ s) => !(candidatesOf.get(s) ?? []).length).length;
   if (empty) log(`Searches: ${empty} shot(s) found no candidate at all (a provider refused or timed out); their plan pick stays.`);
+  // Cap before any download: the eyes look at the shot's best candidates, not at every result a search
+  // returned (measured: 199-253 per shot, 2193 in a 38 s film). ZUPONA_CANDIDATE_CAP=0 looks at all of them.
+  const cap = Number(env.ZUPONA_CANDIDATE_CAP ?? CANDIDATE_CAP);
+  let offered = 0, cappedAway = 0;
+  for (const s of shots) {
+    const all = candidatesOf.get(s) ?? [];
+    const kept = capCandidates(all, s, world, cap);
+    offered += all.length;
+    cappedAway += all.length - kept.length;
+    candidatesOf.set(s, kept);
+  }
+  if (cappedAway) log(`Candidates: ${offered} found, ${offered - cappedAway} kept for the eyes (${cappedAway} refused before a download: licence, size, frame, another country, green screen; the rest beyond the cap of ${cap > 0 ? Math.max(CANDIDATE_FLOOR, cap) : "off"}).`);
 
   // One text list for the whole film; each shot's own prompts are appended.
   const texts = [];
@@ -685,14 +842,31 @@ export async function rerankRun(o) {
   const off = offPrompts(world).map((x) => ({ ...x, row: row(x.text) }));
   const shared = { off, place: placePrompts(world).map(row), quality: QUALITY.map(row), watermark: WATERMARK.map(row), era: ERA.map(row), scale: SCALE_PROMPTS.map(row) };
   const atOf = new Map(shots.map((/** @type {any} */ s) => [s, { ...shared, pos: shotPrompts(s, beatAt(beats, s.start, s.end), world).map(row) }]));
+  // When the shot's own words already name one clip, that shot is not sent to the eyes at all: nothing of
+  // it is downloaded or embedded, and its best three are scored by their tags alone.
+  /** @type {Map<any, { pick: any, tags: number, shortlist: any[] }>} */
+  const textPicks = new Map();
+  if (String(env.ZUPONA_TEXT_DECISIVE ?? "on").toLowerCase() !== "off") {
+    for (const s of shots) { const d = decisiveByText(candidatesOf.get(s) ?? [], s, world); if (d) textPicks.set(s, d); }
+  }
   const images = [];
   const seenImg = new Set();
-  for (const list of candidatesOf.values()) for (const c of list) if (!seenImg.has(c.id)) { seenImg.add(c.id); images.push({ id: c.id, url: c.previewUrl }); }
+  for (const [s, list] of candidatesOf) {
+    if (textPicks.has(s)) continue;
+    for (const c of list) if (!seenImg.has(c.id)) { seenImg.add(c.id); images.push({ id: c.id, url: c.previewUrl }); }
+  }
+  if (textPicks.size) log(`Eyes: ${textPicks.size} of ${shots.length} shot(s) are decided by their own words (one clip carries all three searches, nothing else comes close); they are not looked at.`);
 
   const python = o.python ?? env.ZUPONA_RANK_PYTHON ?? env.ZUPONA_PYTHON ?? "python3";
   const dir = await mkdtemp(join(tmpdir(), "asset-rank-"));
   const budget = Math.max(60, Number(env.ZUPONA_RANK_BUDGET) || 1500);
-  await writeFile(join(dir, "req.json"), JSON.stringify({ texts, images, cache: env.ZUPONA_RANK_CACHE || undefined, budget_seconds: budget }));
+  await writeFile(join(dir, "req.json"), JSON.stringify({
+    texts, images, cache: env.ZUPONA_RANK_CACHE || undefined, budget_seconds: budget,
+    // Parallel thumbnail downloads with their own time limit, and the embedding batch size.
+    fetch_workers: Math.max(1, Number(env.ZUPONA_FETCH_WORKERS) || 24),
+    fetch_budget_seconds: Math.max(30, Number(env.ZUPONA_FETCH_BUDGET) || Math.min(300, Math.round(budget * 0.4))),
+    embed_batch: Math.max(8, Number(env.ZUPONA_EMBED_BATCH) || 64),
+  }));
   const script = new URL("./rank.py", import.meta.url).pathname;
   const t1 = Date.now();
   try {
@@ -714,12 +888,16 @@ export async function rerankRun(o) {
     const ranked = [];
     for (const c of candidatesOf.get(s) ?? []) {
       const sim = ans.sim[c.id];
-      const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : null;
+      const decided = textPicks.get(s) ?? null;
+      const byText = !sim && Boolean(decided?.shortlist.some((x) => x.id === c.id));
+      // A text-decided shot's shortlist is scored by its tags: no thumbnail was looked at, so watermark and
+      // off-world are unknown (never failed), and the critic's eyes still see the pick itself.
+      const score = sim ? scoreOf(sim, atOf.get(s), { kind: c.mediaType, historic }) : byText ? { total: 0, relevance: 0, place: 0.5, quality: 0.5, era: 0.5, watermark: 0, offBy: -1, offWhy: "", by: "text" } : null;
       const stock = STOCK_SOURCES.includes(String(c.source));
       const aboutIt = !s.named || aboutNames(c, s.names ?? []);
       const why = (s.named && !aboutIt && stock ? "off-subject" : "") || refusal(c, score, world) || notFootage(c.title, s.queries ?? [s.query ?? ""]) || strangerAsSubject(`${s.heard ?? ""} ${s.sentence ?? ""}`, c.title);
       const tags = tagHits(c.title, s.queries ?? [s.query ?? ""]);
-      const row = { c, total: /** @type {any} */ (score)?.total + TAG_BONUS * tags + (s.named ? (stock ? -STOCK_NAMED_COST : aboutIt ? ARCHIVE_NAMED_EDGE : 0) : 0), score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
+      const row = { c, total: (/** @type {any} */ (score)?.total ?? 0) + TAG_BONUS * tags + (s.named ? (stock ? -STOCK_NAMED_COST : aboutIt ? ARCHIVE_NAMED_EDGE : 0) : 0), score: { .../** @type {any} */ (score), tags }, phash: ans.images[c.id]?.phash, col: ans.images[c.id]?.col ?? null, scale: scaleOf(sim, atOf.get(s).scale), era: /** @type {any} */ (score)?.era };
       if (why) { refused[why] = (refused[why] ?? 0) + 1; if (why === "off-world" && score) lastResort.push(row); continue; }
       ranked.push(row);
     }
@@ -818,10 +996,10 @@ export async function rerankRun(o) {
       s.pick = c.licence ? { ...c, kind: c.mediaType } : toPick(c);
       delete s.pick.rights; delete s.pick.mediaType; delete s.pick.layer;
       s.status = "found";
-      s.review = "eyes";
+      s.review = textPicks.has(p.s) ? "text" : "eyes";
       s.alternates = p.ranked.filter((x) => x.c.id !== c.id).slice(0, 3).map((x) => x.c.id);
       const critic = verdicts.get(`${s.id}|${c.id}`) ?? null;
-      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0, record: recordClass(c, p.historic) };
+      s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0, record: recordClass(c, p.historic), textMatch: textPicks.has(p.s) };
       if (critic?.fits === false) s.review = "critic-miss";
     }
     report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
@@ -852,9 +1030,16 @@ export async function rerankRun(o) {
     video: picks.filter((r) => r.kind === "video").length,
     flaggedOff: picks.filter((r) => r.why?.offWhy).length,
     records: Object.fromEntries(["A", "B", "C", "D", "E"].map((k) => [k, picks.filter((r) => r.why?.record === k).length])),
-    candidates: { total: images.length, perShotMin: Math.min(...plan.map((p) => p.seen)), perShotMax: Math.max(...plan.map((p) => p.seen)) },
+    candidates: { found: offered, total: images.length, perShotMin: Math.min(...plan.map((p) => p.seen)), perShotMax: Math.max(...plan.map((p) => p.seen)), cap: cap > 0 ? Math.max(CANDIDATE_FLOOR, cap) : null, dropped: cappedAway },
     images: { computed: ans.computed, cached: ans.cached, unseen: ans.unseen ?? 0 },
-    seconds: { search: Math.round(searchSeconds), see: Math.round(seeSeconds), look: Math.round(lookSeconds), total: Math.round((Date.now() - t0) / 1000) },
+    // The shots whose pick needed no look, and the searches: how many one chapter asked, and how many were
+    // distinct (a query two shots share is one search).
+    textDecided: textPicks.size,
+    searchPlan: { planned: planned.length },
+    seconds: {
+      search: Math.round(searchSeconds), presearch: Math.round(preSearchSeconds), see: Math.round(seeSeconds), look: Math.round(lookSeconds),
+      fetch: ans.timings?.fetch ?? null, embed: ans.timings?.embed ?? null, total: Math.round((Date.now() - t0) / 1000),
+    },
     searches: written,
     // The critic's numbers: how many picks it looked at, how many it sent back, and what is still a miss.
     critic: o.brain || o.look ? {
@@ -890,7 +1075,7 @@ export async function rerankRun(o) {
   summary.gapCards = gaps.length;
   await writeFile(mediaPath, JSON.stringify(media, null, 1));
   await writeFile(join(o.run, "rank-C1.json"), JSON.stringify({ summary, shots: report }, null, 1));
-  log(`Eyes: ${summary.picked}/${summary.shots} shots chosen by OpenCLIP from ${summary.candidates.total} candidates (${summary.candidates.perShotMin}-${summary.candidates.perShotMax} per shot); video ${summary.video}/${summary.picked}; ${summary.flaggedOff} still look off-world; ${summary.images.unseen} thumbnails could not be fetched; ${summary.seconds.total} s (search ${summary.seconds.search} s, seeing ${summary.seconds.see} s).`);
+  log(`Eyes: ${summary.picked}/${summary.shots} shots chosen from ${summary.candidates.total} looked-at candidates (${summary.candidates.perShotMin}-${summary.candidates.perShotMax} per shot; ${summary.candidates.found} found, ${summary.candidates.dropped} refused before a download); ${summary.textDecided} decided by their own words without a look; video ${summary.video}/${summary.picked}; ${summary.flaggedOff} still look off-world; ${summary.images.unseen} thumbnails could not be fetched; ${summary.seconds.total} s (search ${summary.seconds.search} s, download ${summary.seconds.fetch ?? "-"} s, embed ${summary.seconds.embed ?? "-"} s, seeing ${summary.seconds.see} s).`);
   if (summary.critic) log(`Critic: ${summary.critic.shotsAsked} shot questions by words, ${summary.critic.looked} looks by eye; ${summary.critic.firstRoundMisses} shots sent back (${summary.critic.repicked} re-picks); now ${summary.critic.fits} fit, ${summary.critic.misses} still miss, ${summary.critic.unknown} not judged (${summary.seconds.look} s).`);
   log(`Cut: colour change between neighbours ${summary.sequence.colourDistanceMean ?? "-"} (0 = one colour, 1 = a new world); scale changes on ${summary.sequence.scaleVariety ?? "-"} of neighbouring pairs; ${summary.sequence.eraMismatch} pick(s) broke a historical scene.`);
   if (o.sheet) {

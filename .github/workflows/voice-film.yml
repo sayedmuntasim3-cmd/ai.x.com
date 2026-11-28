@@ -64,6 +64,8 @@ jobs:
     timeout-minutes: 340
     outputs:
       args: ${{ steps.prepare.outputs.args }}
+      # How many runners render the picture: from the film's own length (a 40-minute film gets 16).
+      parts: ${{ steps.prepare.outputs.parts }}
     env:
       SITE: ${{ inputs.site }}
       VOICE_ID: ${{ inputs.voice_id }}
@@ -153,12 +155,17 @@ jobs:
           test "${PIPESTATUS[0]}" = 0
           node render/voice-runner.mjs summary --run run
           echo "words=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
-      - name: Keep the picture-ranking model between runs (OpenCLIP, CPU)
+      - name: Keep the picture-ranking model and every thumbnail's embedding between runs (OpenCLIP, CPU)
         if: inputs.kind == 'narration'
         uses: actions/cache@v4
         with:
           path: ~/.cache/zupona
-          key: asset-rank-v1
+          # The embeddings are keyed by URL and model inside the folder (rank.py), so a new cache version still
+          # reuses them: restore-keys falls back to the previous one instead of downloading 135,000 thumbnails again.
+          key: asset-rank-v2
+          restore-keys: |
+            asset-rank-v1
+            asset-rank-
       - name: Look at the pictures (OpenCLIP chooses on-topic, in the film's world)
         if: inputs.kind == 'narration'
         env:
@@ -172,6 +179,10 @@ jobs:
           # The eyes never stop the film: if they cannot run, the plan's own picks stay (rerank.mjs prints why).
           if pip install -q --index-url https://download.pytorch.org/whl/cpu torch==2.7.1 torchvision==0.22.1 && pip install -q open_clip_torch==2.29.0 pillow numpy; then
             export HF_HOME="$HOME/.cache/zupona/hf" ZUPONA_RANK_CACHE="$HOME/.cache/zupona/asset-rank"
+            # Speed knobs (mission S1), all with the same defaults in rerank.mjs: 40 candidates a shot before any
+            # download, 24 parallel thumbnail fetches with their own 300 s limit, 64 images an embedding batch,
+            # and the text-decisive skip (a clip whose tags carry all three searches is not looked at).
+            export ZUPONA_CANDIDATE_CAP="${ZUPONA_CANDIDATE_CAP:-40}" ZUPONA_FETCH_WORKERS="${ZUPONA_FETCH_WORKERS:-24}" ZUPONA_EMBED_BATCH="${ZUPONA_EMBED_BATCH:-64}"
             node render/asset-rank/rerank.mjs --run run ${TOPIC:+--topic "$TOPIC"} 2>&1 | tee -a voice-film.log
           else
             echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
@@ -219,7 +230,15 @@ jobs:
           mkdir -p music && touch music/.keep
           [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
           echo "args=--run run --one-track $voice --words run/words.json --music music --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
+          # The picture renders in parts on parts runners at once: one part per 2.5 minutes of film, 2 to 16
+          # (a 40-minute film: 16 parts, about 10 minutes of picture instead of 18 in 8). The parts meet on shot
+          # boundaries and are joined with concat -c copy, so the frames are the same as one render.
+          seconds=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$voice" 2>/dev/null || echo 0)
+          parts=$(node -e 'const s=Number(process.argv[1])||0;console.log(Math.min(16,Math.max(2,Math.round(s/150))))' "$seconds")
+          echo "parts=$parts" >> "$GITHUB_OUTPUT"
+          echo "The film is ${seconds} s long: $parts render parts." | tee -a "$GITHUB_STEP_SUMMARY"
           echo "prepare=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
+          echo "parts=$parts" >> "$RUNNER_TEMP/film-timing.env"
       - uses: actions/upload-artifact@v4
         if: inputs.kind == 'narration'
         with:
@@ -237,7 +256,9 @@ jobs:
           [ -f "$RUNNER_TEMP/film-timing.env" ] || exit 0
           set -a; . "$RUNNER_TEMP/film-timing.env"; set +a
           mkdir -p run
-          node -e 'const e=process.env,n=(k)=>e[k]?Number(e[k]):null,m=(a,b)=>a!=null&&b!=null?Math.round((b-a)/6)/10:null;const t={listenAndPlan:m(n("t0"),n("words")),pictures:m(n("words"),n("pictures")),prepare:m(n("pictures")??n("words"),n("prepare"))};require("fs").writeFileSync("run/film-timing.json",JSON.stringify(t,null,1));console.log("Minutes per stage: "+JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
+          node -e 'const e=process.env,n=(k)=>e[k]?Number(e[k]):null,m=(a,b)=>a!=null&&b!=null?Math.round((b-a)/6)/10:null;const t={listenAndPlan:m(n("t0"),n("words")),pictures:m(n("words"),n("pictures")),prepare:m(n("pictures")??n("words"),n("prepare")),renderParts:n("parts")??null};require("fs").writeFileSync("run/film-timing.json",JSON.stringify(t,null,1));console.log("Minutes per stage: "+JSON.stringify(t))' | tee -a "$GITHUB_STEP_SUMMARY"
+          # The picture pass reports its own split (download, embed, search) in run/rank-C1.json.
+          [ -f run/rank-C1.json ] && node -e 'const r=require("./run/rank-C1.json").summary;console.log("Pictures: "+JSON.stringify({seconds:r.seconds,candidates:r.candidates,textDecided:r.textDecided,searchPlan:r.searchPlan}))' | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Tell the studio what stopped it
         if: failure()
         run: |
@@ -267,7 +288,8 @@ jobs:
     with:
       artifact: prep-${{ inputs.voice_id }}
       args: ${{ needs.film.outputs.args }}
-      parts: 8
+      # As many parts as the film's length earns (2-16): a long film's picture must not sit on one runner.
+      parts: ${{ fromJSON(needs.film.outputs.parts || '8') }}
       out_artifact: film-${{ inputs.voice_id }}
 
   finish:

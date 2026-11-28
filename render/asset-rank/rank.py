@@ -1,10 +1,14 @@
 """The eyes of the asset engine: OpenCLIP on the CPU, cached between runs.
 
   python rank.py score <request.json> <answer.json>
-      request: {"texts": [str], "images": [{"id": str, "url": str}], "cache": dir}
-      answer:  {"model", "seconds", "images": {id: {"ok", "phash"}}, "sim": {id: [cos per text]}}
+      request: {"texts": [str], "images": [{"id": str, "url": str}], "cache": dir,
+                "fetch_workers", "fetch_budget_seconds", "embed_batch", "budget_seconds"}
+      answer:  {"model", "seconds", "timings": {"fetch", "embed"}, "images": {id: {"ok", "phash"}}, "sim": {id: [cos per text]}}
   python rank.py sheet <sheet.json> <out.jpg>
       sheet: {"title": str, "cache": dir, "tiles": [{"url", "label", "mark"}]}  (a contact sheet for a person)
+  python rank.py pending <request.json> <answer.json>
+      request: {"urls": [str], "cache": dir}
+      answer:  {"tag", "cached": [url], "pending": [url]}  (no model, no torch: a cache-hit check)
 
 Only the seeing happens here; every rule (what is on topic, what is off, what is chosen) lives in
 rerank.mjs, where it is tested. Thumbnails and their embeddings are cached under the cache folder
@@ -31,12 +35,34 @@ def key(url):
 
 
 DEADLINE = [None]
+# Thumbnails have their own clock: a slow CDN must not eat the time the model needs to embed them.
+FETCH_DEADLINE = [None]
+
+
+def cached_embed(cache, url, tag):
+    """The cached embedding and its picture facts for a URL, or None. Checked before any download."""
+    path = os.path.join(cache, "emb", key(url) + "-" + tag + ".npy")
+    meta = path[:-4] + ".json"
+    if os.path.exists(path) and os.path.exists(meta):
+        try:
+            return path, meta
+        except Exception:
+            return None
+    return None
+
+
+def pending_urls(urls, cache, tag=None):
+    """The URLs whose embedding is not cached yet, in order: only these need a thumbnail download."""
+    tag = tag or key(MODEL)[:8]
+    return [u for u in urls if not cached_embed(cache, u, tag)]
 
 
 def fetch(url, folder):
     path = os.path.join(folder, key(url) + ".img")
     if os.path.exists(path) and os.path.getsize(path) > 0:
         return path
+    if FETCH_DEADLINE[0] and time.time() > FETCH_DEADLINE[0]:
+        return None  # the download budget is spent: this picture keeps the plan's pick, and is not embedded
     if DEADLINE[0] and time.time() > DEADLINE[0]:
         return None  # the time budget is spent: a picture not fetched yet keeps the plan's pick
     # Three tries: a cold run asks a CDN for ~2000 thumbnails and some answer late (film 993f09ea: 1536 of 2098 at one try).
@@ -107,11 +133,14 @@ def score(req_path, out_path):
     req = json.load(open(req_path))
     # A time budget: the ranking stops taking new pictures when it is spent; what it did not see keeps the plan's pick.
     DEADLINE[0] = t0 + float(req.get("budget_seconds") or 1500)
+    FETCH_DEADLINE[0] = t0 + float(req.get("fetch_budget_seconds") or 240)
     cache = req.get("cache") or os.path.expanduser("~/.cache/zupona/asset-rank")
     thumbs = os.path.join(cache, "thumbs")
     embs = os.path.join(cache, "emb")
     os.makedirs(thumbs, exist_ok=True)
     os.makedirs(embs, exist_ok=True)
+    workers = max(1, int(req.get("fetch_workers") or 24))
+    batch_size = max(8, int(req.get("embed_batch") or 64))
     torch.set_num_threads(max(1, os.cpu_count() or 1))
     model, _, preprocess = open_clip.create_model_and_transforms(MODEL)
     tokenizer = open_clip.get_tokenizer(MODEL)
@@ -124,22 +153,35 @@ def score(req_path, out_path):
 
     images = req["images"]
     urls = sorted({im["url"] for im in images if im.get("url")})
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        files = dict(zip(urls, pool.map(lambda u: fetch(u, thumbs), urls)))
-
     vec = {}
     info = {}
     todo = []
+    # A URL embedded before (this shot or any earlier shot of any earlier film) is read from the cache and
+    # its thumbnail is never downloaded again: on a repeat run the whole picture pass costs no network.
+    missing = []
     for u in urls:
+        hit = cached_embed(cache, u, tag)
+        if hit:
+            try:
+                vec[u] = np.load(hit[0])
+                info[u] = json.load(open(hit[1]))
+                continue
+            except Exception:
+                pass
+        missing.append(u)
+    t_fetch = time.time()
+    if missing:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            files = dict(zip(missing, pool.map(lambda u: fetch(u, thumbs), missing)))
+    else:
+        files = {}
+    fetch_seconds = round(time.time() - t_fetch, 1)
+    for u in missing:
         f = files.get(u)
         if not f:
             continue
         cached = os.path.join(embs, key(u) + "-" + tag + ".npy")
         meta = cached[:-4] + ".json"
-        if os.path.exists(cached) and os.path.exists(meta):
-            vec[u] = np.load(cached)
-            info[u] = json.load(open(meta))
-            continue
         try:
             img = Image.open(f).convert("RGB")
         except Exception:
@@ -151,11 +193,12 @@ def score(req_path, out_path):
             e = model.encode_image(torch.stack([preprocess(b[1]) for b in batch]))
             return (e / e.norm(dim=-1, keepdim=True)).numpy()
 
-    for i in range(0, len(todo), 64):
+    t_embed = time.time()
+    for i in range(0, len(todo), batch_size):
         if time.time() > DEADLINE[0]:
             print("rank.py: the time budget is spent; %d picture(s) not looked at" % (len(todo) - i), file=sys.stderr)
             break
-        batch = todo[i:i + 64]
+        batch = todo[i:i + batch_size]
         try:
             e = encode(batch)
         except Exception as ex:
@@ -174,7 +217,9 @@ def score(req_path, out_path):
             np.save(cached, v)
             json.dump(info[u], open(meta, "w"))
 
-    out = {"model": MODEL, "texts": len(req["texts"]), "images": {}, "sim": {}, "computed": len(todo), "cached": len(vec) - len(todo), "unseen": len(urls) - len(vec)}
+    embed_seconds = round(time.time() - t_embed, 1)
+    out = {"model": MODEL, "texts": len(req["texts"]), "images": {}, "sim": {}, "computed": len(todo), "cached": len(vec) - len(todo), "unseen": len(urls) - len(vec),
+           "timings": {"fetch": fetch_seconds, "embed": embed_seconds, "downloaded": len(missing), "fromCache": len(urls) - len(missing)}}
     for im in images:
         u = im.get("url")
         if u in vec:
@@ -226,8 +271,18 @@ def sheet(req_path, out_path):
     canvas.save(out_path, quality=82)
 
 
+def pending(req_path, out_path):
+    """Which of these URLs still need a download and an embedding (no model, no torch): a cache-hit check."""
+    req = json.load(open(req_path))
+    cache = req.get("cache") or os.path.expanduser("~/.cache/zupona/asset-rank")
+    tag = req.get("tag") or key(MODEL)[:8]
+    urls = sorted({u for u in req.get("urls", []) if u})
+    todo = pending_urls(urls, cache, tag)
+    json.dump({"cached": [u for u in urls if u not in set(todo)], "pending": todo, "tag": tag}, open(out_path, "w"))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 4 or sys.argv[1] not in ("score", "sheet"):
+    if len(sys.argv) != 4 or sys.argv[1] not in ("score", "sheet", "pending"):
         print(__doc__)
         sys.exit(2)
-    (score if sys.argv[1] == "score" else sheet)(sys.argv[2], sys.argv[3])
+    ({"score": score, "sheet": sheet, "pending": pending}[sys.argv[1]])(sys.argv[2], sys.argv[3])
