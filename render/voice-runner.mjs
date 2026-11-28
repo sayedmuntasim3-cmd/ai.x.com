@@ -4,6 +4,7 @@
  * the ticket the Worker gave this one recording.
  *
  *   node render/voice-runner.mjs fetch --out in.mp3
+ *   node render/voice-runner.mjs own --out run/own          (the creator's own photos and clips: R2 voice/:id/own/)
  *   node render/voice-runner.mjs progress --stage words [--params '{"count":123}'] [--error "..."]
  *   node render/voice-runner.mjs summary --run voice-run [--stages pictures]   (intake, words, understand, master, pictures, from the run's files)
  *   node render/voice-runner.mjs deliver --file out/film.mp4 --report out/film.report.json [--review]
@@ -13,7 +14,7 @@
  * Environment: SITE (https://...), VOICE_ID, VOICE_TICKET; RUN_URL (optional, the Actions run page);
  * VOICE_SELFTEST=1 sends nothing (the workflow's self-test).
  */
-import { createWriteStream, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -135,6 +136,37 @@ export function summarizeRun(dir) {
   const manifest = read("manifest.json");
   if (pics?.kind === "quran" && manifest) out.push({ stage: "pictures", params: { assets: (manifest.assets ?? []).length } });
   return out;
+}
+
+/**
+ * Download the creator's own photos and clips (uploaded to voice/<id>/own/ behind the studio key) into a
+ * folder the render's --pictures path reads: own-1.jpg, own-2.mp4 ... The order is the order they were
+ * added in (ownFiles in the record), so a second run of the same film fetches the same names. A file that
+ * is already here at its right size is not downloaded again.
+ * @param {{ site: string, id: string, ticket: string, fetch?: typeof fetch }} c @param {string} dir
+ * @returns {Promise<{ files: { file: string, fileName: string, bytes: number }[], bytes: number }>}
+ */
+export async function fetchOwnMedia(c, dir) {
+  const get = c.fetch ?? fetch;
+  const res = await get(endpoint(c, "/own"));
+  if (!res.ok) throw new Error(`GET /own failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const listed = /** @type {any} */ (await res.json());
+  mkdirSync(dir, { recursive: true });
+  const files = [];
+  let bytes = 0;
+  for (const f of Array.isArray(listed?.files) ? listed.files : []) {
+    const name = `own-${Number(f.index)}.${String(f.ext ?? "jpg")}`;
+    const path = join(dir, name);
+    const size = Number(f.bytes) || 0;
+    if (!(existsSync(path) && statSync(path).size === size)) {
+      const one = await get(endpoint(c, `/own/${Number(f.index)}`));
+      if (!one.ok || !one.body) throw new Error(`own file ${f.fileName} could not be fetched: ${one.status} ${(await one.text()).slice(0, 200)}`);
+      await pipeline(Readable.fromWeb(/** @type {any} */ (one.body)), createWriteStream(path));
+    }
+    files.push({ file: name, fileName: String(f.fileName ?? name), bytes: size });
+    bytes += size;
+  }
+  return { files, bytes };
 }
 
 /**
@@ -281,6 +313,9 @@ async function main() {
     if (!res.ok || !res.body) throw new Error(`The recording could not be fetched: ${res.status} ${await res.text()}`);
     await pipeline(Readable.fromWeb(/** @type {any} */ (res.body)), createWriteStream(String(a.out)));
     console.log(`fetched ${statSync(String(a.out)).size} bytes`);
+  } else if (a._ === "own") {
+    const got = await fetchOwnMedia(c, String(a.out));
+    console.log(got.files.length ? `own media: ${got.files.length} file(s), ${got.bytes} bytes (${got.files.map((f) => f.file).join(", ")})` : "own media: the creator added none");
   } else if (a._ === "progress") {
     await send(c, "/progress", { stage: a.stage, params: typeof a.params === "string" ? JSON.parse(a.params) : {}, ...(typeof a.error === "string" ? { error: a.error } : {}), runUrl });
   } else if (a._ === "summary") {

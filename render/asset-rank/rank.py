@@ -2,8 +2,9 @@
 
   python rank.py score <request.json> <answer.json>
       request: {"texts": [str], "images": [{"id": str, "url": str}], "cache": dir,
-                "fetch_workers", "fetch_budget_seconds", "embed_batch", "budget_seconds"}
+                "fetch_workers", "fetch_budget_seconds", "embed_batch", "budget_seconds", "vectors"}
       answer:  {"model", "seconds", "timings": {"fetch", "embed"}, "images": {id: {"ok", "phash"}}, "sim": {id: [cos per text]}}
+               with "vectors": true in the request, also "vectors": {id: [floats]} and "textVectors": [[floats]]
   python rank.py sheet <sheet.json> <out.jpg>
       sheet: {"title": str, "cache": dir, "tiles": [{"url", "label", "mark"}]}  (a contact sheet for a person)
   python rank.py pending <request.json> <answer.json>
@@ -226,6 +227,11 @@ def score(req_path, out_path):
     embed_seconds = round(time.time() - t_embed, 1)
     out = {"model": MODEL, "texts": len(req["texts"]), "images": {}, "sim": {}, "computed": len(todo), "cached": len(vec) - len(todo), "unseen": len(urls) - len(vec),
            "timings": {"fetch": fetch_seconds, "embed": embed_seconds, "downloaded": len(missing), "fromCache": len(urls) - len(missing)}}
+    # The vectors themselves, when the caller places media by its own similarity (render/own-place.mjs):
+    # the same embeddings this answer was ranked from, never a second run of the model.
+    if req.get("vectors"):
+        out["textVectors"] = [[round(float(x), 6) for x in row] for row in t]
+        out["vectors"] = {im["id"]: [round(float(x), 6) for x in vec[im["url"]]] for im in images if im.get("url") in vec}
     for im in images:
         u = im.get("url")
         if u in vec:

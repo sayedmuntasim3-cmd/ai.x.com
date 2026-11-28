@@ -231,6 +231,19 @@ jobs:
             echo "::warning::OpenCLIP could not be installed; the plan's picks stay."
           fi
           echo "pictures=$(date +%s)" >> "$RUNNER_TEMP/film-timing.env"
+      - name: The creator's own photos and clips (placed on the shots their words match)
+        if: inputs.kind == 'narration'
+        run: |
+          # The files the creator added in the studio (R2 voice/<id>/own/, behind the studio key) come down with
+          # this run's ticket, and the same OpenCLIP that ranks the searched pictures says which shot each one
+          # belongs on (render/own-place.mjs writes run/own/placement.json). The render then reads that folder
+          # through its usual --pictures path, on every part runner, without a model.
+          mkdir -p run/own
+          node render/voice-runner.mjs own --out run/own 2>&1 | tee -a voice-film.log
+          if [ -n "$(ls -A run/own 2>/dev/null)" ]; then
+            export HF_HOME="$HOME/.cache/zupona/hf" ZUPONA_RANK_CACHE="$HOME/.cache/zupona/asset-rank"
+            node render/own-place.mjs --pictures run/own --run run --python python 2>&1 | tee -a voice-film.log || echo "::warning::The creator's own files could not be placed; the searched pictures are used."
+          fi
       - name: Quran pictures (adab guard; no living beings, no AI pictures)
         if: inputs.kind == 'quran'
         env:
@@ -272,7 +285,9 @@ jobs:
           # The free score (original music made here, never under a recitation) as a quiet bed under the voice.
           mkdir -p music && touch music/.keep
           [ -f run/s4.md ] && { node render/score-synth.mjs --run run --out music/ || echo "::warning::The free score could not be made; the film plays without music."; }
-          echo "args=--run run --one-track $voice --words run/words.json --music music --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
+          # The creator's own media is a pictures folder like any other: every part places the same files on the
+          # same shots (run/own/placement.json), and the rights report names them as the creator's own.
+          echo "args=--run run --one-track $voice --words run/words.json --music music --pictures run/own --width ${RESOLUTION%x*} --height ${RESOLUTION#*x} --fps 30" >> "$GITHUB_OUTPUT"
           # A re-make: the parts holding the swapped shots, and the old film for every other part.
           parts_only=""
           reuse_film=""

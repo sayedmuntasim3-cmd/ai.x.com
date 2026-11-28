@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon } from "./icons";
+import { OWN_MEDIA_ACCEPT, validateOwnMediaFiles } from "./own-media.mjs";
 import { alternativesFor, candidateFromSearch, dropSwap, filterShots, packCheck, remakeState, setSwap, shotList, swapOf, swapPlan } from "./shot-swap.mjs";
 import { DRAFT_LABEL, cardOf } from "./film-label.mjs";
 
@@ -60,22 +61,56 @@ const STATUS: Record<string, string> = {
   failed: "Stopped",
 };
 
-/** Send one piece, retried on a dropped connection. */
-async function putPart(url: string, key: string, body: Blob) {
+/**
+ * The statuses that mean "busy, come back": a dropped connection, a slow upload (408), Cloudflare or the
+ * studio saying "too many" (429), or a momentary server error. A 400 or 409 will not get better by waiting.
+ */
+const RETRY_STATUS = [408, 429, 500, 502, 503, 504];
+const WAITS_MS = [1500, 3000, 6000, 12000, 24000];
+
+/** Send one piece, waiting and trying again when the studio is busy (408/429/5xx) or the line drops. */
+async function putPart(url: string, key: string, body: Blob, onWait?: (ms: number, why: string) => void) {
   let last = "";
-  for (let attempt = 1; attempt <= 4; attempt += 1) {
+  for (let attempt = 0; attempt <= WAITS_MS.length; attempt += 1) {
+    let wait = WAITS_MS[attempt] ?? WAITS_MS[WAITS_MS.length - 1];
     try {
       const res = await fetch(url, { method: "PUT", headers: { authorization: `Bearer ${key}` }, body });
       const data = await res.json().catch(() => ({}));
       if (res.ok) return data as { partNumber: number; etag: string };
       last = String(data.error ?? res.status);
-      if (res.status < 500) break;
+      if (!RETRY_STATUS.includes(res.status)) break;
+      // The studio says how long to wait (Retry-After, in seconds); otherwise a longer pause each time.
+      const after = Number(res.headers.get("retry-after"));
+      if (Number.isFinite(after) && after > 0) wait = Math.min(60_000, after * 1000);
     } catch {
       last = "No connection.";
     }
-    await new Promise((r) => setTimeout(r, 1500 * attempt));
+    if (attempt === WAITS_MS.length) break;
+    onWait?.(wait, last);
+    await new Promise((r) => setTimeout(r, wait));
   }
   throw new Error(last);
+}
+
+/**
+ * Where an upload was left, so a reloaded page sends only the pieces that are missing and keeps the same
+ * film (the recording is not uploaded twice). The studio key is never written here.
+ */
+type Pending = { id: string; sig: string; partSize: number; parts: number; etags: Record<number, string> };
+const PENDING_STORE = "zupona:voice-upload";
+function readPending(sig: string): Pending | null {
+  try {
+    const got = JSON.parse(readStore(PENDING_STORE) || "null") as Pending | null;
+    return got && got.sig === sig && got.id ? { ...got, etags: got.etags ?? {} } : null;
+  } catch {
+    return null;
+  }
+}
+function writePending(p: Pending) {
+  writeStore(PENDING_STORE, JSON.stringify(p));
+}
+function clearPending() {
+  writeStore(PENDING_STORE, "");
 }
 
 /** The five plain steps the viewer sees; each stage the film machine reports belongs to one of them. */
@@ -240,7 +275,10 @@ function Stepper({ film, seconds }: { film: VoiceView; seconds: number }) {
 export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: string; voiceUrl?: string; seconds?: number; topic: string }) {
   const [quran, setQuran] = useState(false);
   const [surah, setSurah] = useState("");
-  const [reciter, setReciter] = useState("");
+   const [reciter, setReciter] = useState("");
+  const [ownFiles, setOwnFiles] = useState<File[]>([]);
+  const [ownSent, setOwnSent] = useState(0);
+
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(0);
   const [error, setError] = useState("");
@@ -361,47 +399,135 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
       setError("Say which surah is recited (1-114). A recitation is never guessed.");
       return;
     }
+    const chosen = validateOwnMediaFiles(ownFiles) as { ok: boolean; error?: string };
+    if (!chosen.ok) {
+      setError(String(chosen.error ?? "Those files cannot be used."));
+      return;
+    }
     setBusy(true);
     setError("");
     setSent(0);
+    setOwnSent(0);
     try {
       const blob = await (await fetch(voiceUrl)).blob();
-      const res = await withKey((k) =>
-        fetch("/api/voice", {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${k}` },
-          body: JSON.stringify({ fileName, bytes: blob.size, kind: quran ? "quran" : "narration", topic, ...(quran ? { surah: Number(surah), reciter } : {}) }),
-        }),
-      );
-      if (!res) return; // the visitor chose "Not now" or gave a wrong key three times
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.id) {
-        setError(String(data.error ?? "The studio could not take the recording. Try again in a minute."));
-        return;
-      }
+      // The same recording picked again continues its upload instead of starting a second film.
+      const sig = `${fileName}:${blob.size}`;
       const studioKey = readStore(KEY_STORE);
-      const parts: { partNumber: number; etag: string }[] = [];
-      for (let n = 1; n <= data.parts; n += 1) {
-        const piece = blob.slice((n - 1) * data.partSize, n * data.partSize);
-        parts.push(await putPart(`/api/voice/${data.id}/parts/${n}`, studioKey, piece));
-        setSent(Math.round((n / data.parts) * 100));
+      let upload = readPending(sig);
+      const open = async () => {
+        const res = await withKey((k) =>
+          fetch("/api/voice", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${k}` },
+            body: JSON.stringify({ fileName, bytes: blob.size, kind: quran ? "quran" : "narration", topic, ...(quran ? { surah: Number(surah), reciter } : {}) }),
+          }),
+        );
+        if (!res) return null; // the visitor chose "Not now" or gave a wrong key three times
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.id) {
+          setError(String(data.error ?? "The studio could not take the recording. Try again in a minute."));
+          return null;
+        }
+        const next: Pending = { id: String(data.id), sig, partSize: Number(data.partSize), parts: Number(data.parts), etags: {} };
+        writePending(next);
+        remember(fileName, next.id);
+        return next;
+      };
+      if (!upload) upload = await open();
+      if (!upload) return;
+      /** The pieces already sent are skipped; each new one is remembered as soon as it lands. */
+      const sendAll = async (p: Pending) => {
+        const sentParts: { partNumber: number; etag: string }[] = [];
+        for (let n = 1; n <= p.parts; n += 1) {
+          const known = p.etags[n];
+          if (known) {
+            sentParts.push({ partNumber: n, etag: known });
+            setSent(Math.round((n / p.parts) * 100));
+            continue;
+          }
+          const piece = blob.slice((n - 1) * p.partSize, n * p.partSize);
+          const got = await putPart(`/api/voice/${p.id}/parts/${n}`, studioKey, piece, (_ms, why) => setError(`The studio is busy (${why}); waiting and trying again…`));
+          p.etags[n] = got.etag;
+          writePending(p);
+          sentParts.push(got);
+          setSent(Math.round((n / p.parts) * 100));
+        }
+        return sentParts;
+      };
+      let parts: { partNumber: number; etag: string }[];
+      try {
+        setError(upload.etags && Object.keys(upload.etags).length ? "Continuing the upload where it stopped…" : "");
+        parts = await sendAll(upload);
+      } catch (e) {
+        // The remembered upload is gone (finished on another tab, or cleaned up): one fresh film, all pieces.
+        const why = e instanceof Error ? e.message : "";
+        if (!/no upload is open|409/i.test(why)) throw e;
+        clearPending();
+        const fresh = await open();
+        if (!fresh) return;
+        upload = fresh;
+        parts = await sendAll(upload);
       }
-      const done = await fetch(`/api/voice/${data.id}/complete`, {
+      // The creator's own photos and clips go up before the film starts, so its first run already has them.
+      if (!quran && ownFiles.length) await sendOwn(upload.id, studioKey);
+      const done = await fetch(`/api/voice/${upload.id}/complete`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
         body: JSON.stringify({ parts }),
       });
       const view = (await done.json().catch(() => ({}))) as VoiceView & { error?: string };
-      remember(fileName, data.id);
-      if (seconds) rememberSeconds(data.id, seconds);
-      setFilm(view.id ? view : { id: data.id, status: "uploaded", progress: [] });
-      if (!done.ok && view.error) setError(view.error);
+      clearPending();
+      remember(fileName, upload.id);
+      if (seconds) rememberSeconds(upload.id, seconds);
+      setFilm(view.id ? view : { id: upload.id, status: "uploaded", progress: [] });
+      setError(done.ok ? "" : String(view.error ?? "The studio could not start the film. Try again in a minute."));
       loadList(false);
     } catch (e) {
-      setError(e instanceof Error && e.message ? `The upload stopped: ${e.message}` : "No connection. Check your internet and try again.");
+      // The pieces already sent stay remembered: pressing the button again continues from there.
+      setError(e instanceof Error && e.message ? `The upload stopped: ${e.message} Pick the same recording and press the button again to continue.` : "No connection. Check your internet and try again.");
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Upload one of the creator's own files in pieces: the studio takes them like the recording. */
+  const sendOwn = async (id: string, studioKey: string) => {
+    for (const [i, f] of ownFiles.entries()) {
+      const open = await fetch(`/api/voice/${id}/own`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
+        body: JSON.stringify({ fileName: f.name, bytes: f.size }),
+      });
+      const info = (await open.json().catch(() => ({}))) as { partSize?: number; parts?: number; error?: string };
+      if (!open.ok || !info.partSize || !info.parts) throw new Error(String(info.error ?? `${f.name} could not be added.`));
+      const parts: { partNumber: number; etag: string }[] = [];
+      for (let n = 1; n <= info.parts; n += 1) {
+        const piece = f.slice((n - 1) * info.partSize, n * info.partSize);
+        parts.push(await putPart(`/api/voice/${id}/own/parts/${n}`, studioKey, piece));
+      }
+      const closed = await fetch(`/api/voice/${id}/own/complete`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
+        body: JSON.stringify({ parts }),
+      });
+      if (!closed.ok) {
+        const why = (await closed.json().catch(() => ({}))) as { error?: string };
+        throw new Error(String(why.error ?? `${f.name} could not be added.`));
+      }
+      setOwnSent(Math.round(((i + 1) / ownFiles.length) * 100));
+    }
+  };
+
+  /** Pick the creator's own photos and clips; checked here, before any of them is uploaded. */
+  const pickOwn = (files: FileList | null) => {
+    setError("");
+    const all = [...ownFiles, ...Array.from(files ?? [])];
+    const checked = validateOwnMediaFiles(all) as { ok: boolean; error?: string };
+    if (!checked.ok) {
+      setError(String(checked.error ?? "Those files cannot be used."));
+      return;
+    }
+    setOwnFiles(all);
   };
 
   /** A stopped film starts again from the recording already saved: nothing is uploaded twice. */
@@ -596,13 +722,50 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
               )}
             </div>
           </details>
+          {!quran && (
+            <div className="mt-4 rounded-2xl border border-line bg-canvas/40 p-4">
+              <label className="block text-[13px] font-medium text-ink">
+                Add your own photos or clips (optional)
+                <input
+                  type="file"
+                  multiple
+                  accept={OWN_MEDIA_ACCEPT.join(",")}
+                  onChange={(e) => {
+                    pickOwn(e.target.files);
+                    e.target.value = "";
+                  }}
+                  className="mt-2 block w-full text-[13px] text-ink-2 file:mr-3 file:rounded-xl file:border-0 file:bg-brand/10 file:px-3 file:py-2 file:text-[13px] file:font-semibold file:text-brand-ink"
+                />
+              </label>
+              {ownFiles.length > 0 && (
+                <ul className="mt-3 space-y-1.5">
+                  {ownFiles.map((f) => (
+                    <li key={`${f.name}:${f.size}`} className="flex items-center justify-between gap-3 text-[13px] text-ink-2">
+                      <span className="truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setOwnFiles((list) => list.filter((x) => !(x.name === f.name && x.size === f.size)))}
+                        className="shrink-0 text-[12px] font-medium text-muted underline underline-offset-4"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-[12px] leading-relaxed text-muted">
+                Only add pictures you own or may use: the rights report records them as yours. Each one goes on the shot your words
+                fit best; a picture that does not fit any shot is left out.
+              </p>
+            </div>
+          )}
           <button
             type="button"
             onClick={start}
             disabled={busy}
             className="mt-5 flex h-[60px] w-full items-center justify-center rounded-2xl bg-brand-gradient px-4 text-[17px] font-semibold text-white shadow-cta transition hover:brightness-110 disabled:opacity-60"
           >
-            {busy ? (sent > 0 ? `Uploading… ${sent}%` : "Starting…") : "Make my film"}
+            {busy ? (ownSent > 0 && ownSent < 100 ? `Adding your files… ${ownSent}%` : sent > 0 ? `Uploading… ${sent}%` : "Starting…") : "Make my film"}
           </button>
           <p className="mt-3 text-center text-[13px] text-muted">
             Free during beta · Your recording stays private and its words are never changed.

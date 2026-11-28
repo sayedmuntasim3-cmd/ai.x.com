@@ -1336,8 +1336,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (aiShots) console.log(`AI scenes: ${aiShots}`);
   }
   // The owner's own pictures (pictures/<film id>/SC0012-1.jpg ...) replace their shots, after AI scenes.
+  // The creator's own media of a voice film arrives the same way: the runner downloads the files into
+  // run/own/ and decides, with the eyes, which shot each one belongs on (render/own-place.mjs writes
+  // placement.json there), so the same applyOwnPictures call below puts both on the timeline.
   if (args.pictures) {
     const { applyOwnPictures, downloadPictureLinks, ownPictureFolder } = await import("./own-pictures.mjs");
+    const { placementFolder } = await import("./own-place.mjs");
+    const ownPlaced = placementFolder(args.pictures);
+    timeline.notes.push(...ownPlaced.notes);
     const { parseLinksFile } = await import("../engine/src/picture-links.mjs");
     // Links the owner pasted in the studio (pictures.json) and in a committed links.txt; the committed file wins on a clash.
     const pasted = JSON.parse((await loadRunText(from, "pictures.json")) ?? "{}");
@@ -1349,8 +1355,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       console.log(`picture links: ${got.saved.length} downloaded, ${got.kept.length} already here, ${got.skipped.length} replaced by committed files`);
       for (const f of got.failed) timeline.notes.push(`pictures: the link for ${f.shot} could not be used (${f.why}); the shot keeps its own picture.`);
     }
-    const own = applyOwnPictures(timeline, ownPictureFolder(args.pictures));
+    const folder = ownPictureFolder(args.pictures);
+    // A file named after a shot (committed by the owner) wins over the creator's placed media.
+    const own = applyOwnPictures(timeline, { ...folder, shots: { ...ownPlaced.shots, ...folder.shots } });
     if (own.applied.length) console.log(`own pictures: ${own.applied.length}`);
+    if (own.ownMedia?.length) console.log(`own media: ${own.ownMedia.length} shot(s) use the creator's own media (${own.ownMedia.join(", ")})`);
   }
   // Designed moments for a voice film, found in its words (engine/src/voice-moments.mjs): names, big numbers, dates, places,
   // quotes and a title, laid over the existing pictures. The brain's own designed shots are kept and the plan fills the gaps.

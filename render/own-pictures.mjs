@@ -47,30 +47,42 @@ export function ownPictureFolder(dir) {
  * named after. The shot keeps its time, transition, fades, chip, chapter title
  * and the Edit Director's moves; its card text, map or split is replaced.
  * @param {import("../engine/src/timeline.mjs").Timeline} timeline
- * @param {ReturnType<typeof ownPictureFolder>} folder
+ * @param {ReturnType<typeof ownPictureFolder>} folder  each shot may name its own licence (a creator's own
+ *   media says so; a picture the owner committed keeps "provided by the owner")
  * @returns {{ applied: string[], unknown: string[], ignored: string[] }}
  */
 export function applyOwnPictures(timeline, folder) {
   /** @type {string[]} */
   const applied = [];
+  /** @type {string[]} */
+  const ownMediaShots = [];
   const ids = new Set(timeline.video.map((v) => v.id));
   timeline.video = timeline.video.map((v) => {
     const own = folder.shots[v.id];
     if (!own) return v;
+    let fileHash = "";
+    try {
+      fileHash = createHash("sha256").update(readFileSync(own.file)).digest("hex").slice(0, 12);
+    } catch (e) {
+      timeline.notes.push(`pictures: ${own.file} could not be read (${e instanceof Error ? e.message : String(e)}) and was skipped.`);
+      return v;
+    }
     applied.push(v.id);
+    if (own.licence === OWN_MEDIA_LICENCE) ownMediaShots.push(v.id);
     const { split: _split, counter: _counter, map: _map, speed: _speed, chart: _chart, highlight: _highlight, ...rest } = v;
     // The file's content is part of the shot, so a replaced picture under the same name is rendered again.
-    const fileHash = createHash("sha256").update(readFileSync(own.file)).digest("hex").slice(0, 12);
-    return { ...rest, type: "clip", url: own.file, sourcePageUrl: null, licence: OWNER_LICENCE, motion: own.kind === "image" ? "push" : "none", text: "", sourceIn: 0, still: own.kind === "image", fileHash };
+    return { ...rest, type: "clip", url: own.file, sourcePageUrl: null, licence: own.licence ?? OWNER_LICENCE, motion: own.kind === "image" ? "push" : "none", text: "", sourceIn: 0, still: own.kind === "image", fileHash };
   });
   const unknown = Object.keys(folder.shots).filter((id) => !ids.has(id));
   if (applied.length) timeline.notes.push(`${applied.length} shot${applied.length > 1 ? "s use pictures" : " uses a picture"} provided by the owner (${applied.join(", ")}); their rights are the owner's responsibility.`);
+  // The creator's own media is named in the report as what it is: theirs, with the rights they confirmed.
+  if (ownMediaShots.length) timeline.notes.push(`${OWN_MEDIA_LICENCE} (${ownMediaShots.join(", ")}).`);
   for (const id of unknown) timeline.notes.push(`pictures: ${id} is not a shot of this film; ${folder.shots[id].file} was not used.`);
   for (const f of folder.ignored) timeline.notes.push(`pictures: ${f} is not named after a shot (SC0012-1.jpg) or is a second file for one shot; not used.`);
   timeline.stats.clips = timeline.video.filter((v) => v.type === "clip").length;
   timeline.stats.cards = timeline.video.filter((v) => v.type === "card").length;
   timeline.stats.black = timeline.video.filter((v) => v.type === "black").length;
-  return { applied, unknown, ignored: folder.ignored };
+  return { applied, unknown, ignored: folder.ignored, ownMedia: ownMediaShots };
 }
 
 const TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/x-m4v": "m4v" };
@@ -133,3 +145,130 @@ export async function downloadPictureLinks(links, dir, o = {}) {
   writeFileSync(recordFile, JSON.stringify(record, null, 1));
   return out;
 }
+
+/**
+ * The licence line for media the creator adds themselves. The creator ticked the
+ * promise ("Only add pictures you own or may use") when choosing the files, so the
+ * rights report records their confirmation, not a stock licence.
+ */
+export const OWN_MEDIA_LICENCE = "Your own media, creator confirmed rights";
+/**
+ * The preference given to the creator's own media when it is scored against a sentence. Small on purpose:
+ * OpenCLIP text-to-image similarities sit near 0.15-0.35 (render/asset-rank/rerank.mjs), so a bonus of a few
+ * hundredths wins a tie against stock and still lets an unrelated picture lose.
+ */
+export const OWN_MEDIA_PREFERENCE_BONUS = 0.03;
+/** A match below this (after the bonus) is not used: the shot keeps its searched picture. */
+export const OWN_MEDIA_MATCH_FLOOR = 0.22;
+export const OWN_MEDIA_BONUS = OWN_MEDIA_PREFERENCE_BONUS;
+export const OWN_MEDIA_FLOOR = OWN_MEDIA_MATCH_FLOOR;
+
+/** Cosine similarity of two embedding vectors. */
+export function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || !a.length || a.length !== b.length) return 0;
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i += 1) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  const d = Math.sqrt(na) * Math.sqrt(nb);
+  return d ? dot / d : 0;
+}
+
+function embeddingOf(x) {
+  if (!x) return null;
+  for (const k of ["embedding", "embeddings", "vector", "vec", "features", "values", "clip"]) {
+    if (Array.isArray(x[k])) return x[k];
+  }
+  if (Array.isArray(x)) return x;
+  return null;
+}
+function idOf(x, i) { return x?.id ?? x?.file ?? x?.name ?? x?.path ?? `own-${i + 1}`; }
+function shotIdOf(x, i) { return x?.id ?? x?.shotId ?? x?.shot ?? `shot-${i + 1}`; }
+
+/** Score one own medium against one shot's sentence embedding. */
+export function ownMediaScore(own, shot, bonus = OWN_MEDIA_PREFERENCE_BONUS) {
+  return cosineSimilarity(embeddingOf(own), embeddingOf(shot)) + (Number.isFinite(bonus) ? bonus : OWN_MEDIA_PREFERENCE_BONUS);
+}
+export const scoreOwnMedia = ownMediaScore;
+export const ownMediaSimilarity = (own, shot) => cosineSimilarity(embeddingOf(own), embeddingOf(shot));
+
+/**
+ * Place the creator's own media on the shots whose sentences they match.
+ * Each own file is used at least once when any shot scores above the floor;
+ * the same file is never used on two shots in a row. Returns, in shot order,
+ * the id of the own file placed on that shot (or null).
+ * @param {any[]} shots @param {any[]} ownFiles @param {{ bonus?: number, floor?: number, preferenceBonus?: number, matchFloor?: number }} [o]
+ */
+export function placeOwnMedia(shotsInput, ownInput, o = {}) {
+  const bonus = o.bonus ?? o.preferenceBonus ?? OWN_MEDIA_PREFERENCE_BONUS;
+  const floor = o.floor ?? o.matchFloor ?? OWN_MEDIA_MATCH_FLOOR;
+  const shots = (shotsInput || []).map((s, i) => ({ i, id: shotIdOf(s, i), embedding: embeddingOf(s), raw: s }));
+  const owns = (ownInput || []).map((x, i) => ({ i, id: idOf(x, i), embedding: embeddingOf(x), raw: x }));
+  const n = shots.length, m = owns.length;
+  const score = (oi, si) => (owns[oi].embedding && shots[si].embedding) ? cosineSimilarity(owns[oi].embedding, shots[si].embedding) + bonus : -Infinity;
+
+  const byShot = new Array(n).fill(null);
+  const shotScore = new Array(n).fill(0);
+
+  // First, each shot takes its best matching own file.
+  for (let si = 0; si < n; si += 1) {
+    let bestOi = -1, best = -Infinity;
+    for (let oi = 0; oi < m; oi += 1) {
+      const sc = score(oi, si);
+      if (sc > best) { best = sc; bestOi = oi; }
+    }
+    if (bestOi >= 0 && best >= floor) { byShot[si] = bestOi; shotScore[si] = best; }
+  }
+
+  // Then make sure every own file that matches somewhere is used at least once.
+  const usedOwns = new Set(byShot.filter((v) => v !== null));
+  for (let oi = 0; oi < m; oi += 1) {
+    if (usedOwns.has(oi) || !owns[oi].embedding) continue;
+    let bestSi = -1, best = -Infinity;
+    for (let si = 0; si < n; si += 1) {
+      const sc = score(oi, si);
+      if (sc >= floor && sc > best) { best = sc; bestSi = si; }
+    }
+    if (bestSi >= 0) {
+      const displaced = byShot[bestSi];
+      byShot[bestSi] = oi;
+      shotScore[bestSi] = best;
+      usedOwns.add(oi);
+      if (displaced !== null && !usedOwns.has(displaced)) {
+        // put the displaced own file back on its next best free shot
+        let ndSi = -1, ndBest = -Infinity;
+        for (let si = 0; si < n; si += 1) {
+          if (byShot[si] !== null) continue;
+          const sc = score(displaced, si);
+          if (sc >= floor && sc > ndBest) { ndBest = sc; ndSi = si; }
+        }
+        if (ndSi >= 0) { byShot[ndSi] = displaced; shotScore[ndSi] = ndBest; usedOwns.add(displaced); }
+      }
+    }
+  }
+
+  // Never the same own file on two shots in a row.
+  for (let si = 1; si < n; si += 1) {
+    if (byShot[si] !== null && byShot[si] === byShot[si - 1]) {
+      let bestOi = -1, best = -Infinity;
+      for (let oi = 0; oi < m; oi += 1) {
+        if (oi === byShot[si - 1]) continue;
+        const sc = score(oi, si);
+        if (sc >= floor && sc > best) { best = sc; bestOi = oi; }
+      }
+      if (bestOi >= 0) { byShot[si] = bestOi; shotScore[si] = best; }
+      else byShot[si] = null;
+    }
+  }
+
+  const byShotIds = byShot.map((oi) => (oi === null ? null : owns[oi].id));
+  const assignments = [];
+  for (let si = 0; si < n; si += 1) {
+    if (byShot[si] !== null) assignments.push({ shotIndex: si, shotId: shots[si].id, ownIndex: byShot[si], ownId: owns[byShot[si]].id, score: Math.round(shotScore[si] * 1000) / 1000 });
+  }
+  return { byShot: byShotIds, placed: byShotIds, assignments, scores: shotScore };
+}
+
+export const placeOwnPictures = placeOwnMedia;
+export const placeOwnPhotos = placeOwnMedia;
+export const assignOwnMedia = placeOwnMedia;
+export const ownMediaPlacement = placeOwnMedia;
+export const placeOwnClips = placeOwnMedia;

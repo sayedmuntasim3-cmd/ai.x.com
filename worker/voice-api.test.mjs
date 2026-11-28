@@ -257,6 +257,71 @@ test("no topic typed: the file name is the topic, unless it is a generic name", 
   assert.equal(/** @type {any} */ (checkVoiceRequest({ fileName: "a.mp3", bytes: 5e6, topic: "Gold rush" })).value.topic, "Gold rush");
 });
 
+test("the creator's own photos and clips: only pictures and clips, in pieces, listable, and removed with the film", async () => {
+  const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
+  const audio = new Uint8Array(5000).fill(3);
+  await call(env, "POST", "/api/voice", { headers: OWNER, body: { fileName: "story.mp3", bytes: audio.byteLength } });
+  const p = await call(env, "PUT", `/api/voice/${ID}/parts/1`, { headers: OWNER, body: audio });
+  /** @type {any[]} */
+  const sent = [];
+  const gh = async (/** @type {string} */ _u, /** @type {any} */ init) => { sent.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); };
+  await call(env, "POST", `/api/voice/${ID}/complete`, { headers: OWNER, body: { parts: [p.data] }, fetch: gh });
+  const ticket = sent[0].inputs.ticket;
+
+  const post = (/** @type {any} */ body, /** @type {any} */ headers = OWNER) => call(env, "POST", `/api/voice/${ID}/own`, { headers, body });
+  // Only a studio key or this film's ticket may add a file.
+  assert.equal((await call(env, "POST", `/api/voice/${ID}/own`, { body: { fileName: "a.jpg", bytes: 100 } })).status, 401);
+  // Only the types a picture can be made from; no empty or oversized file.
+  assert.match(String((await post({ fileName: "notes.txt", bytes: 100 })).data.error), /photo or clip: jpg, jpeg, png, webp, mp4, mov/);
+  assert.match(String((await post({ fileName: "a.jpg", bytes: 0 })).data.error), /empty/);
+  assert.match(String((await post({ fileName: "a.jpg", bytes: 300 * 1024 * 1024 })).data.error), /200 MB/);
+  assert.match(String((await post({ fileName: "a.jpg", bytes: 2.5 })).data.error), /empty/);
+
+  // A photo into two pieces; a piece of the wrong size is refused; the key names the file safely.
+  const photo = new Uint8Array(PART_SIZE + 10).map((_, i) => (i * 7) % 251);
+  const opened = await post({ fileName: "My Street.JPG", bytes: photo.byteLength });
+  assert.equal(opened.status, 201);
+  assert.equal(opened.data.parts, 2);
+  assert.equal(opened.data.key, `voice/${ID}/own/1-My-Street.jpg`);
+  assert.equal((await call(env, "PUT", `/api/voice/${ID}/own/parts/1`, { headers: OWNER, body: photo.slice(0, 5) })).status, 400);
+  assert.equal((await call(env, "PUT", `/api/voice/${ID}/own/parts/3`, { headers: OWNER, body: photo })).status, 400);
+  const o1 = await call(env, "PUT", `/api/voice/${ID}/own/parts/1`, { headers: OWNER, body: photo.slice(0, PART_SIZE) });
+  // The upload is not closed until every piece is named.
+  assert.match(String((await call(env, "POST", `/api/voice/${ID}/own/complete`, { headers: OWNER, body: { parts: [o1.data] } })).data.error), /all 2 pieces/);
+  const o2 = await call(env, "PUT", `/api/voice/${ID}/own/parts/2`, { headers: OWNER, body: photo.slice(PART_SIZE) });
+  assert.deepEqual((await call(env, "POST", `/api/voice/${ID}/own/complete`, { headers: OWNER, body: { parts: [o1.data, o2.data] } })).data, { ok: true, files: 1 });
+  // A finished upload cannot be added to again.
+  assert.equal((await call(env, "PUT", `/api/voice/${ID}/own/parts/1`, { headers: OWNER, body: photo.slice(0, PART_SIZE) })).status, 409);
+
+  // A clip goes up in one piece and is the film's second file.
+  const clip = new Uint8Array(4096).fill(4);
+  const cOpen = await post({ fileName: "harbour.mp4", bytes: clip.byteLength });
+  assert.equal(cOpen.data.parts, 1);
+  const c1 = await call(env, "PUT", `/api/voice/${ID}/own/parts/1`, { headers: OWNER, body: clip });
+  assert.deepEqual((await call(env, "POST", `/api/voice/${ID}/own/complete`, { headers: OWNER, body: { parts: [c1.data] } })).data, { ok: true, files: 2 });
+
+  // The film machine lists them and fetches each one with its ticket; nobody else does.
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/own`)).status, 401);
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/own/1`)).status, 401);
+  const listed = await call(env, "GET", `/api/voice/${ID}/own?ticket=${ticket}`);
+  assert.deepEqual(listed.data.files.map((/** @type {any} */ f) => [f.index, f.fileName, f.ext, f.bytes]), [[1, "My Street.JPG", "jpg", photo.byteLength], [2, "harbour.mp4", "mp4", 4096]]);
+  assert.equal(listed.data.bytes, photo.byteLength + 4096);
+  const gotPhoto = await call(env, "GET", `/api/voice/${ID}/own/1?ticket=${ticket}`);
+  assert.equal(gotPhoto.status, 200);
+  assert.deepEqual(gotPhoto.data, photo);
+  assert.equal(gotPhoto.headers.get("content-type"), "image/jpeg");
+  assert.match(String(gotPhoto.headers.get("content-disposition")), /My-Street\.JPG/);
+  assert.deepEqual((await call(env, "GET", `/api/voice/${ID}/own/2`, { headers: OWNER })).data, clip);
+  assert.equal((await call(env, "GET", `/api/voice/${ID}/own/3?ticket=${ticket}`)).status, 404);
+  // The creator sees the files too (never the upload's internals).
+  const view = await call(env, "GET", `/api/voice/${ID}`, { headers: OWNER });
+  assert.deepEqual(view.data.ownFiles.map((/** @type {any} */ f) => f.fileName), ["My Street.JPG", "harbour.mp4"]);
+
+  // Deleting the film removes the creator's files from the bucket as well.
+  assert.equal((await call(env, "DELETE", `/api/voice/${ID}`, { headers: OWNER })).status, 200);
+  assert.deepEqual([...env.FILMS.files.keys()].filter((k) => k.includes("/own/")), []);
+});
+
 test("a stopped film starts again from the saved recording; a film can be deleted", async () => {
   const env = { FILMS: fakeBucket(), STUDIO_TOKEN: "owner-token", GITHUB_TOKEN: "gh", GITHUB_REPO: "o/r" };
   const audio = new Uint8Array(5000).fill(3);

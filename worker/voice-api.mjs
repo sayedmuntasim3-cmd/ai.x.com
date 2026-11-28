@@ -15,6 +15,10 @@
  *   PUT  /api/voice/:id/film/parts/:n    one piece of the MP4   (ticket)
  *   POST /api/voice/:id/film/complete    { parts }   (ticket)
  *   POST /api/voice/:id/marks            { start, ends[], by } the reviewer's ayah times (Quran): the film is made again with them   (Bearer STUDIO_TOKEN)
+ *   POST /api/voice/:id/own              { fileName, bytes } -> open the upload of one of the creator's own photos or clips   (Bearer STUDIO_TOKEN)
+ *   PUT  /api/voice/:id/own/parts/:n     one piece of an own file; POST /own/complete { parts } closes it   (Bearer STUDIO_TOKEN)
+ *   GET  /api/voice/:id/own             the creator's own files of this film, one entry each   (ticket, or Bearer STUDIO_TOKEN)
+ *   GET  /api/voice/:id/own/:n           one of the creator's own files, as uploaded   (ticket, or Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/edit             the film's edit pack: every shot's time, words and top 6 free candidates   (Bearer STUDIO_TOKEN, or ticket)
  *   POST /api/voice/:id/edit             the runner saves the edit pack when the film finishes   (ticket)
  *   POST /api/voice/:id/swaps            { swaps: [{ shotId, candidate|candidateId }] } re-make only the parts holding the swapped shots   (Bearer STUDIO_TOKEN)
@@ -92,6 +96,13 @@ export const MAX_AUDIO_BYTES = 2 * 1024 * 1024 * 1024;
 export const MAX_FILM_BYTES = 4 * 1024 * 1024 * 1024;
 /** How long the runner's ticket is good for (the workflow's own limit is 6 hours). */
 export const RUNNER_TICKET_SECONDS = 7 * 3600;
+/** The file types a creator may add as their own photos or clips. */
+export const OWN_MEDIA_TYPES = /** @type {const} */ ({ jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", mp4: "video/mp4", mov: "video/quicktime" });
+/** At most this many of the creator's own files per film. */
+export const MAX_OWN_MEDIA_FILES = 50;
+/** At most this much own media in total per film. */
+export const MAX_OWN_MEDIA_BYTES = 200 * 1024 * 1024;
+
 /** How long a download link shown to the creator is good for. */
 export const DOWNLOAD_TICKET_SECONDS = 2 * 3600;
 
@@ -240,7 +251,7 @@ async function save(bucket, rec) {
 /** A record as the creator sees it (no upload ids, no keys). @param {any} rec */
 function publicView(rec) {
   const draft = rec.film?.draft === true;
-  return { id: rec.id, swaps: Array.isArray(rec.swaps) ? rec.swaps.length : 0, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, draft, blocks: draft ? cleanBlocks(rec.film?.blocks) : [], release: rec.release ?? null, report: rec.report ?? null };
+  return { id: rec.id, swaps: Array.isArray(rec.swaps) ? rec.swaps.length : 0, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, draft, blocks: draft ? cleanBlocks(rec.film?.blocks) : [], release: rec.release ?? null, report: rec.report ?? null, ownFiles: Array.isArray(rec.ownFiles) ? rec.ownFiles : [] };
 }
 
 /**
@@ -476,6 +487,81 @@ export async function handleVoice(request, env, url, deps = {}) {
     return start(rec);
   }
 
+  // The creator's own photos and clips: the film machine lists them and fetches each one
+  // (render/voice-runner.mjs `own`), the creator sees what is stored (publicView.ownFiles).
+  if (sub === "own" && method === "GET") {
+    if (!owner && !runner) return json({ error: "Wrong ticket." }, 401);
+    const files = (Array.isArray(rec.ownFiles) ? rec.ownFiles : []).map((f, i) => ({ index: i + 1, fileName: String(f?.fileName ?? `own-${i + 1}`), ext: String(f?.ext ?? "jpg"), bytes: Number(f?.bytes) || 0 }));
+    return json({ files, bytes: files.reduce((n, f) => n + f.bytes, 0) });
+  }
+
+  const ownFile = /^own\/(\d{1,5})$/.exec(sub);
+  if (ownFile && method === "GET") {
+    if (!owner && !runner) return json({ error: "Wrong ticket." }, 401);
+    const stored = (Array.isArray(rec.ownFiles) ? rec.ownFiles : [])[Number(ownFile[1]) - 1];
+    if (!stored) return json({ error: "No such file." }, 404);
+    const object = await bucket.get(stored.key);
+    if (!object) return json({ error: "This file is gone." }, 404);
+    const ext = String(stored.ext ?? "jpg").toLowerCase();
+    const type = /** @type {Record<string, string>} */ (OWN_MEDIA_TYPES)[ext] ?? "application/octet-stream";
+    const name = String(stored.fileName ?? `own-${ownFile[1]}.${ext}`).replace(/[^\w.-]+/g, "-");
+    return new Response(object.body, { headers: { "content-type": type, "content-length": String(object.size ?? stored.bytes ?? ""), "content-disposition": `inline; filename="${name}"`, "cache-control": "private, no-store" } });
+  }
+
+  // The creator's own photos and clips (uploaded like the recording, stored under voice/:id/own/).
+  if (sub === "own" && method === "POST") {
+    if (!owner && !runner) return json({ error: "Wrong studio token." }, 401);
+    const body = /** @type {any} */ (await request.json().catch(() => null));
+    const fileName = String(body?.fileName ?? "").trim().slice(0, 160);
+    const ext = /** @type {keyof typeof OWN_MEDIA_TYPES} */ ((/\.([a-z0-9]{2,5})$/i.exec(fileName)?.[1] ?? "").toLowerCase());
+    if (!fileName || !(ext in OWN_MEDIA_TYPES)) return json({ error: `Add a photo or clip: ${Object.keys(OWN_MEDIA_TYPES).join(", ")}.` }, 400);
+    const bytes = Number(body?.bytes);
+    if (!Number.isInteger(bytes) || bytes < 1) return json({ error: "The file is empty." }, 400);
+    if (bytes > MAX_OWN_MEDIA_BYTES) return json({ error: "The file is larger than 200 MB." }, 400);
+    rec.ownFiles = Array.isArray(rec.ownFiles) ? rec.ownFiles : [];
+    if (rec.ownFiles.length >= MAX_OWN_MEDIA_FILES) return json({ error: "At most 50 of your own files per film." }, 400);
+    const used = rec.ownFiles.reduce((n, f) => n + (Number(f?.bytes) || 0), 0);
+    if (used + bytes > MAX_OWN_MEDIA_BYTES) return json({ error: "Your own files may total 200 MB." }, 400);
+    if (rec.ownUpload) await bucket.resumeMultipartUpload(rec.ownUpload.key, rec.ownUpload.uploadId).abort().catch(() => {});
+    const safeBase = fileName.replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "-").slice(0, 60) || "media";
+    const key = `voice/${id}/own/${rec.ownFiles.length + 1}-${safeBase}.${ext}`;
+    const upload = await bucket.createMultipartUpload(key, { httpMetadata: { contentType: OWN_MEDIA_TYPES[ext] } });
+    rec.ownUpload = { key, uploadId: upload.uploadId, bytes, fileName, ext };
+    await save(bucket, rec);
+    return json({ partSize: PART_SIZE, parts: partsFor(bytes), key }, 201);
+  }
+
+  const ownPart = /^own\/parts\/(\d{1,5})$/.exec(sub);
+  if (ownPart && method === "PUT") {
+    if (!owner && !runner) return json({ error: "Wrong studio token." }, 401);
+    const target = rec.ownUpload;
+    if (!target) return json({ error: "No own-media upload is open." }, 409);
+    const n = Number(ownPart[1]);
+    const count = partsFor(target.bytes);
+    if (n < 1 || n > count) return json({ error: `Piece ${n} is out of range (1-${count}).` }, 400);
+    const body = new Uint8Array(await request.arrayBuffer());
+    const expected = n < count ? PART_SIZE : target.bytes - PART_SIZE * (count - 1);
+    if (body.byteLength !== expected) return json({ error: `Piece ${n} should be ${expected} bytes, not ${body.byteLength}.` }, 400);
+    const uploaded = await bucket.resumeMultipartUpload(target.key, target.uploadId).uploadPart(n, body);
+    return json({ partNumber: uploaded.partNumber, etag: uploaded.etag });
+  }
+
+  if (sub === "own/complete" && method === "POST") {
+    if (!owner && !runner) return json({ error: "Wrong studio token." }, 401);
+    const target = rec.ownUpload;
+    if (!target) return json({ error: "No own-media upload is open." }, 409);
+    const body = /** @type {any} */ (await request.json().catch(() => null));
+    const list = Array.isArray(body?.parts) ? body.parts.map((/** @type {any} */ p) => ({ partNumber: Number(p?.partNumber), etag: String(p?.etag ?? "") })) : [];
+    const count = partsFor(target.bytes);
+    if (list.length !== count || list.some((/** @type {any} */ p, /** @type {number} */ i) => p.partNumber !== i + 1 || !p.etag)) return json({ error: `Send all ${count} pieces, numbered 1-${count}, each with its etag.` }, 400);
+    const done = await bucket.resumeMultipartUpload(target.key, target.uploadId).complete(list);
+    rec.ownFiles = Array.isArray(rec.ownFiles) ? rec.ownFiles : [];
+    rec.ownFiles.push({ key: target.key, fileName: target.fileName, ext: target.ext, bytes: done.size ?? target.bytes });
+    delete rec.ownUpload;
+    await save(bucket, rec);
+    return json({ ok: true, files: rec.ownFiles.length });
+  }
+
   // The Craft Ledger: the runner reads the channel's targets before the shot plan, and records the film after the gate.
   if (sub === "ledger" && (method === "GET" || method === "POST")) {
     if (!owner && !runner) return json({ error: "Wrong ticket." }, 401);
@@ -575,7 +661,8 @@ export async function handleVoice(request, env, url, deps = {}) {
     if (!owner) return json({ error: "Wrong studio token." }, 401);
     if (rec.uploadId) await bucket.resumeMultipartUpload(rec.audioKey, rec.uploadId).abort().catch(() => {});
     if (rec.filmUpload) await bucket.resumeMultipartUpload(rec.filmUpload.key, rec.filmUpload.uploadId).abort().catch(() => {});
-    await bucket.delete([rec.audioKey, `voice/${id}/film.mp4`, recordKey(id)]);
+    const ownKeys = Array.isArray(rec.ownFiles) ? rec.ownFiles.map((f) => f.key) : [];
+    await bucket.delete([rec.audioKey, `voice/${id}/film.mp4`, recordKey(id), ...ownKeys]);
     return json({ ok: true, deleted: id });
   }
 
