@@ -14,6 +14,10 @@ production. Never force-push, reset or delete branches; on a real conflict with 
   decisions, review, merges and watching every finished film frame by frame. Workers are archived the moment
   they report. Nobody changes the landing page look (colours, fonts, layout, the "Idea | Voiceover" switch)
   without asking him first (a worker replaced the switch on 28 Nov; it was restored in PR #104).
+  Same day, his standing order to the Boss: own the whole platform like its owner. Look at everything every
+  day (both products, every finished film, the site), find what keeps a film from world-class, and fix it
+  without asking: open as many sonnet workers as the work needs (archive each when it reports), merge through
+  PRs. Credits spent on real Boss work are fine; waste is not. This replaces "at most ONE worker" below.
 - 26 Nov 2026: the Boss has full authority over the platform (after the owner). Every film follows
   `docs/OWNER_BRIEF.md`. Check every instruction, even the owner's own prompt: if it is wrong, correct it and do better.
   Main target: English documentaries for a USA audience. The niche is FIXED: Engineering Disasters & Megaprojects
