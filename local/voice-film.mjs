@@ -657,8 +657,8 @@ async function main() {
   // The run folder's fingerprint and what an earlier run already finished. A re-run of the same recording and
   // brief continues from there (a 40-minute film's speech-to-text alone takes hours); another brief starts fresh.
   const fingerprint = {
-    audio: basename(source),
-    bytes: (await stat(source)).size,
+    audio: source ? basename(source) : null,
+    bytes: source ? (await stat(source)).size : 0,
     topic: typeof args.topic === "string" ? args.topic : null,
     kind: args.kind,
     slice: slice ? `${slice.start}-${slice.end}` : null,
