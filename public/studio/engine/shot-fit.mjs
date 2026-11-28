@@ -18,7 +18,7 @@ export const STAGES = Object.freeze([
 ]);
 
 /** How much a candidate gains or loses (units of the picture score: 10 x CLIP similarity, which spans about 2). */
-export const FIT = Object.freeze({ stage: 2, wrongStage: 3, name: 2 });
+export const FIT = Object.freeze({ stage: 1.5, wrongStage: 2.5, name: 1.5 });
 
 /** @param {string} text @returns {Record<string, number>} hits per stage */
 export function stageHits(text) {

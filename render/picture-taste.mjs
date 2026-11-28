@@ -14,7 +14,7 @@
 import { spawn } from "node:child_process";
 
 /** A pixel this dark (or this light) at the picture's edge is border, not picture. */
-export const VOID_BLACK = 14;
+export const VOID_BLACK = 18;
 export const VOID_WHITE = 245;
 /** A shot must fill at least this share of the frame with picture (the gate blocks below it). */
 export const MIN_FILLED = 0.85;
@@ -29,7 +29,22 @@ export const NEAR_COPY_BITS = 14;
  */
 export function voidMask(gray, w, h) {
   const mask = new Uint8Array(w * h);
-  const is = (/** @type {number} */ i) => gray[i] <= VOID_BLACK || gray[i] >= VOID_WHITE;
+  // Border is flat: a letterbox bar or a paper border has no texture, while dark footage (a night launch, black space) is noisy.
+  // Video black is 16 (limited range), so the black limit has a little room.
+  const is = (/** @type {number} */ i) => {
+    const g = gray[i];
+    if (g > VOID_BLACK && g < VOID_WHITE) return false;
+    const x = i % w, y = (i - x) / w;
+    // At least five of its eight neighbours are the same flat tone (an edge pixel of a bar has five).
+    let same = 0;
+    for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+      if (!dx && !dy) continue;
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= w || yy >= h) { same += 1; continue; }
+      if (Math.abs(gray[yy * w + xx] - g) <= 2) same += 1;
+    }
+    return same >= 5;
+  };
   /** @type {number[]} */
   const stack = [];
   const push = (/** @type {number} */ i) => { if (!mask[i] && is(i)) { mask[i] = 1; stack.push(i); } };
@@ -43,6 +58,17 @@ export function voidMask(gray, w, h) {
     if (y > 0) push(i - w);
     if (y < h - 1) push(i + w);
   }
+  // The rim: a dark or white pixel touching border is border too (a bar's edge pixel has texture on one side).
+  const rim = [];
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i] || (gray[i] > VOID_BLACK && gray[i] < VOID_WHITE)) continue;
+    const x = i % w, y = (i - x) / w;
+    for (let dy = -1; dy <= 1 && !mask[i]; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < w && yy < h && mask[yy * w + xx]) { rim.push(i); break; }
+    }
+  }
+  for (const i of rim) mask[i] = 1;
   return mask;
 }
 
@@ -296,11 +322,11 @@ export async function measureTaste(file, timeline, o = {}) {
  * @param {any[]} video the shots @param {number} count frames @param {(i: number) => { gray: Uint8Array, w: number, h: number }} frame @param {number} fps
  */
 export function tasteOfFrames(video, count, frame, fps) {
-  /** @type {{ id: string, filled: number }[]} */
+  /** @type {{ id: string, filled: number, url?: string | null }[]} */
   const unfilled = [];
-  /** @type {{ id: string, corner: string, share: number }[]} */
+  /** @type {{ id: string, corner: string, share: number, url?: string | null }[]} */
   const logos = [];
-  /** @type {{ id: string, at: number }[]} */
+  /** @type {{ id: string, at: number, text?: string }[]} */
   const cards = [];
   /** @type {{ id: string, hash: string | null, held: boolean }[]} */
   const hashes = [];
@@ -314,13 +340,14 @@ export function tasteOfFrames(video, count, frame, fps) {
       const f = frame(idx[Math.floor(idx.length / 2)]);
       let dark = 0;
       for (let i = 0; i < f.gray.length; i += 1) if (f.gray[i] <= 30) dark += 1;
-      if (textOnBlack(v, dark / f.gray.length)) cards.push({ id, at: Number(v.start) });
+      if (textOnBlack(v, dark / f.gray.length)) cards.push({ id, at: Number(v.start), text: String(v.text ?? "").slice(0, 60) });
     }
     if (deliberate(v) || String(v.type) !== "clip") continue;
     measured += 1;
-    const shares = idx.map((i) => { const f = frame(i); return voidShare(f.gray, f.w, f.h); }).sort((x, y) => x - y);
-    const mid = shares[Math.floor(shares.length / 2)];
-    if (1 - mid < MIN_FILLED) unfilled.push({ id, filled: Math.round((1 - mid) * 1000) / 1000 });
+    // Filled = the clean picture box inside its borders (a night scene or a dark sky is its own content, never "border").
+    const fills = idx.map((i) => { const f = frame(i); const b = contentBox(f.gray, f.w, f.h, { floor: 0.15 }); return b.trimmed ? b.w * b.h : 1; }).sort((x, y) => x - y);
+    const filled = fills[Math.floor(fills.length / 2)];
+    if (filled < MIN_FILLED) unfilled.push({ id, filled: Math.round(filled * 1000) / 1000, url: v.url ?? null });
     const f = frame(idx[Math.floor(idx.length / 2)]);
     // A frame with almost no detail (a dark fade, a flat sky) hashes like every other one: it never counts as a repeat.
     let sum = 0, sq = 0;
@@ -330,7 +357,7 @@ export function tasteOfFrames(video, count, frame, fps) {
     if (!v.still && idx.length >= 3) {
       const picks = [idx[0], idx[Math.floor(idx.length / 2)], idx[idx.length - 1]].map(frame);
       const logo = cornerLogo(picks);
-      if (logo.found) logos.push({ id, corner: logo.corner, share: logo.share });
+      if (logo.found) logos.push({ id, corner: logo.corner, share: logo.share, url: v.url ?? null });
     }
   }
   return { unfilled, logos, cards, repeats: repeatedPictures(hashes), measured };
@@ -389,4 +416,26 @@ export async function prepareStill(o) {
   const W2 = W * 2, H2 = H * 2;
   if (!existsSync(base)) await runQuiet(ffmpeg, ["-v", "error", "-y", "-i", o.src, "-frames:v", "1", "-filter_complex", `[0]${crop}split=2[bg][fg];[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=-0.07:saturation=0.8[bgb];[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`, base]);
   return { mode: "blur-fill", plate: base, filter: null, content, trimmed: box.trimmed };
+}
+
+/**
+ * Plain text cards (white words on an empty black ground) become the nearest picture held, moving (owner's rule: never an empty
+ * black card as filler). The donor is the nearest picture shot, the one before first; the words stay in the captions. A card with
+ * a designed look (graphic, paper, map, chart, counter, chapter title) is left alone.
+ * @param {any[]} video the timeline's shots, changed in place @param {{ kinetic?: boolean }} [o] kinetic: a kinetic-type card is filler too (a voice film's cards are) @returns {string[]} ids of the cards that were replaced
+ */
+export function holdOverCards(video, o = {}) {
+  const pictured = (/** @type {any} */ v) => String(v?.type) === "clip" && v.url;
+  /** @type {string[]} */
+  const out = [];
+  video.forEach((v, i) => {
+    if (!plainCard(v) || v.url || (v.kinetic && !o.kinetic)) return;
+    let donor = null;
+    for (let d = 1; d < video.length && !donor; d += 1) donor = [video[i - d], video[i + d]].find(pictured) ?? null;
+    if (!donor) return;
+    Object.assign(v, { type: "clip", url: donor.url, sourcePageUrl: donor.sourcePageUrl ?? null, licence: donor.licence ?? null, still: true, held: true, motion: "push", text: "", title: "", kinetic: false });
+    delete v.relevance;
+    out.push(String(v.id));
+  });
+  return out;
 }

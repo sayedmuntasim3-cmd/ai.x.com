@@ -26,7 +26,7 @@ const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45,
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
 import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 import { critique, designedMoments, measureFilm, measurePicture } from "./critic.mjs";
-import { measureTaste, prepareStill } from "./picture-taste.mjs";
+import { holdOverCards, measureTaste, prepareStill } from "./picture-taste.mjs";
 import { attachMoments, momentSounds, planMoments } from "../engine/src/voice-moments.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -438,6 +438,9 @@ export async function renderFilm(o) {
   const log = o.log ?? (() => {});
   const dirs = { clips: join(o.workDir, "clips"), segments: join(o.workDir, "segments"), audio: join(o.workDir, "audio"), cards: join(o.workDir, "cards") };
   for (const d of Object.values(dirs)) mkdirSync(d, { recursive: true });
+  // No empty black card as filler: a plain text card holds the nearest picture instead, moving (the words stay in the captions).
+  const heldCards = holdOverCards(t.video, { kinetic: Boolean(o.oneTrack) });
+  if (heldCards.length) log(`Picture taste: ${heldCards.length} plain text card(s) now hold the nearest picture (${heldCards.slice(0, 6).join(", ")}).`);
   const font = o.fontFile ?? FONT_CANDIDATES.find((f) => existsSync(f));
   /** @type {string[]} */
   const warnings = [...t.notes];
@@ -1212,7 +1215,12 @@ export async function renderFilm(o) {
     const at = (/** @type {{ id: string }} */ f) => { const v = t.video.find((/** @type {any} */ x) => String(x.id) === String(f.id)); return v ? { shotType: v.shotType, type: v.type, still: Boolean(v.still), url: v.url, chapterTitle: v.chapterTitle } : {}; };
     /** @type {any} */ (report).picture = { samples: picture.samples, flicker: picture.flicker.slice(0, 60).map((f) => ({ ...f, ...at(f) })), blurred: picture.blurred.slice(0, 40).map((b) => ({ ...b, ...at(b) })), dark: (picture.dark ?? []).slice(0, 40).map((d) => ({ ...d, ...at(d) })) };
   }
-  if (taste) /** @type {any} */ (report).taste = taste;
+  if (taste) {
+    /** @type {any} */ (report).taste = taste;
+    for (const u of taste.unfilled) log(`Picture taste: ${u.id} fills ${Math.round(u.filled * 100)}% of the frame (${u.url ?? "no url"}).`);
+    for (const l of taste.logos) log(`Picture taste: ${l.id} carries a logo in the ${l.corner} (${l.url ?? "no url"}).`);
+    for (const r of taste.repeats) log(`Picture taste: ${r.a} and ${r.b} show the same picture (${r.bits} bits apart).`);
+  }
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;

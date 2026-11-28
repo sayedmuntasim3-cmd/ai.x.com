@@ -36,7 +36,7 @@ test("a stitched mosaic with jagged black edges is trimmed to a clean box", () =
   const g = texture(2);
   // Black wedges eat the corners and a notch the right edge: the shape of a stitched panorama.
   for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) {
-    const cut = Math.abs(x - 8 * Math.sin(y / 5)) < 3 || x < 6 + (y % 7) || x > W - 5 - ((y * 3) % 9) || y < 4 + (x % 5) || y > H - 4 - ((x * 2) % 6);
+    const cut = x < 6 + 2 * (Math.floor(y / 4) % 3) || x > W - 5 - 2 * (Math.floor(y / 3) % 4) || y < 4 + 2 * (Math.floor(x / 6) % 2) || y > H - 4 - 2 * (Math.floor(x / 5) % 3);
     if (cut) g[y * W + x] = 0;
   }
   const b = contentBox(g, W, H);
@@ -187,4 +187,30 @@ test("prepareStill: a picture small inside black is cut out and fills the frame;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+import { holdOverCards } from "./picture-taste.mjs";
+
+test("a plain text card holds the nearest picture; a designed card is left alone", () => {
+  const video = [
+    { id: "a", type: "clip", url: "https://x/a.jpg", still: true },
+    { id: "b", type: "card", text: "Now it came down to a single question." },
+    { id: "c", type: "card", text: "12%", counter: true },
+    { id: "d", type: "clip", url: "https://x/d.jpg", still: true },
+  ];
+  assert.deepEqual(holdOverCards(video), ["b"]);
+  assert.equal(video[1].type, "clip");
+  assert.equal(video[1].url, "https://x/a.jpg");
+  assert.equal(video[1].held, true);
+  assert.equal(video[2].type, "card");
+});
+
+test("dark noisy footage is not border; a flat letterbox bar is", () => {
+  const dark = new Uint8Array(W * H);
+  let s = 3;
+  for (let i = 0; i < dark.length; i += 1) { s = (s * 1103515245 + 12345) & 0x7fffffff; dark[i] = 4 + (s % 14); }
+  assert.ok(voidShare(dark, W, H) < 0.2, "noisy dark footage stays picture");
+  const barred = texture(9);
+  for (let y = 0; y < 10; y += 1) for (let x = 0; x < W; x += 1) barred[y * W + x] = 16;
+  assert.ok(voidShare(barred, W, H) > 0.1, "flat video-black bars are border");
 });
