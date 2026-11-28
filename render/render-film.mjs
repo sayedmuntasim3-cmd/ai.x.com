@@ -24,7 +24,7 @@ import { depthMaps, depthMoveFor, renderDepthShot } from "./depth/depth.mjs";
 const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45, "AUTO-RISER": 0.3, "AUTO-CLICK": 0.22, "AUTO-GLITCH": 0.28 };
 /** Where each designed sound sits between the speakers (left, right gains): placed, never all in the centre. */
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
-import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
+import { curtainWindows, deepestDuckDb, gainPlan, mergeWindows, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 import { critique, designedMoments, measureFilm, measurePicture } from "./critic.mjs";
 import { measureTaste, prepareStill } from "./picture-taste.mjs";
 import { attachMoments, momentSounds, planMoments } from "../engine/src/voice-moments.mjs";
@@ -1107,7 +1107,7 @@ export async function renderFilm(o) {
   const extra = [musicFile, sfxFile].filter((f) => f !== null);
   const musicIn = musicFile ? 2 : -1;
   const sfxIn = sfxFile ? (musicFile ? 3 : 2) : -1;
-  const duckPlan = gainPlan({ voice: voiceWindows(pieces), curtains: curtainWindows(sounds) });
+  const duckPlan = gainPlan({ voice: voiceWindows(pieces), curtains: mergeWindows([...curtainWindows(sounds), ...(t.breaths ?? [])], 0.2) });
   // The duck is what the voice does to the music; the curtains are separate holes in the plan.
   const duckDb = deepestDuckDb(duckPlan.filter((w) => w.gain > 0));
   // Does the score follow the cut? A chapter's turn is marked by a new cue or a riser; where neither is,

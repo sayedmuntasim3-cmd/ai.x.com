@@ -10,6 +10,7 @@
 import { EDIT_SOUNDS } from "./edit-director.mjs";
 import { shotParts } from "./film-media.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
+import { storyMap } from "./story-map.mjs";
 import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionReport, sceneIntent, writtenMove } from "./motion.mjs";
 
 /**
@@ -38,7 +39,7 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
  * @typedef {{ cue: string, start: number, end: number }} MusicSegment
  * @typedef {{ token: string, kind: "bed" | "hit", scene: string, start: number, end: number }} SoundEvent
  *   bed: ambience under the whole scene; hit: a one-shot from start (end is the scene's end)
- * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, sound?: { moved: { token: string, from: number, to: number }[], dropped: { token: string, at: number }[] }, motion?: ReturnType<typeof motionReport> }} Timeline
+ * @typedef {{ width: number, height: number, fps: number, durationSeconds: number, frames: number, video: VideoSegment[], narration: NarrationItem[], captions: Caption[], music: MusicSegment[], sfx: SoundEvent[], look: FilmLook, notes: string[], breaths?: { start: number, end: number }[], stats: { clips: number, cards: number, black: number, scenes: number }, timing?: { plannedSeconds: number, fittedSeconds: number, stretched: number, shortened: number, grownChapters: number, skipped: string[] }, sound?: { moved: { token: string, from: number, to: number }[], dropped: { token: string, at: number }[] }, motion?: ReturnType<typeof motionReport> }} Timeline
  */
 
 /** The shot plan's closed vocabulary (engine/src/shot-plan.mjs SHOT_TYPES; kept here so the timeline imports nothing from it). */
@@ -846,12 +847,20 @@ export function buildTimeline(o) {
     sfx.push({ token: "AUTO-IMPACT", kind: "hit", scene, start: round3(t), end: round3(t + SOUND_SECONDS["AUTO-IMPACT"]) });
   }
   // Nothing lands on a spoken word: a hit that would mask a word moves to the gap after it, or is left out.
-  const clear = keepOffSpeech(sfx, spokenWords(captions));
+  // Then the story's rules (engine/src/story-map.mjs): no hit in the first spoken line, at most one per 8 s.
+  const words = spokenWords(captions);
+  const clear = words.length ? placeEffects(sfx, words) : keepOffSpeech(sfx, words);
+  const spaced = (sfx.length - clear.sounds.length) - clear.dropped.length;
+  if (spaced > 0) notes.push(`sound: ${spaced} hit(s) left out (first spoken line, or less than 8 s after the last hit).`);
+  // A breath before a reveal: the music goes quiet for a moment ahead of the line that turns the story (at most one per 20 s).
+  /** @type {{ start: number, end: number }[]} */
+  const breaths = [];
+  if (words.length) for (const w of storyMap(words, video).revealWindows) if (w.end - w.start >= 0.4 && (!breaths.length || w.start - breaths[breaths.length - 1].end >= 20)) breaths.push(w);
   if (clear.moved.length) notes.push(`sound: ${clear.moved.length} hit(s) moved off a spoken word (${clear.moved.map((m) => `${m.token} ${m.from}s to ${m.to}s`).join(", ")}).`);
   if (clear.dropped.length) notes.push(`sound: ${clear.dropped.length} hit(s) left out, no gap to move to off the words (${clear.dropped.map((d) => `${d.token} at ${d.start}s`).join(", ")}).`);
   if (fit && (fit.report.stretched || fit.report.shortened)) notes.push(`timing: scenes fitted to the voice (${fit.report.stretched} longer, ${fit.report.shortened} shorter; ${fit.report.plannedSeconds} s planned, ${fit.report.fittedSeconds} s fitted). No take is sped up or cut.`);
   return {
-    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx: clear.sounds, look: o.look ?? "documentary", notes,
+    width, height, fps, durationSeconds: frames / fps, frames, video, narration, captions, music, sfx: clear.sounds, look: o.look ?? "documentary", notes, ...(breaths.length ? { breaths } : {}),
     ...(clear.moved.length || clear.dropped.length ? { sound: { moved: clear.moved, dropped: clear.dropped.map((d) => ({ token: d.token, at: d.start })) } } : {}),
     ...(fit ? { timing: fit.report } : {}),
     motion: motionReport(moves, governed, profile, level),
@@ -896,8 +905,8 @@ function round3(n) { return Math.round(n * 1000) / 1000; }
 /**
  * Place effect hits so none lands inside a spoken word, none lands in the first
  * spoken line, and no two land closer than `minGap` seconds (default 8). Hits
- * that cannot be moved into a free gap are dropped. A riser is exempt from the
- * speech check (its climax is the cut) but still obeys the spacing and the
+ * that cannot be moved into a free gap are dropped. A riser (a build into a cut,
+ * not a hit) is exempt from the speech check and the spacing, but not from the
  * first-line rule.
  * @param {any[]} sounds @param {any[]} words @param {{ minGap?: number, firstLineEnd?: number }} [o]
  */
@@ -906,22 +915,18 @@ export function placeEffects(sounds, words, o = {}) {
   const spoken = (words ?? []).filter((w) => w && w.end > w.start).sort((a, b) => a.start - b.start);
   const firstLineEnd = o.firstLineEnd ?? (spoken.length ? spoken[0].end : 0);
   // nothing during the first spoken line
-  let filtered = (sounds ?? []).filter((e) => e && !(e.start < firstLineEnd));
+  let filtered = (sounds ?? []).filter((e) => e && (e.kind === "bed" || !(e.start < firstLineEnd)));
   const r = keepOffSpeech(filtered, spoken);
   // spacing
   const kept = [];
   for (const e of r.sounds.sort((a, b) => a.start - b.start)) {
-    if (e.kind === "bed") { kept.push(e); continue; }
-    const last = kept.filter((k) => k.kind !== "bed").slice(-1)[0];
+    // A sound the script itself asks for (SND-...) is the writer's choice: it keeps its place.
+    if (e.kind === "bed" || e.token === "AUTO-RISER" || !String(e.token).startsWith("AUTO-")) { kept.push(e); continue; }
+    const last = kept.filter((k) => k.kind !== "bed" && k.token !== "AUTO-RISER" && String(k.token).startsWith("AUTO-")).slice(-1)[0];
     if (last && Math.abs(e.start - last.start) < minGap) continue;
     kept.push(e);
   }
   return { sounds: kept, moved: r.moved, dropped: r.dropped };
 }
-
-export const placeHits = placeEffects;
-export const placeSounds = placeEffects;
-export const effectsInGaps = placeEffects;
-export const noHitOnWord = placeEffects;
 
 export * from "./story-map.mjs";
