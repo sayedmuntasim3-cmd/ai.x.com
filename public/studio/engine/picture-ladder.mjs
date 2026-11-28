@@ -166,3 +166,93 @@ export function queryLadder(shot) {
   for (const q of shot.queries) if (!isBareCommon(q)) add(q);
   return out;
 }
+
+/** What a camera can show that a sentence names without a capital letter: [pattern, search words]. */
+const FILMABLE = /** @type {[RegExp, string][]} */ ([
+  [/\b(?:lift(?:ed|s)? off|launch(?:ed|es|ing)?|blast(?:ed)? off|ignition)\b/i, "launch"],
+  [/\b(?:land(?:ed|ing|s)?|touch(?:ed)? down|touchdown)\b/i, "landing"],
+  [/\b(?:crew|astronauts?|pilots?|team)\b/i, "crew"],
+  [/\b(?:command module|capsule|cabin|cockpit|interior|inside)\b/i, "interior"],
+  [/\b(?:lunar module|lander)\b/i, "lunar module"],
+  [/\b(?:rocket|engines?|boosters?)\b/i, "rocket"],
+  [/\b(?:collaps(?:e|ed|ing)|fell|fall|twist(?:ed|ing)?|torn|crash(?:ed)?|explo(?:de|ded|sion))\b/i, "collapse"],
+  [/\b(?:factory|assembly line|workshop|plant)\b/i, "factory"],
+  [/\b(?:build|built|construct(?:ed|ion)?|workers?)\b/i, "construction"],
+  [/\b(?:design(?:ed|er)?|sketch(?:es|ed)?|blueprints?|drawings?)\b/i, "design"],
+  [/\b(?:race|racing|track)\b/i, "racing"],
+  [/\b(?:engine room|v12|v8|engine)\b/i, "engine"],
+  [/\b(?:funeral|portrait|founder)\b/i, "portrait"],
+]);
+
+/** Capitalised names of a sentence (people, craft, places, events), with a leading grammar-only capital dropped. @param {string} text */
+function namedRuns(text) {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim();
+  /** @type {string[]} */
+  const out = [];
+  for (const m of t.matchAll(/\p{Lu}[\p{L}'’-]*(?:\s+(?:\p{Lu}[\p{L}'’-]*|\d+[A-Za-z]?|[IVX]{1,4}\b))*/gu)) {
+    const words = m[0].split(/\s+/);
+    const starts = m.index === 0 || /[.!?]\s*$/.test(t.slice(0, m.index));
+    while (words.length && small(words[0].replace(/[^\p{L}]/gu, "")) && (starts || words.length > 1)) words.shift();
+    if (!words.length || (words.length === 1 && small(words[0]))) continue;
+    const name = words.join(" ");
+    if (!out.some((o) => o.toLowerCase() === name.toLowerCase())) out.push(name);
+  }
+  return out;
+}
+
+/**
+ * What one sentence names: people, craft, places and events (capitalised runs), the years, and the filmable things it
+ * says ("launch", "crew"). Pure code, no model, so it still works when the brain is out of tokens.
+ * @param {string} sentence
+ * @returns {{ names: string[], years: string[], things: string[] }}
+ */
+export function namesIn(sentence) {
+  const s = String(sentence ?? "");
+  const years = [...new Set([...s.matchAll(/\b(1[5-9]\d\d|20[0-2]\d)\b/g)].map((m) => m[1]))];
+  const names = namedRuns(s).filter((n) => !/^\d+$/.test(n) && !CALENDAR_NAME.test(n));
+  // Craft and places said in lower case are things to look up too.
+  for (const m of s.matchAll(/\b(command module|lunar module|service module|space shuttle|assembly line|wind tunnel|test track|control room)\b/gi)) if (!names.some((n) => n.toLowerCase() === m[1].toLowerCase())) names.splice(1, 0, m[1].toLowerCase());
+  const things = FILMABLE.filter(([re]) => re.test(s)).map(([, w]) => w).filter((w, i, a) => a.indexOf(w) === i);
+  return { names, years, things };
+}
+const CALENDAR_NAME = /^(?:january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+\d+)?$/i;
+
+/**
+ * The searches of one shot, NAMES FIRST: the film's subject plus the named things of its own sentence, then the
+ * brain's queries (moods) anchored to the subject, never instead of it. Without a brain only the first part exists.
+ * `named` is true when the shot has something real to look up in an archive (a subject or a name), false for a pure mood shot.
+ * @param {{ sentence?: string, subject?: string, queries?: string[], limit?: number }} o
+ * @returns {{ queries: string[], nameCount: number, named: boolean, names: string[] }}
+ */
+export function namedQueries(o) {
+  const subject = String(o.subject ?? "").replace(/\s+/g, " ").trim();
+  const { names, years, things } = namesIn(o.sentence ?? "");
+  const sub = subject.toLowerCase();
+  const own = names.filter((n) => !sub.includes(n.toLowerCase()) && !n.toLowerCase().includes(sub || "\u0000"));
+  /** @type {string[]} */
+  const out = [];
+  /** @param {string} q */
+  const add = (q) => { const s = q.replace(/\s+/g, " ").trim(); if (s && !out.some((x) => x.toLowerCase() === s.toLowerCase())) out.push(s); };
+  const year = years[0] ?? "";
+  const thing = things[0] ?? "";
+  if (subject) {
+    if (thing && year) add(`${subject} ${thing} ${year}`);
+    if (thing && own[0]) add(`${own[0]} ${thing}${year ? ` ${year}` : ""}`);
+    for (const n of own.slice(0, 4)) { add(`${subject} ${n}`); }
+    if (thing) add(`${subject} ${thing}`);
+    if (year) add(`${subject} ${year}`);
+    for (const n of own.slice(0, 2)) if (year) add(`${n} ${year}`);
+    add(subject);
+  } else {
+    for (const n of own.slice(0, 3)) { if (thing) add(`${n} ${thing}`); add(year ? `${n} ${year}` : n); }
+  }
+  // Mood words after the names, never instead of them.
+  const anchor = out[0] ?? "";
+  const nameCount = out.length;
+  for (const q of o.queries ?? []) {
+    const s = String(q ?? "").trim();
+    if (!s || isBareCommon(s)) continue;
+    add(subject && !s.toLowerCase().includes(sub) ? `${subject} ${s}` : s);
+  }
+  return { queries: out.slice(0, o.limit ?? 10), nameCount: Math.min(nameCount, o.limit ?? 10), named: Boolean(anchor), names: [...(subject ? [subject] : []), ...own] };
+}

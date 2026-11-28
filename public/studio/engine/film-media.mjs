@@ -11,7 +11,7 @@
  */
 import { openArchivesProvider } from "./open-archives.mjs";
 import { isChallenge, isRelevant, locGate } from "./archive-guard.mjs";
-import { queryLadder } from "./picture-ladder.mjs";
+import { namedQueries, queryLadder, subjectOf } from "./picture-ladder.mjs";
 import { createRateLimiter, fetchShotMedia, ProviderError } from "./documentary-media-fetch.mjs";
 import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 
@@ -249,7 +249,9 @@ export function shotSearchPlan(rung, providers, kind) {
   /** @type {(k: MediaKind, list: MediaProvider[]) => { kind: MediaKind, providers: MediaProvider[] }} */
   const step = (k, list) => ({ kind: k, providers: list });
   const history = [step("image", archives), step("video", archives), step("video", stock), step("image", stock)];
-  const steps = rung === "R2" ? history
+  // A shot about a named thing: archival video, then archival stills, then stock (stock only when the archives hold nothing relevant).
+  const named = [step("video", archives), step("image", archives), step("video", stock), step("image", stock)];
+  const steps = rung === "NAMED" ? named : rung === "R2" ? history
     : stock.length ? [step("video", stock), step("image", stock)]
     : [step("video", archives), step("image", archives.filter((p) => !EVIDENCE_SOURCES.includes(p.id)))];
   return steps.filter((s) => s.providers.some((p) => p.kinds.includes(s.kind)));
@@ -318,7 +320,8 @@ export function toPick(c) {
  * `done` carries shots settled by an earlier attempt (key: shotKey); they are not searched again. A
  * Cloudflare Worker run may make only 50 requests and a chapter needs more, so the film run saves the
  * settled shots and the next run (a fresh one) searches only the rest (film 70577b9b, 20 Nov 2026).
- * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number, topic?: string, subject?: string, holdWeak?: boolean }} o
+ * @param {{ chapter: string, markdown: string, providers: MediaProvider[], history?: ReturnType<typeof createUseHistory>, limiter?: ReturnType<typeof createRateLimiter>, kind?: MediaKind, maxWaitMs?: number, timeoutMs?: number, sleep?: (ms: number) => Promise<void>, judge?: MediaJudge, done?: Record<string, ShotMedia>, wholeWord?: boolean, reachable?: (url: string) => Promise<boolean>, concurrency?: number, topic?: string, subject?: string, holdWeak?: boolean, heard?: Record<string, string> }} o
+ * heard: the narration of each scene (key: scene id); with it every shot is searched by the named things of its sentence first.
  * @returns {Promise<ChapterMedia>}
  */
 export async function chapterMedia(o) {
@@ -339,7 +342,12 @@ export async function chapterMedia(o) {
     if (simple && !own.some((q) => q.toLowerCase() === simple.toLowerCase())) own.push(simple);
     // The ladder anchors bare keywords to the film's subject and adds the subject, its category and its era.
     // Always through the ladder: with no subject at all it still drops a bare common word ("eight", "clock") sent alone.
-    const queries = queryLadder({ queries: own, description: shot.description, topic: o.topic ?? "", subject: o.subject });
+    const ladder = queryLadder({ queries: own, description: shot.description, topic: o.topic ?? "", subject: o.subject });
+    // Named things first (done in code, after the brain): the film's subject plus the people, craft, places and years of the shot's own sentence.
+    const subject = o.subject || subjectOf(o.topic ?? "");
+    const nq = o.heard ? namedQueries({ sentence: o.heard[shot.scene] ?? shot.description, subject, queries: own }) : null;
+    const queries = nq?.queries.length ? [...new Set([...nq.queries, ...ladder])] : ladder;
+    const named = Boolean(nq?.named);
     /** @type {ShotMedia} */
     const row = { ...shot, status: queries.length ? "missing" : "no-query", query: null, pick: null, alternates: [], trace: [] };
     const earlier = o.done?.[shotKey(row)];
@@ -348,14 +356,14 @@ export async function chapterMedia(o) {
       shots[at] = earlier;
       return;
     }
-    search: for (const step of plan(shot.rung)) for (const query of queries) {
+    search: for (const step of plan(named ? "NAMED" : shot.rung)) for (const query of queries) {
       const found = await fetchShotMedia(
         { shotId: `${shot.scene}-${shot.shot}`, query, kind: step.kind },
         { providers: step.providers, limiter, used: { has: (id) => history.blocked(id, shot.start) }, verifyItem: verifyArchiveItem, minCandidates: 1, maxWaitMs: o.maxWaitMs, timeoutMs: o.timeoutMs, sleep: o.sleep },
       );
       row.trace.push(...found.trace.map((t) => ({ query, ...t })));
       // Every candidate here passed its item-level rights check inside fetchShotMedia.
-      const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId) && (!o.wholeWord || titleHasWords(c.title, query)));
+      const free = found.candidates.filter((c) => c.rights.allowed && FREE_LICENCES.includes(c.rights.licenseId) && (!o.wholeWord || (named ? isRelevant(query, c.title) : titleHasWords(c.title, query))));
       // A clip too short to show is not footage: try the next query/provider. Among the rest, a clip at
       // least as long as the shot comes first, so a long shot is not filled by a 2-second clip that repeats.
       const shotSeconds = Math.max(0, shot.end - shot.start);
