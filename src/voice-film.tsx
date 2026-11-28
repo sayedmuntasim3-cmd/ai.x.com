@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon } from "./icons";
 import { alternativesFor, candidateFromSearch, dropSwap, filterShots, packCheck, remakeState, setSwap, shotList, swapOf, swapPlan } from "./shot-swap.mjs";
+import { DRAFT_LABEL, cardOf } from "./film-label.mjs";
 
 /**
  * Voiceover mode's "Make my film": the creator's own recording goes up in
@@ -14,7 +15,7 @@ const VOICE_STORE = "zupona:voice-films";
 const eyebrow = "text-[12px] font-semibold uppercase tracking-[0.16em] text-brand-ink";
 
 type Progress = { at: string; stage: string; ok: boolean; message: { en: string; bn: string } };
-type VoiceView = { id: string; status: string; progress: Progress[]; createdAt?: string; topic?: string; fileName?: string; film?: { bytes: number; seconds: number | null } | null; download?: string; listen?: string; run?: { runUrl?: string } | null; kind?: string; report?: { ayat?: { ref: string }[] } | null };
+type VoiceView = { id: string; status: string; progress: Progress[]; createdAt?: string; topic?: string; fileName?: string; film?: { bytes: number; seconds: number | null } | null; draft?: boolean; blocks?: { code: string; en: string; bn: string }[]; download?: string; listen?: string; run?: { runUrl?: string } | null; kind?: string; report?: { ayat?: { ref: string }[] } | null };
 
 function readStore(key: string) {
   try {
@@ -54,6 +55,7 @@ const STATUS: Record<string, string> = {
   queued: "Waiting for a film machine",
   running: "Making your film",
   done: "Your film is ready",
+  draft: DRAFT_LABEL,
   "awaiting-review": "Ready for the scholar's review",
   failed: "Stopped",
 };
@@ -79,7 +81,8 @@ async function putPart(url: string, key: string, body: Blob) {
 /** The five plain steps the viewer sees; each stage the film machine reports belongs to one of them. */
 const STEPS = ["Listening", "Finding pictures", "Editing", "Quality check", "Ready"];
 const STEP_OF: Record<string, number> = { script: 0, narrate: 0, uploaded: 0, marked: 0, queued: 0, started: 0, intake: 0, words: 0, understand: 0, master: 0, pictures: 1, render: 2, check: 3, deliver: 4, done: 4 };
-const FINISHED = ["done", "awaiting-review"];
+// A draft is finished work too (nothing is still being made): it is held back from "released", not from the page.
+const FINISHED = ["done", "awaiting-review", "draft"];
 
 function stepOf(film: VoiceView) {
   if (FINISHED.includes(film.status)) return STEPS.length;
@@ -327,7 +330,7 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
         if (res.ok) {
           const data = (await res.json()) as VoiceView;
           if (!stop) setFilm(data);
-          if (["done", "awaiting-review", "failed"].includes(data.status)) {
+          if (["done", "awaiting-review", "draft", "failed"].includes(data.status)) {
             loadList(false);
             return;
           }
@@ -479,10 +482,22 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
       <div>
         <div className="mt-6 rounded-2xl border border-line bg-canvas/50 p-4" aria-live="polite">
           <p className={`${eyebrow} flex items-center gap-1.5`}>
-            {finished ? <CheckIcon size={16} /> : stopped ? null : <span className="inline-block size-2 animate-pulse rounded-full bg-brand" />}
+            {finished && !shown.draft ? <CheckIcon size={16} /> : stopped ? null : shown.draft ? null : <span className="inline-block size-2 animate-pulse rounded-full bg-brand" />}
             {STATUS[shown.status] ?? shown.status}
           </p>
           <Stepper film={shown} seconds={secondsOf(shown.id, shown)} />
+          {shown.draft && (
+            <div className="mt-3">
+              {cardOf(shown).reasons.length > 0 && (
+                <ul className="list-disc space-y-1 pl-5 text-[14px] text-ink-2">
+                  {cardOf(shown).reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-[13px] leading-relaxed text-muted">This is a draft: it is yours to keep, but it is not a released film. “Try again” fixes the pictures that failed.</p>
+            </div>
+          )}
           {stopped && (
             <p className="mt-3 text-[14px] text-[#c2410c]">
               Why it stopped: {whyStopped(shown)}
@@ -517,7 +532,7 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
           <div className="mt-4 grid grid-cols-2 gap-3">
             {shown.download ? (
               <a href={shown.download} className="inline-flex h-11 items-center justify-center rounded-full bg-ink text-[14px] font-medium text-canvas transition hover:opacity-90">
-                Download the film
+                {shown.draft ? cardOf(shown).download : "Download the film"}
               </a>
             ) : (
               <span className="inline-flex h-11 items-center justify-center rounded-full bg-sunken text-[14px] font-medium text-muted">Film not ready yet</span>
@@ -526,14 +541,15 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
               type="button"
               disabled={busy}
               onClick={() => {
-                if (!stopped) {
+                if (stopped || shown.draft) void retry(shown.id);
+                else {
                   if (fileName) remember(fileName, "");
                   setFilm(null);
-                } else void retry(shown.id);
+                }
               }}
               className="inline-flex h-11 items-center justify-center rounded-full border border-line-strong text-[14px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
             >
-              {stopped ? (busy ? "Starting…" : "Try again") : "Make another"}
+              {stopped || shown.draft ? (busy ? "Starting…" : "Try again") : "Make another"}
             </button>
           </div>
         </div>
@@ -883,6 +899,7 @@ function MyFilms({
         {list.filter((f) => f.id !== activeId).slice(0, 12).map((f) => {
           const finished = FINISHED.includes(f.status);
           const stopped = f.status === "failed";
+          const draft = f.draft === true;
           return (
             <li key={f.id} className="p-3">
               <div className="flex items-start justify-between gap-3">
@@ -893,7 +910,16 @@ function MyFilms({
                     {f.createdAt ? ` · ${new Date(f.createdAt).toLocaleDateString()}` : ""}
                   </p>
                 </div>
-                {finished && f.film ? (
+                {draft && f.film ? (
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button type="button" onClick={() => onDownload(f.id)} className="h-9 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas transition hover:opacity-90">
+                      {cardOf(f).download}
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => onRetry(f.id)} className="h-9 shrink-0 rounded-full border border-line-strong px-3 text-[13px] font-medium text-ink transition hover:border-ink/40 disabled:opacity-60">
+                      Try again
+                    </button>
+                  </span>
+                ) : finished && f.film ? (
                   <div className="flex shrink-0 flex-col gap-1.5">
                     <button type="button" onClick={() => onDownload(f.id)} className="h-9 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas transition hover:opacity-90">
                       Download
@@ -912,6 +938,13 @@ function MyFilms({
                   </button>
                 ) : null}
               </div>
+              {draft && cardOf(f).reasons.length > 0 && (
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[13px] text-ink-2">
+                  {cardOf(f).reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              )}
               {stopped && <p className="mt-1.5 text-[13px] text-[#c2410c]">Why it stopped: {whyStopped(f)}</p>}
             </li>
           );

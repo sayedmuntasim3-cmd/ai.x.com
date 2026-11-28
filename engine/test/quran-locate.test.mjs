@@ -50,6 +50,41 @@ function recite(units, o = {}) {
   return { spans, truth, seconds: at + 0.5 };
 }
 
+/**
+ * A Taraweeh-style recording as the recognizer and the pause detector give
+ * it: every ayah in its own voiced stretch with a pause after it, and a
+ * basmala of its own between two surahs (a real recitation's own words).
+ * @param {{ surah: number, ayah: number | null }[]} units an ayah, or the basmala before a surah (ayah null)
+ * @param {{ lead?: number, gap?: number, step?: number }} [o]
+ * @returns {{ words: { text: string, start: number, end: number }[], spans: Span[], truth: { start: number, end: number, surah: number, ayah: number | null }[], total: number }}
+ */
+function reciteInStretches(units, o = {}) {
+  const lead = o.lead ?? 0.6, gap = o.gap ?? 0.8, step = o.step ?? 0.55;
+  /** @type {{ text: string, start: number, end: number }[]} */
+  const words = [];
+  /** @type {{ start: number, end: number }[]} */
+  const spans = [];
+  /** @type {{ start: number, end: number, surah: number, ayah: number | null }[]} */
+  const truth = [];
+  let at = lead;
+  for (const u of units) {
+    const tokens = u.ayah === null ? tokenizeArabic(ayahText(index, 1, 1) ?? "") : tokenizeArabic(recited(u.surah, u.ayah));
+    const length = tokens.length * step;
+    spans.push({ start: at, end: at + length });
+    tokens.forEach((text, i) => words.push({ text, start: at + i * step, end: at + i * step + 0.5 }));
+    truth.push({ start: at, end: at + length, surah: u.surah, ayah: u.ayah });
+    at += length + gap;
+  }
+  return { words, spans, truth, total: at - gap + 0.4 };
+}
+
+/** An ayah's words as recited: the basmala Tanzil writes before ayah 1 is not part of it. @param {number} surah @param {number} ayah */
+function recited(surah, ayah) {
+  const text = ayahText(index, surah, ayah) ?? "";
+  const words = text.split(/\s+/);
+  return ayah === 1 && surah !== 1 && surah !== 9 && tokenizeArabic(words.slice(0, 4).join(" ")).join(" ") === "بسم الله الرحمن الرحيم" ? words.slice(4).join(" ") : text;
+}
+
 /** The words of a passage as a recognizer writes them, each with a time inside its ayah. @param {number} surah @param {number} from @param {number} to @param {{ start: number, end: number }[]} times @param {number} [drift] */
 function heardWords(surah, from, to, times, drift = 0) {
   /** @type {{ text: string, start: number, end: number }[]} */
@@ -263,6 +298,61 @@ test("locate: given and heard together are confirmed, and the two methods are co
   assert.equal(loc.source, "given+recognized");
   assert.ok(loc.messages.some((m) => m.code === "quran.confirmed"));
   assert.deepEqual(loc.agreement, { ayat: 11, medianSeconds: 0, worstSeconds: 0 });
+});
+
+test("locate: no surah given, a long recitation is found across surah boundaries, one range per surah", () => {
+  // Ad-Duha 93:8-11, then Ash-Sharh 94:1-8, then At-Tin 95:1-3, with the basmala said before each new surah.
+  /** @type {{ surah: number, ayah: number | null }[]} */
+  const units = [];
+  for (let a = 8; a <= 11; a += 1) units.push({ surah: 93, ayah: a });
+  units.push({ surah: 94, ayah: null });
+  for (let a = 1; a <= 8; a += 1) units.push({ surah: 94, ayah: a });
+  units.push({ surah: 95, ayah: null });
+  for (let a = 1; a <= 3; a += 1) units.push({ surah: 95, ayah: a });
+  const v = reciteInStretches(units);
+  const loc = locateRecitation({ index, surahNames, spans: v.spans, totalSeconds: v.total, words: v.words });
+  assert.equal(loc.ok, true, JSON.stringify(loc.messages.map((m) => m.en)));
+  assert.equal(loc.decision, "accept");
+  assert.equal(loc.source, "recognized");
+  assert.equal(loc.timing, "recognized");
+  // The same quran-location.json shape: a list of ranges, one per surah crossed.
+  assert.deepEqual(loc.passages, [{ surah: 93, fromAyah: 8, toAyah: 11 }, { surah: 94, fromAyah: 1, toAyah: 8 }, { surah: 95, fromAyah: 1, toAyah: 3 }]);
+  assert.deepEqual(loc.heard, loc.passages);
+  assert.deepEqual(loc.candidates, []);
+  assert.equal(loc.ayat.length, 15);
+  assert.deepEqual(loc.ayat.map((a) => `${a.surah}:${a.ayah}`), [...Array(4)].map((_, i) => `93:${i + 8}`).concat([...Array(8)].map((_, i) => `94:${i + 1}`), [...Array(3)].map((_, i) => `95:${i + 1}`)));
+  // Each ayah's time is its own stretch, never the basmala's.
+  const ayahTruth = v.truth.filter((t) => t.ayah !== null);
+  loc.ayat.forEach((a, k) => {
+    assert.ok(Math.abs(a.start - ayahTruth[k].start) < 0.002 && Math.abs(a.end - ayahTruth[k].end) < 0.002, `${a.surah}:${a.ayah} ${a.start}-${a.end} vs ${ayahTruth[k].start}-${ayahTruth[k].end}`);
+  });
+  assert.deepEqual(loc.markers.map((m) => m.type), ["basmala", "basmala"]);
+  assert.deepEqual(loc.heard.length, 3);
+  assert.deepEqual(loc.question, null);
+});
+
+test("locate: words that occur in several places list every candidate and take none", () => {
+  // Ar-Rahman's refrain (55:13) is recited 31 times in that surah, word for word.
+  const v = reciteInStretches([{ surah: 55, ayah: 13 }, { surah: 55, ayah: 14 }]);
+  const loc = locateRecitation({ index, surahNames, spans: v.spans, totalSeconds: v.total, words: v.words });
+  // Two ayat: the second pins the first to its place, so this one is settled.
+  assert.equal(loc.decision, "accept");
+  assert.deepEqual(loc.passages, [{ surah: 55, fromAyah: 13, toAyah: 14 }]);
+  // The refrain alone is not: every place is listed, nothing is taken, and the owner is asked.
+  const alone = reciteInStretches([{ surah: 55, ayah: 13 }]);
+  const ask = locateRecitation({ index, surahNames, spans: alone.spans, totalSeconds: alone.total, words: alone.words });
+  assert.equal(ask.ok, false);
+  assert.equal(ask.decision, "ask");
+  assert.equal(ask.question?.code, "quran.ask.candidates");
+  assert.equal(ask.ayat.length, 0, "nothing is placed while the place is unknown");
+  assert.ok(ask.candidates.length > 2, String(ask.candidates.length));
+  assert.ok(ask.candidates.every((c) => c.length === 1 && c[0].surah === 55), JSON.stringify(ask.candidates));
+  assert.ok(ask.candidates.some((c) => c[0].fromAyah === 13 && c[0].toAyah === 13));
+  const places = new Set(ask.candidates.map((c) => `${c[0].surah}:${c[0].fromAyah}`));
+  assert.equal(places.size, ask.candidates.length, "no place is listed twice");
+  assert.match(ask.question?.en ?? "", new RegExp(String(ask.candidates.length)));
+  assert.match(ask.question?.en ?? "", /55:13/);
+  for (const m of ask.messages) assert.ok(m.code in MESSAGES && m.en && m.bn, m.code);
 });
 
 test("locate: unclear, contradictory or impossible input ends in a question, never a guess", () => {

@@ -4,10 +4,60 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { AYAH_COUNTS, buildQuranIndex } from "../engine/src/quran.mjs";
-import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, retakeRecording, sliceWords, voiceReport } from "./voice-film.mjs";
+import { tokenizeArabic } from "../engine/src/arabic.mjs";
+import { AYAH_COUNTS, ayahText, buildQuranIndex } from "../engine/src/quran.mjs";
+import { cutSlice, hasFfmpeg, intake, parseArgs, parseSlice, pictures, resumeState, retakeRecording, runSignature, sliceWords, voiceReport } from "./voice-film.mjs";
+
+const tanzilIndex = buildQuranIndex(JSON.parse(readFileSync(new URL("../engine/data/quran/tanzil-quran-simple-1.0.2.json", import.meta.url), "utf8")));
+
+/** An ayah's words as recited (the basmala before ayah 1 is not part of it). @param {number} surah @param {number} ayah */
+function recited(surah, ayah) {
+  const text = ayahText(tanzilIndex, surah, ayah) ?? "";
+  const words = text.split(/\s+/);
+  return ayah === 1 && surah !== 1 && surah !== 9 && tokenizeArabic(words.slice(0, 4).join(" ")).join(" ") === "بسم الله الرحمن الرحيم" ? words.slice(4).join(" ") : text;
+}
 
 const ffmpeg = await hasFfmpeg();
+
+test("a re-run reads the stages the earlier run finished, and never asks the brain for them again", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-resume-"));
+  const about = { audio: "a.mp3", bytes: 1000, topic: "The bridge", kind: "narration", slice: null, media: false };
+  assert.equal(runSignature(about), runSignature({ ...about, somethingElse: 1 }), "only the fingerprint fields count");
+  assert.equal((await resumeState(dir, about)).matches, false, "a folder with no run.json reuses nothing");
+  writeFileSync(join(dir, "run.json"), JSON.stringify({ version: 1, signature: runSignature({ ...about, bytes: 2000 }), about: { ...about, bytes: 2000 } }));
+  assert.equal((await resumeState(dir, about)).matches, false, "another recording's folder is not reused");
+
+  const { syntheticScenes } = await import("../engine/src/brain-budget.mjs");
+  const { voiceStructure } = await import("../engine/src/voice-understand.mjs");
+  const { planVoiceVisuals } = await import("../engine/src/voice-visuals.mjs");
+  const { planBeats, planShots } = await import("../engine/src/shot-plan.mjs");
+  const scenes = syntheticScenes(1, 4);
+  const structure = voiceStructure(scenes);
+  const director = await planBeats({ scenes, structure, topic: about.topic });
+  const r = await planVoiceVisuals({ scenes, structure, topic: about.topic, brain: null });
+  const plan = planShots({ markdown: r.markdown, scenes, beats: director.beats, world: director.world, genre: director.genre, topic: about.topic, structure });
+  writeFileSync(join(dir, "run.json"), JSON.stringify({ version: 1, signature: runSignature(about), about }));
+  writeFileSync(join(dir, "understanding.json"), JSON.stringify({ ok: true, kind: "narration", language: "en", scenes, structure }));
+  writeFileSync(join(dir, "beats.json"), JSON.stringify({ world: director.world, genre: director.genre, language: director.language, beats: director.beats, findings: director.findings, brainFindings: [] }));
+  writeFileSync(join(dir, "pictures.md"), r.markdown + "\n");
+  writeFileSync(join(dir, "pictures.json"), JSON.stringify({ kind: "narration", plan: r.plan, findings: [], media: null, changedByBrain: [] }));
+  writeFileSync(join(dir, "shots.json"), JSON.stringify({ genre: director.genre, world: director.world, hook: plan.hook, shots: plan.shots, findings: [] }));
+  writeFileSync(join(dir, "edit-C1.json"), JSON.stringify({ scenes: plan.edit }));
+
+  const state = await resumeState(dir, about);
+  assert.equal(state.matches, true);
+  assert.deepEqual(state.stages, ["understanding", "beats", "pictures", "shots", "edit"]);
+
+  // The brain throws if it is asked at all: a resumed run must not make one call.
+  const brain = { name: "must-not-be-asked", capabilities: { vision: false, webSearch: false }, call: async () => { throw new Error("the brain must not be asked again"); } };
+  const again = await pictures({ out: dir, understanding: state.understanding, brain, resume: state, topic: about.topic });
+  assert.equal(again.ok, true);
+  assert.ok(again.messages.some((m) => m.code === "voice.resumed"));
+
+  // A plan with an unfinished line (TODO) is not trusted: it is planned again.
+  writeFileSync(join(dir, "pictures.md"), r.markdown.replace("ANCHOR:", "ANCHOR: TODO") + "\n");
+  assert.equal((await resumeState(dir, about)).pictures, null);
+});
 
 test("arguments: kind is checked", () => {
   assert.deepEqual(parseArgs(["--audio", "a.mp3"]), { audio: "a.mp3", kind: "auto" });
@@ -69,6 +119,38 @@ test("slice: the recording is cut to the slice (ffmpeg)", { skip: !ffmpeg && "ff
   const r = await intake({ audio: file, out: join(dir, "out") });
   assert.ok(r.report && Math.abs(r.report.durationSeconds - 2.5) < 0.05, String(r.report?.durationSeconds));
   assert.deepEqual(JSON.parse(readFileSync(join(dir, "out", "slice.json"), "utf8")), { source: "tone.wav", start: 1, end: 3.5, seconds: 2.5 });
+});
+
+test("a recitation with no surah typed: --kind quran --transcript finds every surah and ayah from the words alone", () => {
+  const dir = mkdtempSync(join(tmpdir(), "voice-transcript-only-"));
+  // Ad-Duha 93:8-11, the basmala, Ash-Sharh 94:1-8, the basmala, At-Tin 95:1-3: what a recognizer hears, with times.
+  /** @type {{ surah: number, ayah: number | null }[]} */
+  const units = [];
+  for (let a = 8; a <= 11; a += 1) units.push({ surah: 93, ayah: a });
+  units.push({ surah: 94, ayah: null });
+  for (let a = 1; a <= 8; a += 1) units.push({ surah: 94, ayah: a });
+  units.push({ surah: 95, ayah: null });
+  for (let a = 1; a <= 3; a += 1) units.push({ surah: 95, ayah: a });
+  /** @type {{ text: string, start: number, end: number }[]} */
+  const words = [];
+  let at = 0.6;
+  for (const u of units) {
+    const tokens = u.ayah === null ? tokenizeArabic(ayahText(tanzilIndex, 1, 1) ?? "") : tokenizeArabic(recited(u.surah, u.ayah));
+    tokens.forEach((text, i) => words.push({ text, start: Math.round((at + i * 0.55) * 1000) / 1000, end: Math.round((at + i * 0.55 + 0.5) * 1000) / 1000 }));
+    at += tokens.length * 0.55 + 0.8;
+  }
+  const fixture = join(dir, "quran-words.json");
+  writeFileSync(fixture, JSON.stringify({ language: "ar", words }));
+  const out = join(dir, "run");
+  execFileSync(process.execPath, ["local/voice-film.mjs", "--kind", "quran", "--transcript", fixture, "--out", out], { stdio: "pipe" });
+  const location = JSON.parse(readFileSync(join(out, "quran-location.json"), "utf8"));
+  assert.equal(location.ok, true);
+  assert.equal(location.source, "recognized");
+  assert.deepEqual(location.passages, [{ surah: 93, fromAyah: 8, toAyah: 11 }, { surah: 94, fromAyah: 1, toAyah: 8 }, { surah: 95, fromAyah: 1, toAyah: 3 }]);
+  assert.equal(location.ayat.length, 15);
+  const understanding = JSON.parse(readFileSync(join(out, "understanding.json"), "utf8"));
+  assert.equal(understanding.kind, "quran");
+  assert.deepEqual(understanding.quranPlan.summary.surahs, [93, 94, 95]);
 });
 
 test("voice brain: free brains only, Groq first", async () => {
