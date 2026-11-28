@@ -1033,7 +1033,9 @@ export async function rerankRun(o) {
       s.why = { by: `OpenCLIP ${ans.model}`, ...pick.score, scale: pick.scale ?? null, provider: c.source, licence: s.pick.licence?.licenseId ?? null, candidates: p.seen, passed: p.ranked.length, refused: p.refused, sequence: pick.sequence ?? null, before, critic, repicks: repicks.get(p) ?? 0, record: recordClass(c, p.historic), textMatch: textPicks.has(p.s) };
       if (critic?.fits === false) s.review = "critic-miss";
     }
-    report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), ...x.score })) });
+    report.push({ scene: s.scene, shot: s.shot, start: s.start, sentence: s.sentence ?? null, queries: s.queries ?? [], before, after: s.pick?.id ?? null, kind: s.pick?.kind ?? null, scale: pick?.scale ?? null, sequence: pick?.sequence ?? null, why: s.why ?? null, // The candidates keep their own picture and licence: "My films" offers them as swaps, and only a
+      // free-licence clip with a picture may be offered (engine/src/edit-pack.mjs checks it again).
+      top: p.ranked.slice(0, 5).map((x) => ({ id: x.c.id, title: String(x.c.title ?? "").slice(0, 60), previewUrl: x.c.previewUrl ?? null, mediaUrl: x.c.mediaUrl ?? null, source: x.c.source ?? null, sourcePageUrl: x.c.sourcePageUrl ?? null, kind: x.c.mediaType ?? x.c.kind ?? null, licence: x.c.rights?.licenseId ?? x.c.licence?.licenseId ?? (typeof x.c.licence === "string" ? x.c.licence : null), ...x.score })) });
   });
   // No off-topic fallback: a named shot with no relevant pick of its own holds the nearest strong pick of the film, never a random picture.
   // The same for any shot no picture fits (owner's rule: never a card of white text on empty black): it holds the nearest strong pick, moving.

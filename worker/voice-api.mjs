@@ -15,6 +15,9 @@
  *   PUT  /api/voice/:id/film/parts/:n    one piece of the MP4   (ticket)
  *   POST /api/voice/:id/film/complete    { parts }   (ticket)
  *   POST /api/voice/:id/marks            { start, ends[], by } the reviewer's ayah times (Quran): the film is made again with them   (Bearer STUDIO_TOKEN)
+ *   GET  /api/voice/:id/edit             the film's edit pack: every shot's time, words and top 6 free candidates   (Bearer STUDIO_TOKEN, or ticket)
+ *   POST /api/voice/:id/edit             the runner saves the edit pack when the film finishes   (ticket)
+ *   POST /api/voice/:id/swaps            { swaps: [{ shotId, candidate|candidateId }] } re-make only the parts holding the swapped shots   (Bearer STUDIO_TOKEN)
  *   POST /api/voice/:id/retry            start a failed film again from the saved recording   (Bearer STUDIO_TOKEN)
  *   DELETE /api/voice/:id                remove the recording, the film and the record   (Bearer STUDIO_TOKEN)
  *   GET  /api/voice/:id/stock?kind=&q=   Pixabay search relayed with the Worker's own key (free; the key never leaves Cloudflare)   (ticket, or Bearer STUDIO_TOKEN)
@@ -32,6 +35,7 @@
  */
 import { msg } from "../engine/src/messages.mjs";
 import { checkMarks } from "../engine/src/quran-marks.mjs";
+import { applySwaps, changedParts, checkEditPack, checkSwaps, EDIT_PACK_VERSION, leanPack, MAX_PACK_BYTES } from "../engine/src/edit-pack.mjs";
 import { addAudience, addRecord, emptyLedger, ledgerJson, parseLedger, recordFromReport } from "../engine/src/craft-memory.mjs";
 import { GROQ_MODELS, GROQ_PROMPT_LIMIT, groqMessages, groqModel, promptTokens } from "./groq.mjs";
 import { nextDailyTopic } from "./daily-film.mjs";
@@ -94,7 +98,9 @@ export const DOWNLOAD_TICKET_SECONDS = 2 * 3600;
 const AUDIO_TYPES = /** @type {const} */ ({ mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac", flac: "audio/flac", ogg: "audio/ogg", opus: "audio/opus", webm: "audio/webm" });
 const ID = /^[0-9a-f-]{36}$/;
 /** The stages the runner reports, in order (each has a message voice.stage.<stage>). */
-export const VOICE_STAGES = /** @type {const} */ (["script", "narrate", "uploaded", "marked", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
+export const VOICE_STAGES = /** @type {const} */ (["script", "narrate", "uploaded", "marked", "swaps", "queued", "started", "intake", "words", "understand", "master", "pictures", "render", "check", "deliver", "done"]);
+/** Where a film's edit pack lives next to it (one JSON; the film, its recording and its pack share the id). */
+const editPackKey = (/** @type {string} */ id) => `voice/${id}/edit.json`;
 
 /** @param {unknown} body @param {number} [status] @param {Record<string, string>} [headers] */
 function json(body, status = 200, headers = {}) {
@@ -234,7 +240,7 @@ async function save(bucket, rec) {
 /** A record as the creator sees it (no upload ids, no keys). @param {any} rec */
 function publicView(rec) {
   const draft = rec.film?.draft === true;
-  return { id: rec.id, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, draft, blocks: draft ? cleanBlocks(rec.film?.blocks) : [], release: rec.release ?? null, report: rec.report ?? null };
+  return { id: rec.id, swaps: Array.isArray(rec.swaps) ? rec.swaps.length : 0, kind: rec.kind, topic: rec.topic, fileName: rec.fileName, bytes: rec.bytes, surah: rec.surah, ayat: rec.ayat, reciter: rec.reciter, createdAt: rec.createdAt, status: statusOf(rec), progress: rec.progress ?? [], run: rec.run ?? null, film: rec.film ? { bytes: rec.film.bytes, seconds: rec.film.seconds ?? null } : null, draft, blocks: draft ? cleanBlocks(rec.film?.blocks) : [], release: rec.release ?? null, report: rec.report ?? null };
 }
 
 /**
@@ -245,7 +251,7 @@ function publicView(rec) {
 export async function dispatchVoiceFilm(o) {
   const inputs = o.workflow === "daily-film.yml"
     ? { voice_id: o.rec.id, site: o.site, ticket: o.ticket, topic_id: o.rec.daily?.topicId ?? "" }
-    : { voice_id: o.rec.id, site: o.site, ticket: o.ticket, kind: o.rec.kind, ext: o.rec.ext, topic: o.rec.topic || "", quran: o.rec.kind === "quran" ? JSON.stringify({ surah: o.rec.surah, ayat: o.rec.ayat || "", reciter: o.rec.reciter || "", ...(o.rec.marks ? { marks: o.rec.marks } : {}) }) : "" };
+    : { voice_id: o.rec.id, site: o.site, ticket: o.ticket, kind: o.rec.kind, ext: o.rec.ext, topic: o.rec.topic || "", quran: o.rec.kind === "quran" ? JSON.stringify({ surah: o.rec.surah, ayat: o.rec.ayat || "", reciter: o.rec.reciter || "", ...(o.rec.marks ? { marks: o.rec.marks } : {}) }) : "", swaps: Array.isArray(o.rec.swaps) && o.rec.swaps.length ? JSON.stringify({ swaps: o.rec.swaps }) : "" };
   return dispatchWorkflow(o, o.workflow ?? "voice-film.yml", inputs);
 }
 
@@ -486,6 +492,50 @@ export async function handleVoice(request, env, url, deps = {}) {
       return { ledger: next.ledger, note: { code: "craft.added", params: { filmId: id, genre: made.record.genre, verdict: made.record.verdict, seconds: made.record.seconds, films: next.ledger.films.length } } };
     });
     return json({ ok: true, films: done?.ledger.films.length ?? 0, note: done?.note ?? null, notes: made.notes });
+  }
+
+  // The edit pack (E1): the runner saves it when the film finishes; the studio reads it to show every shot.
+  if (sub === "edit" && (method === "GET" || method === "POST")) {
+    if (!owner && !runner) return json({ error: "Wrong ticket." }, 401);
+    if (method === "GET") {
+      const o = await bucket.get(editPackKey(id));
+      if (!o) return json({ error: "This film has no edit pack yet. It is written when the film finishes." }, 404);
+      // The page asks for the lean copy (?lean=1): the shots and their pictures, never the film's words.
+      if (url.searchParams.get("lean") === "1") return json(leanPack(JSON.parse(await o.text())));
+      return new Response(o.body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    }
+    const raw = await request.text();
+    const bytes = new TextEncoder().encode(raw).byteLength;
+    if (bytes > MAX_PACK_BYTES + 8192) return json({ error: "The edit pack is larger than the studio stores." }, 413);
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch { return json({ error: "The edit pack must be JSON." }, 400); }
+    const checked = checkEditPack(parsed, bytes);
+    if (!checked.ok) return json({ error: checked.error }, 400);
+    await bucket.put(editPackKey(id), JSON.stringify(checked.value), { httpMetadata: { contentType: "application/json" } });
+    return json({ ok: true, version: EDIT_PACK_VERSION, shots: checked.value.shots.length }, 201);
+  }
+
+  // Swap pictures in a finished film (E1): the swaps are kept, the film goes and only the parts holding
+  // the changed shots are rendered again (render/edit-pack.mjs picks them). Nothing is lowered.
+  if (sub === "swaps" && method === "POST") {
+    if (!owner) return json({ error: "Wrong studio token." }, 401);
+    if (!rec.film) return json({ error: "This film has not finished yet, so there is no picture to swap." }, 409);
+    if (rec.kind === "quran") return json({ error: "A Quran film's pictures are checked against the adab rule; changing one needs the scholar's review, not this page." }, 409);
+    const stored = await bucket.get(editPackKey(id));
+    if (!stored) return json({ error: "This film has no edit pack yet. It is written when the film finishes." }, 404);
+    let pack = null;
+    try { pack = JSON.parse(await stored.text()); } catch { return json({ error: "The film's edit pack could not be read." }, 500); }
+    const checked = checkSwaps(await request.json().catch(() => null), pack);
+    if (!checked.ok) return json({ error: checked.error }, 400);
+    const parts = changedParts(pack, checked.value.swaps);
+    rec.swaps = checked.value.swaps;
+    rec.retries = (rec.retries ?? 0) + 1;
+    // The old film stays (still downloadable while the new one is made): it is the re-make's own source,
+    // for the parts whose shots did not change. The new film overwrites it when it is delivered.
+    // The studio's own copy of the pack now shows the new pictures (the old one stays offered).
+    await bucket.put(editPackKey(id), JSON.stringify(applySwaps(pack, checked.value.swaps)), { httpMetadata: { contentType: "application/json" } });
+    rec.progress.push(progressEntry("swaps", { count: checked.value.swaps.length, parts: parts.changed.length }));
+    return start(rec);
   }
 
   if (sub === "marks" && method === "POST") {
