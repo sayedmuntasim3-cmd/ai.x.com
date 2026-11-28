@@ -525,7 +525,7 @@ export async function renderFilm(o) {
   const range = o.part ? partRange(t.video, o.part.index, o.part.count) : { start: 0, end: t.video.length, frames: 0 };
   // A part's first shot that opens with a move from the shot before needs that shot too (its last frame), and
   // that one the shot before it when it also opens with a move: the chain is redone so the frames are the same.
-  const needsBefore = (/** @type {number} */ i) => i > 0 && Boolean(t.video[i].transition && t.video[i].transition !== "flash" && XFADE[/** @type {keyof typeof XFADE} */ (t.video[i].transition)]) && t.video[i - 1].type !== "black";
+  const needsBefore = (/** @type {number} */ i) => i > 0 && i < t.video.length && Boolean(t.video[i].transition && t.video[i].transition !== "flash" && XFADE[/** @type {keyof typeof XFADE} */ (t.video[i].transition)]) && t.video[i - 1].type !== "black";
   let first = range.start;
   while (first > 0 && needsBefore(first)) first -= 1;
   // M4: designed graphics (Playwright) and the depth camera (Depth Anything V2 small); either one switches
@@ -938,6 +938,13 @@ export async function renderFilm(o) {
       stats.transitions += 1;
     }
     segments[i] = out;
+  }
+  // A part with no shot (a film with fewer, longer shots than parts) writes only its report: the join skips it.
+  if (o.part && range.start >= range.end) {
+    const report = { part: o.part.index + 1, of: o.part.count, shots: [range.start, range.end], frames: 0, empty: true, stats, warnings };
+    writeFileSync(o.outFile.replace(/\.mp4$/i, "") + ".part.json", JSON.stringify(report, null, 1));
+    log(`picture: part ${o.part.index + 1}/${o.part.count} has no shot (nothing to render)`);
+    return /** @type {any} */ (report);
   }
   const videoList = join(o.workDir, "video.txt");
   const pictures = o.joinParts ?? segments.slice(range.start, range.end);
