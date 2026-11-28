@@ -18,6 +18,9 @@ export const AUDIENCE = "zupona-youtube-watch";
 export const CHANNEL_ORDER = Object.freeze(["Plainly Difficult", "Storified", "ColdFusion", "Real Engineering", "Practical Engineering", "Documentary Overload"]);
 
 /** A title that is plainly English: mostly ASCII letters, no other script. @param {string} t */
+/** Titles about money, not engineering (the niche is fixed: Engineering Disasters & Megaprojects). */
+export const OFF_NICHE = /\b(ftx|ponzi|bank(s|ing)?|fraud|bitcoin|crypto|stocks?|ipo|investors?|billion|profits?|economy|economic|netflix|evergrande|scandal)\b/i;
+
 export const looksEnglish = (t) => {
   const letters = [...String(t)].filter((c) => /\p{L}/u.test(c));
   return letters.length >= 8 && letters.filter((c) => /[A-Za-z]/.test(c)).length / letters.length >= 0.95;
@@ -33,7 +36,7 @@ export function pickCandidates(rows, watched, max = DAILY_MAX) {
   for (const r of rows) {
     const channel = r.channel ?? r.channelTitle ?? "";
     if (!r?.id || watched.has(r.id) || byId.has(r.id)) continue;
-    if (!(r.views >= 1_000_000) || !(r.durationSeconds >= 480 && r.durationSeconds <= 2700) || !looksEnglish(r.title)) continue;
+    if (!(r.views >= 1_000_000) || !(r.durationSeconds >= 480 && r.durationSeconds <= 2700) || !looksEnglish(r.title) || OFF_NICHE.test(r.title)) continue;
     byId.set(r.id, { id: r.id, title: r.title, channel, views: r.views, durationSeconds: r.durationSeconds });
   }
   const rank = (/** @type {string} */ c) => { const i = CHANNEL_ORDER.indexOf(c); return i < 0 ? CHANNEL_ORDER.length : i; };

@@ -161,7 +161,8 @@ export function targetsFromSummary(s) {
   if (!s || s.n < MIN_FILMS_FOR_TARGETS) return {};
   /** @type {Record<string, any>} */
   const t = {};
-  const range = (/** @type {number | null} */ lo, /** @type {number | null} */ hi) => (lo !== null && hi !== null && lo < hi ? [lo, hi] : null);
+  // A range narrower than 10% of its middle is a model repeating a default (12 films all said ~142 wpm), not a measurement: skip it.
+  const range = (/** @type {number | null} */ lo, /** @type {number | null} */ hi) => (lo !== null && hi !== null && hi - lo >= 0.1 * ((lo + hi) / 2) ? [lo, hi] : null);
   const wpm = range(s.wpm.p25, s.wpm.p75);
   if (wpm) t.wpm = wpm.map(Math.round);
   const shot = range(s.shotSeconds.p25, s.shotSeconds.p75);
