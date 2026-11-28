@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon } from "./icons";
+import { validateOwnMediaFiles } from "./own-media.mjs";
 
 /**
  * Voiceover mode's "Make my film": the creator's own recording goes up in
@@ -237,6 +238,7 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
   const [quran, setQuran] = useState(false);
   const [surah, setSurah] = useState("");
   const [reciter, setReciter] = useState("");
+  const [ownFiles, setOwnFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(0);
   const [error, setError] = useState("");
@@ -386,6 +388,32 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
         body: JSON.stringify({ parts }),
       });
       const view = (await done.json().catch(() => ({}))) as VoiceView & { error?: string };
+      // Upload the creator's own photos and clips, piece by piece, like the recording.
+      for (const f of ownFiles) {
+        try {
+          const buf = await f.arrayBuffer();
+          const blob = new Blob([buf]);
+          const opened = await fetch(`/api/voice/${data.id}/own`, {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
+            body: JSON.stringify({ fileName: f.name, bytes: f.size }),
+          });
+          const info = (await opened.json().catch(() => ({}))) as { partSize?: number; parts?: number; error?: string };
+          if (!opened.ok || !info.parts) { setError(String(info.error ?? "An own file could not be uploaded.")); continue; }
+          const ownParts: { partNumber: number; etag: string }[] = [];
+          for (let n = 1; n <= (info.parts ?? 1); n += 1) {
+            const piece = blob.slice((n - 1) * (info.partSize ?? 0), n * (info.partSize ?? 0));
+            ownParts.push(await putPart(`/api/voice/${data.id}/own/parts/${n}`, studioKey, piece));
+          }
+          await fetch(`/api/voice/${data.id}/own/complete`, {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${studioKey}` },
+            body: JSON.stringify({ parts: ownParts }),
+          });
+        } catch {
+          setError("An own file could not be uploaded.");
+        }
+      }
       remember(fileName, data.id);
       if (seconds) rememberSeconds(data.id, seconds);
       setFilm(view.id ? view : { id: data.id, status: "uploaded", progress: [] });
@@ -543,6 +571,27 @@ export function VoiceFilm({ fileName, voiceUrl, seconds, topic }: { fileName?: s
                   </p>
                 </div>
               )}
+              <div className="mt-4">
+                <p className="text-[13px] font-medium text-ink">Add your own photos or clips (optional)</p>
+                <label className="mt-2 block rounded-2xl border border-dashed border-line-strong bg-canvas/50 px-4 py-4 text-center text-[13px] text-muted">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.webp,.mp4,.mov"
+                    className="hidden"
+                    onChange={(e) => {
+                      const list = Array.from(e.target.files ?? []);
+                      const v = validateOwnMediaFiles(list);
+                      if (!v.ok) { setError(v.error); return; }
+                      setOwnFiles(list);
+                      setError("");
+                    }}
+                  />
+                  Drop or choose up to 50 files, 200 MB total (JPG, PNG, WebP, MP4, MOV)
+                </label>
+                {ownFiles.length > 0 && <p className="mt-2 text-[12.5px] text-ink-2">{ownFiles.length} file(s) chosen</p>}
+                <p className="mt-2 text-[12px] leading-relaxed text-muted">Only add pictures you own or may use.</p>
+              </div>
             </div>
           </details>
           <button
