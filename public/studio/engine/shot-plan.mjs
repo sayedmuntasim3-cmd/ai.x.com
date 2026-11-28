@@ -16,6 +16,7 @@ import { parseSceneLines, toSeconds } from "./scene-lines.mjs";
 import { checkVoiceChapter, restoreVoiceFields } from "./voice-scenes.mjs";
 import { editInstruction, editSheet, editStats, longHolds, uncoveredHolds, validateEditPlan } from "./edit-director.mjs";
 import { buildTimeline } from "./timeline.mjs";
+import { CARD_SECONDS, MOMENT_GAP } from "./voice-moments.mjs";
 
 /** @typedef {import("./voice-scenes.mjs").VoiceScene} VoiceScene */
 /** @typedef {import("./film-run.mjs").Model} Model */
@@ -287,9 +288,9 @@ export function worldBrief(world) {
 // Visual Director's designed moments. The voice's words and times are never touched: they are checked and put back.
 
 /** The closed vocabulary of shot types (the names render/graphics/from-shot.mjs and render-film.mjs read as v.shotType). */
-export const SHOT_TYPES = Object.freeze(["live-video", "archival-video", "photo-2.5D", "photo-designed", "title", "kinetic-type", "quote", "document", "timeline"]);
+export const SHOT_TYPES = Object.freeze(["live-video", "archival-video", "photo-2.5D", "photo-designed", "title", "kinetic-type", "quote", "document", "timeline", "lowerThird", "counter"]);
 /** Types that are a designed moment (a graphic on a narration beat), drawn as an R1 card. */
-export const DESIGNED_TYPES = Object.freeze(["title", "kinetic-type", "quote", "document", "timeline"]);
+export const DESIGNED_TYPES = Object.freeze(["title", "kinetic-type", "quote", "document", "timeline", "lowerThird", "counter"]);
 /** Shot length by genre (seconds): the median band and the longest one picture may hold (TRANSFORMATION.md §4). */
 export const GENRE_RHYTHM = Object.freeze({
   biography: { target: 4.5, median: [2.5, 6], max: 8 },
@@ -300,7 +301,8 @@ export const GENRE_RHYTHM = Object.freeze({
 /** The hook (docs/research/VIRAL_STUDY.md, TRANSFORMATION.md §4): ≥6 visual beats in the first 30 s, the title by 0:40, a designed moment at least every 45 s. */
 export const HOOK = Object.freeze({ seconds: 30, beats: 6, titleBy: 40, shotMax: 4, designEvery: 45 });
 /** The sound cue under each designed moment (an Edit Director hit; kinetic type gets the renderer's own impact). */
-export const DESIGN_SOUND = Object.freeze({ title: "boom", quote: "riser", document: "click", timeline: "whoosh", "kinetic-type": "impact" });
+// A lower third and a counter land their own impact in the renderer (timeline.mjs), so they take no extra cue.
+export const DESIGN_SOUND = Object.freeze({ title: "boom", quote: "riser", document: "click", timeline: "whoosh", "kinetic-type": "impact", lowerThird: "", counter: "" });
 
 /** Words that are not a picture (what the words-only plan found for 993f09ea: "behind", "basics", "cause", "film"). */
 const WEAK = /^(?:behind|basics?|cause|film|image|noise|detail|record|records|numbers?|accounts?|telling|thing|things|way|part|time|times|year|years|age|today|story|money|terms|word|words|kind|lot|end|start|first|note|reports?|later|decades?|others?|better|best|kept|same|most|next|other|whole|own|everything|nothing|something|someone|anyone|people|life|world|day|days|hand|hands)$/i;
@@ -437,7 +439,10 @@ function moveFor(emotion, prev) {
  * typed, designed moments on narration beats, the world in every picture's search, the shot table, the code
  * edit (sound cues and print frames for the Edit Director stage), and the findings of the code checks.
  * `rhythm` (optional) replaces the genre's rhythm: the Craft Ledger's calibrated one (craft-memory.mjs rhythmFrom), never looser.
- * @param {{ markdown: string, scenes: VoiceScene[], beats: any[], world: World, genre: string, topic?: string, structure?: Structure | null, rhythm?: { target: number, median: [number, number], max: number } }} o
+ * @param {{ markdown: string, scenes: VoiceScene[], beats: any[], world: World, genre: string, topic?: string, structure?: Structure | null, rhythm?: { target: number, median: [number, number], max: number },
+ *   moments?: import("./voice-moments.mjs").Moment[] }} o
+ *   moments: the designed moments the voice's own words carry (voice-moments.mjs planMoments); they fill the
+ *   gaps the brain's plan left, never move a card it planned
  */
 export function planShots(o) {
   const rhythm = o.rhythm ?? GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (o.genre)] ?? GENRE_RHYTHM.documentary;
@@ -451,23 +456,52 @@ export function planShots(o) {
   const where = o.world.city || o.world.country;
 
   // 1. Designed moments: the title by 0:40, then one moment at least every 45 s, each on a sentence the voice says.
-  /** @type {Map<string, NonNullable<ReturnType<typeof designedMoment>>>} */
+  /** @type {Map<string, NonNullable<ReturnType<typeof designedMoment>>[]>} */
   const design = new Map();
+  /** The last card planned in a scene: the one the 12 s / 15 s spacing is measured from. */
+  const lastAt = (/** @type {string} */ sc) => design.get(sc)?.at(-1)?.at ?? -Infinity;
+  /** @param {string} sc @param {any} d */
+  const addCard = (sc, d) => { const list = design.get(sc) ?? []; list.push(d); list.sort((a, b) => a.at - b.at); design.set(sc, list); return d; };
   const title = String(o.topic ?? "").trim();
-  if (title) {
+  // When the voice's own moments (voice-moments.mjs) plan the title, it lands on a sentence nothing else uses;
+  // the blanket title below would collide with the first lower third.
+  const titlePlanned = (o.moments ?? []).some((m) => m.type === "title");
+  if (title && !titlePlanned) {
     // The title lands as the hook's first claim ends: the first sentence that ends after 12 s, before 0:40.
     const s = o.scenes.find((x) => x.start >= 12 && x.start < HOOK.titleBy - 3) ?? o.scenes.find((x) => x.end > 12 && x.start < HOOK.titleBy - 3);
-    if (s) design.set(s.sc, { type: "title", text: title, at: Math.max(s.start, 12), until: Math.min(s.end, Math.max(s.start, 12) + 3.5) });
+    if (s) addCard(s.sc, { type: "title", text: title, at: Math.max(s.start, 12), until: Math.min(s.end, Math.max(s.start, 12) + 3.5) });
   }
   let last = -Infinity, before = -Infinity, lastSc = "";
   for (const s of o.scenes) {
-    if (design.has(s.sc)) { before = last; last = /** @type {any} */ (design.get(s.sc)).at; lastSc = s.sc; continue; }
+    if (design.has(s.sc)) { before = last; last = lastAt(s.sc); lastSc = s.sc; continue; }
     const m = designedMoment(s, beatOf(s), lead);
     // A timeline, document or quote is worth more than the kinetic line just before it: it takes that place.
-    const prev = design.get(lastSc);
-    if (m && m.type !== "kinetic-type" && prev?.type === "kinetic-type" && m.at - last < 12 && m.at - before >= 12) { design.delete(lastSc); last = before; }
+    const prev = design.get(lastSc)?.at(-1);
+    if (m && m.type !== "kinetic-type" && prev?.type === "kinetic-type" && m.at - last < 12 && m.at - before >= 12) {
+      const list = /** @type {any[]} */ (design.get(lastSc));
+      list.pop();
+      if (!list.length) design.delete(lastSc);
+      last = before;
+    }
     // A designed moment needs room: not within 12 s of the last one (15 s for a kinetic line), the gap fill below makes sure 45 s never pass without one.
-    if (m && m.at - last >= (m.type === "kinetic-type" ? 15 : 12)) { design.set(s.sc, m); before = last; last = m.at; lastSc = s.sc; }
+    if (m && m.at - last >= (m.type === "kinetic-type" ? 15 : 12)) { addCard(s.sc, m); before = last; last = m.at; lastSc = s.sc; }
+  }
+  // 1b. The voice's own designed moments (engine/src/voice-moments.mjs): a lower third for each person it
+  // names, a counter for its numbers, the date and place, a quote and the title. They fill the gaps the
+  // brain's plan left, paced by the same 4 s rule; a card it already planned is kept, never moved.
+  for (const m of o.moments ?? []) {
+    if (m.type === "title" && [...design.values()].flat().some((d) => d.type === "title")) continue;
+    const s = o.scenes.find((x) => m.start >= x.start - 0.01 && m.start < x.end - 0.01);
+    if (!s || s.end - m.start < 2.5) continue;
+    const list = design.get(s.sc) ?? [];
+    const near = [...design.values()].flat().find((d) => Math.abs(d.at - m.start) < MOMENT_GAP);
+    if (near) {
+      // A person's lower third or the number the voice stresses is worth more than a kinetic line of the same
+      // sentence, and takes that place (the same preference the design step above already makes).
+      if (near.type === "kinetic-type" && list.includes(near) && (m.type === "lowerThird" || m.type === "counter")) list.splice(list.indexOf(near), 1);
+      else continue;
+    }
+    addCard(s.sc, { type: m.type, text: m.text, at: m.start, until: Math.min(s.end, m.start + (CARD_SECONDS[/** @type {keyof typeof CARD_SECONDS} */ (m.type)] ?? 3.4)) });
   }
   // A stretch of 45 s with no moment gets a kinetic line from a sentence said in it: the shortest whole sentence
   // or clause, else a phrase cut where the speech breaks (phraseLine). A gap that has none is passed over, never
@@ -475,7 +509,7 @@ export function planShots(o) {
   const end = o.scenes.at(-1)?.end ?? 0;
   const skipped = new Set();
   for (let guard = 0; guard < 400; guard += 1) {
-    const ats = [...design.values()].map((d) => d.at).sort((a, b) => a - b);
+    const ats = [...design.values()].flat().map((d) => d.at).sort((a, b) => a - b);
     const edges = [0, ...ats, end];
     let gapAt = -1;
     for (let i = 1; i < edges.length; i += 1) if (edges[i] - edges[i - 1] > HOOK.designEvery && !skipped.has(edges[i - 1])) { gapAt = edges[i - 1]; break; }
@@ -492,14 +526,14 @@ export function planShots(o) {
         return { year, label: after.length >= 3 ? after : before };
       });
       const first = years[0];
-      design.set(first.s.sc, { type: "timeline", text: items.map((i) => `${i.year} ${i.label}`).join(" · "), at: first.x.start, until: first.s.end, items });
+      addCard(first.s.sc, { type: "timeline", text: items.map((i) => `${i.year} ${i.label}`).join(" · "), at: first.x.start, until: first.s.end, items });
       continue;
     }
     // Every line the stretch offers (whole sentences, clauses, phrases), the one that carries the most first.
     const pick = near.flatMap(({ s, x }) => [x.words >= 4 ? cardLine(x.text) : "", phraseLine(x.text)].filter(Boolean).map((line) => ({ s, x, line })))
       .sort((a, b) => cardWeight(b.line) - cardWeight(a.line) || a.line.split(" ").length - b.line.split(" ").length)[0];
     if (!pick) { skipped.add(gapAt); continue; }
-    design.set(pick.s.sc, { type: "kinetic-type", text: pick.line, at: pick.x.start, until: Math.min(pick.s.end, pick.x.end + 0.5) });
+    addCard(pick.s.sc, { type: "kinetic-type", text: pick.line, at: pick.x.start, until: Math.min(pick.s.end, pick.x.end + 0.5) });
   }
 
   // 2. Every scene re-cut to the rhythm: shots of the genre's length (shorter in the hook), each typed.
@@ -524,19 +558,26 @@ export function planShots(o) {
     const pool = where ? [`${where} street`, `${where} traffic`, `${where} market`, `${where} skyline`] : ["city street"];
     for (const p of pool) if (subjects.length < 4) subjects.push(p);
     if (subjects[0] === prevSubject && subjects.length > 1) subjects.push(/** @type {string} */ (subjects.shift()));
-    const d = design.get(s.sc);
-    // Cut points: the designed card where the voice says its line, pictures around it at the target length.
-    /** @type {{ from: number, to: number, card: boolean }[]} */
+    // The designed cards this scene carries (the brain's and the voice's own), in time order.
+    const cards = design.get(s.sc) ?? [];
+    // Cut points: each designed card where the voice says its line, pictures around and between
+    // them at the target length.
+    /** @type {{ from: number, to: number, card: any }[]} */
     let parts = [];
-    const cut = (/** @type {number} */ a, /** @type {number} */ b) => { const len = b - a; if (len <= 0.05) return; const n = Math.max(1, s.start < HOOK.seconds ? Math.ceil(len / target - 0.15) : Math.round(len / target), Math.ceil(len / rhythm.max)); for (let k = 0; k < n; k += 1) parts.push({ from: a + (len * k) / n, to: a + (len * (k + 1)) / n, card: false }); };
-    if (d) {
-      let a = Math.max(s.start, Math.min(d.at, s.end - 2.5));
-      if (a - s.start < 1.2) a = s.start; // no sliver of picture before the card
-      let b = Math.min(s.end, Math.max(a + 2.5, Math.min(d.until, a + 5)));
-      if (s.end - b < 1.2) b = s.end;
-      cut(s.start, a);
-      parts.push({ from: a, to: b, card: true });
-      cut(b, s.end);
+    const cut = (/** @type {number} */ a, /** @type {number} */ b) => { const len = b - a; if (len <= 0.05) return; const n = Math.max(1, s.start < HOOK.seconds ? Math.ceil(len / target - 0.15) : Math.round(len / target), Math.ceil(len / rhythm.max)); for (let k = 0; k < n; k += 1) parts.push({ from: a + (len * k) / n, to: a + (len * (k + 1)) / n, card: null }); };
+    if (cards.length) {
+      let cursor = s.start;
+      for (const d of cards) {
+        let a = Math.max(cursor, Math.min(d.at, s.end - 2.5));
+        if (a - cursor < 1.2) a = cursor; // no sliver of picture before the card
+        let b = Math.min(s.end, Math.max(a + 2.5, Math.min(d.until, a + 5)));
+        if (s.end - b < 1.2) b = s.end;
+        if (b - a < 1) continue;
+        cut(cursor, a);
+        parts.push({ from: a, to: b, card: d });
+        cursor = b;
+      }
+      cut(cursor, s.end);
     } else cut(s.start, s.end);
     const rung = /\bR2\b/.test(String(line.fields.SHOTS ?? "")) ? "R2" : "R3";
     const move = moveFor(beat?.emotion ?? "curiosity", prevMove);
@@ -547,7 +588,8 @@ export function planShots(o) {
     for (const [k, p] of parts.entries()) {
       const id = `${s.sc}-${k + 1}`;
       const time = parts.length > 1 ? `${clockText(p.from)}-${clockText(p.to)} ` : "";
-      if (p.card && d) {
+      if (p.card) {
+        const d = p.card;
         const words = d.type === "document" && d.highlight ? `"${d.text}" highlight "${d.highlight}"` : `"${d.text.replace(/"/g, "'")}"`;
         shotText.push(`(${k + 1}) ${time}R1 ${d.type} card ${words}`);
         types.push(d.type);
@@ -577,7 +619,7 @@ export function planShots(o) {
       if (trans !== "hard cut on the beat") prevTrans = i;
     }
     if (beat?.era) prevEra = beat.era;
-    const fx = [d?.type === "kinetic-type" || d?.type === "title" ? "FX-KINETIC" : "", d?.type === "document" && d.paper ? "FX-PAPER" : ""].filter(Boolean);
+    const fx = [cards.some((d) => d.type === "kinetic-type" || d.type === "title") ? "FX-KINETIC" : "", cards.some((d) => d.type === "document" && d.paper) ? "FX-PAPER" : ""].filter(Boolean);
     let row = line.raw;
     row = setField(row, "SHOTS", shotText.join(" "));
     if (src.length) row = setField(row, "SRC", src.join("; "));
@@ -648,14 +690,17 @@ export function shotFindings(o) {
   const rhythm = GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (o.genre)] ?? GENRE_RHYTHM.documentary;
   for (const f of checkVoiceChapter(o.markdown, o.scenes)) out.push({ shot: f.scene ?? "-", code: f.code, detail: f.detail });
   const said = o.scenes.map((s) => s.narration).join(" ").replace(/\s+/g, " ");
+  // A card's words are the voice's words even when the card adds the quotation marks the narration writes around them.
+  const saidPlain = said.replace(/[“”"]/g, "");
   const lines = new Map(parseSceneLines(o.markdown).map((l) => [l.sc, l]));
   for (const sh of o.shots) {
     if (!SHOT_TYPES.includes(sh.type)) out.push({ shot: sh.id, code: "type-unknown", detail: `type "${sh.type}"` });
     if (sh.seconds > rhythm.max + 0.05 && !DESIGNED_TYPES.includes(sh.type)) out.push({ shot: sh.id, code: "hold-too-long", detail: `${sh.seconds} s on one picture (the ${o.genre} limit is ${rhythm.max} s)` });
     if (DESIGNED_TYPES.includes(sh.type) && sh.type !== "title") {
       // A card shows only words the voice says (the timeline's years and labels, the quote, the kinetic line).
-      const parts = sh.type === "timeline" ? (sh.items ?? []).flatMap((/** @type {any} */ i) => [i.year, i.label]) : [sh.subject.replace(/^“|”(?: — .*)?$/g, "")];
-      for (const p of parts) if (p && !said.includes(p)) out.push({ shot: sh.id, code: "card-words-invented", detail: `"${p}" is not in the voice` });
+      // A composed card joins two said phrases with the house separator: each phrase is checked on its own.
+      const parts = sh.type === "timeline" ? (sh.items ?? []).flatMap((/** @type {any} */ i) => [i.year, i.label]) : sh.subject.replace(/^“|”(?: — .*)?$/g, "").split(" · ").map((/** @type {string} */ x) => x.trim());
+      for (const p of parts) if (p && !said.includes(p) && !saidPlain.includes(p.replace(/[“”"]/g, ""))) out.push({ shot: sh.id, code: "card-words-invented", detail: `"${p}" is not in the voice` });
     }
     if (o.world.currency && o.world.currency !== "dollars" && DOLLAR.test(sh.subject) && !DOLLAR.test(said)) out.push({ shot: sh.id, code: "wrong-currency", detail: sh.subject });
     const foreign = o.world.country ? WORLDS.filter((w) => w.country !== o.world.country).flatMap((w) => [w.country, ...w.cities]).filter((n) => new RegExp(`\\b${n}\\b`, "i").test(sh.subject) && !said.includes(n)) : [];

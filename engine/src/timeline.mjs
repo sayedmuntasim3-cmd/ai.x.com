@@ -42,7 +42,9 @@ import { MOTION_PROFILES, decideMove, governTransitions, motionLevel, motionRepo
  */
 
 /** The shot plan's closed vocabulary (engine/src/shot-plan.mjs SHOT_TYPES; kept here so the timeline imports nothing from it). */
-const SHOT_TYPE_NAMES = new Set(["live-video", "archival-video", "photo-2.5D", "photo-designed", "title", "kinetic-type", "quote", "document", "timeline"]);
+const SHOT_TYPE_NAMES = new Set(["live-video", "archival-video", "photo-2.5D", "photo-designed", "title", "kinetic-type", "quote", "document", "timeline", "lowerThird", "counter"]);
+/** Card types that are a designed moment on their own (their template draws motion and text): the critic counts them. */
+const DESIGNED_CARDS = new Set(["kinetic-type", "title", "quote", "lowerThird"]);
 const TIME = /^(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*[-–]\s*(\d+:\d{2}:\d{2}(?:\.\d+)?)\s*/;
 const PLACEHOLDER = /\$?\[C\d{2,3}[^\]]*\]/g;
 
@@ -739,13 +741,17 @@ export function buildTimeline(o) {
           const place = route ? { ...route.from, to: route.to } : isMap ? mapPlace(shot.text) : null;
           // A chart only from numbers the shot itself writes; a highlighter only on words the card shows.
           const chart = !black && !panels && !place && /FX-CHART/i.test(`${fx} ${shot.text}`) ? chartData(shot.text) : null;
-          const counter = !black && !panels && !place && !chart && /COUNTER/i.test(fx) && /\d/.test(words);
+          // A counter card: FX-COUNTER in the scene, or the shot plan's own TYPE counter (a number the voice says).
+          const counter = !black && !panels && !place && !chart && (/COUNTER/i.test(fx) || base.shotType === "counter") && /\d/.test(words);
           // A counter has its own landing (the number runs, then an impact); a highlighter would stop it running.
           const marked = !black && !panels && !place && !chart && !counter ? highlightFor(shot.text, ost, fx, words) : "";
           // A TYPE timeline card ("2010 the chair · 2025 still cutting hair") is drawn by the timeline template.
           const items = base.shotType === "timeline" ? [...words.matchAll(/(?:^|·)\s*(\d{4})\s+([^·]*)/g)].map((m) => ({ year: m[1], label: m[2].trim() })) : [];
           if (items.length >= 2) base.graphic = { template: "timeline", data: { items, active: items.length - 1 } };
-          video.push({ ...base, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: chart ? chart.title || words : words, counter, ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}), ...(chart ? { chart } : {}), ...(marked ? { highlight: marked } : {}) });
+          // A lower third, a quote or a title card is a designed moment by its own type, even in a scene
+          // whose FX field says nothing (engine/src/voice-moments.mjs plans them from the voice's words).
+          const designedCard = DESIGNED_CARDS.has(String(base.shotType)) ? { kinetic: true } : {};
+          video.push({ ...base, ...designedCard, type: black ? "black" : "card", url: null, sourcePageUrl: null, licence: null, motion: "none", text: chart ? chart.title || words : words, counter, ...(panels ? { split: panels } : {}), ...(place ? { map: place } : {}), ...(chart ? { chart } : {}), ...(marked ? { highlight: marked } : {}) });
         } else if (row?.pick?.mediaUrl) {
           const clipSeconds = Number(row.pick.durationSeconds) || 0;
           const shotSeconds = frames / fps;

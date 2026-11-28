@@ -29,6 +29,9 @@ export function graphicFor(v, helpers = {}) {
     const q = QUOTE.exec(text);
     return { template: "quote", data: q ? { quote: q[1].trim(), by: q[2].trim() } : { quote: text.replace(/^[“"]|[”"]$/g, "") }, alpha: false };
   }
+  // A lower third on its own (a person the voice names, engine/src/voice-moments.mjs): the house lower-third
+  // template over the brand ground. No role is written: the voice's words are the only words on it.
+  if (v.type === "card" && st === "lowerThird" && text) return { template: "lowerThird", data: { name: text }, alpha: false };
   if (v.type === "card") {
     // Only a card that says nothing but the chapter becomes the chapter card; a card with its own words keeps them.
     if (v.chapterTitle && (!text || text === v.chapterTitle)) return { template: "chapter", data: chapter(v.chapterTitle), alpha: false };

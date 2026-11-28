@@ -58,6 +58,12 @@ test("from-shot: the existing FX fields choose the template, everything else fal
   assert.notEqual(graphicFor({ type: "card", chapterTitle: "Chapter 2 · Winter", text: "The snow came early" })?.template, "chapter", "a card's own words are kept");
   assert.equal(graphicFor({ type: "card", shotType: "kinetic-type", text: "The snow came early" })?.template, "kinetic");
   assert.equal(graphicFor({ type: "card", shotType: "quote", text: "No surrender" })?.data.quote, "No surrender");
+  // The moments voice-moments.mjs plans from the words: a person's lower third and a spoken number.
+  const lt = graphicFor({ type: "card", shotType: "lowerThird", kinetic: true, text: "Neil Armstrong" });
+  assert.equal(lt?.template, "lowerThird");
+  assert.deepEqual(lt?.data, { name: "Neil Armstrong" }, "no role is written for the voice's own name");
+  assert.equal(lt?.alpha, false, "a card is drawn over the brand ground, not over footage");
+  assert.equal(graphicFor({ type: "card", shotType: "counter", counter: true, text: "400,000 people" }, { counterParts })?.data?.value, 400000);
   assert.equal(graphicFor({ type: "clip", title: "Runnymede, 1215", url: "u" })?.alpha, true);
   assert.equal(graphicFor({ type: "card", text: "plain words" }), null);
   assert.equal(graphicFor({ type: "card", kinetic: true, text: "x", chart: { title: "", bars: [] } }), null);

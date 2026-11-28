@@ -47,6 +47,7 @@ import { voiceSpans } from "../engine/src/voice-analyze.mjs";
 import { decodeWav } from "../engine/src/wav.mjs";
 import { planVoiceVisuals, quranVisualAdabGuard, respellNames, voiceScore, withMusic } from "../engine/src/voice-visuals.mjs";
 import { DESIGNED_TYPES, GENRE_RHYTHM, auditVoiceFilm, directEdit, planBeats, planShots, worldBrief } from "../engine/src/shot-plan.mjs";
+import { MOMENTS_PER_MINUTE, planMoments } from "../engine/src/voice-moments.mjs";
 import { calibratedDoctrine, emptyLedger, ledgerGenre, parseLedger, rhythmFrom } from "../engine/src/craft-memory.mjs";
 import { mediaProviders } from "../engine/src/film-media.mjs";
 import { archiveKeys } from "../engine/src/open-archives.mjs";
@@ -474,10 +475,17 @@ export async function pictures(o) {
   const doctrine = calibratedDoctrine(o.ledger ?? emptyLedger(), ledgerGenre(director.genre));
   const rhythm = rhythmFrom(doctrine, GENRE_RHYTHM[/** @type {keyof typeof GENRE_RHYTHM} */ (director.genre)] ?? GENRE_RHYTHM.documentary);
   await writeFile(join(o.out, "craft-targets.json"), JSON.stringify({ ...doctrine, rhythm, filmId: o.filmId ?? basename(o.out), ...(o.ledgerFile ? { ledgerFile: o.ledgerFile } : {}) }, null, 1));
-  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure, rhythm });
+  // The designed moments the words already carry (engine/src/voice-moments.mjs): people, numbers, dates,
+  // places, a quote and the title, found with no model. The shot plan seats them where the brain left a gap.
+  const spoken = (u.scenes ?? []).flatMap((/** @type {any} */ s) => s.words ?? []).sort((/** @type {any} */ a, /** @type {any} */ b) => a.start - b.start);
+  const moments = planMoments({ words: spoken, topic: o.topic, seconds: u.scenes.at(-1)?.end ?? 0 });
+  await writeFile(join(o.out, "moments.json"), JSON.stringify(moments, null, 1));
+  const plan = planShots({ markdown: r.markdown, scenes: u.scenes, beats: director.beats, world: director.world, genre: director.genre, topic: o.topic, structure: u.structure, rhythm, moments: moments.moments });
   const lens = plan.shots.map((x) => x.seconds).sort((a, b) => a - b);
   const designed = plan.shots.filter((x) => DESIGNED_TYPES.includes(x.type));
   const planMessages = [
+    msg("voice.moments", { found: moments.moments.length, perMinute: moments.perMinute, need: MOMENTS_PER_MINUTE, kinds: [...new Set(moments.moments.map((m) => m.type))].join(", ") || "—", enough: moments.enough }),
+    ...(moments.title ? [] : [msg("voice.momentsNoTitle")]),
     msg("craft.read", { films: doctrine.films, genre: doctrine.genre, learned: Object.values(doctrine.targets).filter((t) => t.source === "learned").length, lo: rhythm.median[0], hi: rhythm.median[1], max: rhythm.max }),
     msg("voice.shotPlan", { shots: plan.shots.length, designed: designed.length, kinds: [...new Set(designed.map((x) => x.type))].join(", ") || "—", median: lens[Math.floor(lens.length / 2)] ?? 0, problems: plan.findings.length }),
     msg("voice.hook", { score: plan.hook.score, beats: plan.hook.beats, titleAt: plan.hook.titleAt === null ? null : Math.round(plan.hook.titleAt), designed: plan.hook.designed }),
