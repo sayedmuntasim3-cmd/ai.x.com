@@ -26,6 +26,7 @@ const AUTO_GAIN = { "AUTO-WHOOSH": 0.32, "AUTO-IMPACT": 0.42, "AUTO-BOOM": 0.45,
 const SFX_PAN = { "AUTO-WHOOSH": [0.9, 0.66], "AUTO-CLICK": [0.62, 0.9], "AUTO-GLITCH": [0.5, 0.92], "AUTO-IMPACT": [0.8, 0.8], "AUTO-BOOM": [1, 1], "AUTO-RISER": [0.78, 0.78] };
 import { curtainWindows, deepestDuckDb, gainPlan, musicGainExpression, quietExpression, scoreReport, voiceWindows } from "./mix.mjs";
 import { critique, designedMoments, measureFilm, measurePicture } from "./critic.mjs";
+import { measureTaste, prepareStill } from "./picture-taste.mjs";
 import { attachMoments, momentSounds, planMoments } from "../engine/src/voice-moments.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -462,11 +463,12 @@ export async function renderFilm(o) {
   const color = (/** @type {string} */ c) => ["-f", "lavfi", "-i", `color=c=${c}:s=${t.width}x${t.height}:r=${t.fps}`];
 
   // The house look: one gentle grade on every picture, so clips from many sources read as one film.
-  // No synthetic grain: random grain on every frame cannot be compressed (a 45-minute film grew past
-  // 1.5 GB at 360p) and YouTube's own encoder smears it away anyway.
+  // One gentle grade on every picture so old film and new scans sit together (owner's note on film e0b87efb): a slight contrast
+  // and saturation pull, a small black-level lift (never crushed) and a very light FIXED grain (the same pattern every frame,
+  // so it compresses: random grain on every frame made a 45-minute film grow past 1.5 GB at 360p).
   // Per format: documentary (gentle), cinematic (teal shadows, warm highlights; 2.39:1 bars), archive (faded and warm).
   const LOOKS = {
-    documentary: "eq=contrast=1.06:saturation=0.92:gamma=0.98",
+    documentary: "eq=contrast=1.05:saturation=0.9:gamma=0.98,curves=all='0/0.012 1/0.99',noise=alls=3:allf=u",
     cinematic: "eq=contrast=1.12:saturation=1.06:gamma=0.97,colorbalance=rs=-0.05:gs=-0.01:bs=0.06:rh=0.07:gh=0.02:bh=-0.06,vignette=PI/5",
     archive: "eq=contrast=1.08:saturation=0.7:gamma=0.97,colorbalance=rh=0.06:gh=0.03:bh=-0.05,vignette=PI/4.5",
   };
@@ -545,7 +547,7 @@ export async function renderFilm(o) {
     const designed = graphic && !graphic.alpha ? graphic : null;
     // The look of an M4 shot joins the key only for shots it draws, so every other cached shot stays valid.
     const m4 = { ...(designed ? { graphic: [designed.template, designed.data, 1] } : {}), ...(depthOn && v.still && v.frame !== "print" && v.shotType !== "photo-designed" ? { depth: 1 } : {}) };
-    const key = hash({ v: 13, ...moves, ...m4, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
+    const key = hash({ v: 14, ...moves, ...m4, map: v.map ?? null, transition: v.transition === "flash" || v.transition === "glitch" || v.transition === "leak" ? v.transition : null, still: Boolean(v.still), look: filmLook, fadeIn: v.fadeIn ?? 0, fadeOut: v.fadeOut ?? 0, speed: v.speed ?? 1, chapterTitle: v.chapterTitle ?? "", split: v.split ?? null, style: v.style ?? "plain", kinetic: Boolean(v.kinetic), in: v.sourceIn ?? 0, counter: Boolean(v.counter), type: v.type, url: v.url, text: v.text, title: v.title, chip: v.chip, motion: v.motion, frames: v.frames, w: t.width, h: t.height, fps: t.fps, font });
     const file = join(dirs.segments, `${String(i).padStart(5, "0")}-${key}.mp4`);
     segments[i] = file;
     if (existsSync(file)) { stats.segmentsCached += 1; return; }
@@ -564,12 +566,18 @@ export async function renderFilm(o) {
         const n = v.frames;
         const W = t.width;
         const H = t.height;
-        const [pw, ph] = (await run(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", src])).trim().split(",").map(Number);
         const plateKey = hash({ still: v.url, w: W, h: H });
+        // Full frame, always (owner's note on film e0b87efb: small pictures in black, in tilted white borders): the picture's real
+        // content box is cut out (no black, no white border, no jagged mosaic edge), then framed by its shape: a camera's crop
+        // toward the subject, a slow pan across a panorama or down a portrait; a blurred copy only for a picture too small to
+        // fill the frame. No print frame: an archive picture is never a polaroid.
+        const shot = await prepareStill({ src, dir: dirs.cards, key: plateKey, width: W, height: H, frames: n, index: i, ffmpeg });
+        const counts = /** @type {any} */ (stats);
+        counts.stillFrames = { ...(counts.stillFrames ?? {}), [shot.mode]: (counts.stillFrames?.[shot.mode] ?? 0) + 1 };
         // A photograph as a real camera move through its depth (dolly, orbit or rack focus). "photo-designed"
         // and prints keep the designed photo-on-a-desk below; a flat picture or a missing tool falls through too.
         let deep = false;
-        if (m4.depth) {
+        if (m4.depth && shot.mode === "cover" && !shot.trimmed) {
           try {
             const maps = await depthMaps({ src, dir: join(dirs.cards, `${plateKey}-depth`), width: W, height: H });
             if (maps) {
@@ -588,60 +596,10 @@ export async function renderFilm(o) {
         }
         if (deep) {
           // drawn above
-        } else if (v.frame !== "print" && !v.focus && pw > 0 && ph > 0 && pw / ph < 1) {
-          // A portrait or square photograph: 2.5D parallax. The sharp picture grows and drifts one way,
-          // its blurred copy behind it the other way, so the photo seems to float in depth.
-          const bg = join(dirs.cards, `${plateKey}-bg.png`);
-          const fg = join(dirs.cards, `${plateKey}-fg.png`);
-          const bw = Math.round(W * 1.2 / 2) * 2;
-          const bh = Math.round(H * 1.2 / 2) * 2;
-          if (!existsSync(bg)) await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=${bw}:${bh}:force_original_aspect_ratio=increase,crop=${bw}:${bh},boxblur=26:2,eq=brightness=-0.09:saturation=0.75,setsar=1`, bg]);
-          if (!existsSync(fg)) await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=-2:${Math.round(H * 0.86 / 2) * 2},setsar=1`, fg]);
-          input = ["-loop", "1", "-framerate", String(t.fps), "-i", bg, "-loop", "1", "-framerate", String(t.fps), "-i", fg];
-          complex = true;
-          // The scene's move sets the float's direction, strength and easing (hold: barely; reduced motion: still).
-          const mv = v.move;
-          const dir = mv && (mv.kind === "pan" || mv.kind === "drift") ? mv.dir : i % 2 ? -1 : 1;
-          const k = mv ? (mv.kind === "hold" ? (mv.amount === 0 && mv.why.startsWith("reduced") ? 0 : 0.3) : Math.min(1.6, mv.amount / 0.09)) : 1;
-          const e = easeExpr(mv?.ease ?? "linear", n);
-          const en = e.replaceAll("on/", "n/");
-          const r = (/** @type {number} */ x) => Math.round(x * k * 10000) / 10000;
-          chain.push(
-            `[0]zoompan=z='1+${r(0.05)}*${e}':x='iw/2-(iw/zoom/2)+${dir}*iw*${r(0.03)}*${e}':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${t.fps}[pbg];` +
-            `[1]scale=w='trunc(iw*(1+${r(0.07)}*${en})/2)*2':h=-2:eval=frame[pfg];` +
-            `[pbg][pfg]overlay=x='(W-w)/2-${dir}*W*${r(0.025)}*${en}':y='(H-h)/2'`,
-            "setsar=1", LOOK,
-          );
         } else {
-          // A landscape photograph: framed over a blurred copy of itself, then moved slowly
-          // (push in, pull out or pan, in turn) so it lives on screen like footage.
-          const print = v.frame === "print";
-          // Owner's note on film 993f09ea: a small photo floating on a blurred copy of itself looks
-          // like a slide show. A photograph whose own shape is close to the frame's now covers the
-          // frame (the crop a camera would take); only an odd shape keeps a plate behind it.
-          const aspect = await pictureAspect(src, ffprobe);
-          const frameAspect = W / H;
-          // 4:3 is the shape of most archive photographs: it crops to the frame like a camera would.
-          const cover = !print && aspect !== null && Math.abs(aspect - frameAspect) / frameAspect <= 0.35;
-          const plate = join(dirs.cards, `${plateKey}${print ? "-print" : cover ? "-cover" : ""}.png`);
-          if (!existsSync(plate)) {
-            const W2 = W * 2;
-            const H2 = H * 2;
-            if (cover) {
-              await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-vf", `scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},setsar=1`, plate]);
-            } else {
-            const bg = `[bg]scale=${W2}:${H2}:force_original_aspect_ratio=increase,crop=${W2}:${H2},boxblur=30:2,eq=brightness=${print ? "-0.18:saturation=0.55" : "-0.07:saturation=0.8"}[bgb]`;
-            // A print: the photo in a white border, turned a degree or two, casting a soft shadow on its own blur.
-            const angle = (i % 2 ? 1 : -1) * 0.03;
-            const border = Math.round(H2 * 0.016);
-            const fg = print
-              ? `[fg]scale=w='min(${Math.round(W2 * 0.8)},iw*${Math.round(H2 * 0.72)}/ih)':h=-2,pad=iw+${2 * border}:ih+${2 * border}:${border}:${border}:color=0xf4f1ea,format=rgba,rotate=${angle}:c=none:ow=rotw(${angle}):oh=roth(${angle}),split=2[p1][p2];[p2]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.55,boxblur=${Math.round(H2 * 0.012)}:2[sh];[bgb][sh]overlay=(W-w)/2+${Math.round(H2 * 0.012)}:(H-h)/2+${Math.round(H2 * 0.018)}[b2];[b2][p1]overlay=(W-w)/2:(H-h)/2,setsar=1`
-              : `[fg]scale=${W2}:${H2}:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1`;
-            await run(ffmpeg, ["-v", "error", "-y", "-i", src, "-frames:v", "1", "-filter_complex", `[0]split=2[bg][fg];${bg};${fg}`, plate]);
-            }
-          }
-          input = ["-loop", "1", "-framerate", String(t.fps), "-i", plate];
-          chain.push(`${stillMove(v.focus, print, i, n, v.move)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
+          input = ["-loop", "1", "-framerate", String(t.fps), "-i", shot.plate];
+          if (shot.filter) chain.push(shot.filter, "setsar=1", LOOK);
+          else chain.push(`${stillMove(v.focus, false, i, n, v.move)}:d=1:s=${W}x${H}:fps=${t.fps}`, "setsar=1", LOOK);
         }
       } catch (error) {
         stats.clipsFailed += 1;
@@ -1225,24 +1183,36 @@ export async function renderFilm(o) {
   /** @type {{ blurred: any[], blurredDesigned?: any[], flicker: any[], dark?: any[] } | null} */
   let picture = null;
   try { picture = await measurePicture(o.outFile, t, { ffmpeg }); } catch { /* the report says null */ }
+  // Picture taste: how much of each shot is picture, the same picture twice, a burned-in logo, text on empty black.
+  /** @type {Awaited<ReturnType<typeof measureTaste>> | null} */
+  let taste = null;
+  try { taste = await measureTaste(o.outFile, t, { ffmpeg }); } catch (error) { warnings.push(`Picture taste could not be measured (${error instanceof Error ? error.message.slice(0, 120) : error}).`); }
   // The eyes' per-shot relevance (M3) reaches the gate too, not only the `why` field of a media file.
   // The critic also reads which scenes really carry a voice (a single recording voices them all) and the edit plans,
   // so a scene that lost its narration or a transition the editor asked for cannot pass unnoticed.
-  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(o.oneTrack ? { voiceFilm: true } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
+  const critic = critique(t, { master: mixed, durationSeconds: t.durationSeconds, fps: t.fps, width: t.width, height: t.height }, { channels, freezes: mixed?.freezes ?? [], relevance: t.video.map((v) => (Number.isFinite(v.relevance) ? /** @type {number} */ (v.relevance) : NaN)), ...(o.oneTrack ? {} : { voiced: pieces.filter((p) => p.file && p.scene).map((p) => /** @type {string} */ (p.scene)) }), edits: o.edits ?? [], ...(o.craft ? { craft: o.craft } : {}), ...(o.oneTrack ? { voiceFilm: true } : {}), ...(taste ? { taste } : {}), ...(picture ? { blurred: picture.blurred, blurredDesigned: picture.blurredDesigned ?? [], flicker: picture.flicker, dark: picture.dark ?? [] } : {}) });
   if (critic.verdict === "block") for (const f of critic.findings.filter((x) => x.severity === "block")) warnings.push(`Critic: ${f.en}`);
   const base = o.outFile.replace(/\.mp4$/i, "");
   writeFileSync(base + ".srt", toSrt(t.captions));
   const licences = [...new Map(t.video.filter((v) => v.type === "clip").map((v) => [v.url, { url: v.url, sourcePageUrl: v.sourcePageUrl, licence: v.licence }])).values()];
   // What the Edit Director's plan put on screen (punch-ins and shakes drawn, glitches into scenes).
   const edit = { punchIns: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).punchIns), 0), shakes: t.video.reduce((n, v) => n + (v.type === "black" ? 0 : editMotionCount(v, t.fps).shakes), 0), glitches: t.video.filter((v) => v.transition === "glitch" && !v.fadeIn).length };
-  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, // One recording (the voice system) voices every scene: it is laid from 0:00 under the whole film.
+  // The film's own shots: id, where it sits, how many frames, and the eyes' relevance. A film that is blocked can
+  // then name the shots that failed and the parts that hold them (render/autofix.mjs), instead of being sent back whole.
+  const shots = t.video.map((v) => ({
+    id: String(v.id), scene: v.scene, shot: v.shot, start: v.start, end: v.end, frames: v.frames, type: v.type, url: v.url ?? null,
+    ...(Number.isFinite(v.relevance) ? { relevance: v.relevance } : {}), ...(v.shotType ? { shotType: v.shotType } : {}),
+    ...(v.still ? { still: true } : {}), ...(v.chapterTitle ? { chapterTitle: v.chapterTitle } : {}),
+  }));
+  const report = { file: basename(o.outFile), durationSeconds: t.durationSeconds, width: t.width, height: t.height, fps: t.fps, stats: { ...t.stats, ...stats, edit }, shots, // One recording (the voice system) voices every scene: it is laid from 0:00 under the whole film.
     score,
     voicedScenes: o.oneTrack ? t.narration.length : pieces.filter((p) => p.file).length, narratedScenes: t.narration.length, ...(o.oneTrack ? { oneTrack: basename(o.oneTrack.file) } : {}), musicCues: { scripted: new Set((t.music ?? []).map((m) => m.cue)).size, played: new Set(cues.map((m) => m.cue)).size }, soundEffects: { scripted: new Set((t.sfx ?? []).map((e) => e.token)).size, played: new Set(sounds.map((e) => e.token)).size }, mix: { stereo: true, channels, duckDb, curtains: duckPlan.filter((w) => w.gain === 0).length, music: musicFile !== null, effects: sfxFile !== null }, master: mixed, critic, licences, ...(t.timing ? { timing: t.timing } : {}), ...(t.motion ? { motion: t.motion } : {}), warnings };
   // Where the picture flickers or is blurred, by shot: a count alone cannot be fixed (film ccd86532 reported 13 and no place).
   if (picture) {
     const at = (/** @type {{ id: string }} */ f) => { const v = t.video.find((/** @type {any} */ x) => String(x.id) === String(f.id)); return v ? { shotType: v.shotType, type: v.type, still: Boolean(v.still), url: v.url, chapterTitle: v.chapterTitle } : {}; };
-    /** @type {any} */ (report).picture = { samples: picture.samples, flicker: picture.flicker.slice(0, 60).map((f) => ({ ...f, ...at(f) })), blurred: picture.blurred.slice(0, 40).map((b) => ({ ...b, ...at(b) })) };
+    /** @type {any} */ (report).picture = { samples: picture.samples, flicker: picture.flicker.slice(0, 60).map((f) => ({ ...f, ...at(f) })), blurred: picture.blurred.slice(0, 40).map((b) => ({ ...b, ...at(b) })), dark: (picture.dark ?? []).slice(0, 40).map((d) => ({ ...d, ...at(d) })) };
   }
+  if (taste) /** @type {any} */ (report).taste = taste;
   writeFileSync(base + ".report.json", JSON.stringify(report, null, 1));
   log(`done: ${o.outFile}`);
   return report;

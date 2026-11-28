@@ -196,6 +196,55 @@ export function parsePassage(given, surahNames = []) {
 /** @param {AyahRange[]} ranges */
 const rangesText = (ranges) => ranges.map((r) => `${r.surah}:${r.fromAyah}${r.toAyah > r.fromAyah ? "-" + r.toAyah : ""}`).join(", ");
 
+/** A list of passages for a message: the first few, then how many more. @param {AyahRange[][]} passages @param {number} [max] */
+const passagesText = (passages, max = 6) => passages.slice(0, max).map(rangesText).join("; ") + (passages.length > max ? ` (+${passages.length - max})` : "");
+
+/**
+ * Every whole passage a recognizer's result may be, when the words heard
+ * occur in more than one place (a refrain, a repeated ayah). One candidate is
+ * a whole passage, so a recording of several ayat with one doubtful piece
+ * lists each full reading. Never a guess: the list is for the user to pick
+ * from, and nothing is taken until they do.
+ * @param {import("./quran.mjs").RecitationMatch | null | undefined} match
+ * @param {number} [max] most candidates kept (a refrain can occur 31 times)
+ * @returns {AyahRange[][]}
+ */
+export function candidatePassages(match, max = 40) {
+  const segments = match?.segments ?? [];
+  if (!segments.length || !segments.some((s) => s.ambiguous && s.alternatives.length)) return [];
+  /** @type {AyahRange[][]} */
+  let out = [[]];
+  for (const s of segments) {
+    const options = s.ambiguous && s.alternatives.length ? s.alternatives : [{ surah: s.surah, fromAyah: s.fromAyah, toAyah: s.toAyah }];
+    /** @type {AyahRange[][]} */
+    const next = [];
+    for (const partial of out) for (const o of options) next.push([...partial, { surah: o.surah, fromAyah: o.fromAyah, toAyah: o.toAyah }]);
+    out = next.slice(0, max);
+  }
+  const seen = new Set();
+  return out.filter((p) => { const key = rangesText(p); if (seen.has(key)) return false; seen.add(key); return true; });
+}
+
+/**
+ * The voiced stretches a transcript's own word times give, for a locator run
+ * with no recording beside the transcript (the words are its evidence, and
+ * their times only have to be close enough to snap ayah ends onto pauses).
+ * @param {{ start?: number, end?: number }[]} words
+ * @returns {Span[]}
+ */
+export function spansFromWords(words) {
+  /** @type {Span[]} */
+  const spans = [];
+  for (const w of words ?? []) {
+    const start = Number(w?.start), end = Number(w?.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+    const last = spans[spans.length - 1];
+    if (last && start - last.end < 0.02) last.end = Math.max(last.end, end);
+    else spans.push({ start, end });
+  }
+  return spans;
+}
+
 /** The words of an ayah as recited after the surah's opening basmala (which Tanzil writes into ayah 1). @param {import("./quran.mjs").QuranIndex} index @param {number} surah @param {number} ayah */
 function recitedText(index, surah, ayah) {
   const text = ayahText(index, surah, ayah) ?? "";
@@ -595,6 +644,33 @@ export function snapToPauses(items, spans, reach = 1.2) {
 }
 
 /**
+ * A fixed phrase said between two ayat (the basmala before a new surah, the
+ * isti'adha that opens the recording) is not an ayah and must not be covered
+ * by one: the boundary either side of it goes to the silence before and after
+ * it, so the phrase keeps its own time (the next surah's title card shows it).
+ * @param {{ start: number, end: number }[]} ayat in recited order, changed in place
+ * @param {{ start: number, end: number }[]} markers the fixed phrases' times
+ * @param {Span[]} spans
+ * @returns {number} how many boundaries were moved
+ */
+export function settleMarkers(ayat, markers, spans) {
+  let moved = 0;
+  for (let k = 0; k + 1 < ayat.length; k += 1) {
+    const a = ayat[k], b = ayat[k + 1];
+    const between = markers.filter((m) => m.start >= a.start && m.end <= b.end);
+    if (!between.length) continue;
+    const from = Math.min(...between.map((m) => m.start)), to = Math.max(...between.map((m) => m.end));
+    let before = /** @type {number | undefined} */ (undefined), after = /** @type {number | undefined} */ (undefined);
+    for (const s of spans) { if (s.end <= from + 0.02) before = s.end; if (after === undefined && s.start >= to - 0.02) after = s.start; }
+    if (before === undefined || after === undefined || before <= a.start || after >= b.end) continue;
+    if (Math.abs(a.end - before) > 0.001 || Math.abs(b.start - after) > 0.001) moved += 1;
+    a.end = r3(before);
+    b.start = r3(after);
+  }
+  return moved;
+}
+
+/**
  * The stretches a recognizer should listen to, one after another: voiced
  * stretches grouped into clips of at most `maxSeconds`, cut only in pauses,
  * so no word is split where a 30 s listening window ends. Returned flat
@@ -749,7 +825,7 @@ export function locateRecitation(o) {
   const messages = [];
   /** @param {Message} question @param {Partial<ReturnType<typeof result>>} [more] */
   const ask = (question, more = {}) => ({ ...result(), ...more, ok: false, decision: /** @type {"ask"} */ ("ask"), question, messages: [...messages, question] });
-  const result = () => ({ ok: true, decision: /** @type {"accept" | "ask"} */ ("accept"), source: /** @type {"given" | "recognized" | "given+recognized" | null} */ (null), timing: /** @type {"recognized" | "estimated" | null} */ (null), passages: /** @type {AyahRange[]} */ ([]), heard: /** @type {AyahRange[]} */ ([]), ayat: /** @type {LocatedAyah[]} */ ([]), markers: /** @type {LocatedMarker[]} */ ([]), other: /** @type {ReturnType<typeof otherSpeech>} */ ([]), repeats: /** @type {{ surah: number, ayah: number, start: number }[]} */ ([]), fit: /** @type {{ unitsPerSecond: number, median: number, worst: number, onPause: number, ends: number, joined: number, openingUnsure: boolean } | null} */ (null), agreement: /** @type {{ ayat: number, medianSeconds: number, worstSeconds: number } | null} */ (null), alignment: /** @type {{ ends: number, agree: number, moved: number, low: number } | null} */ (null), recognition: /** @type {{ coverage: number, quality: number, why: string[] } | null} */ (null), question: /** @type {Message | null} */ (null), messages });
+  const result = () => ({ ok: true, decision: /** @type {"accept" | "ask"} */ ("accept"), source: /** @type {"given" | "recognized" | "given+recognized" | null} */ (null), timing: /** @type {"recognized" | "estimated" | null} */ (null), passages: /** @type {AyahRange[]} */ ([]), candidates: /** @type {AyahRange[][]} */ ([]), heard: /** @type {AyahRange[]} */ ([]), ayat: /** @type {LocatedAyah[]} */ ([]), markers: /** @type {LocatedMarker[]} */ ([]), other: /** @type {ReturnType<typeof otherSpeech>} */ ([]), repeats: /** @type {{ surah: number, ayah: number, start: number }[]} */ ([]), fit: /** @type {{ unitsPerSecond: number, median: number, worst: number, onPause: number, ends: number, joined: number, openingUnsure: boolean } | null} */ (null), agreement: /** @type {{ ayat: number, medianSeconds: number, worstSeconds: number } | null} */ (null), alignment: /** @type {{ ends: number, agree: number, moved: number, low: number } | null} */ (null), recognition: /** @type {{ coverage: number, quality: number, why: string[] } | null} */ (null), question: /** @type {Message | null} */ (null), messages });
 
   const hasGiven = Boolean(o.given && [o.given.surah, o.given.passage].some((v) => v !== undefined && v !== null && v !== false && String(v).trim() !== ""));
   /** @type {AyahRange[] | null} */
@@ -768,9 +844,12 @@ export function locateRecitation(o) {
   const recognition = verdict ? { coverage: verdict.coverage, quality: verdict.quality, why: verdict.why } : null;
   if (verdict && verdict.heard.length) messages.push(msg("quran.heard", { passage: rangesText(verdict.heard), coverage: Math.round(verdict.coverage * 100), quality: Math.round(verdict.quality * 100) }));
 
+  // The places a doubtful stretch may be. Listed whole, never chosen for the user.
+  const candidates = candidatePassages(match);
   if (isAdhan(words)) return ask(msg("quran.ask.adhan"), { recognition });
   if (!given) {
     if (!verdict || verdict.verdict === "nothing") return ask(msg("quran.ask.passage"), { recognition });
+    if (verdict.verdict === "candidate" && candidates.length > 1) return ask(msg("quran.ask.candidates", { count: candidates.length, passages: passagesText(candidates) }), { recognition, heard: verdict.heard, candidates });
     if (verdict.verdict === "candidate") return ask(msg("quran.ask.confirm", { passage: rangesText(verdict.heard), why: verdict.why.join(",") }), { recognition, heard: verdict.heard });
   } else if (verdict?.verdict === "mismatch") {
     return ask(msg("quran.ask.mismatch", { given: rangesText(given), heard: rangesText(verdict.heard) }), { recognition, heard: verdict.heard, passages: given });
@@ -794,6 +873,9 @@ export function locateRecitation(o) {
     if (!heard.length) return ask(msg("quran.ask.times"), { recognition, heard: verdict.heard });
     for (const r of absorbRepeats(heard, timedTokens(words), o.index)) out.repeats.push({ surah: r.surah, ayah: r.ayah, start: r3(r.start) });
     const snapped = snapToPauses(heard, spans);
+    out.markers = match.markers.filter((m) => m.start !== null && m.end !== null).map((m) => ({ type: m.type, start: r3(/** @type {number} */ (m.start)), end: r3(/** @type {number} */ (m.end)), timing: /** @type {"recognized"} */ ("recognized") }));
+    // The basmala said before a new surah belongs to neither ayah: its own silence separates it from both.
+    settleMarkers(snapped, out.markers, spans);
     /** @type {Set<string>} */
     const seen = new Set();
     out.ayat = heard.map((a, k) => {
@@ -803,7 +885,6 @@ export function locateRecitation(o) {
       const share = Math.min(1, a.matchedWords / Math.max(1, a.ayahWords));
       return { surah: a.surah, ayah: a.ayah, start: snapped[k].start, end: snapped[k].end, timing: /** @type {"recognized"} */ ("recognized"), onPause: snapped[k].onPause, joined: !snapped[k].onPause, confidence: r3(share * a.confidence), sure: snapped[k].onPause && share >= GATE.sureHeard, repeat, heardShare: r3(share) };
     });
-    out.markers = match.markers.filter((m) => m.start !== null && m.end !== null).map((m) => ({ type: m.type, start: r3(/** @type {number} */ (m.start)), end: r3(/** @type {number} */ (m.end)), timing: /** @type {"recognized"} */ ("recognized") }));
     out.other = [...out.other, ...otherSpeech(words, match)];
     for (const x of out.other) if (x.type === "takbir" && x.start !== null && x.end !== null) out.markers.push({ type: "takbir", start: r3(x.start), end: r3(x.end), timing: "recognized" });
     out.source = given ? "given+recognized" : "recognized";
